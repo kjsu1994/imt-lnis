@@ -15,7 +15,7 @@ export function createPayloadViewer(container, {receivedOnly = false} = {}) {
     if (text !== undefined) element.textContent = text;
     return element;
   };
-  const title = create('h2', receivedOnly ? '수신 JSON 원문' : '송수신 JSON 본문');
+  const title = create('h2', receivedOnly ? '수신 JSON 원문' : '송수신 JSON 원문');
   const controls = create('div');
   controls.className = 'dtn-payload-controls';
   const sent = create('button', '송신 원문');
@@ -25,7 +25,7 @@ export function createPayloadViewer(container, {receivedOnly = false} = {}) {
   // 수신 노드에는 송신 원문이 없으므로 불필요한 버튼을 노출하지 않는다.
   sent.hidden = receivedOnly;
   controls.append(sent, received);
-  const status = create('p', '');
+  const status = create('p', '아직 준비된 JSON 원문이 없습니다.');
   status.setAttribute('role', 'status');
   const panel = create('div');
   panel.hidden = true;
@@ -33,16 +33,19 @@ export function createPayloadViewer(container, {receivedOnly = false} = {}) {
   const prettyLabel = create('label');
   const pretty = create('input');
   pretty.type = 'checkbox';
-  prettyLabel.append(pretty, document.createTextNode(' 정렬해서 보기 (원문은 변경하지 않음)'));
-  const download = create('a', 'JSON 파일 다운로드');
-  const close = create('button', '보기 닫기');
+  pretty.disabled = true;
+  prettyLabel.append(pretty, document.createTextNode(' 정렬 보기'));
+  const download = create('a', 'JSON 다운로드');
+  download.setAttribute('aria-disabled', 'true');
+  const close = create('button', '접기');
   close.type = 'button';
   const toolbar = create('div');
   toolbar.className = 'dtn-payload-controls';
   toolbar.append(prettyLabel, download, close);
   const text = create('textarea');
   text.readOnly = true;
-  text.rows = 20;
+  text.rows = 9;
+  text.placeholder = 'JSON 원문이 준비되면 위 버튼으로 확인할 수 있습니다.';
   text.spellcheck = false;
   text.className = 'dtn-payload-text';
   text.setAttribute('aria-label', '선택한 시험의 JSON 본문');
@@ -58,7 +61,11 @@ export function createPayloadViewer(container, {receivedOnly = false} = {}) {
     text.value = '';
     pretty.checked = false;
     panel.hidden = true;
+    pretty.disabled = true;
+    sent.setAttribute('aria-expanded', 'false');
+    received.setAttribute('aria-expanded', 'false');
     download.removeAttribute('href');
+    download.setAttribute('aria-disabled', 'true');
   }
 
   async function show(direction) {
@@ -81,13 +88,16 @@ export function createPayloadViewer(container, {receivedOnly = false} = {}) {
       text.value = original;
       caption.textContent = (direction === 'sent' ? '송신 요청 JSON' : '최초 접수 수신 JSON') + ' · 시험 ' + selectedId;
       download.href = payloadUrl(selectedId, direction, true);
+      download.setAttribute('aria-disabled', 'false');
       panel.hidden = false;
+      pretty.disabled = false;
+      (direction === 'sent' ? sent : received).setAttribute('aria-expanded', 'true');
       const legacy = response.headers.get('X-LNIS-Payload-Representation') === 'legacy-normalized';
       status.textContent = legacy
         ? '과거 시험의 정규화된 저장본입니다.'
         : direction === 'sent'
           ? '외부 DTN/HDTN에 전달할 요청 본문입니다.'
-          : '접수 당시 원문입니다. 정렬 보기는 표시만 바꾸며, 다운로드는 원문을 유지합니다.';
+          : '접수 당시 원문 · 다운로드는 원문 그대로 저장합니다.';
     } catch (error) {
       if (requestGeneration === generation && error.name !== 'AbortError') status.textContent = 'JSON 조회 실패: ' + error.message;
     }
@@ -96,6 +106,7 @@ export function createPayloadViewer(container, {receivedOnly = false} = {}) {
   sent.onclick = () => show('sent');
   received.onclick = () => show('received');
   pretty.onchange = () => {
+    if (pretty.disabled || !original) { pretty.checked = false; return; }
     try { text.value = displayedJson(original, pretty.checked); }
     catch { pretty.checked = false; text.value = original; status.textContent = '정렬할 수 없어 원문을 표시합니다.'; }
   };

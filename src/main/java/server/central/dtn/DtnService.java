@@ -63,6 +63,14 @@ public class DtnService {
     @Value("${lnis.dtn.receive-token:}")
     private String receiveToken;
 
+    @Value("${lnis.dtn.example-enabled:false}")
+    private boolean exampleEnabled;
+
+    @Value("${lnis.dtn.sender-adapter-control-url:}")
+    private String senderAdapterControlUrl;
+    @Value("${lnis.dtn.receiver-adapter-control-url:}")
+    private String receiverAdapterControlUrl;
+
     private DtnNodeLink nodeLink;
 
     /** 기존 중앙 서버 모드는 그대로 두고 독립 노드 모드에서만 관리 통신을 연결한다. */
@@ -81,6 +89,8 @@ public class DtnService {
     public Map<String, Object> configuration()
     {
         return Map.of(
+                "exampleEnabled", exampleEnabled,
+                "adapterControlConfigured", !senderAdapterControlUrl.isBlank() && !receiverAdapterControlUrl.isBlank(),
                 "configured",
                 !sendUrl.isBlank() && (sendingNode() || !receiveToken.isBlank()),
                 "defaultSendUrl", sendUrl,
@@ -286,6 +296,8 @@ public class DtnService {
             if (result.getPvt() == null || result.getPvt().isEmpty()) {
                 throw new IllegalArgumentException("PVT 결과 없음");
             }
+            if (result.getObservations() != null)
+                job.setObservationsJson(objectMapper.writeValueAsString(result.getObservations()));
             if (preparing) {
                 if (result.getTransfer() == null
                         || !job.getId().equals(result.getTransfer().getTestId())) {

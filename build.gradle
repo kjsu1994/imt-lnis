@@ -53,6 +53,7 @@ dependencies {
 
 tasks.named('test') {
     systemProperty 'lnis.native.candidate', providers.gradleProperty('nativeCandidate').orElse('native/bin/win-x64').get()
+    systemProperty 'lnis.f9t.source', providers.gradleProperty('f9tExampleSource').orElse('').get()
     useJUnitPlatform()
     testLogging {
         events 'failed', 'skipped'
@@ -68,6 +69,8 @@ tasks.register('webTest') {
                 'src/test/js/frame-evidence-selection.smoke.mjs',
                 'src/test/js/result-presentation.smoke.mjs',
                 'src/test/js/dtn-payload.smoke.mjs',
+                'src/test/js/dtn-observations.smoke.mjs',
+                'src/test/js/dtn-sender.smoke.mjs',
                 'src/test/js/node-connection.smoke.mjs',
                 'src/test/js/dtn-receiver.smoke.mjs'
         ].each { script ->

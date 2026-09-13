@@ -1,10 +1,15 @@
-import {createPayloadViewer} from './dtn-payload.js?v=20260911-receiver';
+import {createPayloadViewer} from './dtn-payload.js?v=20260913-compact';
+import {createObservationView} from './dtn-observations.js?v=20260913';
 
 const api = '/lnis/api/v1';
 const $ = id => document.getElementById(id);
 const payloadViewer = createPayloadViewer($('dtn-payload'), {receivedOnly: true});
 let tests = [], epochs = [], selectedId = '', renderVersion = 0, polling = false;
 let reportKey = '', lastEvent = '';
+const observations = createObservationView($('dtn-observations'), index => {
+  if (epochs[index]) { $('pvt-epoch').value = String(index); renderEpoch(); }
+});
+observations.setData(null);
 
 async function get(path) {
   const response = await fetch(api + path, {cache: 'no-store'});
@@ -15,7 +20,7 @@ async function get(path) {
 function log(message) {
   // 자동 갱신으로 브라우저 로그가 무한히 늘어나지 않도록 최근 내역만 유지한다.
   const target = $('dtn-log');
-  target.textContent = (target.textContent + new Date().toLocaleTimeString('ko-KR') + ' ' + message + '\n').slice(-12000);
+  target.textContent = (target.textContent + new Date().toLocaleTimeString('ko-KR', {hour12: false}) + ' ' + message + '\n').slice(-12000);
   target.scrollTop = target.scrollHeight;
 }
 
@@ -35,6 +40,7 @@ function time(value) {
 }
 
 function renderEpoch() {
+  observations.select(Number($('pvt-epoch').value));
   const pvt = epochs[Number($('pvt-epoch').value)];
   const position = pvt?.positionValid === true;
   const velocity = pvt?.velocityValid === true;
@@ -46,7 +52,7 @@ function renderEpoch() {
   $('pvt-clock').textContent = number(position ? pvt.receiverClockBiasSeconds : null, 9);
   pill('pvt-validity', !pvt ? '결과 대기' : '위치 ' + (position ? '유효' : '무효') + ' · 속도 ' + (velocity ? '유효' : '무효'),
     !pvt ? '' : position && velocity ? 'online' : 'warning');
-  $('pvt-message').textContent = pvt?.message || '관측 시각은 DTN 도착 시각이 아닌 GNSS Week/TOW입니다.';
+  $('pvt-message').textContent = pvt?.message || '지구 ECEF · GPS L1 C/A';
 }
 
 function setEpochs(values, preserve = false) {
@@ -73,7 +79,7 @@ function renderSummary(job) {
   };
   $('receive-state').textContent = job ? (states[job.state] || job.state) : '수신 대기';
   $('receive-state').className = failed ? 'receiver-error' : '';
-  $('receive-message').textContent = job?.message || '송신 화면에서 수집을 마친 뒤 전송하면 시험이 등록됩니다.';
+  $('receive-message').textContent = job?.message || '송신 측 시험 시작을 기다립니다.';
   $('test-id').textContent = job?.testId || '-';
   $('test-updated').textContent = time(job?.updatedAt);
   // 서버가 복호화/계산의 개별 진척률을 제공하지 않으므로 하나의 처리 단계로 표시한다.
@@ -93,6 +99,7 @@ async function renderTest(force = false) {
   if (changed || !job) {
     reportKey = '';
     setEpochs([]);
+    observations.setData(null);
     $('dtn-report').hidden = true;
     $('dtn-report').removeAttribute('href');
   }
@@ -108,6 +115,7 @@ async function renderTest(force = false) {
     // 시험을 바꾼 뒤 늦게 도착한 이전 응답이 새 시험의 PVT를 덮어쓰지 않는다.
     if (version !== renderVersion || selectedId !== job.testId) return;
     setEpochs(report.receivedPvt, !changed);
+    observations.setData(report.observations, !changed);
     reportKey = event;
   } catch (error) {
     if (version !== renderVersion) return;
@@ -121,7 +129,7 @@ function renderAgents(agents) {
   for (const role of ['SENDER', 'RECEIVER']) {
     const agent = agents.find(item => item.role === role);
     const online = !!agent && agent.state !== 'OFFLINE';
-    const text = role === 'SENDER' ? '송신 노드' : '수신 실행기';
+    const text = role === 'SENDER' ? '송신 처리기' : '수신 처리기';
     pill('dtn-' + role.toLowerCase() + '-status', text + ' ' +
       (online ? (agent.state === 'READY' ? '준비됨' : '처리 중') : '연결 안 됨'),
       online ? (agent.state === 'READY' ? 'online' : 'warning') : 'error');
@@ -168,6 +176,10 @@ async function initialize() {
       if (node.baseUrl) $('receive-url').value = node.baseUrl.replace(/\/$/, '') + api + '/dtn/receive';
     }
   } catch { /* 중앙 서버 모드에서는 현재 브라우저 주소를 사용한다. */ }
+  try {
+    const connection = await get('/node/connection');
+    $('sender-address').value = connection.baseUrl || '';
+  } catch { /* Optional in central mode. */ }
   await poll();
   const repeat = async () => { await poll(); setTimeout(repeat, 2000); };
   setTimeout(repeat, 2000);

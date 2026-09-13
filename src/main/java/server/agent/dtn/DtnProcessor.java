@@ -31,6 +31,7 @@ public final class DtnProcessor {
       throw new IllegalArgumentException("DTN 수집 입력은 1 MiB 이하로 제한됩니다.");
     var records = GrawCodec.splitLengthPrefixed(source);
     AgentResult result = new AgentResult();
+    result.setObservations(server.shared.model.DtnObservationView.fromRecords(records));
     try (var pvt = new NativePvtCodec(nativeDirectory)) { result.setPvt(pvt.calculate(records)); }
     var frames = new AfsFrameBuilder(afs).prepare(records,
         new TestOptions(TestType.TEST_A_NORMAL, 0, 0, 0, Map.of()), 1).frames();
@@ -84,6 +85,7 @@ public final class DtnProcessor {
     if (!Hashing.hex(Hashing.sha256Digest().digest(source.toByteArray())).equals(transfer.getSourceSha256()))
       throw new IllegalArgumentException("복원 데이터 SHA-256 불일치");
     AgentResult result = new AgentResult();
+    result.setObservations(server.shared.model.DtnObservationView.fromRecords(records));
     try (var pvt = new NativePvtCodec(nativeDirectory)) { result.setPvt(pvt.calculate(records)); }
     return result;
   }

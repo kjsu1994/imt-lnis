@@ -171,6 +171,8 @@ public class DtnController {
     {
         DtnJob job = dtnService.get(id);
         Map<String, Object> report = new LinkedHashMap<>(summary(job));
+        report.put("observations", job.getObservationsJson() == null
+                ? null : objectMapper.readTree(job.getObservationsJson()));
         report.put(
                 "referencePvt",
                 job.getReferenceJson() == null
@@ -248,6 +250,7 @@ public class DtnController {
         result.put("receivedOriginalAvailable", job.getReceivedRawJson() != null);
         result.put("comparisonOnSender", job.getExpectedPayloadSha256() != null);
         result.put("receivedEpochs", job.getReceiverJson() == null ? 0 : objectMapper.readTree(job.getReceiverJson()).size());
+        result.put("referenceEpochs", job.getReferenceJson() == null ? 0 : objectMapper.readTree(job.getReferenceJson()).size());
         if (job.getComparisonJson() != null) {
             JsonNode comparison = objectMapper.readTree(job.getComparisonJson());
             result.put("verdict", comparison.path("verdict").asText());

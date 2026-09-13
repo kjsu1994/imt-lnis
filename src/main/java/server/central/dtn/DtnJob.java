@@ -45,4 +45,7 @@ public class DtnJob {
     private String receiverJson;
     @Lob
     private String comparisonJson;
+    /** Local input/restored observations for the UI; not part of the adapter contract. */
+    @Lob
+    private String observationsJson;
 }

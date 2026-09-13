@@ -54,6 +54,7 @@ public final class DtnModels {
   public static class AgentResult {
     private Transfer transfer;
     private List<Pvt> pvt;
+    private DtnObservationView observations;
     private String error;
   }
 }

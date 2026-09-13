@@ -22,6 +22,12 @@ import org.springframework.test.web.servlet.MockMvc;
 class WebPageControllerTest {
   @Autowired private MockMvc mvc;
 
+  @Test void developmentExampleIsOffByDefault() throws Exception {
+    mvc.perform(get("/lnis/api/v1/dtn/config"))
+        .andExpect(status().isOk()).andExpect(jsonPath("$.exampleEnabled").value(false));
+    mvc.perform(get("/lnis/api/v1/dtn/example/file")).andExpect(status().isNotFound());
+  }
+
   @Test
   void servesNewAndLegacyPagesWithoutNginx() throws Exception {
     mvc.perform(get("/"))

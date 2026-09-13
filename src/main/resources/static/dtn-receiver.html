@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>LNIS DTN Receiver</title>
   <link rel="stylesheet" href="/lnis/assets/app.css?v=20260911-receiver">
-  <link rel="stylesheet" href="/lnis/assets/dtn-payload.css">
-  <link rel="stylesheet" href="/lnis/assets/dtn-ui.css">
-  <link rel="stylesheet" href="/lnis/assets/dtn-receiver.css?v=20260911-receiver">
+  <link rel="stylesheet" href="/lnis/assets/dtn-payload.css?v=20260913-compact">
+  <link rel="stylesheet" href="/lnis/assets/dtn-ui.css?v=20260913-compact">
+  <link rel="stylesheet" href="/lnis/assets/dtn-receiver.css?v=20260913">
 </head>
 <body data-page="dtn-receiver">
 <header>
@@ -27,15 +27,23 @@
 <main>
   <section class="status-strip" aria-label="연결 상태">
     <span id="dtn-server-status" class="pill warning">서버 연결 확인 중</span>
-    <span id="dtn-sender-status" class="pill">송신 노드 확인 중</span>
-    <span id="dtn-receiver-status" class="pill">수신 실행기 확인 중</span>
+    <span id="dtn-sender-status" class="pill">송신 처리기 확인 중</span>
+    <span id="dtn-receiver-status" class="pill">수신 처리기 확인 중</span>
   </section>
 
   <section class="card receiver-overview">
     <div class="card-title">
-      <h2>DTN 수신 시험</h2>
-      <small>AFS Frame + Metadata · 수신 후 자동 복호화·PVT 계산</small>
+      <h2>시험 설정 · 수신</h2>
+      <small>자동 수신·복원·지구 PVT 계산</small>
     </div>
+    <div class="test-type-selector" aria-label="지원 예정 시험 유형">
+      <button disabled>GNSS RAW · 준비 중</button><button disabled id="receiver-type">AFS Frame + Metadata</button><button disabled>I/Q Sample · 준비 중</button>
+    </div>
+    <div class="transport-mode-section"><div class="transport-mode-title"><span>전송 경로</span><strong>어댑터 경로 정보 미제공</strong></div>
+      <div class="transport-mode-selector"><button disabled>DTN → HDTN</button><button disabled>DTN → DTN</button><button disabled>HDTN → DTN</button><button disabled>HDTN → HDTN</button></div></div>
+    <div class="destination-row"><label>상대 송신 서비스<input id="sender-address" readonly placeholder="주소 정보 없음"></label>
+      <div class="destination-status"><span class="connection-dot unknown"></span><div><small>역방향 연결</small><strong>미확인</strong></div></div>
+      <span class="pill">COM 수집은 송신 측에서 수행</span></div>
     <!-- 외부 어댑터가 호출할 주소다. 관리 API나 송신 어댑터의 /transfers와 구분한다. -->
     <div class="receiver-endpoint">
       <label for="receive-url">수신 API <span class="pill">POST</span></label>
@@ -58,7 +66,7 @@
     </ol>
     <div class="receiver-result-line">
       <strong id="receive-state" role="status" aria-live="polite">수신 대기</strong>
-      <span id="receive-message">송신 화면에서 수집을 마친 뒤 전송하면 시험이 등록됩니다.</span>
+      <span id="receive-message">송신 측 시험 시작을 기다립니다.</span>
     </div>
     <div class="receiver-meta">
       <span>시험 ID <code id="test-id">-</code></span>
@@ -66,15 +74,17 @@
     </div>
   </section>
 
+  <section class="card epoch-observation-card" id="dtn-observations"></section>
+
   <section class="card receiver-pvt">
     <div class="card-title">
-      <h2>복원 데이터로 계산한 PVT</h2>
+      <h2>수신 복원 지구 PVT</h2>
       <div class="receiver-result-links">
         <a id="dtn-report" hidden target="_blank" rel="noopener">전체 PVT 보고서</a>
-        <a href="/lnis/dtntest/sender">송신 측 비교 결과 보기 →</a>
+
       </div>
     </div>
-    <small>기준 PVT와의 차이·최종 판정은 송신 서버에서 확인합니다. 수신 계산 완료는 PASS 판정과 다릅니다.</small>
+    <small>송·수신 PVT 비교 결과는 송신 측에서 확인합니다.</small>
     <div class="receiver-epoch-row">
       <label for="pvt-epoch">관측 시각</label>
       <select id="pvt-epoch" disabled><option value="">계산 결과 없음</option></select>
@@ -91,16 +101,16 @@
       <div class="pvt-value"><span>속도 Z</span><strong id="pvt-vz">-</strong><small>m/s</small></div>
       <div class="pvt-value"><span>사용 위성</span><strong id="pvt-satellites">-</strong><small>개</small></div>
     </div>
-    <small id="pvt-message">관측 시각은 DTN 도착 시각이 아닌 GNSS Week/TOW입니다.</small>
+    <small id="pvt-message">지구 ECEF · GPS L1 C/A</small>
   </section>
 
   <section id="dtn-payload" class="card receiver-payload"></section>
-  <details class="card receiver-log">
-    <summary>수신 화면 로그</summary>
+  <section class="card receiver-log">
+    <h2>송수신 로그</h2>
     <div class="receiver-log-actions"><button id="dtn-log-clear" type="button">로그 지우기</button></div>
     <pre id="dtn-log" class="log"></pre>
-  </details>
+  </section>
 </main>
-<script type="module" src="/lnis/assets/dtn-receiver.js?v=20260911-receiver"></script>
+<script type="module" src="/lnis/assets/dtn-receiver.js?v=20260913-compact"></script>
 </body>
 </html>

@@ -1,0 +1,10 @@
+# Development only. Do not include this override in production.
+# Place the verified f9t-example.graw and its LICENSE in ./examples first.
+# docker compose -f docker-compose.yml -f docker-compose.example.yml up -d
+services:
+  node:
+    environment:
+      LNIS_DTN_EXAMPLE_ENABLED: "true"
+      LNIS_DTN_EXAMPLE_FILE: /app/examples/f9t-example.graw
+    volumes:
+      - ./examples:/app/examples:ro

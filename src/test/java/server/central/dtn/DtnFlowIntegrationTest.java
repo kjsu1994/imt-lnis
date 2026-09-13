@@ -109,6 +109,14 @@ class DtnFlowIntegrationTest {
       var input = inputs.create("dtn.graw", source.length, InputKind.GRAW_UPLOAD);
       inputs.append(input.inputId(), 0, source); inputs.complete(input.inputId());
       HttpClient client = HttpClient.newHttpClient();
+      var preview = client.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port
+          + "/lnis/api/v1/dtn/inputs/" + input.inputId() + "/observations")).GET().build(),
+          HttpResponse.BodyHandlers.ofString());
+      assertEquals(200, preview.statusCode());
+      var previewJson = json.readTree(preview.body());
+      assertEquals(2400, previewJson.path("epochs").get(0).path("observation").path("week").asInt());
+      assertTrue(previewJson.path("navigationCount").asInt() > 0);
+      assertFalse(previewJson.path("epochs").get(0).path("observation").path("observations").isEmpty());
       String body = json.writeValueAsString(Map.of("inputId", input.inputId(),
           "senderAgentId", "dtn-sender", "receiverAgentId", "dtn-receiver",
           "sendUrl", "http://127.0.0.1:" + external.getAddress().getPort() + "/transfers/selected"));
@@ -139,6 +147,8 @@ class DtnFlowIntegrationTest {
       assertEquals("PASS", json.readTree(service.get(id).getComparisonJson()).path("verdict").asText());
       assertNotNull(service.get(id).getComparisonJson());
       assertFalse(json.readTree(service.get(id).getSentJson()).has("pvt"));
+      assertFalse(json.readTree(service.get(id).getSentJson()).has("observations"));
+      assertEquals(previewJson, json.readTree(service.get(id).getObservationsJson()));
       assertEquals(401, callback(client, null, packet.get()).statusCode());
       assertEquals(202, callback(client, "test-receive-token", packet.get()).statusCode());
       var modified = (com.fasterxml.jackson.databind.node.ObjectNode)json.readTree(packet.get());
