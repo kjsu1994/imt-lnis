@@ -18,7 +18,13 @@
 - Existing comparison tolerances remain: position 0.001 m, velocity 0.001 m/s,
   clock bias 1 ns, identical GPS week/TOW. Invalid PVT is not a successful comparison.
 - RAWX standard-deviation fields are shown as device codes, not mislabeled SI values.
-- COM one-shot capture, RAW direct transfer and I/Q transfer are explicitly unavailable.
+- COM/serial one-shot capture reuses the UBX parser and native terrestrial PVT engine.
+  It retains received navigation and the first epoch with valid position AND velocity,
+  with a 120-second acquisition deadline and 1 MiB input cap. Previous unsuccessful
+  observation epochs are not transmitted. RAW direct transfer and I/Q transfer remain unavailable.
+  Serial completion finalizes the input on the server even when the browser disconnects.
+  GET `/dtn/inputs/{id}/pvt` recalculates the completed input for preview; transmission
+  recalculates the exact same records through the existing sender/receiver engine.
   The collecting service will need complete navigation information plus one target epoch;
   simply stopping after the first RAWX message is not sufficient.
 

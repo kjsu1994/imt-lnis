@@ -7,6 +7,7 @@ let inputId = null, agents = [], busy = false, job = null, config = {}, peerConf
 let selectedType = 'AFS_METADATA', senderMode = 'DTN', receiverMode = 'HDTN';
 let pvt = [], comparison = null, epochIndex = 0, reportKey = '', lastEvent = '', lastAgentState = '';
 let polling = false, inputMode = 'upload';
+let captureId = null, captureError = '';
 const active = () => ['PREPARING', 'WAITING_DTN', 'WAITING_RECEIVER', 'CALCULATING'].includes(job?.state);
 const locked = () => busy || active();
 const view = createObservationView($('dtn-observations'), index => { epochIndex = index; renderPvt(); });
@@ -56,7 +57,8 @@ function renderPvt() {
 function updateControls() {
   const tx = agents.find(a => a.agentId === $('dtn-sender').value);
   const rx = agents.find(a => a.agentId === $('dtn-receiver').value);
-  $('dtn-start').disabled = true; // One-shot capture is not connected yet.
+  $('dtn-start').disabled = locked() || ! $('dtn-port').value || tx?.state !== 'READY' || selectedType === 'IQ_SAMPLE';
+  $('dtn-port').disabled = $('dtn-baud').disabled = locked();
   $('dtn-send').disabled = locked() || selectedType !== 'AFS_METADATA' || !inputId || !urlValid() || tx?.state !== 'READY' || rx?.state !== 'READY';
   for (const id of ['dtn-upload', 'dtn-graw-file', 'dtn-example', 'dtn-send-url']) $(id).disabled = locked();
   $('dtn-refresh').disabled = locked() || tx?.state !== 'READY';
@@ -92,6 +94,37 @@ async function upload(file) {
   } finally { busy = false; updateControls(); }
 }
 $('dtn-upload').onclick = () => upload($('dtn-graw-file').files[0]).catch(e => log(e.message, 'ERROR'));
+$('dtn-port').onchange = updateControls;
+$('dtn-start').onclick = async () => {
+  if (locked() || !$('dtn-port').value) return;
+  busy = true; inputId = null; captureError = ''; resetResult(); view.setData(null); updateControls();
+  $('dtn-input-state').textContent = '항법정보·관측값 수집 중 · 최대 120초';
+  log('한 시점 수집 시작 · ' + $('dtn-port').value);
+  try {
+    const input = await post('/captures', {senderAgentId: $('dtn-sender').value,
+      portName: $('dtn-port').value, baudRate: Number($('dtn-baud').value), protocolId: 'UBX',
+      receiverModel: 'u-blox EVK-F9T', sessionName: 'DTN single epoch', singleEpoch: true});
+    captureId = input.inputId;
+    const deadline = Date.now() + 140000;
+    while (true) {
+      if (captureError) throw new Error(captureError);
+      const state = await request('/inputs/' + captureId);
+      if (state.complete) break;
+      if (Date.now() >= deadline) throw new Error('수집 완료 응답이 없습니다. 장치와 서버 상태를 확인하세요.');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    const observations = await request('/dtn/inputs/' + captureId + '/observations');
+    pvt = await request('/dtn/inputs/' + captureId + '/pvt');
+    if (observations.epochs?.length !== 1 || !pvt[0]?.positionValid || !pvt[0]?.velocityValid)
+      throw new Error('유효한 한 시점 PVT 입력이 아닙니다.');
+    view.setData(observations); renderPvt(); inputId = captureId;
+    $('dtn-input-state').textContent = '한 시점 수집 완료 · 지구 PVT 계산 완료';
+    log('수집 완료 · 관측값 1시점 · 지구 PVT 계산 완료');
+  } catch (e) {
+    inputId = null; pvt = []; view.setData(null); renderPvt();
+    $('dtn-input-state').textContent = '수집 실패'; log(e.message, 'ERROR');
+  } finally { captureId = null; busy = false; updateControls(); }
+};
 $('dtn-example').onclick = async () => {
   if (locked()) return;
   busy = true; updateControls();
@@ -226,6 +259,8 @@ function socket() {
   ws.onmessage = event => {
     try {
       const data = JSON.parse(event.data);
+      if (data.agentId === $('dtn-sender').value && data.sessionId === captureId && data.type === 'ERROR')
+        captureError = data.payload?.message || 'GNSS 수집 실패';
       if (data.agentId === $('dtn-sender').value && data.payload?.ports)
         $('dtn-port').replaceChildren(new Option('포트 선택', ''), ...data.payload.ports.map(p => new Option(p.name, p.name)));
     } catch { log('포트 응답을 읽을 수 없습니다.', 'WARN'); }

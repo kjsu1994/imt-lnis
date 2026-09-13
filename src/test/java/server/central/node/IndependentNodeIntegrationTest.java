@@ -88,6 +88,9 @@ class IndependentNodeIntegrationTest {
             UUID input = inputs.create("node-test.graw", source.length, InputKind.GRAW_UPLOAD).inputId();
             inputs.append(input, 0, source);
             inputs.complete(input);
+            var preview = sender.getBean(server.central.dtn.DtnInputViewController.class).pvt(input);
+            assertTrue(preview.getFirst().isPositionValid());
+            assertTrue(preview.getFirst().isVelocityValid());
             DtnService tx = sender.getBean(DtnService.class);
             DtnService rx = receiver.getBean(DtnService.class);
             UUID test = tx.create(input, "sender-1", "receiver-1",

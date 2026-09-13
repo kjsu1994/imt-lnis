@@ -65,7 +65,7 @@
       <button id="dtn-refresh" type="button">포트 조회</button>
       <details class="advanced-settings"><summary>통신 설정</summary>
         <label>보드레이트<select id="dtn-baud"><option>9600</option><option>38400</option><option>57600</option><option selected>115200</option><option>230400</option><option>460800</option><option>921600</option></select></label></details>
-      <button id="dtn-start" type="button" disabled title="한 시점 수집 기능은 추후 연결됩니다.">수집 시작 · 준비 중</button>
+      <button id="dtn-start" type="button" disabled title="유효한 지구 PVT 한 시점 확보 후 자동 종료 · 최대 120초">수집 시작</button>
     </div>
     <div id="dtn-upload-panel" class="compact-input-row">
       <label>capture.graw<input id="dtn-graw-file" type="file" accept=".graw,application/octet-stream"></label>
@@ -101,5 +101,5 @@
   <section id="dtn-payload" class="card"></section>
   <section class="card"><div class="card-title"><h2>송수신 로그</h2><button id="dtn-log-clear" type="button">화면 로그 지우기</button></div><pre id="dtn-log" class="log" aria-label="PC 시간 기준 로그"></pre></section>
 </main>
-<script type="module" src="/lnis/assets/dtn.js?v=20260913-compact"></script>
+<script type="module" src="/lnis/assets/dtn.js?v=20260913-capture"></script>
 </body></html>

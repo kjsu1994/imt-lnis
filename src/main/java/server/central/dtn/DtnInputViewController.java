@@ -15,9 +15,22 @@ import server.shared.model.DtnObservationView;
 @RequestMapping("/lnis/api/v1/dtn/inputs")
 public class DtnInputViewController {
   private final InputBufferService inputs;
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  private DtnPvtCalculator calculator;
 
   @GetMapping("/{id}/observations")
   public DtnObservationView observations(@PathVariable UUID id) {
+    return DtnObservationView.fromRecords(records(id));
+  }
+
+  @GetMapping("/{id}/pvt")
+  public java.util.List<DtnModels.Pvt> pvt(@PathVariable UUID id) {
+    var records = records(id);
+    if (calculator == null) throw new IllegalStateException("PVT 미리보기는 통합 노드 실행에서 지원됩니다.");
+    return calculator.calculate(records);
+  }
+
+  private java.util.List<byte[]> records(UUID id) {
     var input = inputs.get(id);
     if (!input.complete() || input.receivedSize() <= 0
         || input.receivedSize() > DtnModels.MAX_INPUT_BYTES)
@@ -30,6 +43,6 @@ public class DtnInputViewController {
       bytes.writeBytes(chunk);
     }
     if (bytes.size() != input.receivedSize()) throw new IllegalArgumentException("입력 크기 불일치");
-    return DtnObservationView.fromRecords(GrawCodec.splitLengthPrefixed(bytes.toByteArray()));
+    return GrawCodec.splitLengthPrefixed(bytes.toByteArray());
   }
 }

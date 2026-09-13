@@ -17,6 +17,15 @@ import java.util.Locale;
 @Configuration(proxyBeanMethods = false)
 @Profile("node")
 public class NodeModeConfiguration {
+    @Bean
+    server.central.dtn.DtnPvtCalculator dtnPvtCalculator(Environment environment) {
+        var directory = java.nio.file.Path.of(environment.getProperty("lnis.native.dir", "native"));
+        return records -> {
+            try (var codec = new server.agent.codec.NativePvtCodec(directory)) {
+                return codec.calculate(records);
+            }
+        };
+    }
     @Bean(destroyMethod = "close")
     LocalNodeLifecycle localNodeLifecycle(Environment environment, ObjectMapper objectMapper,
             AgentConnectionRegistry connectionRegistry, AgentMessageService messageService,

@@ -34,6 +34,9 @@ const context = {
       body = {inputId: 'input1'};
     }
     else if (url.endsWith('/complete')) body = {recordCount: 2};
+    else if (url.endsWith('/captures')) { assert.equal(JSON.parse(options.body).singleEpoch, true); body = {inputId: 'capture1'}; }
+    else if (url.endsWith('/inputs/capture1')) body = {complete: true};
+    else if (url.endsWith('/pvt')) body = [{positionValid: true, velocityValid: true, ecefMeters: [1, 2, 3], velocityMetersPerSecond: [0, 0, 0]}];
     else if (url.endsWith('/observations')) body = observations;
     else if (url.endsWith('/tests/t1')) body = currentJob;
     else if (url.endsWith('/report')) body = {referencePvt: [{week: 2400, towSeconds: 1,
@@ -64,3 +67,11 @@ await assert.rejects(context.upload(file));
 assert.equal(loaded, null);
 assert.equal(elements.get('dtn-send').disabled, true);
 console.log('PASS: sender upload, preview, disabled example/capture, duplicate start, invalid PVT and input failure reset');
+elements.get('dtn-port').value = '/dev/ttyACM0';
+elements.get('dtn-port').onchange();
+assert.equal(elements.get('dtn-start').disabled, false);
+await elements.get('dtn-start').onclick();
+assert.equal(elements.get('pvt-x').textContent, '1.000');
+assert.equal(elements.get('dtn-send').disabled, false);
+assert.equal(elements.get('dtn-port').disabled, false);
+console.log('PASS: serial one-shot completion, PVT preview and transfer readiness');

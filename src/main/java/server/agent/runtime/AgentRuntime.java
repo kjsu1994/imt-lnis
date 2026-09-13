@@ -128,7 +128,9 @@ public final class AgentRuntime implements AutoCloseable {
     } catch (Exception error) {
       ack(envelope, false, error.getMessage());
       status(envelope.sessionId(), EventType.ERROR, 0, "Failed", safe(error), Map.of());
-      if (state.get() != AgentState.BUSY) state.set(AgentState.ERROR);
+      boolean singleCapture = "START_CAPTURE".equals(envelope.payload().path("command").asText())
+          && envelope.payload().path("arguments").path("singleEpoch").asBoolean();
+      if (state.get() != AgentState.BUSY && !singleCapture) state.set(AgentState.ERROR);
     }
   }
 
@@ -215,14 +217,28 @@ public final class AgentRuntime implements AutoCloseable {
       throw new IllegalStateException("Only SENDER can capture GNSS");
     }
     var settings = json.treeToValue(args, SerialCaptureService.Settings.class);
+    var selection = settings.singleEpoch() ? new server.agent.gnss.SingleEpochCapture(records -> {
+      try (var pvt = new server.agent.codec.NativePvtCodec(config.nativeDirectory())) {
+        var result = pvt.calculate(records).getFirst();
+        return result.isPositionValid() && result.isVelocityValid();
+      }
+    }) : null;
     state.set(AgentState.BUSY);
+    try {
     capture.start(
         settings,
         chunk -> publishCaptureChunk(sessionId, chunk),
         error -> {
-          state.set(AgentState.ERROR);
+          state.set(settings.singleEpoch() ? AgentState.READY : AgentState.ERROR);
           status(sessionId, EventType.ERROR, 0, "CaptureFailed", safe(error), Map.of());
+        }, selection, () -> {
+          state.set(AgentState.READY);
+          status(sessionId, EventType.GNSS_STATUS, 100, "SingleEpochComplete", "한 시점 수집·지구 PVT 검증 완료", Map.of());
         });
+    } catch (Exception error) {
+      state.set(AgentState.READY);
+      throw error;
+    }
   }
 
   private void publishCaptureChunk(UUID sessionId, SerialCaptureService.CaptureChunk chunk) {

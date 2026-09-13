@@ -50,6 +50,8 @@ public final class SerialCaptureService implements AutoCloseable {
 
     /** 포트를 연 뒤 RTS 제어선을 활성화할지 여부다. */
     boolean rtsEnabled;
+
+    boolean singleEpoch;
   }
 
   /** 메모리 상한을 위해 수집 데이터를 약 1 MiB 단위로 서버에 전달하는 청크다. */
@@ -91,9 +93,17 @@ public final class SerialCaptureService implements AutoCloseable {
 
   public synchronized void start(
       Settings settings, Consumer<CaptureChunk> chunks, Consumer<Throwable> failure) {
+    start(settings, chunks, failure, null, () -> {});
+  }
+
+  public synchronized void start(Settings settings, Consumer<CaptureChunk> chunks,
+      Consumer<Throwable> failure, SingleEpochCapture selection, Runnable completed) {
+    if (settings.singleEpoch && (selection == null || !"ubx".equalsIgnoreCase(settings.protocolId)))
+      throw new IllegalArgumentException("한 시점 수집은 UBX만 지원합니다.");
     if (!running.compareAndSet(false, true))
       throw new IllegalStateException("Capture is already running");
     // 포트를 완전히 구성한 뒤 worker를 시작해 reader가 반쯤 적용된 직렬 설정을 보지 않게 한다.
+    try {
     port = SerialPort.getCommPort(settings.portName);
     port.setBaudRate(settings.baudRate);
     port.setNumDataBits(8);
@@ -110,15 +120,24 @@ public final class SerialCaptureService implements AutoCloseable {
     else port.clearRTS();
     if ("ubx".equalsIgnoreCase(settings.protocolId)) configureUbloxTemporarily();
     worker =
-        Thread.ofPlatform().name("lnis-gnss-capture").start(() -> run(settings, chunks, failure));
+        Thread.ofPlatform().name("lnis-gnss-capture").start(() -> run(settings, chunks, failure, selection, completed));
+    } catch (RuntimeException error) {
+      if (port != null) port.closePort();
+      running.set(false);
+      throw error;
+    }
   }
 
-  private void run(Settings settings, Consumer<CaptureChunk> chunks, Consumer<Throwable> failure) {
+  private void run(Settings settings, Consumer<CaptureChunk> chunks, Consumer<Throwable> failure,
+      SingleEpochCapture selection, Runnable completed) {
     UbloxParser ubx = new UbloxParser();
     UUID testId = UUID.randomUUID();
     long sequence = 0, bytesRead = 0, records = 0, chunkIndex = 0;
     ByteArrayOutputStream rawChunk = new ByteArrayOutputStream(1024 * 1024),
         canonicalChunk = new ByteArrayOutputStream(1024 * 1024);
+    boolean selected = false;
+    Throwable failed = null;
+    long deadline = System.nanoTime() + 120_000_000_000L;
     try {
       // raw-only를 제외한 파일의 첫 record에는 나중에 수집 환경을 추적할 메타데이터를 넣는다.
       if (!"raw-only".equalsIgnoreCase(settings.protocolId)) {
@@ -135,11 +154,14 @@ public final class SerialCaptureService implements AutoCloseable {
                         settings.portName,
                         settings.baudRate,
                         settings.sessionName)));
-        writeRecord(canonicalChunk, metadata);
+        if (selection != null) selection.accept(metadata);
+        else writeRecord(canonicalChunk, metadata);
         records++;
       }
       byte[] buffer = new byte[8192];
       while (running.get()) {
+        if (selection != null && System.nanoTime() >= deadline)
+          throw new IllegalStateException("120초 안에 유효한 지구 PVT를 얻지 못했습니다. RAWX/SFRBX 출력과 안테나 수신 상태를 확인하세요.");
         int count = port.readBytes(buffer, buffer.length);
         if (count < 0) {
           throw new IllegalStateException("Serial read failed");
@@ -147,18 +169,26 @@ public final class SerialCaptureService implements AutoCloseable {
         if (count == 0) {
           continue;
         }
-        rawChunk.write(buffer, 0, count);
+        if (selection == null) rawChunk.write(buffer, 0, count);
         bytesRead += count;
         // ubx는 검증·변환하고 canonical-v1은 이미 변환된 입력이므로 그대로 누적한다.
         if ("ubx".equalsIgnoreCase(settings.protocolId))
           for (var frame : ubx.push(buffer, count)) {
             var message = UbloxParser.toCanonical(frame);
             if (message != null) {
-              writeRecord(
-                  canonicalChunk,
-                  GrawCodec.encode(
+              byte[] record = GrawCodec.encode(
                       new GrawCodec.Envelope(
-                          testId, UUID.randomUUID(), sequence++, Instant.now(), message)));
+                          testId, UUID.randomUUID(), sequence++, Instant.now(), message));
+              if (selection != null) {
+                var chosen = selection.accept(record);
+                if (chosen != null) {
+                  for (byte[] item : chosen) writeRecord(canonicalChunk, item);
+                  records = chosen.size();
+                  selected = true;
+                  running.set(false);
+                  break;
+                }
+              } else writeRecord(canonicalChunk, record);
               records++;
             }
           }
@@ -170,17 +200,23 @@ public final class SerialCaptureService implements AutoCloseable {
               new CaptureChunk(
                   chunkIndex++, drain(rawChunk), drain(canonicalChunk), bytesRead, records));
       }
+      if (selection != null && !selected) throw new IllegalStateException("한 시점 수집이 중단되었습니다.");
       if (rawChunk.size() > 0 || canonicalChunk.size() > 0) {
         chunks.accept(
             new CaptureChunk(
                 chunkIndex, drain(rawChunk), drain(canonicalChunk), bytesRead, records));
       }
     } catch (Throwable error) {
-      failure.accept(error);
+      failed = error;
     } finally {
-      restoreUbloxConfiguration();
-      if (port != null) port.closePort();
-      running.set(false);
+      try { restoreUbloxConfiguration(); }
+      catch (Throwable error) { if (failed == null) failed = error; }
+      finally { if (port != null) port.closePort(); running.set(false); }
+    }
+    if (failed != null) failure.accept(failed);
+    else if (selected) {
+      try { completed.run(); }
+      catch (Throwable error) { failure.accept(error); }
     }
   }
 

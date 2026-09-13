@@ -52,5 +52,8 @@ public class CaptureRequest {
 
     /** 직렬 포트를 열 때 RTS(Request To Send) 제어선을 활성화할지 여부다. */
     boolean rtsEnabled;
+
+    /** DTN only: automatically select one epoch with valid terrestrial position and velocity. */
+    boolean singleEpoch;
 }
 
