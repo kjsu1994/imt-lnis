@@ -738,7 +738,13 @@
     }
 }
 /* DTN-only shared layout. Do not change AFS page styles. */
-body[data-page^="dtn-"] .dtn-send-actions { display: flex; justify-content: flex-end; align-items: center; gap: 16px; margin-top: 14px; }
+body[data-page^="dtn-"] .dtn-send-actions { display: flex; justify-content: flex-end; align-items: center; gap: 12px; margin: 0; }
+body[data-page="dtn-sender"] .dtn-input-header { gap: 8px 20px; align-items: center; flex-wrap: wrap; }
+body[data-page="dtn-sender"] .dtn-input-heading { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px 14px; min-width: 0; }
+body[data-page="dtn-sender"] .dtn-input-heading h2 { margin: 0; }
+body[data-page="dtn-sender"] .dtn-input-heading strong { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+body[data-page="dtn-sender"] .dtn-input-header .dtn-send-actions { margin-left: auto; min-width: 0; }
+body[data-page="dtn-sender"] .dtn-send-actions button { flex-shrink: 0; }
 body[data-page^="dtn-"] .dtn-send-actions p { margin: 0; font-size: 13px; color: var(--muted); }
 body[data-page^="dtn-"] .dtn-comparison-card { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; }
 body[data-page^="dtn-"] .dtn-comparison-card h2 { margin: 0; }
@@ -752,6 +758,14 @@ body[data-page^="dtn-"] .card h2 { margin-bottom: 12px; }
 body[data-page^="dtn-"] .compact-input-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
 body[data-page^="dtn-"] .compact-input-row label { flex: 1; min-width: 180px; }
 body[data-page^="dtn-"] .compact-input-row progress { width: 150px; margin-bottom: 12px; }
+body[data-page="dtn-sender"] #dtn-upload-panel { display: grid; grid-template-columns: minmax(240px, 1fr) auto minmax(220px, 1fr); align-items: end; }
+body[data-page="dtn-sender"] #dtn-upload-panel > label { min-width: 0; margin: 0; }
+body[data-page="dtn-sender"] #dtn-upload-panel input { min-width: 0; width: 100%; box-sizing: border-box; }
+body[data-page="dtn-sender"] #dtn-upload-panel .upload-progress-field progress { display: block; width: 100%; height: 12px; margin: 14px 0; }
+@media (max-width: 760px) {
+  body[data-page="dtn-sender"] #dtn-upload-panel { grid-template-columns: minmax(0, 1fr) auto; }
+  body[data-page="dtn-sender"] #dtn-upload-panel .upload-progress-field { grid-column: 1 / -1; }
+}
 body[data-page^="dtn-"] .observation-summary { display: flex; flex-wrap: wrap; gap: 12px 24px; color: #516178; padding: 12px 0; font-size: 13px; }
 body[data-page^="dtn-"] .connection-dot.unknown { background: #94a3b8; box-shadow: none; }
 body[data-page^="dtn-"] .epoch-table-viewport { max-height: 350px; overflow: auto; }
