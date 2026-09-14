@@ -72,9 +72,38 @@ class DtnFlowIntegrationTest {
   @Autowired InputBufferService inputs;
   @Autowired AgentRepository agents;
   @Autowired ObjectMapper json;
+  @Autowired server.central.agent.AgentMessageService agentMessages;
   @MockitoBean AgentCommandService commands;
   @MockitoBean AgentConnectionRegistry connections;
   @AfterAll static void shutdown() { external.stop(0); }
+
+  @Test void centralModeServesAgentPvtAfterCaptureCompletionAndReload() throws Exception {
+    var observation = new server.shared.codec.GrawCodec.ObservationEpoch(123.5, 2400, 18, 1, 1, List.of());
+    byte[] record = server.shared.codec.GrawCodec.encode(new server.shared.codec.GrawCodec.Envelope(
+        UUID.randomUUID(), UUID.randomUUID(), 0, Instant.now(), observation));
+    byte[] raw = java.nio.ByteBuffer.allocate(record.length + 4).putInt(record.length).put(record).array();
+    var input = inputs.create("capture.graw", 0, InputKind.GNSS_CAPTURE);
+    inputs.append(input.inputId(), 0, raw);
+    var pvt = new DtnModels.Pvt();
+    pvt.setWeek(2400); pvt.setTowSeconds(123.5);
+    pvt.setPositionValid(true); pvt.setVelocityValid(true);
+    pvt.setEcefMeters(new double[] {1, 2, 3});
+    pvt.setVelocityMetersPerSecond(new double[] {0.1, 0.2, 0.3});
+    agentMessages.handle(Envelope.of(MessageType.STATUS, "capture-sender", AgentRole.SENDER,
+        input.inputId(), json.valueToTree(new Progress(EventType.GNSS_STATUS, 100,
+            "SingleEpochComplete", "Complete", Map.of("pvt", List.of(pvt))))));
+    assertTrue(inputs.get(input.inputId()).complete());
+    assertNotNull(inputs.get(input.inputId()).capturedPvtJson());
+    assertFalse(json.valueToTree(inputs.get(input.inputId())).has("capturedPvtJson"));
+    // Repeating the ordinary completion API must not erase the saved preview.
+    inputs.complete(input.inputId());
+    var response = HttpClient.newHttpClient().send(HttpRequest.newBuilder(URI.create(
+        "http://localhost:" + port + "/lnis/api/v1/dtn/inputs/" + input.inputId() + "/pvt"))
+        .GET().build(), HttpResponse.BodyHandlers.ofString());
+    assertEquals(200, response.statusCode(), response.body());
+    assertEquals(json.valueToTree(List.of(pvt)), json.readTree(response.body()));
+    inputs.remove(input.inputId());
+  }
 
   @Test void roundTripAndAuthenticationAndPayloadIntegrity() throws Exception {
     callback.set(URI.create("http://127.0.0.1:" + port + "/lnis/api/v1/dtn/receive"));

@@ -75,4 +75,27 @@ class AgentMessageServiceTest {
         .publish(
             eq(EventType.ERROR), eq("receiver-1"), eq(AgentRole.RECEIVER), eq(sessionId), any());
   }
+  @Test void olderAgentCanCompleteCaptureWithoutPvtCounters() throws Exception {
+    var json = new ObjectMapper().findAndRegisterModules();
+    var service = new AgentMessageService(json, agents, inputs, sessions, events, lifecycle,
+        frameEvidence, connectionRegistry);
+    UUID id = UUID.randomUUID();
+    service.handle(Envelope.of(MessageType.STATUS, "sender", AgentRole.SENDER, id,
+        json.valueToTree(new server.shared.model.AgentProtocol.Progress(EventType.GNSS_STATUS,
+            100, "SingleEpochComplete", "Complete", Map.of()))));
+    verify(inputs).complete(id);
+  }
+
+  @Test void invalidAgentPvtDoesNotMarkInputComplete() {
+    var json = new ObjectMapper().findAndRegisterModules();
+    var service = new AgentMessageService(json, agents, inputs, sessions, events, lifecycle,
+        frameEvidence, connectionRegistry);
+    UUID id = UUID.randomUUID();
+    var pvt = new server.shared.model.DtnModels.Pvt();
+    org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> service.handle(
+        Envelope.of(MessageType.STATUS, "sender", AgentRole.SENDER, id,
+            json.valueToTree(new server.shared.model.AgentProtocol.Progress(EventType.GNSS_STATUS,
+                100, "SingleEpochComplete", "Complete", Map.of("pvt", java.util.List.of(pvt)))))));
+    org.mockito.Mockito.verifyNoInteractions(inputs);
+  }
 }

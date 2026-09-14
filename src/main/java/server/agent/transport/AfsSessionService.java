@@ -12,6 +12,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.Future;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.BiConsumer;
@@ -80,6 +82,20 @@ public final class AfsSessionService implements AutoCloseable {
   private record ReceivedFrame(int index, int prn, int week, int intervalOfWeek,
       int timeOfInterval, byte[] payload) {}
 
+  private static final class Operation {
+    volatile boolean cancelled;
+    Future<?> future;
+
+    void check() {
+      if (cancelled || Thread.currentThread().isInterrupted()) throw new CancellationException();
+    }
+
+    void cancel() {
+      cancelled = true;
+      if (future != null) future.cancel(true);
+    }
+  }
+
   private static final class ReceiverContext {
     final UUID sessionId;
     final SessionCommand command;
@@ -89,7 +105,8 @@ public final class AfsSessionService implements AutoCloseable {
     final Consumer<RoleResult> result;
     final List<ReceivedFrame> frames = new ArrayList<>();
     AfsTransferStart manifest;
-    boolean cancelled;
+    final Operation operation = new Operation();
+    boolean evaluating;
 
     ReceiverContext(UUID sessionId, SessionCommand command, BiConsumer<EventType, Object> event,
         Consumer<FrameEvidenceMessage> evidence, Consumer<RoleResult> result) {
@@ -102,11 +119,17 @@ public final class AfsSessionService implements AutoCloseable {
   }
 
   private final NativeAfsCodec codec;
-  private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
+  private final ExecutorService executor;
   private ReceiverContext receiver;
+  private Operation sender;
 
   public AfsSessionService(NativeAfsCodec codec) {
+    this(codec, Executors.newVirtualThreadPerTaskExecutor());
+  }
+
+  AfsSessionService(NativeAfsCodec codec, ExecutorService executor) {
     this.codec = codec;
+    this.executor = executor;
   }
 
   /** Receiver를 소켓 없이 준비하고 start/batch/complete 메시지를 기다린다. */
@@ -122,27 +145,36 @@ public final class AfsSessionService implements AutoCloseable {
   }
 
   /** GRAW를 AFS frame으로 변환해 작은 batch로 전달하고 Sender 결과를 생성한다. */
-  public void send(UUID sessionId, SessionCommand command, byte[] source,
+  public synchronized void send(UUID sessionId, SessionCommand command, byte[] source,
       BiConsumer<EventType, Object> event, Consumer<FrameEvidenceMessage> evidence,
       Consumer<RoleResult> result, TransferSink transfer) {
-    executor.submit(() -> runSender(sessionId, command, source, event, evidence, result, transfer));
+    if (sender != null) throw new IllegalStateException("AFS sender is already running");
+    Operation operation = new Operation();
+    sender = operation;
+    operation.future = executor.submit(() -> {
+      try { runSender(operation, sessionId, command, source, event, evidence, result, transfer); }
+      finally { finishSender(operation); }
+    });
   }
 
-  private void runSender(UUID id, SessionCommand command, byte[] source,
+  private void runSender(Operation operation, UUID id, SessionCommand command, byte[] source,
       BiConsumer<EventType, Object> event, Consumer<FrameEvidenceMessage> evidence,
       Consumer<RoleResult> result, TransferSink transfer) {
     Instant started = Instant.now();
     try {
+      operation.check();
       List<byte[]> records = GrawCodec.splitLengthPrefixed(source);
       AfsFrameBuilder.Prepared prepared =
-          new AfsFrameBuilder(codec).prepare(records, command.options(), command.afs().prn());
+          new AfsFrameBuilder(codec).prepare(records, command.options(), command.afs().prn(), operation::check);
       String sourceHash = Hashing.hex(Hashing.sha256Digest().digest(source));
       AfsTransferStart manifest = new AfsTransferStart(command.senderAgentId(),
           command.receiverAgentId(), source.length, sourceHash, records.size(),
           prepared.frames().size(), command.afs().prn(), command.options().testType(),
           command.options().errorCount(), command.options().errorSeed(),
           command.options().syncDamageInterval(), prepared.injectedFrameCount());
+      operation.check();
       transfer.start(manifest);
+      operation.check();
 
       Map<Integer, AfsFrameBuilder.InjectionDetail> injections = new HashMap<>();
       prepared.injections().forEach(value -> injections.put(value.frameIndex(), value));
@@ -153,9 +185,11 @@ public final class AfsSessionService implements AutoCloseable {
           "injectedFrameCount", prepared.injectedFrameCount()));
 
       for (int offset = 0; offset < prepared.frames().size(); offset += FRAMES_PER_BATCH) {
+        operation.check();
         int end = Math.min(prepared.frames().size(), offset + FRAMES_PER_BATCH);
         List<AfsTransferFrame> frames = new ArrayList<>(end - offset);
         for (int index = offset; index < end; index++) {
+          operation.check();
           AfsFrameBuilder.Frame frame = prepared.frames().get(index);
           frames.add(new AfsTransferFrame(index, command.afs().prn(), frame.week(),
               frame.intervalOfWeek(), frame.timeOfInterval(), frame.payload()));
@@ -169,24 +203,33 @@ public final class AfsSessionService implements AutoCloseable {
                     : "Sender가 시험 조건에 따라 비트를 반전한 프레임"));
           }
         }
+        operation.check();
         transfer.batch(new AfsTransferBatch(command.senderAgentId(), command.receiverAgentId(), frames));
+        operation.check();
         event.accept(EventType.TX_STATUS, Map.of("percent",
             35 + (int) (45.0 * end / prepared.frames().size()), "stage", "Transferring",
             "message", "AFS frame " + end + "/" + prepared.frames().size() + " 전달",
             "transferredFrames", end, "totalFrames", prepared.frames().size()));
       }
+      operation.check();
       transfer.complete(new AfsTransferComplete(command.senderAgentId(),
           command.receiverAgentId(), prepared.frames().size()));
 
       IntegrityResult integrity = new IntegrityResult(true, source.length, source.length,
           sourceHash, sourceHash, records.size(), records.size(), "AFS frame 생성 및 전달 완료");
       long injectedBits = (long) command.options().errorCount() * prepared.injectedFrameCount();
+      operation.check();
+      finishSender(operation);
       result.accept(new RoleResult(2, id, AgentRole.SENDER, Verdict.PASS, Instant.now(),
           integrity, List.of(metric("GeneratedFrames", prepared.frames().size(), "frame")),
           new AfsCounters(prepared.frames().size(), prepared.frames().size(), 0, source.length,
               Duration.between(started, Instant.now()), 0, injectedBits, 0),
           List.of(resourceSample()), null));
+    } catch (CancellationException ignored) {
+      // Cancellation has no role result.
     } catch (Exception error) {
+      if (operation.cancelled) return;
+      finishSender(operation);
       result.accept(failed(id, AgentRole.SENDER, error));
       event.accept(EventType.ERROR, Map.of("message", safe(error)));
     }
@@ -243,18 +286,23 @@ public final class AfsSessionService implements AutoCloseable {
         || context.frames.size() != manifest.frameCount()) {
       throw new IllegalArgumentException("AFS transfer 완료 경계와 수신 프레임 수가 일치하지 않습니다.");
     }
-    receiver = null;
-    executor.submit(() -> runReceiver(context));
+    context.evaluating = true;
+    context.operation.future = executor.submit(() -> {
+      try { runReceiver(context); }
+      finally { finishReceiver(context); }
+    });
   }
 
   private void runReceiver(ReceiverContext context) {
     AfsTransferStart manifest = context.manifest;
     try {
+      context.operation.check();
       context.event.accept(EventType.RX_STATUS, Map.of("percent", 85, "stage", "Evaluating",
           "message", "AFS frame 복호화 및 GRAW 무결성 검증", "receivedFrames",
           context.frames.size(), "expectedFrames", manifest.frameCount()));
-      DecodeAggregate aggregate = decodeFrames(context.frames, manifest.testType());
+      DecodeAggregate aggregate = decodeFrames(context.frames, manifest.testType(), context.operation);
       for (ReceivedFrame frame : context.frames) {
+        context.operation.check();
         if (!shouldKeepEvidence(frame.index(), manifest.frameCount())) continue;
         FrameDecodeDiagnostic diagnostic = aggregate.diagnostics.get(frame.index());
         context.evidence.accept(new FrameEvidenceMessage(frame.index(), null, null, frame.payload(),
@@ -278,6 +326,7 @@ public final class AfsSessionService implements AutoCloseable {
       List<byte[]> records = aggregate.reassembler.completeRecords();
       ByteArrayOutputStream reconstructed = new ByteArrayOutputStream();
       for (byte[] record : records) {
+        context.operation.check();
         reconstructed.writeBytes(ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN)
             .putInt(record.length).array());
         reconstructed.writeBytes(record);
@@ -306,42 +355,53 @@ public final class AfsSessionService implements AutoCloseable {
               raw.length, Duration.between(context.started, Instant.now()),
               aggregate.decodeFailedFrames, injectedBits, rejected),
           List.of(resourceSample()), passed ? null : integrity.detail());
+      context.operation.check();
       context.event.accept(EventType.RX_STATUS, Map.of("percent", 100, "stage", "Verified",
           "message", "AFS frame 및 GRAW 검증 완료", "integritySuccess", integrity.success(),
           "processedFrames", context.frames.size(), "fullyDecodedFrames",
           aggregate.fullyDecodedFrames));
+      context.operation.check();
+      finishReceiver(context);
       context.result.accept(result);
+    } catch (CancellationException ignored) {
+      // Cancellation has no role result.
     } catch (Exception error) {
+      if (context.operation.cancelled) return;
+      finishReceiver(context);
       context.result.accept(failed(context.sessionId, AgentRole.RECEIVER, error));
       context.event.accept(EventType.ERROR, Map.of("message", safe(error)));
     }
   }
 
-  private DecodeAggregate decodeFrames(Collection<ReceivedFrame> input, TestType type) {
+  private DecodeAggregate decodeFrames(Collection<ReceivedFrame> input, TestType type, Operation operation) {
     DecodeAggregate total = new DecodeAggregate();
     if (type == TestType.TEST_D_SYNC_RECOVERY) {
       ByteArrayOutputStream joined = new ByteArrayOutputStream();
-      input.forEach(frame -> joined.writeBytes(frame.payload()));
+      input.forEach(frame -> { operation.check(); joined.writeBytes(frame.payload()); });
       byte[] bytes = joined.toByteArray();
-      List<Long> offsets = findConfirmedSyncOffsets(bytes);
+      List<Long> offsets = findConfirmedSyncOffsets(bytes, operation::check);
       List<ReceivedFrame> ordered = new ArrayList<>(input);
       total.recoveredSyncFrames = offsets.size();
       for (long offset : offsets) {
+        operation.check();
         int source = (int) (offset / 6000);
-        if (source < ordered.size()) decodeOne(extract(bytes, offset), ordered.get(source), total);
+        if (source < ordered.size()) decodeOne(extract(bytes, offset), ordered.get(source), total, operation);
       }
       return total;
     }
-    input.forEach(frame -> decodeOne(frame.payload(), frame, total));
+    input.forEach(frame -> decodeOne(frame.payload(), frame, total, operation));
     return total;
   }
 
-  private void decodeOne(byte[] frame, ReceivedFrame source, DecodeAggregate total) {
+  private void decodeOne(byte[] frame, ReceivedFrame source, DecodeAggregate total, Operation operation) {
+    operation.check();
     try {
       NativeAfsCodec.Decoded decoded = codec.decode(source.timeOfInterval(), frame);
+      operation.check();
       total.decodedFrames++;
       total.reencodedFrames.put(source.index(), codec.encode(source.timeOfInterval(), decoded.sb2(),
           decoded.sb3(), decoded.sb4()));
+      operation.check();
       if (decoded.sb2Valid()) {
         total.sb2Valid++;
         total.sb2Ephemeris.put(source.index(), Sb2PayloadCodec.decode(decoded.sb2(), source.prn(),
@@ -363,7 +423,10 @@ public final class AfsSessionService implements AutoCloseable {
         total.reassembler.add(AfsRawFragmentCodec.decode(AfsRawFragmentCodec.fromSbBits(decoded.sb3())));
         total.reassembler.add(AfsRawFragmentCodec.decode(AfsRawFragmentCodec.fromSbBits(decoded.sb4())));
       }
+    } catch (CancellationException cancelled) {
+      throw cancelled;
     } catch (Exception error) {
+      operation.check();
       total.decodeFailedFrames++;
       total.diagnostics.put(source.index(), new FrameDecodeDiagnostic(false, false, false, false,
           false, 0, 0, 0, false, safe(error)));
@@ -371,7 +434,7 @@ public final class AfsSessionService implements AutoCloseable {
   }
 
   private synchronized ReceiverContext requireReceiver(UUID sessionId) {
-    if (receiver == null || !receiver.sessionId.equals(sessionId) || receiver.cancelled) {
+    if (receiver == null || !receiver.sessionId.equals(sessionId) || receiver.operation.cancelled || receiver.evaluating) {
       throw new IllegalStateException("준비된 Receiver AFS 세션이 없습니다.");
     }
     return receiver;
@@ -382,16 +445,31 @@ public final class AfsSessionService implements AutoCloseable {
     return context.manifest;
   }
 
+  private synchronized void finishSender(Operation operation) {
+    if (sender == operation) sender = null;
+  }
+
+  private synchronized void finishReceiver(ReceiverContext context) {
+    if (receiver == context) receiver = null;
+  }
+
   public synchronized void cancel() {
-    if (receiver != null) receiver.cancelled = true;
+    if (sender != null) sender.cancel();
+    if (receiver != null) receiver.operation.cancel();
+    sender = null;
     receiver = null;
   }
 
   static List<Long> findConfirmedSyncOffsets(byte[] bytes) {
+    return findConfirmedSyncOffsets(bytes, () -> {});
+  }
+
+  private static List<Long> findConfirmedSyncOffsets(byte[] bytes, Runnable checkpoint) {
     byte[] sync = {(byte) 0xCC, 0x63, (byte) 0xF7, 0x45, 0x36, (byte) 0xF4,
         (byte) 0x9E, 0x04, (byte) 0xA0};
     List<Long> candidates = new ArrayList<>();
     for (long offset = 0; offset + 6000 <= (long) bytes.length * 8; offset++) {
+      if ((offset & 4095) == 0) checkpoint.run();
       boolean matched = true;
       for (int index = 0; index < 68; index++) {
         if (bit(bytes, offset + index) != bit(sync, index)) { matched = false; break; }

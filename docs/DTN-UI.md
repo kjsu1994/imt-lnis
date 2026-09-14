@@ -23,8 +23,13 @@
   with a 120-second acquisition deadline and 1 MiB input cap. Previous unsuccessful
   observation epochs are not transmitted. RAW direct transfer and I/Q transfer remain unavailable.
   Serial completion finalizes the input on the server even when the browser disconnects.
-  GET `/dtn/inputs/{id}/pvt` recalculates the completed input for preview; transmission
-  recalculates the exact same records through the existing sender/receiver engine.
+  The Agent includes its validated PVT in the completion status. The server persists it
+  in the nullable `input_buffers.captured_pvt_json` column together with input completion.
+  GET `/dtn/inputs/{id}/pvt` returns this saved preview in both central-server and node modes,
+  including after a browser reconnect or server restart. Central mode requires the updated
+  capture Agent. Inputs without a saved preview retain the existing node-only calculation
+  fallback. Transmission still recalculates the exact same records independently through
+  the existing sender/receiver engine.
   The collecting service will need complete navigation information plus one target epoch;
   simply stopping after the first RAWX message is not sufficient.
 
@@ -99,3 +104,11 @@ For the local Docker demonstration, copy the GRAW and LICENSE into the sender's
 `examples` directory and use `deployment/node/docker-compose.example.yml` as an explicit
 override. Starting with only the normal Compose file disables the feature. Removing
 the override and example files does not affect normal uploads or AFS/PVT tests.
+
+## AFS cancellation
+
+AFS cancellation interrupts the session worker and checks cancellation between frame
+encoding, transfer batches, synchronization scanning and decoding. A native codec call
+already in progress finishes before its result is discarded; no subsequent frame is
+processed for that cancelled task. Late completion callbacks and in-flight frames from
+an older session cannot release or fail a newer AFS session.

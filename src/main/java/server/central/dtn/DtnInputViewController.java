@@ -15,6 +15,7 @@ import server.shared.model.DtnObservationView;
 @RequestMapping("/lnis/api/v1/dtn/inputs")
 public class DtnInputViewController {
   private final InputBufferService inputs;
+  private final com.fasterxml.jackson.databind.ObjectMapper json;
   @org.springframework.beans.factory.annotation.Autowired(required = false)
   private DtnPvtCalculator calculator;
 
@@ -24,8 +25,11 @@ public class DtnInputViewController {
   }
 
   @GetMapping("/{id}/pvt")
-  public java.util.List<DtnModels.Pvt> pvt(@PathVariable UUID id) {
+  public java.util.List<DtnModels.Pvt> pvt(@PathVariable UUID id) throws java.io.IOException {
     var records = records(id);
+    String captured = inputs.get(id).capturedPvtJson();
+    if (captured != null)
+      return json.readValue(captured, new com.fasterxml.jackson.core.type.TypeReference<>() {});
     if (calculator == null) throw new IllegalStateException("PVT 미리보기는 통합 노드 실행에서 지원됩니다.");
     return calculator.calculate(records);
   }

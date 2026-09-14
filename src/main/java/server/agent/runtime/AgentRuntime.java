@@ -29,6 +29,8 @@ public final class AgentRuntime implements AutoCloseable {
   private final ObjectMapper json = new ObjectMapper().findAndRegisterModules();
   private final AtomicReference<AgentState> state = new AtomicReference<>(AgentState.READY);
   private final AfsSessionService afs;
+  private final Object afsStateLock = new Object();
+  private UUID activeAfsSession;
   private final server.agent.dtn.DtnWorker dtn;
   private final Map<UUID, ByteArrayOutputStream> sessionInputs = new ConcurrentHashMap<>();
   private volatile Consumer<Envelope> outbound = ignored -> {};
@@ -78,6 +80,10 @@ public final class AgentRuntime implements AutoCloseable {
             Map.of("bytes", bytes));
         return;
       }
+      if ((envelope.type() == MessageType.AFS_TRANSFER_START
+          || envelope.type() == MessageType.AFS_TRANSFER_BATCH
+          || envelope.type() == MessageType.AFS_TRANSFER_COMPLETE)
+          && !isActiveAfs(envelope.sessionId())) return;
       if (envelope.type() == MessageType.AFS_TRANSFER_START) {
         afs.receiveStart(envelope.sessionId(),
             json.treeToValue(envelope.payload(), AfsTransferStart.class));
@@ -148,10 +154,15 @@ public final class AgentRuntime implements AutoCloseable {
   }
 
   private void cancel(UUID sessionId) {
-    capture.stop();
-    afs.cancel();
+    synchronized (afsStateLock) {
+      // A delayed cancellation must not stop a newer trial.
+      if (activeAfsSession != null && !activeAfsSession.equals(sessionId)) return;
+      capture.stop();
+      activeAfsSession = null;
+      afs.cancel();
+      state.set(AgentState.READY);
+    }
     sessionInputs.remove(sessionId);
-    state.set(AgentState.READY);
     status(sessionId, EventType.SESSION_STATUS, 0, "Cancelled", "Operation cancelled", Map.of());
   }
 
@@ -160,14 +171,19 @@ public final class AgentRuntime implements AutoCloseable {
     if (config.role() != server.shared.model.LnisModels.AgentRole.RECEIVER) {
       throw new IllegalStateException("Only RECEIVER can arm AFS reception");
     }
-    state.set(AgentState.BUSY);
     var command = json.treeToValue(args, AfsSessionService.SessionCommand.class);
-    afs.arm(
-        sessionId,
-        command,
-        (type, payload) -> event(sessionId, type, payload),
-        evidence -> frameEvidence(sessionId, evidence),
-        result -> completeRole(sessionId, result));
+    beginAfs(sessionId);
+    try {
+      afs.arm(
+          sessionId,
+          command,
+          (type, payload) -> event(sessionId, type, payload),
+          evidence -> frameEvidence(sessionId, evidence),
+          result -> completeRole(sessionId, result));
+    } catch (RuntimeException error) {
+      abandonAfs(sessionId);
+      throw error;
+    }
   }
 
   /** 전달 완료된 GRAW 입력을 꺼내 AFS frame 생성 및 관리 채널 전송을 시작한다. */
@@ -179,26 +195,31 @@ public final class AgentRuntime implements AutoCloseable {
     if (input == null || input.size() == 0) {
       throw new IllegalStateException("No GRAW input was transferred");
     }
-    state.set(AgentState.BUSY);
     var command = json.treeToValue(args, AfsSessionService.SessionCommand.class);
-    afs.send(
-        sessionId,
-        command,
-        input.toByteArray(),
-        (type, payload) -> event(sessionId, type, payload),
-        evidence -> frameEvidence(sessionId, evidence),
-        result -> completeRole(sessionId, result),
-        new AfsSessionService.TransferSink() {
-          @Override public void start(AfsTransferStart start) {
-            send(MessageType.AFS_TRANSFER_START, sessionId, json.valueToTree(start));
-          }
-          @Override public void batch(AfsTransferBatch batch) {
-            send(MessageType.AFS_TRANSFER_BATCH, sessionId, json.valueToTree(batch));
-          }
-          @Override public void complete(AfsTransferComplete complete) {
-            send(MessageType.AFS_TRANSFER_COMPLETE, sessionId, json.valueToTree(complete));
-          }
-        });
+    beginAfs(sessionId);
+    try {
+      afs.send(
+          sessionId,
+          command,
+          input.toByteArray(),
+          (type, payload) -> event(sessionId, type, payload),
+          evidence -> frameEvidence(sessionId, evidence),
+          result -> completeRole(sessionId, result),
+          new AfsSessionService.TransferSink() {
+            @Override public void start(AfsTransferStart start) {
+              send(MessageType.AFS_TRANSFER_START, sessionId, json.valueToTree(start));
+            }
+            @Override public void batch(AfsTransferBatch batch) {
+              send(MessageType.AFS_TRANSFER_BATCH, sessionId, json.valueToTree(batch));
+            }
+            @Override public void complete(AfsTransferComplete complete) {
+              send(MessageType.AFS_TRANSFER_COMPLETE, sessionId, json.valueToTree(complete));
+            }
+          });
+    } catch (RuntimeException error) {
+      abandonAfs(sessionId);
+      throw error;
+    }
   }
 
   /** AFS 원문 증거는 전용 메시지로 중앙 서버에 보낸다. */
@@ -206,9 +227,32 @@ public final class AgentRuntime implements AutoCloseable {
     send(MessageType.FRAME_EVIDENCE, sessionId, json.valueToTree(evidence));
   }
 
+  private boolean isActiveAfs(UUID sessionId) {
+    synchronized (afsStateLock) {
+      return sessionId != null && sessionId.equals(activeAfsSession);
+    }
+  }
+
+  private void beginAfs(UUID sessionId) {
+    synchronized (afsStateLock) {
+      if (activeAfsSession != null) throw new IllegalStateException("AFS operation already running");
+      activeAfsSession = sessionId;
+      state.set(AgentState.BUSY);
+    }
+  }
+
+  private boolean abandonAfs(UUID sessionId) {
+    synchronized (afsStateLock) {
+      if (!sessionId.equals(activeAfsSession)) return false;
+      activeAfsSession = null;
+      state.set(AgentState.READY);
+      return true;
+    }
+  }
+
   private void completeRole(UUID sessionId, Object result) {
-    send(MessageType.ROLE_RESULT, sessionId, json.valueToTree(result));
-    state.set(AgentState.READY);
+    if (abandonAfs(sessionId))
+      send(MessageType.ROLE_RESULT, sessionId, json.valueToTree(result));
   }
 
   /** COM 포트 설정을 역직렬화하고 canonical GRAW 청크 callback을 등록한다. */
@@ -217,10 +261,14 @@ public final class AgentRuntime implements AutoCloseable {
       throw new IllegalStateException("Only SENDER can capture GNSS");
     }
     var settings = json.treeToValue(args, SerialCaptureService.Settings.class);
+    var capturedPvt = new AtomicReference<List<server.shared.model.DtnModels.Pvt>>();
     var selection = settings.singleEpoch() ? new server.agent.gnss.SingleEpochCapture(records -> {
       try (var pvt = new server.agent.codec.NativePvtCodec(config.nativeDirectory())) {
-        var result = pvt.calculate(records).getFirst();
-        return result.isPositionValid() && result.isVelocityValid();
+        var results = pvt.calculate(records);
+        var result = results.getFirst();
+        if (!result.isPositionValid() || !result.isVelocityValid()) return false;
+        capturedPvt.set(results);
+        return true;
       }
     }) : null;
     state.set(AgentState.BUSY);
@@ -233,7 +281,7 @@ public final class AgentRuntime implements AutoCloseable {
           status(sessionId, EventType.ERROR, 0, "CaptureFailed", safe(error), Map.of());
         }, selection, () -> {
           state.set(AgentState.READY);
-          status(sessionId, EventType.GNSS_STATUS, 100, "SingleEpochComplete", "한 시점 수집·지구 PVT 검증 완료", Map.of());
+          status(sessionId, EventType.GNSS_STATUS, 100, "SingleEpochComplete", "한 시점 수집·지구 PVT 검증 완료", Map.of("pvt", capturedPvt.get()));
         });
     } catch (Exception error) {
       state.set(AgentState.READY);

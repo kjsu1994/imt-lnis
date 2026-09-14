@@ -99,7 +99,16 @@ public class InputBufferService {
     @Transactional
     public synchronized InputBufferEntity complete(UUID id)
     {
+        return complete(id, null);
+    }
+
+    /** Store Agent-calculated PVT atomically with input completion. */
+    @Transactional
+    public synchronized InputBufferEntity complete(UUID id, String capturedPvtJson)
+    {
         InputBufferEntity current = get(id);
+        if (capturedPvtJson != null && current.kind() != InputKind.GNSS_CAPTURE)
+            throw new IllegalArgumentException("Capture PVT requires a GNSS capture input");
         // 전체 파일을 한 배열로 합치지 않고 청크를 순차 공급해 큰 GRAW에서도 검증 메모리를 제한한다.
         GrawStreamingValidator validator = new GrawStreamingValidator();
         for (long i = 0; i < current.chunkCount(); i++) {
@@ -127,6 +136,8 @@ public class InputBufferService {
                         true,
                         current.createdAt(),
                         Instant.now());
+        complete.capturedPvtJson = current.capturedPvtJson() != null
+                ? current.capturedPvtJson() : capturedPvtJson;
         inputBufferRepository.save(complete, completedRetention);
         // 메타데이터만 먼저 만료돼 고아 청크가 남지 않도록 모든 청크 TTL도 같은 시점으로 연장한다.
         inputBufferRepository.touchChunks(id, current.chunkCount(), completedRetention);

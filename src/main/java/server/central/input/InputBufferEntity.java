@@ -59,4 +59,16 @@ public class InputBufferEntity {
 
     /** 완료 검증이 끝난 UTC 시각이며 완료 전에는 {@code null}이다. */
     Instant completedAt;
+
+    /** PVT calculated by the capture Agent, retained with the immutable completed input. */
+    @Lob
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    String capturedPvtJson;
+
+    public InputBufferEntity(UUID inputId, InputKind kind, String fileName, long declaredSize,
+            long receivedSize, long chunkCount, long recordCount, String sha256, boolean complete,
+            Instant createdAt, Instant completedAt) {
+        this(inputId, kind, fileName, declaredSize, receivedSize, chunkCount, recordCount, sha256,
+                complete, createdAt, completedAt, null);
+    }
 }
