@@ -89,6 +89,25 @@ public class NativePvtIntegrationTest {
     }
   }
 
+  @Test void rawUsesSameEarthSolverAndRejectsDispatchOrHashChanges() throws Exception {
+    try (var codec = NativeAfsCodec.load(candidate())) {
+      var processor = new DtnProcessor(codec, candidate());
+      UUID id = UUID.randomUUID(); byte[] input = validSample();
+      var prepared = processor.prepare(id, input, true);
+      var transfer = prepared.getTransfer();
+      assertEquals("GNSS_RAW", transfer.getTestType());
+      assertNull(transfer.getFrames());
+      assertArrayEquals(input, Base64.getDecoder().decode(transfer.getGrawBase64()));
+      assertEquals(prepared.getPvt(), processor.receive(id, transfer).getPvt());
+      assertTrue(prepared.getPvt().getFirst().isPositionValid());
+      assertTrue(prepared.getPvt().getFirst().isVelocityValid());
+      transfer.setTestType("IQ_SAMPLE");
+      assertThrows(IllegalArgumentException.class, () -> processor.receive(id, transfer));
+      transfer.setTestType("GNSS_RAW"); transfer.setSourceSha256("0".repeat(64));
+      assertThrows(IllegalArgumentException.class, () -> processor.receive(id, transfer));
+    }
+  }
+
   /** native/test_pvt.c가 생성한 합성 항법/관측값이다. 실제 장비 로그가 아니다. */
   public static byte[] validSample() throws Exception {
     List<GrawCodec.Message> messages = new ArrayList<>();
@@ -109,10 +128,10 @@ public class NativePvtIntegrationTest {
     }
     messages.add(new GrawCodec.ObservationEpoch(100000, 2400, 18, 1, 1, observations));
     java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
-    UUID capture = UUID.randomUUID();
+    UUID capture = UUID.nameUUIDFromBytes("synthetic-earth-pvt-v1".getBytes(java.nio.charset.StandardCharsets.UTF_8));
     int sequence = 0;
     for (var message : messages) {
-      byte[] record = GrawCodec.encode(new GrawCodec.Envelope(capture, UUID.randomUUID(), sequence++,
+      byte[] record = GrawCodec.encode(new GrawCodec.Envelope(capture, UUID.nameUUIDFromBytes((capture + ":" + sequence).getBytes(java.nio.charset.StandardCharsets.UTF_8)), sequence++,
           Instant.parse("2026-09-07T00:00:00Z"), message));
       out.writeBytes(ByteBuffer.allocate(4).putInt(record.length).array()); out.writeBytes(record);
     }

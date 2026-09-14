@@ -253,8 +253,18 @@
  * 입력 방식
  * ========================================================= */
 
+.receiver-pvt-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.receiver-pvt-pair > div { min-width: 0; padding: 12px; border: 1px solid var(--line); border-radius: 8px; }
+.receiver-pvt-pair h3 { margin: 0 0 10px; font-size: 14px; }
+body[data-page^="dtn-"] .receiver-pvt-pair .pvt-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.receiver-pvt-pair .pvt-value { padding: 8px; min-width: 0; }
+.receiver-pvt-pair .pvt-value strong { font-size: 16px; overflow-wrap: anywhere; }
+@media (max-width: 600px) { .receiver-pvt-pair { grid-template-columns: 1fr; } }
+
 .compact-tabs {
     display: flex;
+    flex-wrap: wrap;
+    align-items: center;
 
     gap: 5px;
 
@@ -283,31 +293,6 @@
  * 상세 통신 설정
  * ========================================================= */
 
-.advanced-settings {
-    margin: 14px 0;
-
-    padding: 10px 12px;
-
-    border: 1px solid var(--line);
-
-    border-radius: 8px;
-}
-
-
-.advanced-settings summary {
-    cursor: pointer;
-
-    font-size: 12px;
-
-    font-weight: 700;
-
-    color: var(--muted);
-}
-
-
-.advanced-settings label {
-    margin-top: 12px;
-}
 
 
 
@@ -746,17 +731,32 @@ body[data-page="dtn-sender"] .dtn-input-heading strong { font-size: 12px; color:
 body[data-page="dtn-sender"] .dtn-input-header .dtn-send-actions { margin-left: auto; min-width: 0; }
 body[data-page="dtn-sender"] .dtn-send-actions button { flex-shrink: 0; }
 body[data-page^="dtn-"] .dtn-send-actions p { margin: 0; font-size: 13px; color: var(--muted); }
-body[data-page^="dtn-"] .dtn-comparison-card { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; }
-body[data-page^="dtn-"] .dtn-comparison-card h2 { margin: 0; }
+body[data-page^="dtn-"] .dtn-comparison-card { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 13px; }
 body[data-page^="dtn-"] .dtn-comparison-card .result-console { min-height: 0; padding: 0; margin: 0; background: none; white-space: pre-wrap; overflow-wrap: anywhere; }
 body[data-page^="dtn-"] .dtn-comparison-card .observation-summary { padding: 0; }
 body[data-page^="dtn-"] main { max-width: 1500px; display: grid; gap: 14px; }
 body[data-page^="dtn-"] .status-strip { margin: 0; }
-body[data-page^="dtn-"] .destination-row { grid-template-columns: minmax(180px, 1fr) 90px auto auto auto; }
+.synthetic-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.dtn-output-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+body[data-page^="dtn-"] .dtn-output-grid > .card { height: 440px; margin: 0; box-sizing: border-box; display: flex; flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 10px; overflow: auto; }
+body[data-page^="dtn-"] .dtn-output-grid .card-title { margin: 0; }
+body[data-page^="dtn-"] .dtn-output-grid .log { flex: 1; min-height: 0; max-height: none; height: auto; margin: 0; overflow: auto; }
+.dtn-output-grid #dtn-payload > div:not(.dtn-payload-controls) { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.dtn-output-grid #dtn-payload > p { flex: 0 0 auto; }
+.dtn-output-grid #dtn-payload > h2,
+.dtn-output-grid #dtn-payload .dtn-payload-controls { flex: 0 0 auto; margin: 0; }
+.dtn-output-grid #dtn-payload > div:not(.dtn-payload-controls) > p { flex: 0 0 auto; margin: 0 0 8px; overflow-wrap: anywhere; }
+.dtn-output-grid .dtn-payload-text { flex: 1; min-height: 120px; height: auto; margin-top: 8px; resize: none; }
+@media (max-width: 900px) { .dtn-output-grid { grid-template-columns: minmax(0, 1fr); } }
+body[data-page^="dtn-"] .destination-row { grid-template-columns: minmax(180px, 1fr) 90px auto auto; }
+body[data-page="dtn-sender"] .destination-status { min-height: 40px; }
+body[data-page="dtn-sender"] .destination-status > div { display: flex; align-items: center; gap: 10px; white-space: nowrap; }
 body[data-page^="dtn-"] .card { min-width: 0; }
 body[data-page^="dtn-"] .card h2 { margin-bottom: 12px; }
 body[data-page^="dtn-"] .compact-input-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
 body[data-page^="dtn-"] .compact-input-row label { flex: 1; min-width: 180px; }
+body[data-page^="dtn-"] #dtn-capture-panel > label { flex: 0 1 220px; min-width: 160px; }
+body[data-page^="dtn-"] #dtn-capture-panel > .serial-settings { flex: 1 1 260px; }
 body[data-page^="dtn-"] .compact-input-row progress { width: 150px; margin-bottom: 12px; }
 body[data-page="dtn-sender"] #dtn-upload-panel { display: grid; grid-template-columns: minmax(240px, 1fr) auto minmax(220px, 1fr); align-items: end; }
 body[data-page="dtn-sender"] #dtn-upload-panel > label { min-width: 0; margin: 0; }

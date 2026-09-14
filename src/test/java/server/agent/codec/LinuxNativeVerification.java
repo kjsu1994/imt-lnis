@@ -34,6 +34,7 @@ public final class LinuxNativeVerification {
         regression.rejectsMalformedNativeInputWithoutFabricatingCoordinates();
         regression.reservedSignalByteDoesNotTreatCnavAsLnav();
         regression.validGpsSolutionSurvivesAfsRoundTrip();
+        regression.rawUsesSameEarthSolverAndRejectsDispatchOrHashChanges();
         System.out.println("PASS: Linux JNA ABI, AFS/DTN roundtrip, PVT solution, no-fix, CNAV exclusion, hash rejection");
     }
 }

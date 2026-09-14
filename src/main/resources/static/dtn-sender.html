@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>LNIS DTN Sender</title>
-  <link rel="stylesheet" href="/lnis/assets/app.css?v=20260914-local-adapter">
-  <link rel="stylesheet" href="/lnis/assets/dtn-payload.css?v=20260913-compact">
-  <link rel="stylesheet" href="/lnis/assets/dtn-ui.css?v=20260914-local-adapter">
+  <link rel="stylesheet" href="/lnis/assets/app.css?v=20260914-transfer-v2">
+  <link rel="stylesheet" href="/lnis/assets/dtn-payload.css?v=20260914-download-button">
+  <link rel="stylesheet" href="/lnis/assets/dtn-ui.css?v=20260914-synthetic-tools">
 </head>
 <body data-page="dtn-sender">
 <header>
@@ -24,9 +24,9 @@
   <section class="card">
     <div class="card-title"><h2>시험 설정</h2><span class="pill">송신</span></div>
     <div class="test-type-selector" aria-label="시험 데이터 유형">
-      <button type="button" class="test-type-button" data-test-type="GNSS_RAW">GNSS RAW <small>준비 중</small></button>
+      <button type="button" class="test-type-button" data-test-type="GNSS_RAW">GNSS RAW</button>
       <button type="button" class="test-type-button active" data-test-type="AFS_METADATA">AFS Frame + Metadata</button>
-      <button type="button" class="test-type-button" data-test-type="IQ_SAMPLE">I/Q Sample <small>준비 중</small></button>
+      <button type="button" class="test-type-button" data-test-type="IQ_SAMPLE">I/Q Sample</button>
     </div>
     <div class="transport-mode-section">
       <div class="transport-mode-title"><span>전송 경로</span><strong id="dtn-transport-mode-state">어댑터 적용 전</strong></div>
@@ -36,7 +36,6 @@
         <button type="button" class="transport-mode-button" data-sender-mode="HDTN" data-receiver-mode="DTN">HDTN → DTN</button>
         <button type="button" class="transport-mode-button" data-sender-mode="HDTN" data-receiver-mode="HDTN">HDTN → HDTN</button>
       </div>
-      <button id="dtn-apply-mode" type="button" disabled>경로 적용</button>
     </div>
     <select id="dtn-sender" hidden></select><select id="dtn-receiver" hidden></select>
     <div class="destination-row">
@@ -44,7 +43,6 @@
       <label class="port-field">포트<input id="dtn-receiver-port" type="number" min="1" max="65535" value="8091" required></label>
       <div class="destination-status"><span id="destination-dot" class="connection-dot unknown"></span>
         <div><small>송신 → 수신 서비스</small><strong id="destination-state">미확인</strong></div></div>
-      <div class="destination-status"><span class="connection-dot unknown"></span><div><small>역방향 연결</small><strong>미확인</strong></div></div>
       <div class="connection-actions"><button id="dtn-connection-test" type="button">연결 확인</button><button id="dtn-connection-save" type="button">저장·적용</button></div>
     </div>
     <small id="dtn-connection-message" role="status"></small>
@@ -54,7 +52,6 @@
           <input id="dtn-send-url" type="url" placeholder="http://어댑터-IP:포트" autocomplete="off"></label>
         <button id="dtn-adapter-health" type="button" aria-controls="dtn-adapter-health-results">연결 확인</button>
       </div>
-      <small class="adapter-url-help">이 PC에 연결된 어댑터만 10초마다 확인합니다. 주소 변경은 현재 화면에 적용됩니다.</small>
       <details id="dtn-adapter-health-results" class="adapter-health-results" aria-busy="false">
         <summary><span id="dtn-adapter-status" class="pill" role="status" aria-live="polite">미확인</span><span class="adapter-health-toggle">상세 보기</span></summary>
         <div class="adapter-health-content">
@@ -75,13 +72,14 @@
     <div class="compact-tabs">
       <button type="button" class="input-mode" data-input-mode="capture">COM 포트</button>
       <button type="button" class="input-mode active" data-input-mode="upload">capture.graw</button>
-      <button type="button" id="dtn-example" hidden>F9T 예제 불러오기 · 개발용</button>
+    <div id="dtn-development" class="synthetic-tools" hidden>
+      <button type="button" id="dtn-replay">합성 PVT 수집 재생 · 개발용</button>
+    </div>
     </div>
     <div id="dtn-capture-panel" class="hidden compact-input-row">
       <label>COM 포트<select id="dtn-port"><option value="">포트 선택</option></select></label>
       <button id="dtn-refresh" type="button">포트 조회</button>
-      <details class="advanced-settings"><summary>통신 설정</summary>
-        <label>보드레이트<select id="dtn-baud"><option>9600</option><option>38400</option><option>57600</option><option selected>115200</option><option>230400</option><option>460800</option><option>921600</option></select></label></details>
+      <label class="serial-settings">통신 속도 (baud)<select id="dtn-baud"><option>9600</option><option>38400</option><option>57600</option><option selected>115200</option><option>230400</option><option>460800</option><option>921600</option></select></label>
       <button id="dtn-start" type="button" disabled title="유효한 지구 PVT 한 시점 확보 후 자동 종료 · 최대 120초">수집 시작</button>
     </div>
     <div id="dtn-upload-panel" class="compact-input-row">
@@ -91,8 +89,11 @@
         <progress id="dtn-upload-progress" max="100" value="0" aria-label="파일 적용 상태" title="파일 업로드·검증 완료 시 채워집니다. 전송시험 진행률이 아닙니다."></progress></label>
     </div>
     <div id="dtn-iq-panel" class="hidden">
-      <div class="compact-input-row"><label>I/Q 파일 참조<input disabled placeholder="공유 폴더 연동 준비 중"></label><button disabled>파일 확인</button></div>
-      <div class="observation-summary"><span>길이 90초</span><span>크기 —</span><span>샘플 형식 —</span><span>SHA-256 —</span></div>
+      <div class="compact-input-row"><label>저장된 I/Q<select id="iq-saved"><option value="">저장된 파일 없음</option></select></label><button id="iq-delete" type="button" disabled>선택 파일 삭제</button></div>
+      <div class="compact-input-row"><button id="iq-generate" type="button">90초 I/Q 생성</button><button id="iq-cancel" type="button" disabled>생성 취소</button>
+        <progress id="iq-progress" max="100" value="0" aria-label="I/Q 파일 생성"></progress></div>
+      <p id="iq-state" role="status">생성 대기 · 12 MHz · 약 2.16 GB · 파일 경로만 REST로 전달</p>
+      <pre id="iq-file" class="result-console">GNSS 항법정보 기반 AFS I/Q · 수신 검증은 파일 크기·해시 기준</pre>
     </div>
   </section>
   <section class="card epoch-observation-card" id="dtn-observations"></section>
@@ -110,14 +111,17 @@
       <div class="pvt-value"><span>수신기 시계오차</span><strong id="pvt-clock">—</strong><small>s</small></div>
     </div>
     <small id="pvt-message">지구 ECEF · GPS L1 C/A · 전송시험 시작 시 계산</small>
-  </section>
-  <section class="card dtn-comparison-card"><h2>송·수신 PVT 비교</h2>
+    <div class="dtn-comparison-card" role="status" aria-label="송·수신 PVT 비교">
+    <strong>송·수신 비교</strong>
     <pre id="dtn-result" class="result-console">시험 대기</pre>
     <div id="dtn-comparison" class="observation-summary">위치 차이 — · 속도 차이 — · 시계오차 차이 —</div>
     <a id="dtn-report" hidden target="_blank" rel="noopener">상세 PVT 결과</a>
+    </div>
   </section>
+  <div class="dtn-output-grid">
   <section id="dtn-payload" class="card"></section>
   <section class="card"><div class="card-title"><h2>송수신 로그</h2><button id="dtn-log-clear" type="button">화면 로그 지우기</button></div><pre id="dtn-log" class="log" aria-label="PC 시간 기준 로그"></pre></section>
+  </div>
 </main>
-<script type="module" src="/lnis/assets/dtn.js?v=20260914-local-adapter"></script>
+<script type="module" src="/lnis/assets/dtn.js?v=20260914-auto-pretty"></script>
 </body></html>

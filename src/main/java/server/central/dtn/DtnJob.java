@@ -15,9 +15,14 @@ public class DtnJob {
     @Id
     private UUID id;
     private UUID inputId;
+    private UUID iqFileId;
     private String senderAgentId;
     private String receiverAgentId;
     private String state;
+    private String testType;
+    private String senderMode;
+    private String receiverMode;
+    private Boolean development;
     private Instant createdAt;
     private Instant updatedAt;
     /** 독립 수신 노드는 본문 대신 사전 등록된 해시만으로 외부 전달 내용을 검증한다. */
@@ -48,4 +53,6 @@ public class DtnJob {
     /** Local input/restored observations for the UI; not part of the adapter contract. */
     @Lob
     private String observationsJson;
+    @Lob
+    private String fileResultJson;
 }

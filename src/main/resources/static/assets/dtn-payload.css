@@ -12,6 +12,21 @@
 .card:has(> .dtn-payload-controls) > div:not(.dtn-payload-controls) { width: 100%; min-width: 0; }
 .card:has(> .dtn-payload-controls) [hidden] { display: none !important; }
 .dtn-payload-controls label { margin: 0; }
+.dtn-payload-controls a {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #c7d4d8;
+  border-radius: 8px;
+  background: #f7f9f9;
+  color: #35515d;
+  padding: 9px 13px;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+.dtn-payload-controls a:hover { filter: brightness(.97); }
+.dtn-payload-controls a:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
 .dtn-payload-controls input[type="checkbox"] { width: auto; }
 .dtn-payload-text {
   box-sizing: border-box;

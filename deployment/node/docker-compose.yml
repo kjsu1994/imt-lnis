@@ -5,10 +5,11 @@ services:
   init-db:
     image: lnis-node:local
     user: "0:0"
-    entrypoint: ["sh", "-c", "chown -R 10001:10001 /app/data"]
+    entrypoint: ["sh", "-c", "chown -R 10001:10001 /app/data /exchange"]
     network_mode: none
     volumes:
       - ./DB:/app/data
+      - ./exchange:/exchange
     restart: "no"
 
   node:
@@ -30,13 +31,15 @@ services:
       LNIS_DB_URL: jdbc:h2:file:/app/data/lnis
       LNIS_DB_PASSWORD: ${LNIS_DB_PASSWORD:-}
       LNIS_DATA_DIR: /app/data
+      LNIS_IQ_ENABLED: ${LNIS_IQ_ENABLED:-false}
+      LNIS_IQ_DIRECTORY: /exchange
+      OMP_NUM_THREADS: "2"
       dtn_adapter: ${dtn_adapter:-}
       LNIS_DTN_SEND_TOKEN: ${LNIS_DTN_SEND_TOKEN:-}
       LNIS_DTN_RECEIVE_TOKEN: ${LNIS_DTN_RECEIVE_TOKEN:-}
-      LNIS_DTN_SENDER_ADAPTER_CONTROL_URL: ${LNIS_DTN_SENDER_ADAPTER_CONTROL_URL:-}
-      LNIS_DTN_RECEIVER_ADAPTER_CONTROL_URL: ${LNIS_DTN_RECEIVER_ADAPTER_CONTROL_URL:-}
     volumes:
       - ./DB:/app/data
+      - ./exchange:/exchange
     tmpfs:
       # JNA 및 jSerialComm의 네이티브 라이브러리 로딩에 실행 가능한 임시 경로가 필요하다.
       - /tmp:rw,exec,nosuid,size=128m,mode=1777

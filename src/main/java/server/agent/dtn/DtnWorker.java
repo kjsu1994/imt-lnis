@@ -31,7 +31,7 @@ public final class DtnWorker {
 
   public synchronized void accept(UUID id, JsonNode args) {
     String requested = args.path("mode").asText();
-    if (!("PREPARE".equals(requested) && role == AgentRole.SENDER)
+    if (!(("PREPARE".equals(requested) || "PREPARE_RAW".equals(requested)) && role == AgentRole.SENDER)
         && !("RECEIVE".equals(requested) && role == AgentRole.RECEIVER))
       throw new IllegalArgumentException("DTN 작업과 Agent 역할이 다릅니다.");
     if (active == null) {
@@ -67,7 +67,7 @@ public final class DtnWorker {
 
   private void process(UUID id, String requested, byte[] data) {
     try {
-      DtnModels.AgentResult result = "PREPARE".equals(requested) ? processor.prepare(id, data)
+      DtnModels.AgentResult result = requested.startsWith("PREPARE") ? processor.prepare(id, data, "PREPARE_RAW".equals(requested))
           : processor.receive(id, json.readValue(data, DtnModels.Transfer.class));
       send(id, result);
     } catch (Exception | LinkageError e) { sendError(id, new IllegalStateException(e)); }

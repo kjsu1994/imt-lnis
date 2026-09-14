@@ -29,85 +29,20 @@ import java.nio.charset.StandardCharsets;
 public class DtnController {
     private final DtnService dtnService;
     private final ObjectMapper objectMapper;
-    private final DtnAdapterControlService dtnAdapterControlService;
 
     @Data
     public static class CreateRequest {
-        @NotNull
         private UUID inputId;
+        private UUID iqFileId;
         @NotBlank
         private String senderAgentId;
         @NotBlank
         private String receiverAgentId;
         @jakarta.validation.constraints.Size(max = 2048)
         private String sendUrl;
-        @Data
-        public static class AdapterModeRequest {
-            @NotBlank
-            private String senderMode;
-            @NotBlank
-            private String receiverMode;
-        }
-    }
-
-    /* 송신/수신 Adapter의 DTN/HDTN 동작 모드 설정 */
-    @PostMapping("/adapter-mode")
-    public ResponseEntity<Map<String, Object>> changeAdapterMode(
-            @Valid @RequestBody DtnController.CreateRequest.AdapterModeRequest request)
-    {
-        String senderMode =
-                normalizeAdapterMode(
-                        request.getSenderMode()
-                );
-        String receiverMode =
-                normalizeAdapterMode(
-                        request.getReceiverMode()
-                );
-        dtnAdapterControlService.changeMode(
-                senderMode,
-                receiverMode
-        );
-        Map<String, Object> response =
-                new LinkedHashMap<>();
-        response.put(
-                "senderMode",
-                senderMode
-        );
-        response.put(
-                "receiverMode",
-                receiverMode
-        );
-        response.put(
-                "accepted",
-                true
-        );
-        response.put(
-                "message",
-                senderMode
-                        + " → "
-                        + receiverMode
-                        + " 설정 완료"
-        );
-        return ResponseEntity.ok(response);
-    }
-
-    private String normalizeAdapterMode(
-            String value)
-    {
-        String mode =
-                value
-                        .trim()
-                        .toUpperCase(Locale.ROOT);
-        if (
-                !"DTN".equals(mode)
-                        &&
-                        !"HDTN".equals(mode)
-        ) {
-            throw new IllegalArgumentException(
-                    "Adapter mode는 DTN 또는 HDTN이어야 합니다."
-            );
-        }
-        return mode;
+        private String testType = "AFS_METADATA";
+        private String senderMode;
+        private String receiverMode;
     }
 
     /* DTN 외부 연동 설정 조회 */
@@ -147,7 +82,12 @@ public class DtnController {
     public ResponseEntity<Map<String, Object>> create(@Valid @RequestBody CreateRequest request)
             throws Exception
     {
-        DtnJob dtnJob = request.getSendUrl() == null || request.getSendUrl().isBlank()
+        DtnJob dtnJob = request.getSenderMode() != null || request.getReceiverMode() != null
+                ? dtnService.create("IQ_SAMPLE".equals(request.getTestType()) ? request.getIqFileId() : request.getInputId(), request.getSenderAgentId(), request.getReceiverAgentId(),
+                        request.getSendUrl(), request.getTestType(), request.getSenderMode(), request.getReceiverMode())
+                : !"AFS_METADATA".equals(request.getTestType())
+                ? dtnService.create("IQ_SAMPLE".equals(request.getTestType()) ? request.getIqFileId() : request.getInputId(), request.getSenderAgentId(), request.getReceiverAgentId(), request.getSendUrl(), request.getTestType())
+                : request.getSendUrl() == null || request.getSendUrl().isBlank()
                 ? dtnService.create(request.getInputId(), request.getSenderAgentId(), request.getReceiverAgentId())
                 : dtnService.create(request.getInputId(), request.getSenderAgentId(), request.getReceiverAgentId(), request.getSendUrl());
 
@@ -173,6 +113,7 @@ public class DtnController {
         Map<String, Object> report = new LinkedHashMap<>(summary(job));
         report.put("observations", job.getObservationsJson() == null
                 ? null : objectMapper.readTree(job.getObservationsJson()));
+        report.put("fileResult", job.getFileResultJson() == null ? null : objectMapper.readTree(job.getFileResultJson()));
         report.put(
                 "referencePvt",
                 job.getReferenceJson() == null
@@ -188,6 +129,22 @@ public class DtnController {
                 job.getComparisonJson() == null
                         ? null
                         : objectMapper.readTree(job.getComparisonJson()));
+        // Legacy transfers lack a reference. Never substitute receiver results for it.
+        if (job.getReferenceJson() == null && job.getReceivedJson() != null
+                && !"IQ_SAMPLE".equals(job.getTestType())) {
+            var transfer = objectMapper.readValue(job.getReceivedJson(), DtnModels.Transfer.class);
+            var reference = transfer.getReferencePvt();
+            report.put("referencePvt", reference);
+            if (reference != null && job.getReceiverJson() != null) {
+                try {
+                    List<DtnModels.Pvt> received = objectMapper.readValue(job.getReceiverJson(),
+                            new com.fasterxml.jackson.core.type.TypeReference<>() {});
+                    report.put("comparison", DtnComparison.compare(reference, received));
+                } catch (IllegalArgumentException exception) {
+                    report.put("comparison", Map.of("verdict", "INCONCLUSIVE", "message", exception.getMessage()));
+                }
+            }
+        }
         Map<String, Object> response = report;
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
@@ -236,6 +193,10 @@ public class DtnController {
     {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("testId", job.getId());
+        result.put("testType", job.getTestType() == null ? "AFS_METADATA" : job.getTestType());
+        result.put("senderMode", job.getSenderMode());
+        result.put("receiverMode", job.getReceiverMode());
+        result.put("development", Boolean.TRUE.equals(job.getDevelopment()));
         result.put("inputId", job.getInputId());
         result.put("senderAgentId", job.getSenderAgentId());
         result.put("receiverAgentId", job.getReceiverAgentId());
@@ -250,6 +211,7 @@ public class DtnController {
         result.put("receivedOriginalAvailable", job.getReceivedRawJson() != null);
         result.put("comparisonOnSender", job.getExpectedPayloadSha256() != null);
         result.put("receivedEpochs", job.getReceiverJson() == null ? 0 : objectMapper.readTree(job.getReceiverJson()).size());
+        result.put("fileResult", job.getFileResultJson() == null ? null : objectMapper.readTree(job.getFileResultJson()));
         result.put("referenceEpochs", job.getReferenceJson() == null ? 0 : objectMapper.readTree(job.getReferenceJson()).size());
         if (job.getComparisonJson() != null) {
             JsonNode comparison = objectMapper.readTree(job.getComparisonJson());

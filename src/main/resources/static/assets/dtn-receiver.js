@@ -1,12 +1,19 @@
-import {initAdapterHealth} from './dtn-adapter-health.js?v=20260914-local';
-import {createPayloadViewer} from './dtn-payload.js?v=20260913-compact';
-import {createObservationView} from './dtn-observations.js?v=20260913';
+import {initAdapterHealth} from './dtn-adapter-health.js?v=20260914-transfer-v2';
+import {createPayloadViewer} from './dtn-payload.js?v=20260914-auto-pretty';
+import {createObservationView} from './dtn-observations.js?v=20260914-navigation';
 
 const api = '/lnis/api/v1';
 const $ = id => document.getElementById(id);
 const payloadViewer = createPayloadViewer($('dtn-payload'), {receivedOnly: true});
 let tests = [], epochs = [], selectedId = '', renderVersion = 0, polling = false;
 let reportKey = '', lastEvent = '';
+let referenceEpochs = [];
+function setComparison(report = {}) {
+  referenceEpochs = Array.isArray(report.referencePvt) ? report.referencePvt : [];
+  const verdict = report.comparison?.verdict;
+  pill('pvt-match', verdict === 'PASS' ? '전체 PVT 일치' : verdict === 'FAIL' ? '전체 PVT 불일치' : 'PVT 비교 불가',
+    verdict === 'PASS' ? 'online' : verdict === 'FAIL' ? 'error' : 'warning');
+}
 const observations = createObservationView($('dtn-observations'), index => {
   if (epochs[index]) { $('pvt-epoch').value = String(index); renderEpoch(); }
 });
@@ -43,6 +50,13 @@ function time(value) {
 function renderEpoch() {
   observations.select(Number($('pvt-epoch').value));
   const pvt = epochs[Number($('pvt-epoch').value)];
+  const reference = pvt && referenceEpochs.find(value => value.week === pvt.week && value.towSeconds === pvt.towSeconds);
+  ['x', 'y', 'z'].forEach((axis, index) => {
+    $('reference-' + axis).textContent = number(reference?.positionValid ? reference.ecefMeters?.[index] : null);
+    $('reference-v' + axis).textContent = number(reference?.velocityValid ? reference.velocityMetersPerSecond?.[index] : null);
+  });
+  $('reference-clock').textContent = number(reference?.positionValid ? reference.receiverClockBiasSeconds : null, 9);
+  $('reference-satellites').textContent = reference?.satellitesUsed ?? '-';
   const position = pvt?.positionValid === true;
   const velocity = pvt?.velocityValid === true;
   ['x', 'y', 'z'].forEach((axis, index) => {
@@ -69,13 +83,21 @@ function setEpochs(values, preserve = false) {
 }
 
 function renderSummary(job) {
+  const types = {GNSS_RAW: 'GNSS RAW', AFS_METADATA: 'AFS Frame + Metadata', IQ_SAMPLE: 'I/Q Sample'};
+  $('receiver-type').textContent = types[job?.testType] || '시험 선택 대기';
+  for (const type of Object.keys(types)) $('receiver-' + type).className = job?.testType === type ? 'active' : '';
+  $('receiver-mode').textContent = job?.senderMode && job?.receiverMode ? job.senderMode + ' → ' + job.receiverMode : '경로 정보 없음';
+  $('receiver-iq').hidden = job?.testType !== 'IQ_SAMPLE';
+  $('receiver-iq-result').textContent = job?.fileResult ? JSON.stringify(job.fileResult, null, 2) : 'I/Q 파일 수신·검증 대기';
   const failed = ['FAILED', 'CANCELLED', 'INCONCLUSIVE'].includes(job?.state);
   const completed = job?.state === 'COMPLETED';
   const received = !!job?.dtnReceived;
+  const iq = job?.testType === 'IQ_SAMPLE';
+  $('step-process').textContent = iq ? '③ I/Q 파일 검증' : '③ 복원·PVT 계산';
   const states = {
     PREPARING: '시험 준비 중', WAITING_DTN: '외부 JSON 수신 대기',
-    WAITING_RECEIVER: '수신 실행기 대기', CALCULATING: 'AFS 복호화·PVT 계산 중',
-    COMPLETED: '수신 계산 완료', FAILED: '처리 실패', CANCELLED: '시험 취소',
+    WAITING_RECEIVER: '수신 실행기 대기', CALCULATING: iq ? 'I/Q 파일 검증 중' : '복원·PVT 계산 중',
+    COMPLETED: iq ? 'I/Q 파일 검증 완료' : '수신 계산 완료', FAILED: '처리 실패', CANCELLED: '시험 취소',
     INCONCLUSIVE: '판정 불가'
   };
   $('receive-state').textContent = job ? (states[job.state] || job.state) : '수신 대기';
@@ -99,6 +121,7 @@ async function renderTest(force = false) {
   renderSummary(job);
   if (changed || !job) {
     reportKey = '';
+    setComparison();
     setEpochs([]);
     observations.setData(null);
     $('dtn-report').hidden = true;
@@ -115,11 +138,13 @@ async function renderTest(force = false) {
     const report = await get('/dtn/tests/' + encodeURIComponent(job.testId) + '/report');
     // 시험을 바꾼 뒤 늦게 도착한 이전 응답이 새 시험의 PVT를 덮어쓰지 않는다.
     if (version !== renderVersion || selectedId !== job.testId) return;
+    setComparison(report);
     setEpochs(report.receivedPvt, !changed);
     observations.setData(report.observations, !changed);
     reportKey = event;
   } catch (error) {
     if (version !== renderVersion) return;
+    setComparison();
     setEpochs([]);
     $('pvt-message').textContent = 'PVT 조회 실패 · ' + error.message;
     log('PVT 조회 실패 · ' + error.message);
@@ -129,7 +154,7 @@ async function renderTest(force = false) {
 function renderAgents(agents) {
   for (const role of ['SENDER', 'RECEIVER']) {
     const agent = agents.find(item => item.role === role);
-    const online = !!agent && agent.state !== 'OFFLINE';
+    const online = !!agent && !['OFFLINE','ERROR'].includes(agent.state);
     const text = role === 'SENDER' ? '송신 처리기' : '수신 처리기';
     pill('dtn-' + role.toLowerCase() + '-status', text + ' ' +
       (online ? (agent.state === 'READY' ? '준비됨' : '처리 중') : '연결 안 됨'),
@@ -144,6 +169,9 @@ async function poll(force = false) {
   try {
     const [agents, nextTests, config] = await Promise.all([get('/agents'), get('/dtn/tests'), get('/dtn/config')]);
     tests = nextTests;
+    const connection = await get('/node/connection').catch(() => ({}));
+    $('reverse-state').textContent = connection.peerOnline == null ? '미확인' : connection.peerOnline ? '연결됨' : '연결 끊김';
+    $('reverse-dot').className = 'connection-dot ' + (connection.peerOnline == null ? 'unknown' : connection.peerOnline ? 'online' : 'offline');
     pill('dtn-server-status', '서버 연결됨', 'online');
     renderAgents(agents);
     pill('receive-auth', config.receiveConfigured ? '수신 인증 설정됨' : '수신 인증 미설정',

@@ -48,6 +48,8 @@ public class NodeConnectionService {
         result.setTokenConfigured(!properties.getManagementToken().isBlank());
         result.setEditable(properties.getRole() == AgentRole.SENDER);
         result.setBusy(busy());
+        result.setPeerOnline(connection.online());
+        result.setReverseOnline(connection.reverseOnline());
         return result;
     }
 

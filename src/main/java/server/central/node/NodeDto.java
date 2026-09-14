@@ -23,5 +23,10 @@ public final class NodeDto {
         private boolean online;
         private int codecAbiVersion;
         private String baseUrl;
+        private Boolean peerOnline;
+        public StatusResponse(int protocolVersion, String agentId, AgentRole role, AgentState state,
+                boolean online, int codecAbiVersion, String baseUrl) {
+            this(protocolVersion, agentId, role, state, online, codecAbiVersion, baseUrl, null);
+        }
     }
 }

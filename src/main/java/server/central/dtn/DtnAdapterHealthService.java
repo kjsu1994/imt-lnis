@@ -56,24 +56,26 @@ public class DtnAdapterHealthService {
     try {
       URI uri = URI.create(url);
       var request = HttpRequest.newBuilder(uri).timeout(timeout).GET().build();
-      return client.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+      var pending = client.sendAsync(request, information -> new server.central.common.LimitedBodySubscriber(16 * 1024));
+      return pending.copy()
           .orTimeout(timeout.toMillis(), TimeUnit.MILLISECONDS)
           .handle((response, error) -> {
-            if (error != null) return failure(url, started);
+            if (error != null) { pending.cancel(true); return failure(url, started); }
             int httpStatus = response.statusCode();
-            JsonNode body = parse(response.body());
+            String text = new String(response.body(), java.nio.charset.StandardCharsets.UTF_8);
+            JsonNode body = parse(text);
             if (httpStatus < 200 || httpStatus >= 300)
               return new EndpointHealth(url, false, httpStatus, elapsed(started), null,
-                  "연결실패", body, response.body());
+                  "연결실패", body, text);
             String adapterStatus = body == null ? null : body.path("status").asText(null);
             if ("ready".equalsIgnoreCase(adapterStatus))
               return new EndpointHealth(url, true, httpStatus, elapsed(started), "ready",
-                  "정상연결", body, response.body());
+                  "정상연결", body, text);
             if ("busy".equalsIgnoreCase(adapterStatus))
               return new EndpointHealth(url, false, httpStatus, elapsed(started), "busy",
-                  "시험대기", body, response.body());
+                  "시험대기", body, text);
             return new EndpointHealth(url, false, httpStatus, elapsed(started), adapterStatus,
-                "상태확인 필요", body, response.body());
+                "상태확인 필요", body, text);
           });
     } catch (IllegalArgumentException error) {
       return CompletableFuture.completedFuture(new EndpointHealth(url, false, null,

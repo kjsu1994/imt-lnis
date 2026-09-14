@@ -25,6 +25,6 @@ public class NodeStatusService {
         AgentState state = agent == null ? AgentState.ERROR : agent.state();
         return new NodeDto.StatusResponse(PROTOCOL_VERSION, nodeProperties.getAgentId(),
                 nodeProperties.getRole(), state, online, agent == null ? 0 : agent.codecAbiVersion(),
-                nodeProperties.getBaseUrl().toString());
+                nodeProperties.getBaseUrl().toString(), connectionRegistry.online(nodeProperties.getPeerAgentId()));
     }
 }

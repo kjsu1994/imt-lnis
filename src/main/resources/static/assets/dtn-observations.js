@@ -1,6 +1,13 @@
 // Shared DTN-only observation display. Device values are never inserted as HTML.
 export const numeric = (value, digits = 3) =>
   typeof value === 'number' && Number.isFinite(value) ? value.toFixed(digits) : '—';
+const constellation = id => ['GPS', 'SBAS', 'Galileo', 'BeiDou', 'IMES', 'QZSS', 'GLONASS', 'NavIC'][id] || ('GNSS ' + id);
+export function navigationCells(item) {
+  const n = item.message;
+  return [item.sequence, item.capturedAt, constellation(n.constellationId), n.satelliteId,
+    n.signalId, n.frequencyId, n.sfrbxVersion, n.words.length,
+    n.words.map(word => Number(word).toString(16).toUpperCase().padStart(8, '0')).join(' ')];
+}
 
 export function observationCells(o) {
   const gnss = ['GPS', 'SBAS', 'Galileo', 'BeiDou', 'IMES', 'QZSS', 'GLONASS', 'NavIC'][o.constellationId] || ('GNSS ' + o.constellationId);
@@ -17,10 +24,11 @@ export function observationCells(o) {
 export function createObservationView(container, onSelect = () => {}) {
   if (!container) return {setData() {}, select() {}};
   container.innerHTML = `
-    <div class="card-title"><div><span class="section-kicker">GNSS RAW · UBX 해석값</span><h2>GNSS 관측값</h2></div>
+    <div class="card-title"><div><span class="section-kicker">GNSS RAW · UBX 해석값</span><h2>GNSS 수집 데이터</h2></div>
       <label>GNSS 기준시간 <select data-epoch aria-label="관측 시점"></select></label></div>
     <div class="observation-summary"><span data-source>데이터 없음</span><span data-nav>항법정보 —</span>
       <span data-count>관측 신호 —</span><span data-status></span></div>
+    <h3>관측값 · RAWX</h3>
     <div class="epoch-table-viewport" tabindex="0" aria-label="GNSS 관측값 표">
       <table class="epoch-observation-table"><caption>위성·신호별 관측값</caption><thead><tr>
         <th>GNSS</th><th>위성</th><th>신호</th><th>의사거리 <small>m</small></th>
@@ -28,7 +36,15 @@ export function createObservationView(container, onSelect = () => {}) {
         <th>C/N₀ <small>dB-Hz</small></th><th>추적시간 <small>ms</small></th>
         <th title="수신기가 출력한 표준편차 코드. SI 단위의 표준편차가 아닙니다.">편차 코드 <small>PR / CP / DO</small></th>
         <th>측정 유효성</th><th title="GPS L1·의사거리 유효 조건. 최종 계산에서 사용한 위성 수는 PVT 결과에 표시됩니다.">PVT 입력</th>
-      </tr></thead><tbody></tbody></table></div>`;
+      </tr></thead><tbody></tbody></table></div>
+    <h3>항법정보 · SFRBX</h3>
+    <div class="epoch-table-viewport" tabindex="0" aria-label="GNSS 항법정보 표">
+      <table class="epoch-observation-table"><caption>항법정보 · SFRBX · 수집된 전체 메시지</caption><thead><tr>
+        <th>수집 순번</th><th>수집 시각 <small>UTC</small></th><th>GNSS</th><th>위성</th>
+        <th>신호 ID</th><th>주파수 ID</th><th>버전</th><th>워드 수</th><th>수신 워드 <small>HEX · 32 bit</small></th>
+      </tr></thead><tbody data-navigation></tbody></table></div>
+    <details data-record-details><summary>저장된 전체 필드 보기 · JSON</summary><pre data-records class="log"></pre></details>
+    <small>GRAW에 저장된 RAWX·SFRBX 및 수집 정보입니다. 수신기의 다른 출력 메시지는 현재 저장하지 않습니다.</small>`;
   const select = container.querySelector('[data-epoch]');
   const body = container.querySelector('tbody');
   let data = null;
@@ -61,6 +77,27 @@ export function createObservationView(container, onSelect = () => {}) {
     setData(next, preserve = false) {
       const selected = preserve ? Number(select.value) : 0;
       data = next;
+      const navigationBody = container.querySelector('[data-navigation]');
+      navigationBody.replaceChildren();
+      for (const item of data?.navigation || []) {
+        const row = document.createElement('tr');
+        for (const value of navigationCells(item)) {
+          const cell = document.createElement('td'); cell.textContent = String(value ?? '—'); row.append(cell);
+        }
+        navigationBody.append(row);
+      }
+      if (!data?.navigation?.length) {
+        const row = document.createElement('tr'), cell = document.createElement('td');
+        row.className = 'epoch-empty-row'; cell.colSpan = 9; cell.textContent = '표시할 항법정보가 없습니다.';
+        row.append(cell); navigationBody.append(row);
+      }
+      const details = container.querySelector('[data-record-details]');
+      const renderRecords = () => {
+        container.querySelector('[data-records]').textContent = details.open
+          ? JSON.stringify(data?.records || [], null, 2) : '';
+      };
+      details.ontoggle = renderRecords;
+      renderRecords();
       select.replaceChildren(...(data?.epochs?.length
         ? data.epochs.map((item, i) => new Option('Week ' + item.observation.week + ' / TOW ' + numeric(item.observation.receiverTowSeconds) + ' s', String(i)))
         : [new Option('GNSS 시간 없음', '')]));

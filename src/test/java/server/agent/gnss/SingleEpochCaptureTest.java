@@ -1,4 +1,5 @@
 package server.agent.gnss;
+import server.shared.codec.SingleEpochCapture;
 
 import static org.junit.jupiter.api.Assertions.*;
 import java.nio.file.Path;

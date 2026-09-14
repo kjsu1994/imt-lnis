@@ -3,6 +3,11 @@ import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 
 const html = readFileSync(new URL('../../main/resources/static/dtn-sender.html', import.meta.url), 'utf8');
+const capturePanel = html.split('id="dtn-capture-panel"')[1].split('</div>')[0];
+assert.ok(!html.includes('class="card dtn-comparison-card"'), 'PVT comparison must not occupy a separate card');
+assert.ok(html.split('송신 기준 지구 PVT')[1].split('</section>')[0].includes('id="dtn-comparison"'), 'comparison stays inside sender PVT section');
+assert.ok(capturePanel.includes('id="dtn-baud"'), 'serial speed remains available in COM input');
+assert.ok(!capturePanel.includes('<details'), 'serial settings must be visible without expanding');
 const source = readFileSync(new URL('../../main/resources/static/assets/dtn.js', import.meta.url), 'utf8')
   .replace(/^import .*;\r?\n/gm, '').replace(/initialize\(\);\s*$/, 'globalThis.ready = initialize();');
 class Element {
@@ -11,6 +16,8 @@ class Element {
   setAttribute() {} removeAttribute(key) { delete this[key]; } reportValidity() { return true; }
 }
 const elements = new Map([...html.matchAll(/id="([^"]+)"/g)].map(([, id]) => [id, new Element()]));
+assert.match(html, /id="dtn-development"[^>]*\bhidden\b/);
+elements.get('dtn-development').hidden = true;
 let loaded = null, currentJob = null, failUpload = false, starts = 0;
 let healthFetch, healthCalls = 0, healthUrl;
 const intervals = [];
@@ -31,7 +38,7 @@ const context = {
       return healthFetch();
     }
     let body = {};
-    if (url.endsWith('/config')) body = {maximumInputBytes: 1048576, exampleEnabled: false,
+    if (url.endsWith('/config')) body = {maximumInputBytes: 1048576, exampleEnabled: true,
       defaultSendUrl: 'http://sender.default:8080', defaultReceiveUrl: 'http://receiver.default:8080'};
     else if (url.endsWith('/agents')) body = [tx, rx];
     else if (url.endsWith('/node/connection')) body = {ip: '127.0.0.1', port: 18091, editable: true};
@@ -53,7 +60,13 @@ const context = {
   }
 };
 vm.createContext(context); vm.runInContext(readFileSync(new URL('../../main/resources/static/assets/dtn-adapter-health.js', import.meta.url), 'utf8').replace('export function', 'function') + '\n' + source, context); await context.ready;
-assert.equal(elements.get('dtn-example').hidden, true);
+assert.equal(elements.has('dtn-example'), false);
+assert.equal(html.includes('합성 GRAW 다운로드'), false);
+assert.equal(html.includes('합성 데이터 · 실측 아님'), false);
+assert.equal(elements.has('dtn-replay'), true);
+assert.equal(elements.has('reverse-state'), false);
+assert.equal(elements.has('destination-state'), true);
+assert.equal(elements.get('dtn-development').hidden, true);
 assert.equal(elements.get('dtn-start').disabled, true);
 assert.equal(elements.get('dtn-send').disabled, true);
 assert.equal(elements.get('dtn-send-url').value, 'http://sender.default:8080');
@@ -136,3 +149,18 @@ context.document.visibilityState = 'hidden';
 intervals.find(value => value.delay === 10000).callback();
 assert.equal(healthCalls, callsBeforeHidden);
 console.log('PASS: busy status, stale response ignored and hidden tab skips polling');
+
+vm.runInContext("job=null; selectedType='IQ_SAMPLE'; inputId=null; config.iqEnabled=true; updateControls();", context);
+assert.equal(elements.get('iq-generate').disabled, true, 'GNSS input required for generation');
+vm.runInContext("inputId='captured'; updateControls();", context);
+assert.equal(elements.get('iq-generate').disabled, false);
+assert.equal(elements.get('dtn-start').disabled, false, 'COM capture remains available for I/Q');
+let iqPanelHidden;
+elements.get('dtn-iq-panel').classList.toggle = (name, hidden) => { if(name==='hidden') iqPanelHidden=hidden; };
+vm.runInContext("selectedType='AFS_METADATA'; iqJob={id:'running',state:'GENERATING'}; updateInputPanels(); updateControls();",context);
+assert.equal(iqPanelHidden,false,'reload during generation keeps cancel visible even on another trial tab');
+assert.equal(elements.get('iq-cancel').disabled,false);
+vm.runInContext("iqJob={id:'old',state:'READY',file:{}}; clearIqSelection(); updateControls();",context);
+assert.equal(elements.get('iq-file').textContent,'');
+assert.equal(elements.get('iq-saved').value,'');
+console.log('PASS: I/Q GNSS requirement, COM controls, active generation visibility and stale file reset');

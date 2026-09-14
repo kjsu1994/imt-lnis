@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {numeric, observationCells} from '../../main/resources/static/assets/dtn-observations.js';
+import {numeric, observationCells, navigationCells} from '../../main/resources/static/assets/dtn-observations.js';
 
 assert.equal(numeric(null), '—');
 assert.equal(numeric(NaN), '—');
@@ -18,3 +18,8 @@ assert.equal(observationCells({...raw, constellationId: 2})[10], '제외');
 assert.equal(observationCells({...raw, trackingStatus: 0})[10], '제외');
 assert.equal(observationCells({...raw, signalId: 3})[10], '제외');
 console.log('PASS: RAWX numeric units, invalid/missing values, deviation codes and GPS L1 input eligibility');
+assert.deepEqual(navigationCells({sequence: 7, capturedAt: '2026-09-14T00:00:00Z', message: {
+  constellationId: 0, satelliteId: 19, signalId: 0, frequencyId: 0, sfrbxVersion: 2,
+  words: [0, 4294967295, 2147483648]
+}}), [7, '2026-09-14T00:00:00Z', 'GPS', 19, 0, 0, 2, 3, '00000000 FFFFFFFF 80000000']);
+console.log('PASS: SFRBX sequence, all words and unsigned 32-bit HEX');

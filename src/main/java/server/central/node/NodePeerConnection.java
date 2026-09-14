@@ -38,6 +38,8 @@ public class NodePeerConnection implements CommandEndpoint {
     private final FrameEvidenceService evidenceService;
     private final ObjectMapper mapper;
     private volatile Instant lastOnline;
+    private volatile Boolean reverseOnline;
+    public Boolean reverseOnline() { return online() ? reverseOnline : null; }
     private boolean registered;
 
     @Scheduled(fixedDelay = 3000)
@@ -58,6 +60,7 @@ public class NodePeerConnection implements CommandEndpoint {
                     registered = true;
                 }
                 lastOnline = status.isOnline() ? Instant.now() : null;
+                reverseOnline = status.getPeerOnline();
                 String host = checkedAddress.getHost();
                 List<String> addresses = host.matches("[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+")
                         ? List.of(host) : List.of();

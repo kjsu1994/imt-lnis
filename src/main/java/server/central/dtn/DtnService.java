@@ -69,12 +69,12 @@ public class DtnService {
     @Value("${lnis.dtn.example-enabled:false}")
     private boolean exampleEnabled;
 
-    @Value("${lnis.dtn.sender-adapter-control-url:}")
-    private String senderAdapterControlUrl;
-    @Value("${lnis.dtn.receiver-adapter-control-url:}")
-    private String receiverAdapterControlUrl;
+    @Value("${lnis.dtn.development:false}")
+    private boolean development;
 
     private DtnNodeLink nodeLink;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private IqService iq;
 
     /** 기존 중앙 서버 모드는 그대로 두고 독립 노드 모드에서만 관리 통신을 연결한다. */
     @org.springframework.beans.factory.annotation.Autowired(required = false)
@@ -93,8 +93,8 @@ public class DtnService {
     {
         return Map.ofEntries(
                 Map.entry("exampleEnabled", exampleEnabled),
-                Map.entry("adapterControlConfigured",
-                        !senderAdapterControlUrl.isBlank() && !receiverAdapterControlUrl.isBlank()),
+                Map.entry("development", development),
+                Map.entry("iqEnabled", iq != null && iq.enabled()),
                 Map.entry("configured",
                         !sendUrl.isBlank() && (sendingNode() || !receiveToken.isBlank())),
                 Map.entry("defaultSendUrl", sendUrl),
@@ -116,6 +116,21 @@ public class DtnService {
     /** 기존 API는 환경 설정을 기본값으로 사용하고, 새 화면의 URL은 시험마다 별도로 확정한다. */
     public synchronized DtnJob create(UUID inputId, String sender, String receiver, String requestedUrl)
     {
+        return create(inputId, sender, receiver, requestedUrl, "AFS_METADATA");
+    }
+
+    public synchronized DtnJob create(UUID inputId, String sender, String receiver, String requestedUrl, String testType)
+    {
+        return create(inputId, sender, receiver, requestedUrl, testType, "DTN", "HDTN");
+    }
+
+    public synchronized DtnJob create(UUID inputId, String sender, String receiver, String requestedUrl,
+            String testType, String senderMode, String receiverMode)
+    {
+        if (senderMode == null || receiverMode == null || !List.of("DTN", "HDTN").contains(senderMode) || !List.of("DTN", "HDTN").contains(receiverMode))
+            throw new IllegalArgumentException("전송 경로는 DTN 또는 HDTN을 선택하세요.");
+        if (testType == null || !List.of("AFS_METADATA", "GNSS_RAW", "IQ_SAMPLE").contains(testType))
+            throw new IllegalArgumentException("지원하지 않는 시험 유형입니다.");
         URI destination = DtnDestination.resolve(requestedUrl, sendUrl);
         if (nodeLink != null) {
             if (!nodeLink.sender()) {
@@ -137,6 +152,34 @@ public class DtnService {
         if (rx.role() != AgentRole.RECEIVER) {
             throw new IllegalArgumentException("Receiver 역할 오류");
         }
+        if ("IQ_SAMPLE".equals(testType)) {
+            if (iq == null || inputId == null) throw new IllegalArgumentException("생성된 I/Q 파일을 선택하세요.");
+            DtnJob job = new DtnJob();
+            job.setId(UUID.randomUUID()); job.setTestType(testType); job.setDevelopment(development);
+            job.setIqFileId(inputId);
+            job.setSenderMode(senderMode); job.setReceiverMode(receiverMode);
+            job.setSendUrl(destination.toString()); job.setSenderAgentId(sender); job.setReceiverAgentId(receiver);
+            job.setCreatedAt(Instant.now()); update(job, "PREPARING", "I/Q 파일 무결성 확인 중");
+            Thread.ofVirtual().name("iq-prepare").start(() -> {
+                try {
+                    IqFile file = iq.completed(inputId);
+                    Transfer transfer = new Transfer(); transfer.setTestId(job.getId());
+                    transfer.setTestType(testType); transfer.setFormat("LNIS-IQ-FILE-v1");
+                    transfer.setProfile("LANS-AFS-IQ-v1");
+                    transfer.setSenderMode(senderMode); transfer.setReceiverMode(receiverMode); transfer.setFile(file);
+                    synchronized (this) {
+                        if (!"PREPARING".equals(get(job.getId()).getState())) return;
+                        var packet = objectMapper.valueToTree(transfer);
+                        ((com.fasterxml.jackson.databind.node.ObjectNode)packet).remove(List.of("prn", "recordCount"));
+                        job.setSentJson(objectMapper.writeValueAsString(packet));
+                        update(job, "WAITING_DTN", "I/Q 파일 경로 전달 및 수신 대기");
+                    }
+                    sendExternal(job.getId(), job.getSentJson());
+                } catch (Exception error) { synchronized (this) { if (ACTIVE.contains(get(job.getId()).getState())) fail(job, error); } }
+            });
+            return job;
+        }
+        if (inputId == null) throw new IllegalArgumentException("GNSS 입력을 선택하세요.");
         InputBufferEntity input = inputBufferService.get(inputId);
         if (!input.complete()
                 || input.receivedSize() <= 0
@@ -152,14 +195,18 @@ public class DtnService {
         }
         DtnJob job = new DtnJob();
         job.setId(UUID.randomUUID());
+        job.setTestType(testType);
+        job.setSenderMode(senderMode);
+        job.setReceiverMode(receiverMode);
+        job.setDevelopment(development);
         job.setSendUrl(destination.toString());
         job.setInputId(inputId);
         job.setSenderAgentId(sender);
         job.setReceiverAgentId(receiver);
         job.setCreatedAt(Instant.now());
-        update(job, "PREPARING", "기준 PVT 계산 및 AFS 생성 중");
+        update(job, "PREPARING", "기준 PVT 계산 및 " + testType + " 준비 중");
         try {
-            sendChunks(job, sender, "PREPARE", data.toByteArray());
+            sendChunks(job, sender, "GNSS_RAW".equals(testType) ? "PREPARE_RAW" : "PREPARE", data.toByteArray());
         } catch (RuntimeException e) {
             fail(job, e);
         }
@@ -220,6 +267,21 @@ public class DtnService {
             throw new IllegalArgumentException("DTN JSON 본문은 올바른 UTF-8이어야 합니다.", error);
         }
         job.setReceivedRawJson(receivedOriginal);
+        String txMode = received.path("senderMode").asText("DTN");
+        String rxMode = received.path("receiverMode").asText("HDTN");
+        if (!List.of("DTN", "HDTN").contains(txMode) || !List.of("DTN", "HDTN").contains(rxMode))
+            throw new IllegalArgumentException("수신 전송 경로 오류");
+        job.setSenderMode(txMode);
+        job.setReceiverMode(rxMode);
+        String type = received.path("testType").asText("AFS_METADATA");
+        if (!List.of("AFS_METADATA", "GNSS_RAW", "IQ_SAMPLE").contains(type)) throw new IllegalArgumentException("시험 유형 오류");
+        job.setTestType(type);
+        if ("IQ_SAMPLE".equals(type)) {
+            String path = received.path("file").path("filePath").asText();
+            if (!path.matches("/exchange/[0-9a-fA-F-]{36}\\.bin")) throw new IllegalArgumentException("I/Q 공유 경로 오류");
+            job.setIqFileId(UUID.fromString(path.substring(10,46)));
+        }
+        job.setDevelopment(development);
         job.setReceivedJson(objectMapper.writeValueAsString(received));
         job.setReceivedAt(Instant.now());
         update(job, "WAITING_RECEIVER", "DTN 수신 완료 / Receiver 연결 대기");
@@ -307,6 +369,9 @@ public class DtnService {
                     throw new IllegalArgumentException("송신 payload 식별 오류");
                 }
                 job.setReferenceJson(objectMapper.writeValueAsString(result.getPvt()));
+                result.getTransfer().setReferencePvt(result.getPvt());
+                result.getTransfer().setSenderMode(job.getSenderMode());
+                result.getTransfer().setReceiverMode(job.getReceiverMode());
                 job.setSentJson(objectMapper.writeValueAsString(result.getTransfer()));
                 update(job, "WAITING_DTN", "외부 DTN 전달 및 수신 대기");
                 String packet = job.getSentJson();
@@ -317,7 +382,7 @@ public class DtnService {
                 job.setReceiverJson(objectMapper.writeValueAsString(result.getPvt()));
                 if (nodeLink != null && !nodeLink.sender()) {
                     // 수신 노드에는 기준 PVT가 없다. 비교는 송신 노드에서만 수행한다.
-                    update(job, "COMPLETED", "수신 AFS 복호화 및 PVT 계산 완료");
+                    update(job, "COMPLETED", "수신 입력 복원 및 PVT 계산 완료");
                 } else {
                     compare(job, result.getPvt());
                 }
@@ -371,7 +436,12 @@ public class DtnService {
                             .map(a -> a.state() == AgentState.READY)
                             .orElse(false)) {
                 try {
-                    update(job, "CALCULATING", "Receiver AFS 복호화 및 PVT 계산 중");
+                    if ("IQ_SAMPLE".equals(job.getTestType())) {
+                        update(job, "CALCULATING", "수신 공유 I/Q 파일 검증 중");
+                        Thread.ofVirtual().name("iq-verify").start(() -> verifyIq(job));
+                        continue;
+                    }
+                    update(job, "CALCULATING", "Receiver 입력 복원 및 PVT 계산 중");
                     sendChunks(
                             job,
                             job.getReceiverAgentId(),
@@ -437,6 +507,17 @@ public class DtnService {
             fail(job, new IllegalStateException("수신 노드 실패: " + result.getMessage()));
         } else if ("COMPLETED".equals(result.getState())) {
             try {
+                if ("IQ_SAMPLE".equals(job.getTestType())) {
+                    if (result.getReceivedAt() == null || result.getFileResult() == null)
+                        throw new IllegalArgumentException("I/Q 완료 결과 누락");
+                    IqFile file = objectMapper.readValue(job.getSentJson(), Transfer.class).getFile();
+                    JsonNode verified = result.getFileResult();
+                    if (!"PASS".equals(verified.path("verdict").asText()) || file.sizeBytes() != verified.path("sizeBytes").asLong()
+                            || !file.sha256().equals(verified.path("sha256").asText()))
+                        throw new IllegalArgumentException("수신 I/Q 검증 결과 불일치");
+                    job.setFileResultJson(verified.toString()); job.setComparisonJson(verified.toString());
+                    update(job, "COMPLETED", "I/Q 송수신 크기·SHA-256 일치"); return;
+                }
                 if (result.getReceivedAt() == null || result.getPvt() == null || result.getPvt().isEmpty()) {
                     throw new IllegalArgumentException("수신 노드의 완료 결과가 불완전합니다.");
                 }
@@ -446,6 +527,27 @@ public class DtnService {
                 fail(job, error);
             }
         }
+    }
+
+    private void verifyIq(DtnJob job) {
+        try {
+            Transfer transfer = objectMapper.readValue(job.getReceivedJson(), Transfer.class);
+            if (!"IQ_SAMPLE".equals(transfer.getTestType()) || !"LNIS-IQ-FILE-v1".equals(transfer.getFormat())
+                    || transfer.getSchemaVersion() != 1 || transfer.getFrames() != null || transfer.getGrawBase64() != null)
+                throw new IllegalArgumentException("I/Q 전송 형식 오류");
+            var result = new LinkedHashMap<>(iq.verify(transfer.getFile()));
+            result.put("preview", iq.preview(transfer.getFile()));
+            synchronized (this) {
+                if (!"CALCULATING".equals(get(job.getId()).getState())) return;
+                job.setFileResultJson(objectMapper.writeValueAsString(result));
+                update(job, "COMPLETED", "수신 I/Q 파일 크기·SHA-256 검증 완료");
+            }
+        } catch (Exception error) { synchronized (this) { if ("CALCULATING".equals(get(job.getId()).getState())) fail(job, error); } }
+    }
+
+    public synchronized void deleteIq(UUID id) throws java.io.IOException {
+        if (dtnRepository.existsByIqFileIdAndStateIn(id, ACTIVE)) throw new IllegalStateException("전송·검증 중인 파일은 삭제할 수 없습니다.");
+        iq.delete(id);
     }
 
     private void compare(DtnJob job, List<Pvt> receiverPvt) throws Exception

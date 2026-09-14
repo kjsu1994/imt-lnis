@@ -34,7 +34,6 @@ class ServerResponseContractTest {
     private final AgentRepository agentRepository = mock(AgentRepository.class);
     private final AgentCommandService commands = mock(AgentCommandService.class);
     private final DtnService dtnService = mock(DtnService.class);
-    private final DtnAdapterControlService dtnAdapterControlService = mock(DtnAdapterControlService.class);
     private MockMvc mvc;
 
     @BeforeEach
@@ -44,7 +43,7 @@ class ServerResponseContractTest {
                 new SessionController(sessionService),
                 new InputController(inputService),
                 new AgentController(agentRepository, commands),
-                new DtnController(dtnService, objectMapper, dtnAdapterControlService),
+                new DtnController(dtnService, objectMapper),
                 new DiscoveryController())
                 .setControllerAdvice(new ApiExceptionHandler())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
@@ -62,6 +61,18 @@ class ServerResponseContractTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.service").value("lnis-server"))
                 .andExpect(jsonPath("$.agentWebSocketPath").value("/lnis/agent/ws"));
+    }
+
+    @Test void forwardsAllSelectedTransportModesWithTestType() throws Exception {
+        for (String tx : List.of("DTN", "HDTN")) for (String rx : List.of("DTN", "HDTN")) {
+            UUID id = UUID.randomUUID(); DtnJob job = new DtnJob(); job.setId(UUID.randomUUID());
+            job.setState("PREPARING"); job.setTestType("GNSS_RAW"); job.setSenderMode(tx); job.setReceiverMode(rx);
+            when(dtnService.create(id, "sender-1", "receiver-1", null, "GNSS_RAW", tx, rx)).thenReturn(job);
+            mvc.perform(post("/lnis/api/v1/dtn/tests").contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsBytes(
+                    Map.of("inputId",id,"senderAgentId","sender-1","receiverAgentId","receiver-1","testType","GNSS_RAW","senderMode",tx,"receiverMode",rx))))
+                    .andExpect(status().isAccepted()).andExpect(jsonPath("$.senderMode").value(tx)).andExpect(jsonPath("$.receiverMode").value(rx));
+            verify(dtnService).create(id, "sender-1", "receiver-1", null, "GNSS_RAW", tx, rx);
+        }
     }
 
     @Test
@@ -141,5 +152,20 @@ class ServerResponseContractTest {
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("\"receivedPvt\":null")));
         mvc.perform(get("/lnis/api/v1/dtn/config"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.configured").value(false));
+        String pvt = """
+                [{"week":2400,"towSeconds":100000,"positionValid":true,"velocityValid":true,
+                  "ecefMeters":[1,2,3],"velocityMetersPerSecond":[4,5,6],"receiverClockBiasSeconds":0}]
+                """;
+        job.setReceivedJson("{\"referencePvt\":" + pvt + "}");
+        job.setReceiverJson(pvt);
+        mvc.perform(get("/lnis/api/v1/dtn/tests/" + id + "/report"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.comparison.verdict").value("PASS"))
+                .andExpect(jsonPath("$.referencePvt[0].ecefMeters[0]").value(1));
+        job.setReceiverJson(pvt.replace("[1,2,3]", "[2,2,3]"));
+        mvc.perform(get("/lnis/api/v1/dtn/tests/" + id + "/report"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.comparison.verdict").value("FAIL"));
+        job.setReceivedJson("{}");
+        mvc.perform(get("/lnis/api/v1/dtn/tests/" + id + "/report"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.comparison").doesNotExist());
     }
 }

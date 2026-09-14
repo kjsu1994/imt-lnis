@@ -1,4 +1,4 @@
-package server.central.node;
+package server.central.common;
 
 import java.io.IOException;
 import java.net.http.HttpResponse;
@@ -8,14 +8,14 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
 
 /** 응답을 메모리에 전부 올리기 전에 크기를 검사하고 초과 시 수신을 중단한다. */
-final class LimitedBodySubscriber implements HttpResponse.BodySubscriber<byte[]> {
+public final class LimitedBodySubscriber implements HttpResponse.BodySubscriber<byte[]> {
     private final HttpResponse.BodySubscriber<byte[]> delegate = HttpResponse.BodySubscribers.ofByteArray();
     private final int maximumBytes;
     private Flow.Subscription subscription;
     private long receivedBytes;
     private boolean failed;
 
-    LimitedBodySubscriber(int maximumBytes)
+    public LimitedBodySubscriber(int maximumBytes)
     {
         this.maximumBytes = maximumBytes;
     }

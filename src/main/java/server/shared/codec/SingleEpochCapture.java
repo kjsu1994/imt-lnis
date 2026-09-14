@@ -1,4 +1,4 @@
-package server.agent.gnss;
+package server.shared.codec;
 
 import java.util.ArrayList;
 import java.util.List;

@@ -1,0 +1,39 @@
+# Opt-in local development. Never enable this override on production nodes.
+services:
+  node:
+    environment:
+      dtn_adapter: http://lnis-dev-relay:8080
+      LNIS_DTN_DEVELOPMENT: "true"
+      LNIS_DTN_EXAMPLE_ENABLED: ${LNIS_DEV_EXAMPLES:-false}
+      LNIS_DTN_EXAMPLE_FILE: /app/examples/f9t-example.graw
+      LNIS_DTN_SYNTHETIC_FILE: /app/examples/synthetic-earth-pvt.graw
+    volumes:
+      - ./examples:/app/examples:ro
+    networks:
+      default: {}
+      development:
+        aliases: ["lnis-${LNIS_NODE_ROLE}"]
+  dev-relay:
+    image: node:22-alpine
+    profiles: [relay]
+    user: "10001:10001"
+    command: [node, /app/dev-relay.mjs]
+    environment:
+      RECEIVER_URL: http://lnis-receiver:8091/lnis/api/v1/dtn/receive
+      RECEIVE_TOKEN: ${LNIS_DEV_RECEIVE_TOKEN:?Development receiver token required}
+      SEND_TOKEN: ${LNIS_DTN_SEND_TOKEN:?Development send token required}
+    volumes:
+      - ./dev-relay.mjs:/app/dev-relay.mjs:ro
+      - ${LNIS_DEV_SENDER_FILES:-./exchange}:/sender-files:ro
+      - ${LNIS_DEV_RECEIVER_FILES:-../lnis-receiver/exchange}:/receiver-files
+    networks:
+      development:
+        aliases: [lnis-dev-relay]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+networks:
+  development:
+    external: true
+    name: lnis-development

@@ -62,7 +62,7 @@ public class NodeDtnService implements DtnNodeLink {
             registration.setTestId(job.getId());
             registration.setSenderAgentId(job.getSenderAgentId());
             registration.setReceiverAgentId(job.getReceiverAgentId());
-            registration.setProfile(DtnModels.PROFILE);
+            registration.setProfile(mapper.readTree(job.getSentJson()).path("profile").asText());
             registration.setPayloadSha256(DtnPayloadDigest.sha256(mapper, mapper.readTree(job.getSentJson())));
             DtnRemoteResult accepted = peerClient.exchange("/lnis/api/v1/node/peer/dtn/tests",
                     registration, DtnRemoteResult.class, 16 * 1024);
@@ -91,7 +91,7 @@ public class NodeDtnService implements DtnNodeLink {
     {
         requireReceiver();
         validateParticipants(registration.getSenderAgentId(), registration.getReceiverAgentId());
-        if (registration.getTestId() == null || !DtnModels.PROFILE.equals(registration.getProfile())
+        if (registration.getTestId() == null || !(DtnModels.PROFILE.equals(registration.getProfile()) || "LANS-AFS-IQ-v1".equals(registration.getProfile()))
                 || registration.getPayloadSha256() == null
                 || !registration.getPayloadSha256().matches("[0-9a-f]{64}")) {
             throw new IllegalArgumentException("지원하지 않는 DTN 등록 정보입니다.");
@@ -141,6 +141,10 @@ public class NodeDtnService implements DtnNodeLink {
         result.setState(job.getState());
         result.setMessage(job.getMessage());
         result.setReceivedAt(job.getReceivedAt());
+        if (job.getFileResultJson() != null) {
+            try { result.setFileResult(mapper.readTree(job.getFileResultJson())); }
+            catch (java.io.IOException error) { throw new IllegalStateException("I/Q 결과 조회 실패", error); }
+        }
         if (job.getReceiverJson() != null) {
             try {
                 result.setPvt(mapper.readValue(job.getReceiverJson(), new TypeReference<>() {}));

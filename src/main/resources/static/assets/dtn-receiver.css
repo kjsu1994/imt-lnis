@@ -1,6 +1,11 @@
 /* 수신 화면은 조작보다 관찰이 중심이다. 핵심 상태는 펼치고 상세 원문/로그는 필요할 때 연다. */
 body[data-page="dtn-receiver"] main { display: grid; gap: 14px; }
 body[data-page="dtn-receiver"] .status-strip { margin: 0; }
+body[data-page="dtn-receiver"] .destination-row { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; }
+body[data-page="dtn-receiver"] .destination-row > label { flex: 1 1 260px; min-width: 0; margin: 0; }
+body[data-page="dtn-receiver"] .destination-status { flex: 0 0 auto; min-height: 40px; padding: 8px 12px; box-sizing: border-box; }
+body[data-page="dtn-receiver"] .destination-status > div { display: flex; align-items: center; gap: 10px; white-space: nowrap; }
+body[data-page="dtn-receiver"] .test-type-selector button.active:disabled { opacity: 1; color: var(--teal); background: #e6f4f0; border-color: #a6d6c8; }
 .receiver-overview .card-title, .receiver-pvt .card-title { margin-bottom: 10px; flex-wrap: wrap; gap: 8px; }
 .receiver-overview .card-title h2, .receiver-pvt .card-title h2 { margin: 0; }
 .receiver-endpoint, .receiver-selection, .receiver-epoch-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }

@@ -1,4 +1,5 @@
 package server.agent.gnss;
+import server.shared.codec.SingleEpochCapture;
 
 import com.fazecast.jSerialComm.SerialPort;
 import java.io.ByteArrayOutputStream;

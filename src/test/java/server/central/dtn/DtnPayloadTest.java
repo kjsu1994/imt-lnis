@@ -24,13 +24,29 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /** 수신 원문의 공백·한글·줄바꿈과 기존 중복/인증/동일성 검증 계약을 함께 검사한다. */
 class DtnPayloadTest {
+    @Test
+    void observationViewPreservesNavigationAndRoundTripsAsJson() throws Exception {
+        var navigation = new server.shared.codec.GrawCodec.NavigationUpdate(0, 19, 0, 0, 2,
+                java.util.List.of(0L, 4294967295L));
+        var record = server.shared.codec.GrawCodec.encode(new server.shared.codec.GrawCodec.Envelope(
+                UUID.randomUUID(), UUID.randomUUID(), 7, java.time.Instant.parse("2026-09-14T00:00:00Z"), navigation));
+        var view = server.shared.model.DtnObservationView.fromRecords(java.util.List.of(record, record));
+        assertEquals(2, view.navigationCount());
+        assertEquals(2, view.navigation().size());
+        assertEquals(navigation.words(), view.navigation().getFirst().message().words());
+        var mapper = new ObjectMapper().findAndRegisterModules();
+        var json = mapper.writeValueAsString(view);
+        var restored = mapper.readValue(json, server.shared.model.DtnObservationView.class);
+        assertEquals(mapper.readTree(json), mapper.readTree(mapper.writeValueAsString(restored)));
+        assertEquals(2, restored.records().size());
+        assertTrue(server.shared.model.DtnObservationView.fromRecords(java.util.List.of()).navigation().isEmpty());
+    }
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final DtnRepository repository = mock(DtnRepository.class);
     private final DtnService service = new DtnService(repository, mock(AgentCommandService.class),
             mock(AgentRepository.class), mock(AgentConnectionRegistry.class),
             mock(InputBufferService.class), objectMapper);
     private final DtnJob job = new DtnJob();
-    private final DtnAdapterControlService dtnAdapterControlService = mock(DtnAdapterControlService.class);
     private String original;
 
     @BeforeEach
@@ -82,7 +98,7 @@ class DtnPayloadTest {
     void downloadReturnsOriginalBytesWithoutAdditionalJsonWrapping() throws Exception
     {
         service.receive("Bearer test-token", original.getBytes(StandardCharsets.UTF_8));
-        MockMvc mvc = MockMvcBuilders.standaloneSetup(new DtnController(service, objectMapper, dtnAdapterControlService))
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(new DtnController(service, objectMapper))
                 .setMessageConverters(new ByteArrayHttpMessageConverter()).build();
         mvc.perform(get("/lnis/api/v1/dtn/tests/" + job.getId() + "/payload/received?download=true"))
                 .andExpect(status().isOk())

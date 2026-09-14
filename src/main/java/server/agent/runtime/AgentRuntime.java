@@ -262,7 +262,7 @@ public final class AgentRuntime implements AutoCloseable {
     }
     var settings = json.treeToValue(args, SerialCaptureService.Settings.class);
     var capturedPvt = new AtomicReference<List<server.shared.model.DtnModels.Pvt>>();
-    var selection = settings.singleEpoch() ? new server.agent.gnss.SingleEpochCapture(records -> {
+    var selection = settings.singleEpoch() ? new server.shared.codec.SingleEpochCapture(records -> {
       try (var pvt = new server.agent.codec.NativePvtCodec(config.nativeDirectory())) {
         var results = pvt.calculate(records);
         var result = results.getFirst();

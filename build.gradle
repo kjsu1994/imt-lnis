@@ -89,6 +89,16 @@ tasks.named('bootJar') {
     archiveFileName = 'lnis.jar'
 }
 
+tasks.register('syntheticGraw', JavaExec) {
+    group = 'verification'
+    description = '실측이 아닌 지구 PVT 검증용 GRAW와 예상 결과를 생성한다.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'server.agent.codec.ExportSyntheticGraw'
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }
+    systemProperty 'lnis.native.candidate', providers.gradleProperty('nativeCandidate').orElse('native/bin/win-x64').get()
+}
+
 // 운영 배포와 분리된 검증 묶음이다. Linux JVM에서 실제 SO와 Java 경계를 함께 시험한다.
 tasks.register('linuxNativeVerificationZip', Zip) {
     group = 'verification'
@@ -133,7 +143,13 @@ tasks.register('linuxNodeDistZip', Zip) {
     dependsOn tasks.named('bootJar'), tasks.named('check'), tasks.named('nativeLinuxSourcesZip')
     archiveFileName = 'lnis-node-linux.zip'
     destinationDirectory = layout.buildDirectory.dir('distributions')
-    from('deployment/node')
+    from('deployment/node') {
+        exclude 'docker-compose.dev.yml', 'dev-relay.mjs', 'docker-compose.example.yml'
+    }
+    from('build/iq') {
+        into 'iq'
+        include 'afs_sim', '008_Weil1500hex210prns.txt', 'LICENSE.txt', 'sources.zip'
+    }
     from(tasks.named('bootJar').flatMap { it.archiveFile })
     from('build/native-linux/libLnisAfsCodec.so') { into 'native' }
     from(tasks.named('nativeLinuxSourcesZip').flatMap { it.archiveFile }) { into 'licenses' }
@@ -143,6 +159,9 @@ tasks.register('linuxNodeDistZip', Zip) {
         into 'licenses/ldpc'
     }
     doFirst {
+        if (!file('build/iq/afs_sim').isFile()) {
+            throw new GradleException('먼저 native/build-iq.ps1로 I/Q 생성기를 빌드하세요.')
+        }
         if (!file('build/native-linux/libLnisAfsCodec.so').isFile()) {
             throw new GradleException('먼저 native/build-linux.ps1로 Linux SO를 빌드하세요.')
         }
@@ -227,7 +246,4 @@ tasks.register('deployComposeBundle') {
     }
 }
 
-// 사용자가 요청한 단순 흐름: 모든 시험이 성공한 build에서만 운영 폴더를 갱신한다.
-tasks.named('build') {
-    dependsOn tasks.named('deployComposeBundle')
-}
+// Build verifies artifacts only. Deployment is always an explicit task.

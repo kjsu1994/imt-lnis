@@ -17,4 +17,5 @@ public class DtnRemoteResult {
     private String message;
     private Instant receivedAt;
     private List<Pvt> pvt;
+    private com.fasterxml.jackson.databind.JsonNode fileResult;
 }

@@ -74,6 +74,12 @@ class DtnAdapterHealthServiceTest {
     assertThrows(IllegalStateException.class, () -> service("sender", "", Duration.ofSeconds(2)).check(null));
   }
 
+  @Test void excessiveHealthBodyIsCancelled() {
+    server.createContext("/sender/health", exchange -> reply(exchange, 200, "x".repeat(20000)));
+    var health = service("sender", base, Duration.ofSeconds(2)).check(null).adapter();
+    assertFalse(health.ok()); assertNull(health.rawResponse());
+  }
+
   private DtnAdapterHealthService service(String role, String url, Duration timeout) {
     return new DtnAdapterHealthService(HttpClient.newHttpClient(), json, url, role, timeout);
   }

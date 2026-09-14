@@ -19,11 +19,24 @@ public final class DtnModels {
     private UUID testId;
     private String profile = PROFILE;
     private String format = "LNIS-GRAW-AFS-v1";
+    /** Adapter dispatch key; absent in legacy AFS v1 requests. */
+    private String testType = "AFS_METADATA";
+    private String senderMode;
+    private String receiverMode;
+    private IqFile file;
     private String sourceSha256;
     private int recordCount;
     private int prn = 1;
     private List<Frame> frames;
+    /** RAW transport preserves canonical GRAW bytes, not UBX serial bytes. */
+    private String grawBase64;
+    /** Display/comparison only; never used as receiver solver input. */
+    private List<Pvt> referencePvt;
   }
+
+  /** A reference to a completed local shared file, never the I/Q binary body. */
+  public record IqFile(String filePath, long sizeBytes, String sha256, int durationSeconds,
+      int sampleRateHz, String sampleFormat, int quantizationBits) {}
 
   /** frameBase64는 반드시 750바이트 AFS 프레임이며 관측 시각은 복원된 GRAW에 있다. */
   @Data @NoArgsConstructor
@@ -49,7 +62,7 @@ public final class DtnModels {
     private String message;
   }
 
-  /** Sender 기준 결과는 외부 DTN에 전달하지 않는다. */
+  /** 실행기의 독립 계산 결과와 전송 데이터. */
   @Data @NoArgsConstructor
   public static class AgentResult {
     private Transfer transfer;

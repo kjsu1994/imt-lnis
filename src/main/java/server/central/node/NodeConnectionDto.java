@@ -33,6 +33,8 @@ public final class NodeConnectionDto {
         private boolean tokenConfigured;
         private boolean editable;
         private boolean busy;
+        private boolean peerOnline;
+        private Boolean reverseOnline;
     }
 
     @Data

@@ -9,13 +9,13 @@ export function displayedJson(original, pretty) {
   return pretty ? JSON.stringify(JSON.parse(original), null, 2) : original;
 }
 
-export function createPayloadViewer(container, {receivedOnly = false} = {}) {
+export function createPayloadViewer(container, {receivedOnly = false, sentOnly = false} = {}) {
   const create = (tag, text) => {
     const element = document.createElement(tag);
     if (text !== undefined) element.textContent = text;
     return element;
   };
-  const title = create('h2', receivedOnly ? '수신 JSON 원문' : '송수신 JSON 원문');
+  const title = create('h2', receivedOnly ? '수신 JSON 원문' : sentOnly ? '송신 JSON 원문' : '송수신 JSON 원문');
   const controls = create('div');
   controls.className = 'dtn-payload-controls';
   const sent = create('button', '송신 원문');
@@ -24,6 +24,7 @@ export function createPayloadViewer(container, {receivedOnly = false} = {}) {
   sent.disabled = received.disabled = true;
   // 수신 노드에는 송신 원문이 없으므로 불필요한 버튼을 노출하지 않는다.
   sent.hidden = receivedOnly;
+  received.hidden = sentOnly;
   controls.append(sent, received);
   const status = create('p', '아직 준비된 JSON 원문이 없습니다.');
   status.setAttribute('role', 'status');
@@ -33,6 +34,7 @@ export function createPayloadViewer(container, {receivedOnly = false} = {}) {
   const prettyLabel = create('label');
   const pretty = create('input');
   pretty.type = 'checkbox';
+  pretty.checked = true;
   pretty.disabled = true;
   prettyLabel.append(pretty, document.createTextNode(' 정렬 보기'));
   const download = create('a', 'JSON 다운로드');
@@ -52,6 +54,7 @@ export function createPayloadViewer(container, {receivedOnly = false} = {}) {
   panel.append(caption, toolbar, text);
   container.append(title, controls, status, panel);
   let job = null, original = '', generation = 0, pending = null;
+  let automaticKey = null;
 
   function reset() {
     generation++;
@@ -59,7 +62,7 @@ export function createPayloadViewer(container, {receivedOnly = false} = {}) {
     pending = null;
     original = '';
     text.value = '';
-    pretty.checked = false;
+    pretty.checked = true;
     panel.hidden = true;
     pretty.disabled = true;
     sent.setAttribute('aria-expanded', 'false');
@@ -98,6 +101,7 @@ export function createPayloadViewer(container, {receivedOnly = false} = {}) {
         : direction === 'sent'
           ? '외부 DTN/HDTN에 전달할 요청 본문입니다.'
           : '접수 당시 원문 · 다운로드는 원문 그대로 저장합니다.';
+      pretty.onchange();
     } catch (error) {
       if (requestGeneration === generation && error.name !== 'AbortError') status.textContent = 'JSON 조회 실패: ' + error.message;
     }
@@ -106,7 +110,7 @@ export function createPayloadViewer(container, {receivedOnly = false} = {}) {
   sent.onclick = () => show('sent');
   received.onclick = () => show('received');
   pretty.onchange = () => {
-    if (pretty.disabled || !original) { pretty.checked = false; return; }
+    if (pretty.disabled || !original) return;
     try { text.value = displayedJson(original, pretty.checked); }
     catch { pretty.checked = false; text.value = original; status.textContent = '정렬할 수 없어 원문을 표시합니다.'; }
   };
@@ -115,14 +119,23 @@ export function createPayloadViewer(container, {receivedOnly = false} = {}) {
   return {
     setJob(nextJob) {
       if (job?.testId !== nextJob?.testId) {
+        automaticKey = null;
         reset();
         status.textContent = nextJob
-          ? (receivedOnly ? '수신 원문 버튼으로 접수 당시 JSON을 확인하세요.' : '준비된 송신 또는 수신 JSON을 선택하세요.')
+          ? (receivedOnly ? '수신 원문 버튼으로 접수 당시 JSON을 확인하세요.' : sentOnly ? '송신 원문 버튼으로 전송 JSON을 확인하세요.' : '준비된 송신 또는 수신 JSON을 선택하세요.')
           : '시험을 선택하세요.';
       }
       job = nextJob || null;
       sent.disabled = !job?.sentPayloadAvailable;
       received.disabled = !job?.receivedPayloadAvailable;
+      const direction = receivedOnly ? 'received' : sentOnly ? 'sent'
+        : job?.sentPayloadAvailable ? 'sent' : 'received';
+      const available = direction === 'sent' ? job?.sentPayloadAvailable : job?.receivedPayloadAvailable;
+      const key = job?.testId + ':' + direction;
+      if (available && automaticKey !== key) {
+        automaticKey = key;
+        return show(direction);
+      }
     }
   };
 }

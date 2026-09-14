@@ -27,18 +27,29 @@ public final class DtnProcessor {
   }
 
   public AgentResult prepare(UUID id, byte[] source) {
+    return prepare(id, source, false);
+  }
+
+  public AgentResult prepare(UUID id, byte[] source, boolean raw) {
     if (source.length == 0 || source.length > DtnModels.MAX_INPUT_BYTES)
       throw new IllegalArgumentException("DTN 수집 입력은 1 MiB 이하로 제한됩니다.");
     var records = GrawCodec.splitLengthPrefixed(source);
     AgentResult result = new AgentResult();
     result.setObservations(server.shared.model.DtnObservationView.fromRecords(records));
     try (var pvt = new NativePvtCodec(nativeDirectory)) { result.setPvt(pvt.calculate(records)); }
-    var frames = new AfsFrameBuilder(afs).prepare(records,
-        new TestOptions(TestType.TEST_A_NORMAL, 0, 0, 0, Map.of()), 1).frames();
     Transfer transfer = new Transfer();
     transfer.setTestId(id);
     transfer.setSourceSha256(Hashing.hex(Hashing.sha256Digest().digest(source)));
     transfer.setRecordCount(records.size());
+    if (raw) {
+      transfer.setFormat("LNIS-GRAW-RAW-v1");
+      transfer.setTestType("GNSS_RAW");
+      transfer.setGrawBase64(Base64.getEncoder().encodeToString(source));
+      result.setTransfer(transfer);
+      return result;
+    }
+    var frames = new AfsFrameBuilder(afs).prepare(records,
+        new TestOptions(TestType.TEST_A_NORMAL, 0, 0, 0, Map.of()), 1).frames();
     List<DtnModels.Frame> output = new ArrayList<>();
     for (var frame : frames) {
       DtnModels.Frame item = new DtnModels.Frame();
@@ -55,8 +66,11 @@ public final class DtnProcessor {
   }
 
   public AgentResult receive(UUID id, Transfer transfer) {
+    if (transfer != null && "LNIS-GRAW-RAW-v1".equals(transfer.getFormat()))
+      return receiveRaw(id, transfer);
     if (transfer == null || !id.equals(transfer.getTestId()) || transfer.getSchemaVersion() != 1
         || !DtnModels.PROFILE.equals(transfer.getProfile()) || !"LNIS-GRAW-AFS-v1".equals(transfer.getFormat())
+        || !"AFS_METADATA".equals(transfer.getTestType()) || transfer.getGrawBase64() != null
         || transfer.getPrn() != 1 || transfer.getFrames() == null || transfer.getFrames().isEmpty()
         || transfer.getFrames().size() > 20000 || transfer.getRecordCount() < 1)
       throw new IllegalArgumentException("지원하지 않는 DTN payload입니다.");
@@ -84,6 +98,25 @@ public final class DtnProcessor {
     }
     if (!Hashing.hex(Hashing.sha256Digest().digest(source.toByteArray())).equals(transfer.getSourceSha256()))
       throw new IllegalArgumentException("복원 데이터 SHA-256 불일치");
+    AgentResult result = new AgentResult();
+    result.setObservations(server.shared.model.DtnObservationView.fromRecords(records));
+    try (var pvt = new NativePvtCodec(nativeDirectory)) { result.setPvt(pvt.calculate(records)); }
+    return result;
+  }
+
+  private AgentResult receiveRaw(UUID id, Transfer transfer) {
+    if (!id.equals(transfer.getTestId()) || transfer.getSchemaVersion() != 1
+        || !"GNSS_RAW".equals(transfer.getTestType())
+        || !DtnModels.PROFILE.equals(transfer.getProfile()) || transfer.getFrames() != null
+        || transfer.getGrawBase64() == null
+        || transfer.getGrawBase64().length() > ((DtnModels.MAX_INPUT_BYTES + 2) / 3) * 4)
+      throw new IllegalArgumentException("지원하지 않는 RAW payload입니다.");
+    byte[] source = Base64.getDecoder().decode(transfer.getGrawBase64());
+    if (source.length == 0 || source.length > DtnModels.MAX_INPUT_BYTES
+        || !Hashing.hex(Hashing.sha256Digest().digest(source)).equals(transfer.getSourceSha256()))
+      throw new IllegalArgumentException("RAW 입력 크기 또는 SHA-256 불일치");
+    var records = GrawCodec.splitLengthPrefixed(source);
+    if (records.size() != transfer.getRecordCount()) throw new IllegalArgumentException("RAW 레코드 수 불일치");
     AgentResult result = new AgentResult();
     result.setObservations(server.shared.model.DtnObservationView.fromRecords(records));
     try (var pvt = new NativePvtCodec(nativeDirectory)) { result.setPvt(pvt.calculate(records)); }

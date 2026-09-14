@@ -71,7 +71,8 @@ public final class NodeContainerVerification {
             JsonNode result = waitComplete(sender + "/lnis/api/v1/dtn/tests/" + id);
             assertEquals("PASS", result.path("verdict").asText(), result.toString());
             JsonNode report = json("GET", receiver + "/lnis/api/v1/dtn/tests/" + id + "/report", null);
-            assertFalse(report.path("referencePvt").isArray());
+            assertTrue(report.path("referencePvt").isArray());
+            assertEquals("PASS", report.path("comparison").path("verdict").asText());
             assertTrue(report.path("receivedPvt").isArray());
             assertArrayEquals(delivered.get(), HTTP.send(HttpRequest.newBuilder(URI.create(receiver
                     + "/lnis/api/v1/dtn/tests/" + id + "/payload/received")).GET().build(),

@@ -4,10 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>LNIS DTN Receiver</title>
-  <link rel="stylesheet" href="/lnis/assets/app.css?v=20260914-local-adapter">
-  <link rel="stylesheet" href="/lnis/assets/dtn-payload.css?v=20260913-compact">
-  <link rel="stylesheet" href="/lnis/assets/dtn-ui.css?v=20260914-local-adapter">
-  <link rel="stylesheet" href="/lnis/assets/dtn-receiver.css?v=20260913">
+  <link rel="stylesheet" href="/lnis/assets/app.css?v=20260914-transfer-v2">
+  <link rel="stylesheet" href="/lnis/assets/dtn-payload.css?v=20260914-download-button">
+  <link rel="stylesheet" href="/lnis/assets/dtn-ui.css?v=20260914-output-spacing">
+  <link rel="stylesheet" href="/lnis/assets/dtn-receiver.css?v=20260914-compact-status">
 </head>
 <body data-page="dtn-receiver">
 <header>
@@ -34,15 +34,15 @@
   <section class="card receiver-overview">
     <div class="card-title">
       <h2>시험 설정 · 수신</h2>
-      <small>자동 수신·복원·지구 PVT 계산</small>
+      <small id="receiver-type">시험 선택 대기</small>
     </div>
-    <div class="test-type-selector" aria-label="지원 예정 시험 유형">
-      <button disabled>GNSS RAW · 준비 중</button><button disabled id="receiver-type">AFS Frame + Metadata</button><button disabled>I/Q Sample · 준비 중</button>
+    <div class="test-type-selector" aria-label="지원 시험 유형">
+      <button disabled id="receiver-GNSS_RAW">GNSS RAW</button><button disabled id="receiver-AFS_METADATA">AFS Frame + Metadata</button><button disabled id="receiver-IQ_SAMPLE">I/Q Sample</button>
     </div>
-    <div class="transport-mode-section"><div class="transport-mode-title"><span>전송 경로</span><strong>어댑터 경로 정보 미제공</strong></div>
+    <div class="transport-mode-section"><div class="transport-mode-title"><span>전송 경로</span><strong id="receiver-mode">시험 선택 대기</strong></div>
       <div class="transport-mode-selector"><button disabled>DTN → HDTN</button><button disabled>DTN → DTN</button><button disabled>HDTN → DTN</button><button disabled>HDTN → HDTN</button></div></div>
     <div class="destination-row"><label>상대 송신 서비스<input id="sender-address" readonly placeholder="주소 정보 없음"></label>
-      <div class="destination-status"><span class="connection-dot unknown"></span><div><small>역방향 연결</small><strong>미확인</strong></div></div>
+      <div class="destination-status"><span id="reverse-dot" class="connection-dot unknown"></span><div><small>수신 → 송신 서비스</small><strong id="reverse-state">미확인</strong></div></div>
       <span class="pill">COM 수집은 송신 측에서 수행</span></div>
     <!-- 외부 어댑터가 호출할 주소다. 관리 API나 송신 어댑터의 /transfers와 구분한다. -->
     <div class="receiver-endpoint">
@@ -59,7 +59,6 @@
           <input id="dtn-send-url" type="url" placeholder="http://어댑터-IP:포트" autocomplete="off"></label>
         <button id="dtn-adapter-health" type="button" aria-controls="dtn-adapter-health-results">연결 확인</button>
       </div>
-      <small class="adapter-url-help">이 PC에 연결된 어댑터만 10초마다 확인합니다. 주소 변경은 현재 화면에 적용됩니다.</small>
       <details id="dtn-adapter-health-results" class="adapter-health-results" aria-busy="false">
         <summary><span id="dtn-adapter-status" class="pill" role="status" aria-live="polite">미확인</span><span class="adapter-health-toggle">상세 보기</span></summary>
         <div class="adapter-health-content">
@@ -96,20 +95,31 @@
 
   <section class="card receiver-pvt">
     <div class="card-title">
-      <h2>수신 복원 지구 PVT</h2>
+      <h2>송·수신 지구 PVT</h2>
+      <span id="pvt-match" class="pill" role="status">PVT 비교 대기</span>
       <div class="receiver-result-links">
         <a id="dtn-report" hidden target="_blank" rel="noopener">전체 PVT 보고서</a>
 
       </div>
     </div>
-    <small>송·수신 PVT 비교 결과는 송신 측에서 확인합니다.</small>
     <div class="receiver-epoch-row">
       <label for="pvt-epoch">관측 시각</label>
       <select id="pvt-epoch" disabled><option value="">계산 결과 없음</option></select>
       <span id="pvt-count">0개 관측</span>
       <span id="pvt-validity" class="pill">결과 대기</span>
     </div>
-    <div class="pvt-grid">
+    <div class="receiver-pvt-pair">
+    <div><h3>송신 기준 지구 PVT</h3><div class="pvt-grid">
+      <div class="pvt-value"><span>ECEF X</span><strong id="reference-x">-</strong><small>m</small></div>
+      <div class="pvt-value"><span>ECEF Y</span><strong id="reference-y">-</strong><small>m</small></div>
+      <div class="pvt-value"><span>ECEF Z</span><strong id="reference-z">-</strong><small>m</small></div>
+      <div class="pvt-value"><span>수신기 시계 오차</span><strong id="reference-clock">-</strong><small>s</small></div>
+      <div class="pvt-value"><span>속도 X</span><strong id="reference-vx">-</strong><small>m/s</small></div>
+      <div class="pvt-value"><span>속도 Y</span><strong id="reference-vy">-</strong><small>m/s</small></div>
+      <div class="pvt-value"><span>속도 Z</span><strong id="reference-vz">-</strong><small>m/s</small></div>
+      <div class="pvt-value"><span>사용 위성</span><strong id="reference-satellites">-</strong><small>개</small></div>
+    </div></div>
+    <div><h3>수신 복원 지구 PVT</h3><div class="pvt-grid">
       <div class="pvt-value"><span>ECEF X</span><strong id="pvt-x">-</strong><small>m</small></div>
       <div class="pvt-value"><span>ECEF Y</span><strong id="pvt-y">-</strong><small>m</small></div>
       <div class="pvt-value"><span>ECEF Z</span><strong id="pvt-z">-</strong><small>m</small></div>
@@ -119,16 +129,19 @@
       <div class="pvt-value"><span>속도 Z</span><strong id="pvt-vz">-</strong><small>m/s</small></div>
       <div class="pvt-value"><span>사용 위성</span><strong id="pvt-satellites">-</strong><small>개</small></div>
     </div>
+    </div></div>
     <small id="pvt-message">지구 ECEF · GPS L1 C/A</small>
   </section>
 
+  <section class="card" id="receiver-iq" hidden><h2>I/Q 수신 파일 검증</h2><pre id="receiver-iq-result" class="result-console"></pre></section>
+  <div class="dtn-output-grid">
   <section id="dtn-payload" class="card receiver-payload"></section>
   <section class="card receiver-log">
-    <h2>송수신 로그</h2>
-    <div class="receiver-log-actions"><button id="dtn-log-clear" type="button">로그 지우기</button></div>
+    <div class="card-title"><h2>송수신 로그</h2><button id="dtn-log-clear" type="button">로그 지우기</button></div>
     <pre id="dtn-log" class="log"></pre>
   </section>
+  </div>
 </main>
-<script type="module" src="/lnis/assets/dtn-receiver.js?v=20260914-local-adapter"></script>
+<script type="module" src="/lnis/assets/dtn-receiver.js?v=20260914-auto-pretty"></script>
 </body>
 </html>
