@@ -52,12 +52,12 @@ const context = {
     return {ok: true, json: async () => body};
   }
 };
-vm.createContext(context); vm.runInContext(source, context); await context.ready;
+vm.createContext(context); vm.runInContext(readFileSync(new URL('../../main/resources/static/assets/dtn-adapter-health.js', import.meta.url), 'utf8').replace('export function', 'function') + '\n' + source, context); await context.ready;
 assert.equal(elements.get('dtn-example').hidden, true);
 assert.equal(elements.get('dtn-start').disabled, true);
 assert.equal(elements.get('dtn-send').disabled, true);
 assert.equal(elements.get('dtn-send-url').value, 'http://sender.default:8080');
-assert.equal(elements.get('dtn-receive-url').value, 'http://receiver.default:8080');
+assert.equal(elements.has('dtn-receive-url'), false);
 elements.get('dtn-send-url').value = 'http://127.0.0.1:18092';
 const file = {name: 'capture.graw', size: 10, arrayBuffer: async () => new ArrayBuffer(10)};
 await context.upload(file);
@@ -90,34 +90,49 @@ await elements.get('dtn-send').onclick();
 assert.ok(intervals.some(value => value.delay === 10000), 'adapter health polls every 10 seconds');
 let resolveHealth;
 healthFetch = () => new Promise(resolve => { resolveHealth = resolve; });
-elements.get('dtn-receive-url').value = 'http://localhost:18092';
+
 const checking = elements.get('dtn-adapter-health').onclick();
 assert.equal(elements.get('dtn-adapter-health').disabled, true);
-assert.match(elements.get('dtn-adapter-sender-health').textContent, /확인 중/);
+assert.match(elements.get('dtn-adapter-status').textContent, /확인 중/);
 await elements.get('dtn-adapter-health').onclick();
 assert.equal(healthCalls, 1, 'duplicate probes must be prevented');
 const report = {
   checkedAt: '2026-09-14T01:00:00Z',
-  sender: {ok: true, status: 'ready', message: '정상연결', httpStatus: 200, elapsedMillis: 12,
+  adapter: {ok: true, status: 'ready', message: '정상연결', httpStatus: 200, elapsedMillis: 12,
     url: 'http://127.0.0.1:18092/sender/health', response: {status: 'ready'}, rawResponse: '{"status":"ready"}'},
   receiver: {ok: false, status: 'busy', message: '시험대기', httpStatus: 200, elapsedMillis: 13,
     url: 'http://127.0.0.1:18092/receiver/health', response: {status: 'busy'}, rawResponse: '{"status":"busy"}'}
 };
 resolveHealth({ok: true, json: async () => report});
 await checking;
-assert.match(healthUrl, /sendUrl=http%3A%2F%2F127\.0\.0\.1%3A18092&receiveUrl=http%3A%2F%2Flocalhost%3A18092/);
-assert.equal(elements.get('dtn-adapter-sender-health').textContent, 'Sender · 정상연결');
-assert.equal(elements.get('dtn-adapter-sender-health').className, 'pill online');
-assert.equal(elements.get('dtn-adapter-receiver-health').textContent, 'Receiver · 시험대기');
-assert.equal(elements.get('dtn-adapter-receiver-health').className, 'pill warning');
+assert.match(healthUrl, /adapterUrl=http%3A%2F%2F127\.0\.0\.1%3A18092$/);
+assert.equal(elements.get('dtn-adapter-status').textContent, '정상연결');
+assert.equal(elements.get('dtn-adapter-status').className, 'pill online');
 assert.match(elements.get('dtn-adapter-health-json').textContent, /"rawResponse": "{\\"status\\":\\"ready\\"}"/);
 assert.match(elements.get('dtn-adapter-health-time').textContent, /마지막 확인/);
 assert.equal(elements.get('dtn-adapter-health').disabled, false);
 assert.equal(elements.get('dtn-send').disabled, true, 'health check must not unlock the active trial');
 healthFetch = async () => { throw new Error('server unreachable'); };
 await elements.get('dtn-adapter-health').onclick();
-assert.equal(elements.get('dtn-adapter-sender-health').textContent, 'Sender · 연결실패');
-assert.equal(elements.get('dtn-adapter-sender-health').className, 'pill error', 'old success must not survive a failed check');
+assert.equal(elements.get('dtn-adapter-status').textContent, '연결실패');
+assert.equal(elements.get('dtn-adapter-status').className, 'pill error', 'old success must not survive a failed check');
 assert.match(elements.get('dtn-adapter-health-json').textContent, /server unreachable/);
 assert.equal(elements.get('dtn-adapter-health').disabled, false);
 console.log('PASS: adapter status JSON, URL derivation, collapsible details, polling and manual retry');
+
+healthFetch = async () => ({ok: true, json: async () => ({...report, adapter: report.receiver})});
+await elements.get('dtn-adapter-health').onclick();
+assert.equal(elements.get('dtn-adapter-status').textContent, '시험대기');
+assert.equal(elements.get('dtn-adapter-status').className, 'pill warning');
+healthFetch = () => new Promise(resolve => { resolveHealth = resolve; });
+const stale = elements.get('dtn-adapter-health').onclick();
+elements.get('dtn-send-url').value = 'http://changed:8080';
+elements.get('dtn-send-url').oninput();
+resolveHealth({ok: true, json: async () => report});
+await stale;
+assert.equal(elements.get('dtn-adapter-status').textContent, '확인 대기');
+const callsBeforeHidden = healthCalls;
+context.document.visibilityState = 'hidden';
+intervals.find(value => value.delay === 10000).callback();
+assert.equal(healthCalls, callsBeforeHidden);
+console.log('PASS: busy status, stale response ignored and hidden tab skips polling');

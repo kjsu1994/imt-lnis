@@ -18,7 +18,7 @@ const context = {
   createPayloadViewer(container, options) { assert.equal(options.receivedOnly, true); return {setJob() {}}; },
   createObservationView() { return {setData() {}, select() {}}; },
   Option: function(text, value) { this.text = text; this.value = value; },
-  location: {origin: 'http://localhost:8089'}, navigator: {}, setTimeout() {},
+  location: {origin: 'http://localhost:8089'}, navigator: {}, setTimeout() {}, setInterval() {},
   fetch: async (url, options) => {
     assert.ok(!options?.method || options.method === 'GET', 'Receiver screen must not start a test');
     requests.push(url);
@@ -31,7 +31,7 @@ const context = {
   }
 };
 vm.createContext(context);
-vm.runInContext(source, context);
+vm.runInContext(readFileSync(new URL('../../main/resources/static/assets/dtn-adapter-health.js', import.meta.url), 'utf8').replace('export function', 'function') + '\n' + source, context);
 await context.ready;
 assert.equal(elements.get('receive-url').value, 'http://192.168.1.72:8089/lnis/api/v1/dtn/receive');
 assert.equal(elements.get('receive-state').textContent, '수신 대기');

@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>LNIS DTN Receiver</title>
-  <link rel="stylesheet" href="/lnis/assets/app.css?v=20260911-receiver">
+  <link rel="stylesheet" href="/lnis/assets/app.css?v=20260914-local-adapter">
   <link rel="stylesheet" href="/lnis/assets/dtn-payload.css?v=20260913-compact">
-  <link rel="stylesheet" href="/lnis/assets/dtn-ui.css?v=20260913-align">
+  <link rel="stylesheet" href="/lnis/assets/dtn-ui.css?v=20260914-local-adapter">
   <link rel="stylesheet" href="/lnis/assets/dtn-receiver.css?v=20260913">
 </head>
 <body data-page="dtn-receiver">
@@ -14,7 +14,7 @@
   <div>
     <span class="eyebrow">LNIS DTN VALIDATOR</span>
     <h1>DTN 송수신 시험</h1>
-    <nav class="test-suite-tabs" aria-label="시험 대분류">
+    <nav class="test-suite-tabs" aria-label="시험 대분류" hidden>
       <a href="/lnis/afstest/receiver">AFS Frame 시험</a>
       <a class="active" href="/lnis/dtntest/receiver" aria-current="page">DTN 송수신 시험</a>
     </nav>
@@ -52,6 +52,24 @@
       <span id="receive-auth" class="pill warning">인증 설정 확인 중</span>
     </div>
     <small id="receive-help" role="status">외부 DTN/HDTN 수신 어댑터가 이 주소로 JSON을 전달합니다.</small>
+
+    <div class="adapter-url-row">
+      <div class="adapter-url-controls">
+        <label><span>DTN 어댑터 서버 주소</span>
+          <input id="dtn-send-url" type="url" placeholder="http://어댑터-IP:포트" autocomplete="off"></label>
+        <button id="dtn-adapter-health" type="button" aria-controls="dtn-adapter-health-results">연결 확인</button>
+      </div>
+      <small class="adapter-url-help">이 PC에 연결된 어댑터만 10초마다 확인합니다. 주소 변경은 현재 화면에 적용됩니다.</small>
+      <details id="dtn-adapter-health-results" class="adapter-health-results" aria-busy="false">
+        <summary><span id="dtn-adapter-status" class="pill" role="status" aria-live="polite">미확인</span><span class="adapter-health-toggle">상세 보기</span></summary>
+        <div class="adapter-health-content">
+          <div class="adapter-health-item"><small id="dtn-adapter-detail">연결 확인을 기다립니다.</small></div>
+          <small id="dtn-adapter-health-time" class="adapter-health-time">10초마다 자동 확인</small>
+          <details class="adapter-health-developer"><summary>개발자 모드 · JSON 원문</summary>
+            <pre id="dtn-adapter-health-json">아직 확인 결과가 없습니다.</pre></details>
+        </div>
+      </details>
+    </div>
 
     <div class="receiver-selection">
       <label for="dtn-tests">시험 기록</label>
@@ -111,6 +129,6 @@
     <pre id="dtn-log" class="log"></pre>
   </section>
 </main>
-<script type="module" src="/lnis/assets/dtn-receiver.js?v=20260913-compact"></script>
+<script type="module" src="/lnis/assets/dtn-receiver.js?v=20260914-local-adapter"></script>
 </body>
 </html>

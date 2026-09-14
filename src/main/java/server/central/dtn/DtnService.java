@@ -98,7 +98,7 @@ public class DtnService {
                 Map.entry("configured",
                         !sendUrl.isBlank() && (sendingNode() || !receiveToken.isBlank())),
                 Map.entry("defaultSendUrl", sendUrl),
-                Map.entry("defaultReceiveUrl", receiveUrl.isBlank() ? sendUrl : receiveUrl),
+                Map.entry("adapterUrl", nodeLink != null && !sendingNode() && !receiveUrl.isBlank() ? receiveUrl : sendUrl),
                 Map.entry("receiveConfigured", !receiveToken.isBlank()),
                 Map.entry("sendReady", sendingNode() || !receiveToken.isBlank()),
                 Map.entry("nodeRole",

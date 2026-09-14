@@ -50,7 +50,7 @@ assert.equal(elements['[data-connection-save]'].disabled, false);
 
 // 관리 IP/Port가 아닌 어댑터 URL 원문을 사용하고 사용자 경로·쿼리를 보존한다.
 const dtn = readFileSync(new URL('../../main/resources/static/assets/dtn.js', import.meta.url), 'utf8');
-const build = dtn.match(/function buildAdapterUrl\(id\) \{[\s\S]*?const buildReceiveUrl = \(\) =>[^;]+;/)[0];
+const build = dtn.match(/function buildAdapterUrl\(id\) \{[\s\S]*?const buildSendUrl = \(\) =>[^;]+;/)[0];
 let adapter = 'https://adapter.example:8443/custom/transfers?route=1';
 const context = {URL, $: id => { assert.equal(id, 'dtn-send-url'); return {value: adapter}; }};
 vm.createContext(context);

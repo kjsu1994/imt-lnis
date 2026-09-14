@@ -1,3 +1,4 @@
+import {initAdapterHealth} from './dtn-adapter-health.js?v=20260914-local';
 import {createPayloadViewer} from './dtn-payload.js?v=20260913-compact';
 import {createObservationView} from './dtn-observations.js?v=20260913';
 
@@ -167,6 +168,8 @@ async function poll(force = false) {
 }
 
 async function initialize() {
+  try { const config = await get('/dtn/config'); initAdapterHealth(config.adapterUrl || '', log); }
+  catch (error) { initAdapterHealth('', log); log(error.message); }
   $('receive-url').value = location.origin + api + '/dtn/receive';
   try {
     const response = await fetch(api + '/node', {cache: 'no-store'});

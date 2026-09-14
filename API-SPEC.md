@@ -242,17 +242,20 @@ DELETE /lnis/api/v1/inputs/{inputId}
 ## 5.1 DTN Adapter Health
 
 ```http
-GET /lnis/api/v1/dtn/adapter-health?sendUrl=http%3A%2F%2F192.168.1.154%3A8080&receiveUrl=http%3A%2F%2F192.168.1.155%3A8080
+GET /lnis/api/v1/dtn/adapter-health?adapterUrl=http%3A%2F%2F192.168.1.154%3A8080
 ```
 
-`sendUrl`과 `receiveUrl`의 scheme, host, port를 기준으로 `/sender/health`와 `/receiver/health`를 동시에 GET 조회합니다.
-파라미터를 생략하면 Compose/env의 `LNIS_DTN_SEND_URL`, `LNIS_DTN_RECEIVE_URL`을 사용합니다. 수신 URL을 생략한 기존 배포는 송신 URL을 함께 사용하며, 기존 `transferUrl` 파라미터도 호환됩니다. 응답 JSON의 `status`가 `ready`이면
+`adapterUrl`의 scheme, host, port를 기준으로 이 노드 역할의 경로 하나만 GET 조회합니다.
+송신 노드는 `/sender/health`, 수신 노드는 `/receiver/health`를 사용하며 역할은 서버의 `LNIS_NODE_ROLE`로 결정합니다.
+파라미터를 생략하면 Compose/env의 `dtn_adapter`를 사용합니다. 화면에서는 주소 입력값을 전달하며 10초마다 조회합니다.
+응답 JSON의 `status`가 `ready`이면
 `정상연결`, `busy`이면 `시험대기`로 판정하며 무응답 또는 HTTP 오류는 `연결실패`로 판정합니다.
 
 ```json
 {
   "checkedAt": "2026-09-14T01:00:00Z",
-  "sender": {
+  "role": "sender",
+  "adapter": {
     "url": "http://192.168.1.154:8080/sender/health",
     "ok": true,
     "httpStatus": 200,
@@ -600,7 +603,7 @@ I/Q 생성, RF 송수신, 달 환경 모사는 수행하지 않는다.
 4. 중앙 서버가 별도 Receiver Agent에 전달하고, Receiver가 AFS 복호화와 PVT 계산을 수행한다.
 
 외부 송신 접수 경로 제안: `POST /lnis-dtn/api/v1/transfers`.
-`LNIS_DTN_SEND_URL`에 기본 서버 주소만 설정하면 `/transfers`를 자동 적용한다. 기존처럼 경로가 포함된 URL은 그대로 사용한다.
+`dtn_adapter`에 기본 서버 주소만 설정하면 `/transfers`를 자동 적용한다. 기존처럼 경로가 포함된 URL은 그대로 사용한다.
 송신 시스템은 HTTP 2xx로 접수를 알린다. 접수 성공은 DTN 전달 완료를 의미하지 않는다.
 HTTP 송신 대기 제한은 30초이며 자동 재전송은 하지 않는다.
 BPv7 source/destination EID, lifetime, convergence layer 등은 외부 프로그램의 설정으로 관리한다.
@@ -723,8 +726,8 @@ Receiver가 연결되지 않았으면 대기하며 READY가 되면 전달한다.
 }
 ```
 
-- 생략하거나 공백이면 `LNIS_DTN_SEND_URL`을 사용한다. 기본 서버 주소에는 `/transfers`를 자동 적용하며 기존 경로 포함 URL도 지원한다.
-- 화면에는 `LNIS_DTN_SEND_URL`과 `LNIS_DTN_RECEIVE_URL`을 각각 기본값으로 채운다. Receiver URL은 헬스체크에 사용한다.
+- 생략하거나 공백이면 `dtn_adapter`을 사용한다. 기본 서버 주소에는 `/transfers`를 자동 적용하며 기존 경로 포함 URL도 지원한다.
+- 양쪽 PC의 화면에는 각자 설정한 `dtn_adapter`를 기본값으로 채운다. 수신 화면 주소는 로컬 어댑터 헬스체크에 사용한다.
 - 화면에서 지정한 URL은 시험 생성 시 DB에 저장하며, 이후 입력란 변경은 진행 중 시험에 영향을 주지 않는다.
 - 서버가 해당 URL로 `POST`, `Content-Type: application/json` 요청을 보낸다. 브라우저에서 어댑터를 직접 호출하지 않는다.
 - `http`/`https`와 유효한 호스트를 요구한다. 최대 2048자이며 URL 내부 인증 정보, fragment, 잘못된 포트는 거부한다.
@@ -760,8 +763,7 @@ V는 ECEF 속도, 단위 m/s. T 비교 항목은 수신기 시계 오차, 단위
 운영 폴더의 .env에 설정한 뒤 서버를 재시작한다.
 
 ```dotenv
-LNIS_DTN_SEND_URL=http://<외부-DTN-송신부>:<port>
-LNIS_DTN_RECEIVE_URL=http://<외부-DTN-수신부>:<port>
+dtn_adapter=http://<이-PC에-연결된-DTN-어댑터-IP>:<port>
 LNIS_DTN_SEND_TOKEN=<외부에서 요구하는 경우 송신 인증 토큰>
 LNIS_DTN_RECEIVE_TOKEN=<LNIS가 발급해 외부 수신부에 전달할 토큰>
 ```

@@ -35,8 +35,8 @@ spring:
 
 lnis:
   dtn:
-    send-url: ${LNIS_DTN_SEND_URL:}
-    receive-url: ${LNIS_DTN_RECEIVE_URL:${LNIS_DTN_SEND_URL:}}
+    send-url: ${dtn_adapter:${LNIS_DTN_SEND_URL:}}
+    receive-url: ${dtn_adapter:${LNIS_DTN_RECEIVE_URL:${LNIS_DTN_SEND_URL:}}}
     send-token: ${LNIS_DTN_SEND_TOKEN:}
     receive-token: ${LNIS_DTN_RECEIVE_TOKEN:}
   agent-tokens: ${LNIS_AGENT_TOKENS:sender-1=change-me-sender,receiver-1=change-me-receiver}

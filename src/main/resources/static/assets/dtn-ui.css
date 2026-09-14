@@ -795,31 +795,31 @@ body[data-page^="dtn-"] .transport-mode-section > button { margin-top: 10px; }
 }
 
 /* Adapter probes remain available while a transfer is running. */
-body[data-page="dtn-sender"] .adapter-url-row { display: block; margin-top: 16px; }
-body[data-page="dtn-sender"] .adapter-url-controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)) auto; align-items: end; gap: 10px; }
-body[data-page="dtn-sender"] .adapter-url-controls label { display: block; min-width: 0; }
-body[data-page="dtn-sender"] .adapter-url-controls label span { display: block; margin-bottom: 6px; }
-body[data-page="dtn-sender"] .adapter-url-controls input { width: 100%; min-width: 0; margin: 0; }
-body[data-page="dtn-sender"] .adapter-url-controls button { flex-shrink: 0; white-space: nowrap; }
-body[data-page="dtn-sender"] .adapter-url-help { display: block; margin-top: 7px; color: var(--muted); }
-body[data-page="dtn-sender"] .adapter-health-results { margin-top: 10px; padding: 12px; border-radius: 8px; background: #f7f9fb; }
-body[data-page="dtn-sender"] .adapter-health-item { display: flex; align-items: flex-start; flex-direction: column; gap: 6px; min-width: 0; }
-body[data-page="dtn-sender"] .adapter-health-item small { max-width: 100%; overflow-wrap: anywhere; word-break: break-word; color: var(--muted); }
-body[data-page="dtn-sender"] .adapter-health-results > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; list-style: none; }
-body[data-page="dtn-sender"] .adapter-health-results > summary::-webkit-details-marker { display: none; }
-body[data-page="dtn-sender"] .adapter-health-summary { display: flex; flex-wrap: wrap; gap: 8px; }
-body[data-page="dtn-sender"] .adapter-health-toggle { flex-shrink: 0; color: var(--teal); font-size: 12px; font-weight: 700; }
-body[data-page="dtn-sender"] .adapter-health-results[open] .adapter-health-toggle { font-size: 0; }
-body[data-page="dtn-sender"] .adapter-health-results[open] .adapter-health-toggle::after { content: "상세 접기"; font-size: 12px; }
-body[data-page="dtn-sender"] .adapter-health-content { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 20px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
-body[data-page="dtn-sender"] .adapter-health-time { grid-column: 1 / -1; color: var(--muted); }
-body[data-page="dtn-sender"] .adapter-health-developer { grid-column: 1 / -1; }
-body[data-page="dtn-sender"] .adapter-health-developer summary { cursor: pointer; color: var(--teal); font-size: 12px; font-weight: 700; }
-body[data-page="dtn-sender"] .adapter-health-developer pre { max-height: 320px; margin: 10px 0 0; padding: 12px; overflow: auto; border-radius: 7px; background: #102630; color: #c6dde2; white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.5 ui-monospace, Consolas, monospace; }
+body[data-page^="dtn-"] .adapter-url-row { display: block; margin-top: 16px; }
+body[data-page^="dtn-"] .adapter-url-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 10px; }
+body[data-page^="dtn-"] .adapter-url-controls label { display: block; min-width: 0; }
+body[data-page^="dtn-"] .adapter-url-controls label span { display: block; margin-bottom: 6px; }
+body[data-page^="dtn-"] .adapter-url-controls input { width: 100%; min-width: 0; margin: 0; }
+body[data-page^="dtn-"] .adapter-url-controls button { flex-shrink: 0; white-space: nowrap; }
+body[data-page^="dtn-"] .adapter-url-help { display: block; margin-top: 7px; color: var(--muted); }
+body[data-page^="dtn-"] .adapter-health-results { margin-top: 10px; padding: 12px; border-radius: 8px; background: #f7f9fb; }
+body[data-page^="dtn-"] .adapter-health-item { display: flex; align-items: flex-start; flex-direction: column; gap: 6px; min-width: 0; }
+body[data-page^="dtn-"] .adapter-health-item small { max-width: 100%; overflow-wrap: anywhere; word-break: break-word; color: var(--muted); }
+body[data-page^="dtn-"] .adapter-health-results > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; list-style: none; }
+body[data-page^="dtn-"] .adapter-health-results > summary::-webkit-details-marker { display: none; }
+body[data-page^="dtn-"] .adapter-health-summary { display: flex; flex-wrap: wrap; gap: 8px; }
+body[data-page^="dtn-"] .adapter-health-toggle { flex-shrink: 0; color: var(--teal); font-size: 12px; font-weight: 700; }
+body[data-page^="dtn-"] .adapter-health-results[open] .adapter-health-toggle { font-size: 0; }
+body[data-page^="dtn-"] .adapter-health-results[open] .adapter-health-toggle::after { content: "상세 접기"; font-size: 12px; }
+body[data-page^="dtn-"] .adapter-health-content { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 20px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+body[data-page^="dtn-"] .adapter-health-time { grid-column: 1 / -1; color: var(--muted); }
+body[data-page^="dtn-"] .adapter-health-developer { grid-column: 1 / -1; }
+body[data-page^="dtn-"] .adapter-health-developer summary { cursor: pointer; color: var(--teal); font-size: 12px; font-weight: 700; }
+body[data-page^="dtn-"] .adapter-health-developer pre { max-height: 320px; margin: 10px 0 0; padding: 12px; overflow: auto; border-radius: 7px; background: #102630; color: #c6dde2; white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.5 ui-monospace, Consolas, monospace; }
 @media (max-width: 600px) {
-  body[data-page="dtn-sender"] .adapter-url-controls { grid-template-columns: minmax(0, 1fr); }
-  body[data-page="dtn-sender"] .adapter-url-controls button { width: 100%; margin-left: 0; }
-  body[data-page="dtn-sender"] .adapter-health-content { grid-template-columns: minmax(0, 1fr); }
-  body[data-page="dtn-sender"] .adapter-health-item,
-  body[data-page="dtn-sender"] .adapter-health-time { min-width: 0; overflow-wrap: anywhere; }
+  body[data-page^="dtn-"] .adapter-url-controls { grid-template-columns: minmax(0, 1fr); }
+  body[data-page^="dtn-"] .adapter-url-controls button { width: 100%; margin-left: 0; }
+  body[data-page^="dtn-"] .adapter-health-content { grid-template-columns: minmax(0, 1fr); }
+  body[data-page^="dtn-"] .adapter-health-item,
+  body[data-page^="dtn-"] .adapter-health-time { min-width: 0; overflow-wrap: anywhere; }
 }

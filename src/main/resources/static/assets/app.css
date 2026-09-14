@@ -544,3 +544,6 @@
 .adapter-url-row { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; margin-top: 8px; }
 .adapter-url-row > span { white-space: nowrap; }
 .adapter-url-row input { flex: 1 1 240px; min-width: 0; margin: 0; }
+
+/* Honor hidden on suite navigation despite the nav flex layout. */
+.test-suite-tabs[hidden] { display: none !important; }

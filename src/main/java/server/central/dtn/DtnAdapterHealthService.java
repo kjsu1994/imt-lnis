@@ -10,50 +10,45 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-/** Read-only probes derived from the Sender and Receiver adapter base URLs. */
+/** Read-only probe of the adapter attached to this node. */
 @Service
 public class DtnAdapterHealthService {
   public record EndpointHealth(String url, boolean ok, Integer httpStatus, long elapsedMillis,
       String status, String message, JsonNode response, String rawResponse) {}
-  public record HealthReport(Instant checkedAt, EndpointHealth sender, EndpointHealth receiver) {}
+  public record HealthReport(Instant checkedAt, String role, EndpointHealth adapter) {}
 
   private final HttpClient client;
   private final ObjectMapper json;
-  private final String defaultSendUrl;
-  private final String defaultReceiveUrl;
+  private final String defaultUrl;
+  private final String role;
   private final Duration timeout;
 
   @Autowired
   public DtnAdapterHealthService(ObjectMapper json,
-      @Value("${lnis.dtn.send-url:}") String defaultSendUrl,
-      @Value("${lnis.dtn.receive-url:}") String defaultReceiveUrl) {
+      @Value("${lnis.dtn.send-url:}") String sendUrl,
+      @Value("${lnis.dtn.receive-url:}") String receiveUrl,
+      @Value("${lnis.node.role:sender}") String role) {
     this(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3))
-        .followRedirects(HttpClient.Redirect.NEVER).build(), json, defaultSendUrl,
-        defaultReceiveUrl, Duration.ofSeconds(5));
+        .followRedirects(HttpClient.Redirect.NEVER).build(), json,
+        "receiver".equalsIgnoreCase(role) && !receiveUrl.isBlank() ? receiveUrl : sendUrl,
+        role, Duration.ofSeconds(5));
   }
 
-  DtnAdapterHealthService(HttpClient client, ObjectMapper json, String defaultSendUrl,
-      String defaultReceiveUrl, Duration timeout) {
+  DtnAdapterHealthService(HttpClient client, ObjectMapper json, String defaultUrl,
+      String role, Duration timeout) {
     this.client = client;
     this.json = json;
-    this.defaultSendUrl = defaultSendUrl;
-    this.defaultReceiveUrl = defaultReceiveUrl;
+    this.defaultUrl = defaultUrl;
+    this.role = role.toLowerCase(java.util.Locale.ROOT);
+    if (!this.role.equals("sender") && !this.role.equals("receiver"))
+      throw new IllegalArgumentException("Unsupported adapter role: " + role);
     this.timeout = timeout;
   }
 
-  /** Legacy callers may continue supplying one adapter address for both roles. */
   public HealthReport check(String adapterUrl) {
-    return check(adapterUrl, adapterUrl);
-  }
-
-  public HealthReport check(String sendUrl, String receiveUrl) {
-    String senderValue = configured(sendUrl, defaultSendUrl, null);
-    String receiverValue = configured(receiveUrl, defaultReceiveUrl, senderValue);
-    var sender = probe(healthUrl(adapterBase(senderValue, "송신"), "sender"));
-    var receiver = probe(healthUrl(adapterBase(receiverValue, "수신"), "receiver"));
-    var senderResult = sender.join();
-    var receiverResult = receiver.join();
-    return new HealthReport(Instant.now(), senderResult, receiverResult);
+    String value = configured(adapterUrl, defaultUrl, null);
+    var result = probe(healthUrl(adapterBase(value, role), role)).join();
+    return new HealthReport(Instant.now(), role, result);
   }
 
   private CompletableFuture<EndpointHealth> probe(String url) {

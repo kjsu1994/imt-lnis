@@ -1,3 +1,4 @@
+import {initAdapterHealth} from './dtn-adapter-health.js?v=20260914-local';
 import {createPayloadViewer} from './dtn-payload.js?v=20260913-compact';
 import {createObservationView, numeric} from './dtn-observations.js?v=20260913';
 
@@ -38,7 +39,6 @@ function buildAdapterUrl(id) {
   } catch { return null; }
 }
 const buildSendUrl = () => buildAdapterUrl('dtn-send-url');
-const buildReceiveUrl = () => buildAdapterUrl('dtn-receive-url');
 const urlValid = () => !!buildSendUrl();
 function renderPvt() {
   const value = pvt[epochIndex];
@@ -62,7 +62,7 @@ function updateControls() {
   $('dtn-start').disabled = locked() || ! $('dtn-port').value || tx?.state !== 'READY' || selectedType === 'IQ_SAMPLE';
   $('dtn-port').disabled = $('dtn-baud').disabled = locked();
   $('dtn-send').disabled = locked() || selectedType !== 'AFS_METADATA' || !inputId || !urlValid() || tx?.state !== 'READY' || rx?.state !== 'READY';
-  for (const id of ['dtn-upload', 'dtn-graw-file', 'dtn-example', 'dtn-send-url', 'dtn-receive-url']) $(id).disabled = locked();
+  for (const id of ['dtn-upload', 'dtn-graw-file', 'dtn-example', 'dtn-send-url']) $(id).disabled = locked();
   $('dtn-refresh').disabled = locked() || tx?.state !== 'READY';
   for (const button of document.querySelectorAll('.test-type-button,.transport-mode-button,.input-mode')) button.disabled = locked();
   for (const id of ['dtn-connection-test', 'dtn-connection-save', 'dtn-receiver-ip', 'dtn-receiver-port']) $(id).disabled = locked() || !peerConfig?.editable;
@@ -190,17 +190,7 @@ async function connectPeer(save) {
 $('dtn-connection-test').onclick = () => connectPeer(false);
 $('dtn-connection-save').onclick = () => connectPeer(true);
 for (const id of ['dtn-receiver-ip', 'dtn-receiver-port']) $(id).oninput = () => { destination('주소 변경 · 미확인'); $('dtn-connection-message').textContent = ''; };
-function adapterUrlChanged() {
-  updateControls(); lastHealthKey = '';
-  for (const role of ['sender', 'receiver']) {
-    const label = role === 'sender' ? 'Sender' : 'Receiver';
-    pill('dtn-adapter-' + role + '-health', label + ' · 확인 대기');
-    $('dtn-adapter-' + role + '-detail').textContent = '변경된 서버 주소를 기준으로 다시 확인합니다.';
-  }
-  $('dtn-adapter-health-time').textContent = '주소 변경 · 수동 확인 또는 다음 자동 확인을 기다립니다.';
-  $('dtn-adapter-health-json').textContent = '아직 변경된 주소의 확인 결과가 없습니다.';
-}
-for (const id of ['dtn-send-url', 'dtn-receive-url']) $(id).oninput = adapterUrlChanged;
+$('dtn-send-url').oninput = updateControls;
 $('dtn-log-clear').onclick = () => { $('dtn-log').textContent = ''; };
 $('dtn-refresh').onclick = async () => {
   try { await post('/agents/' + encodeURIComponent($('dtn-sender').value) + '/serial-ports/refresh'); log('COM 포트 조회 요청'); }
@@ -279,63 +269,11 @@ function socket() {
   };
   ws.onclose = () => setTimeout(socket, 3000);
 }
-let healthChecking = false, lastHealthKey = '';
-function adapterTone(value) {
-  return value.status === 'ready' ? 'online' : value.status === 'busy' ? 'warning' : 'error';
-}
-async function checkAdapterHealth(automatic = false) {
-  if (healthChecking) return;
-  healthChecking = true;
-  const button = $('dtn-adapter-health'), results = $('dtn-adapter-health-results');
-  button.disabled = true; button.textContent = '확인 중…'; results.setAttribute('aria-busy', 'true');
-  for (const role of ['sender', 'receiver']) {
-    pill('dtn-adapter-' + role + '-health', (role === 'sender' ? 'Sender' : 'Receiver') + ' · 확인 중', 'warning');
-    $('dtn-adapter-' + role + '-detail').textContent = 'GET 요청 중 · 최대 5초';
-  }
-  try {
-    const sendUrl = buildSendUrl(), receiveUrl = buildReceiveUrl();
-    if (!sendUrl || !receiveUrl) throw new Error('Sender와 Receiver Adapter 서버 주소를 확인하세요.');
-    const report = await request('/dtn/adapter-health?sendUrl=' + encodeURIComponent(sendUrl)
-      + '&receiveUrl=' + encodeURIComponent(receiveUrl),
-      {signal: AbortSignal.timeout(8000)});
-    if (!report.sender || !report.receiver || !report.checkedAt) throw new Error('헬스체크 응답 형식 오류');
-    for (const role of ['sender', 'receiver']) {
-      const value = report[role], label = role === 'sender' ? 'Sender' : 'Receiver';
-      pill('dtn-adapter-' + role + '-health', label + ' · ' + value.message, adapterTone(value));
-      const status = value.httpStatus == null ? '' : 'HTTP ' + value.httpStatus + ' · ';
-      $('dtn-adapter-' + role + '-detail').textContent = status + value.elapsedMillis + ' ms · ' + value.url;
-    }
-    $('dtn-adapter-health-time').textContent = '마지막 확인 ' + new Date(report.checkedAt).toLocaleString('ko-KR', {hour12: false}) + ' · LNIS 서버 기준';
-    $('dtn-adapter-health-json').textContent = JSON.stringify(report, null, 2);
-    const healthKey = report.sender.status + ':' + report.sender.message + ':' + report.sender.httpStatus
-      + '|' + report.receiver.status + ':' + report.receiver.message + ':' + report.receiver.httpStatus;
-    if (!automatic || healthKey !== lastHealthKey)
-      log('어댑터 연결 확인 · Sender ' + report.sender.message + ' / Receiver ' + report.receiver.message,
-        report.sender.status === 'ready' && report.receiver.status === 'ready' ? 'INFO' : 'WARN');
-    lastHealthKey = healthKey;
-  } catch (error) {
-    for (const role of ['sender', 'receiver']) {
-      pill('dtn-adapter-' + role + '-health', (role === 'sender' ? 'Sender' : 'Receiver') + ' · 연결실패', 'error');
-      $('dtn-adapter-' + role + '-detail').textContent = 'LNIS 서버의 확인 결과를 받지 못했습니다.';
-    }
-    $('dtn-adapter-health-time').textContent = '마지막 확인 실패 · 다시 확인해 주세요.';
-    $('dtn-adapter-health-json').textContent = JSON.stringify({error: error.message}, null, 2);
-    if (!automatic || lastHealthKey !== 'request-failed') log('어댑터 상태 확인 실패 · ' + error.message, 'ERROR');
-    lastHealthKey = 'request-failed';
-  } finally {
-    healthChecking = false; button.disabled = false; button.textContent = '어댑터 연결 확인';
-    results.setAttribute('aria-busy', 'false');
-  }
-}
-$('dtn-adapter-health').onclick = () => checkAdapterHealth(false);
-setInterval(() => {
-  if (document.visibilityState !== 'hidden') checkAdapterHealth(true);
-}, 10000);
 async function initialize() {
   try {
     config = await request('/dtn/config');
     $('dtn-send-url').value = config.defaultSendUrl || '';
-    $('dtn-receive-url').value = config.defaultReceiveUrl || config.defaultSendUrl || '';
+    initAdapterHealth(config.adapterUrl || config.defaultSendUrl || '', log);
     $('dtn-example').hidden = !config.exampleEnabled;
     $('dtn-transport-mode-state').textContent = config.adapterControlConfigured ? '경로 적용 전' : '어댑터 제어 미설정';
     try {
