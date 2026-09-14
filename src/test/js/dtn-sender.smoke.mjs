@@ -12,6 +12,7 @@ class Element {
 }
 const elements = new Map([...html.matchAll(/id="([^"]+)"/g)].map(([, id]) => [id, new Element()]));
 let loaded = null, currentJob = null, failUpload = false, starts = 0;
+let healthFetch, healthCalls = 0;
 const tx = {agentId: 'sender-1', role: 'SENDER', state: 'READY'}, rx = {agentId: 'receiver-1', role: 'RECEIVER', state: 'READY'};
 const observations = {epochs: [{observation: {week: 2400, receiverTowSeconds: 1, observations: []}}]};
 const context = {
@@ -21,8 +22,13 @@ const context = {
   numeric: (n, d = 3) => typeof n === 'number' && Number.isFinite(n) ? n.toFixed(d) : '—',
   Option: function(text, value) { this.value = value; },
   location: {protocol: 'http:', host: '127.0.0.1:18090'}, WebSocket: class {},
-  URL, setInterval() {}, setTimeout() {},
+  URL, AbortSignal, setInterval() {}, setTimeout() {},
   fetch: async (url, options) => {
+    if (url.endsWith('/adapter-health')) {
+      healthCalls++;
+      assert.equal(options.method, undefined, 'health checks use GET');
+      return healthFetch();
+    }
     let body = {};
     if (url.endsWith('/config')) body = {maximumInputBytes: 1048576, exampleEnabled: false};
     else if (url.endsWith('/agents')) body = [tx, rx];
@@ -75,3 +81,31 @@ assert.equal(elements.get('pvt-x').textContent, '1.000');
 assert.equal(elements.get('dtn-send').disabled, false);
 assert.equal(elements.get('dtn-port').disabled, false);
 console.log('PASS: serial one-shot completion, PVT preview and transfer readiness');
+
+await elements.get('dtn-send').onclick();
+let resolveHealth;
+healthFetch = () => new Promise(resolve => { resolveHealth = resolve; });
+const checking = elements.get('dtn-adapter-health').onclick();
+assert.equal(elements.get('dtn-adapter-health').disabled, true);
+assert.match(elements.get('dtn-adapter-sender-health').textContent, /확인 중/);
+await elements.get('dtn-adapter-health').onclick();
+assert.equal(healthCalls, 1, 'duplicate probes must be prevented');
+const report = {
+  checkedAt: '2026-09-14T01:00:00Z',
+  sender: {ok: true, message: '응답 정상', httpStatus: 200, elapsedMillis: 12, url: 'http://192.168.1.154:8080/sender/health'},
+  receiver: {ok: false, message: '응답 오류', httpStatus: 503, elapsedMillis: 13, url: 'http://192.168.1.154:8080/receiver/health'}
+};
+resolveHealth({ok: true, json: async () => report});
+await checking;
+assert.equal(elements.get('dtn-adapter-sender-health').className, 'pill online');
+assert.equal(elements.get('dtn-adapter-receiver-health').className, 'pill error');
+assert.match(elements.get('dtn-adapter-receiver-detail').textContent, /503/);
+assert.match(elements.get('dtn-adapter-health-time').textContent, /마지막 확인/);
+assert.equal(elements.get('dtn-adapter-health').disabled, false);
+assert.equal(elements.get('dtn-send').disabled, true, 'health check must not unlock the active trial');
+healthFetch = async () => { throw new Error('server unreachable'); };
+await elements.get('dtn-adapter-health').onclick();
+assert.match(elements.get('dtn-adapter-sender-health').textContent, /확인 불가/);
+assert.equal(elements.get('dtn-adapter-sender-health').className, 'pill warning', 'old success must not survive a failed check');
+assert.equal(elements.get('dtn-adapter-health').disabled, false);
+console.log('PASS: adapter health partial failure, duplicate prevention, retry and independent trial controls');

@@ -5,7 +5,7 @@
   <title>LNIS DTN Sender</title>
   <link rel="stylesheet" href="/lnis/assets/app.css?v=20260911-inline">
   <link rel="stylesheet" href="/lnis/assets/dtn-payload.css?v=20260913-compact">
-  <link rel="stylesheet" href="/lnis/assets/dtn-ui.css?v=20260913-input-actions">
+  <link rel="stylesheet" href="/lnis/assets/dtn-ui.css?v=20260914-health">
 </head>
 <body data-page="dtn-sender">
 <header>
@@ -48,8 +48,20 @@
       <div class="connection-actions"><button id="dtn-connection-test" type="button">연결 확인</button><button id="dtn-connection-save" type="button">저장·적용</button></div>
     </div>
     <small id="dtn-connection-message" role="status"></small>
-    <label class="adapter-url-row"><span>외부 어댑터 전송 URL</span>
-      <input id="dtn-send-url" type="url" placeholder="http://어댑터-IP:포트/transfers" autocomplete="off"></label>
+    <div class="adapter-url-row">
+      <label for="dtn-send-url">외부 어댑터 전송 URL</label>
+      <div class="adapter-url-controls">
+        <input id="dtn-send-url" type="url" placeholder="http://어댑터-IP:포트/transfers" autocomplete="off">
+        <button id="dtn-adapter-health" type="button" aria-controls="dtn-adapter-health-results">어댑터 연결 확인</button>
+      </div>
+      <div id="dtn-adapter-health-results" class="adapter-health-results" role="status" aria-live="polite" aria-busy="false">
+        <div class="adapter-health-item"><span id="dtn-adapter-sender-health" class="pill">Sender · 미확인</span>
+          <small id="dtn-adapter-sender-detail">버튼을 눌러 상태를 확인하세요.</small></div>
+        <div class="adapter-health-item"><span id="dtn-adapter-receiver-health" class="pill">Receiver · 미확인</span>
+          <small id="dtn-adapter-receiver-detail">버튼을 눌러 상태를 확인하세요.</small></div>
+        <small id="dtn-adapter-health-time" class="adapter-health-time">LNIS 서버에서 각 어댑터의 HTTP 응답을 확인합니다.</small>
+      </div>
+    </div>
   </section>
   <section class="card" id="dtn-input-card">
     <div class="card-title dtn-input-header">
@@ -104,5 +116,5 @@
   <section id="dtn-payload" class="card"></section>
   <section class="card"><div class="card-title"><h2>송수신 로그</h2><button id="dtn-log-clear" type="button">화면 로그 지우기</button></div><pre id="dtn-log" class="log" aria-label="PC 시간 기준 로그"></pre></section>
 </main>
-<script type="module" src="/lnis/assets/dtn.js?v=20260913-capture"></script>
+<script type="module" src="/lnis/assets/dtn.js?v=20260914-health"></script>
 </body></html>

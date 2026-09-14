@@ -793,3 +793,22 @@ body[data-page^="dtn-"] .transport-mode-section > button { margin-top: 10px; }
   body[data-page^="dtn-"] .card-title { flex-wrap: wrap; }
   body[data-page^="dtn-"] .card-title label { width: 100%; min-width: 0; }
 }
+
+/* Adapter probes remain available while a transfer is running. */
+body[data-page="dtn-sender"] .adapter-url-row { display: block; margin-top: 16px; }
+body[data-page="dtn-sender"] .adapter-url-row > label { display: block; margin-bottom: 6px; }
+body[data-page="dtn-sender"] .adapter-url-controls { display: flex; align-items: center; gap: 10px; }
+body[data-page="dtn-sender"] .adapter-url-controls input { flex: 1; min-width: 0; margin: 0; }
+body[data-page="dtn-sender"] .adapter-url-controls button { flex-shrink: 0; white-space: nowrap; }
+body[data-page="dtn-sender"] .adapter-health-results { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 20px; margin-top: 10px; padding: 12px; border-radius: 8px; background: #f7f9fb; }
+body[data-page="dtn-sender"] .adapter-health-item { display: flex; align-items: flex-start; flex-direction: column; gap: 6px; min-width: 0; }
+body[data-page="dtn-sender"] .adapter-health-item small { max-width: 100%; overflow-wrap: anywhere; word-break: break-word; color: var(--muted); }
+body[data-page="dtn-sender"] .adapter-health-time { grid-column: 1 / -1; color: var(--muted); }
+@media (max-width: 600px) {
+  body[data-page="dtn-sender"] .adapter-url-controls { flex-wrap: wrap; }
+  body[data-page="dtn-sender"] .adapter-url-controls input { flex-basis: 100%; }
+  body[data-page="dtn-sender"] .adapter-url-controls button { width: 100%; margin-left: 0; }
+  body[data-page="dtn-sender"] .adapter-health-results { grid-template-columns: minmax(0, 1fr); }
+  body[data-page="dtn-sender"] .adapter-health-item,
+  body[data-page="dtn-sender"] .adapter-health-time { min-width: 0; overflow-wrap: anywhere; }
+}

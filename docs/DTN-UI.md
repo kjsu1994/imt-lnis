@@ -112,3 +112,21 @@ encoding, transfer batches, synchronization scanning and decoding. A native code
 already in progress finishes before its result is discarded; no subsequent frame is
 processed for that cancelled task. Late completion callbacks and in-flight frames from
 an older session cannot release or fail a newer AFS session.
+
+## Adapter health check
+
+The sender page provides one button beside the transfer URL. A click calls
+`GET /lnis/api/v1/dtn/adapter-health`; the LNIS server probes both configured URLs
+concurrently using GET (3-second connection timeout, 5-second request deadline).
+Defaults are `http://192.168.1.154:8080/sender/health` and
+`http://192.168.1.154:8080/receiver/health`. Override them using
+`lnis.dtn.sender-adapter-health-url` and `lnis.dtn.receiver-adapter-health-url`.
+These are independent of the transfer URL and mode-control URLs.
+
+Each result includes the probed URL, HTTP status when available, elapsed milliseconds
+and a message. HTTP 2xx is shown as a successful response; other statuses, timeouts
+and connection failures are shown separately. No response-body schema is assumed.
+Results are not cached and are labelled with their last check time, not presented as
+continuous monitoring or proof of DTN delivery. Checking does not start a trial,
+change adapter mode, or block transfer controls. Requests go through the LNIS server
+so browser CORS and mixed-content restrictions do not affect the adapter probes.

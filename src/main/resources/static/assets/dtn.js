@@ -267,6 +267,42 @@ function socket() {
   };
   ws.onclose = () => setTimeout(socket, 3000);
 }
+let healthChecking = false;
+$('dtn-adapter-health').onclick = async () => {
+  if (healthChecking) return;
+  healthChecking = true;
+  const button = $('dtn-adapter-health'), results = $('dtn-adapter-health-results');
+  button.disabled = true; button.textContent = '확인 중…'; results.setAttribute('aria-busy', 'true');
+  for (const role of ['sender', 'receiver']) {
+    pill('dtn-adapter-' + role + '-health', (role === 'sender' ? 'Sender' : 'Receiver') + ' · 확인 중', 'warning');
+    $('dtn-adapter-' + role + '-detail').textContent = 'GET 요청 중 · 최대 5초';
+  }
+  $('dtn-adapter-health-time').textContent = 'LNIS 서버에서 두 어댑터를 확인하고 있습니다.';
+  try {
+    const report = await request('/dtn/adapter-health', {signal: AbortSignal.timeout(8000)});
+    if (!report.sender || !report.receiver || !report.checkedAt) throw new Error('헬스체크 응답 형식 오류');
+    for (const role of ['sender', 'receiver']) {
+      const value = report[role], label = role === 'sender' ? 'Sender' : 'Receiver';
+      pill('dtn-adapter-' + role + '-health', label + ' · ' + value.message, value.ok ? 'online' : 'error');
+      const status = value.httpStatus == null ? '' : 'HTTP ' + value.httpStatus + ' · ';
+      $('dtn-adapter-' + role + '-detail').textContent = status + value.elapsedMillis + ' ms · ' + value.url;
+    }
+    $('dtn-adapter-health-time').textContent = '마지막 확인 ' + new Date(report.checkedAt).toLocaleString('ko-KR', {hour12: false}) + ' · LNIS 서버 기준 · HTTP 응답 상태';
+    log('어댑터 연결 확인 · Sender ' + report.sender.message + ' / Receiver ' + report.receiver.message,
+      report.sender.ok && report.receiver.ok ? 'INFO' : 'WARN');
+  } catch (error) {
+    for (const role of ['sender', 'receiver']) {
+      pill('dtn-adapter-' + role + '-health', (role === 'sender' ? 'Sender' : 'Receiver') + ' · 확인 불가', 'warning');
+      $('dtn-adapter-' + role + '-detail').textContent = 'LNIS 서버의 확인 결과를 받지 못했습니다.';
+    }
+    $('dtn-adapter-health-time').textContent = '다시 확인해 주세요.';
+    log('어댑터 상태 확인 실패 · ' + error.message, 'ERROR');
+  } finally {
+    healthChecking = false; button.disabled = false; button.textContent = '어댑터 연결 확인';
+    results.setAttribute('aria-busy', 'false');
+  }
+};
+
 async function initialize() {
   try {
     config = await request('/dtn/config');

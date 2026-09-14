@@ -239,6 +239,23 @@ DELETE /lnis/api/v1/inputs/{inputId}
 
 명시적 삭제는 세션 참조 여부와 관계없이 메타데이터와 파일을 제거하므로 주의합니다.
 
+## 5.1 DTN Adapter Health
+
+`http
+GET /lnis/api/v1/dtn/adapter-health
+`
+
+LNIS 서버가 Sender와 Receiver Adapter의 health URL을 동시에 GET으로 확인합니다. 기본 주소는 각각
+http://192.168.1.154:8080/sender/health, http://192.168.1.154:8080/receiver/health이며 설정으로 변경할 수 있습니다.
+HTTP 2xx만 ok=true이고, 응답 본문 형식은 가정하지 않습니다.
+
+`json
+{
+  "checkedAt": "2026-09-14T01:00:00Z",
+  "sender": {"url": "http://192.168.1.154:8080/sender/health", "ok": true, "httpStatus": 200, "elapsedMillis": 16, "message": "응답 정상"},
+  "receiver": {"url": "http://192.168.1.154:8080/receiver/health", "ok": false, "httpStatus": null, "elapsedMillis": 5000, "message": "응답 시간 초과"}
+}
+`
 ## 6. GNSS Capture
 
 ### 수집 시작
