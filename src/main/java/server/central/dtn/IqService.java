@@ -21,6 +21,8 @@ public class IqService {
   private final boolean enabled;
   private volatile Process process;
   private UUID active;
+  @org.springframework.beans.factory.annotation.Autowired(required=false) private DtnLogService logs;
+  private void trace(UUID id,String stage,boolean detail,String message) { if(logs!=null) logs.add(id,"IQ",stage,detail,message); }
   private final Map<UUID, Map<String,Object>> jobs = new LinkedHashMap<>();
 
   public IqService(ObjectMapper json, @Value("${lnis.iq.directory:/exchange}") String root,
@@ -81,14 +83,18 @@ public class IqService {
     if(!found) throw new IllegalArgumentException("PVT 관측 시각 불일치");
     return text.toString();
   }
-  public synchronized Map<String,Object> start(String earthInput) throws IOException {
+  public synchronized Map<String,Object> start(String earthInput) throws IOException { return start(earthInput,null); }
+  public synchronized Map<String,Object> start(String earthInput,UUID inputId) throws IOException {
     if(earthInput==null || !earthInput.startsWith("LNIS-IQ-EARTH-1 ")) throw new IllegalArgumentException("GNSS 입력 필요");
     if (!enabled()) throw new IllegalStateException("I/Q 생성기를 설정하세요.");
     if (active != null) throw new IllegalStateException("I/Q 생성 작업 진행 중");
     Files.createDirectories(root);
     if (Files.getFileStore(root).getUsableSpace() < EXPECTED_BYTES + 268_435_456L)
       throw new IllegalStateException("I/Q 생성 공간 부족: 최소 2.43 GB가 필요합니다.");
-    UUID id = UUID.randomUUID(); active = id;
+    UUID id = UUID.randomUUID();
+    if(logs!=null) logs.copy(inputId,id,"IQ");
+    trace(id,"I/Q 입력",true,"대상 PRN "+earthInput.lines().filter(s->s.startsWith("P ")).toList()+" · 항법 레코드 "+earthInput.lines().filter(s->s.startsWith("N ")).count()+"건");
+    active = id;
     set(id, "GENERATING", "GNSS 기반 90초 AFS I/Q 생성 중 · PRN별 SB2 반복", null);
     Thread.ofVirtual().name("iq-generate").start(() -> generate(id,earthInput));
     return status(id);
@@ -105,12 +111,23 @@ public class IqService {
         process = new ProcessBuilder(simulator.toString(), "-e", work.resolve("earth-input.txt").toString(), "-t", "90", "-s", "12000000", "-b", "2", part.toString())
             .directory(work.toFile()).redirectErrorStream(true).redirectOutput(work.resolve("generation.log").toFile()).start();
       }
+      trace(id,"I/Q 생성",true,"기존 AFS 생성기 실행 · 90초 · 12 MHz · I/Q signed int8");
       Process running = process;
-      if (!running.waitFor(30, TimeUnit.MINUTES)) { running.destroyForcibly(); throw new IOException("I/Q 생성 제한 시간 초과"); }
+      long deadline=System.nanoTime()+TimeUnit.MINUTES.toNanos(30), started=System.nanoTime();
+      int previous=0;
+      while(!running.waitFor(2,TimeUnit.SECONDS)) {
+        if(System.nanoTime()>deadline) { running.destroyForcibly(); throw new IOException("I/Q 생성 제한 시간 초과"); }
+        long written=Files.exists(part)?Files.size(part):0;
+        int bucket=(int)Math.min(9,written*10/EXPECTED_BYTES);
+        if(bucket>previous) { previous=bucket; trace(id,"I/Q 생성",true,"파일 출력 "+(bucket*10)+"% · "+written+" / "+EXPECTED_BYTES+" bytes"); }
+      }
       synchronized (this) { if (!id.equals(active) || cancelled(id)) return; }
       if (running.exitValue() != 0 || Files.size(part) != EXPECTED_BYTES)
         throw new IOException("I/Q 생성 실패: exit=" + running.exitValue() + ", bytes=" + Files.size(part) + ", expected=" + EXPECTED_BYTES);
+      trace(id,"I/Q 검증",true,"파일 출력 100% · 크기 확인 완료 · "+Files.size(part)+" bytes · 생성 소요 "+((System.nanoTime()-started)/1_000_000)+" ms");
+      trace(id,"I/Q 검증",true,"SHA-256 계산 시작 · 아직 전송 준비 완료가 아닙니다.");
       String digest = sha256(part);
+      trace(id,"I/Q 검증",true,"SHA-256 계산 완료 · "+digest);
       synchronized (this) {
         if (!id.equals(active) || cancelled(id)) return;
         Files.move(part, root.resolve(id + ".bin"), StandardCopyOption.ATOMIC_MOVE);
@@ -156,6 +173,8 @@ public class IqService {
     value.put("id", id); value.put("state", state); value.put("message", message);
     value.put("updatedAt", Instant.now().toString()); if (file != null) value.put("file", file);
     jobs.put(id, value);
+    if(logs!=null && !("READY".equals(state) && "저장된 I/Q 파일".equals(message)))
+      logs.add(id,"IQ","FAILED".equals(state)?"ERROR":"CANCELLED".equals(state)?"WARN":"INFO","I/Q",false,message);
     if (jobs.size() > 50) jobs.remove(jobs.keySet().iterator().next());
   }
   public IqFile completed(UUID id) throws IOException {

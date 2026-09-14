@@ -24,6 +24,8 @@ import java.util.UUID;
 public class CaptureController {
     private final InputBufferService inputBufferService;
     private final AgentCommandService agentCommandService;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private server.central.dtn.DtnLogService logs;
 
     /* GNSS 수집 시작: 명령 실패 시 생성한 입력을 정리한다. */
     @PostMapping
@@ -31,12 +33,15 @@ public class CaptureController {
     {
         InputBufferEntity input =
                 inputBufferService.create("capture.graw", 0, InputKind.GNSS_CAPTURE);
+        if(request.singleEpoch() && logs!=null) logs.add(input.inputId(),"INPUT","COM 수집",false,
+            "수집 요청 · "+request.portName()+" · "+request.baudRate()+" baud · 관측값·항법정보 대기");
         try {
             agentCommandService.command(
                     request.senderAgentId(), input.inputId(), CommandType.START_CAPTURE, request);
             InputBufferEntity response = input;
             return new ResponseEntity<>(response, HttpStatus.OK);
         } catch (RuntimeException error) {
+            if(request.singleEpoch() && logs!=null) logs.add(input.inputId(),"INPUT","ERROR","COM 수집",false,error.getMessage());
             // Agent 조회 또는 명령 전송이 실패하면 시험에 사용할 수 없는 DB·파일 입력을 남기지 않는다.
             try {
                 inputBufferService.remove(input.inputId());

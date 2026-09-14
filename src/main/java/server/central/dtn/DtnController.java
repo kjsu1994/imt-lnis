@@ -29,6 +29,31 @@ import java.nio.charset.StandardCharsets;
 public class DtnController {
     private final DtnService dtnService;
     private final ObjectMapper objectMapper;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private DtnLogService logs;
+
+    @GetMapping("/logs")
+    public ResponseEntity<?> logs(@RequestParam UUID scopeId, @RequestParam(defaultValue="0") long after,
+            @RequestParam(defaultValue="false") boolean download) {
+        if (after < 0) throw new IllegalArgumentException("로그 순번 오류");
+        var entries = logs.read(scopeId, after);
+        if (!download) return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(Map.of(
+            "entries",entries,"nextSequence",entries.isEmpty()?after:entries.getLast().getSequence(),"hasMore",entries.size()==500));
+        var text = new StringBuilder("LNIS local processing log · ").append(scopeId).append("\n");
+        long cursor=0;
+        do {
+            entries=logs.read(scopeId,cursor);
+            for(var e:entries) {
+                text.append(e.getOccurredAt()).append(" [").append(e.getLevel()).append("] [")
+                    .append(e.getStage()).append("] ").append(e.getMessage()).append("\n");
+                cursor=e.getSequence();
+            }
+        } while(entries.size()==500);
+        if(cursor==0) text.append("상세 로그 도입 전 시험 또는 기록된 처리 로그 없음\n");
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+            .header("Content-Disposition","attachment; filename=\"dtn-log-"+scopeId+".txt\"")
+            .contentType(new MediaType("text","plain",StandardCharsets.UTF_8)).body(text.toString());
+    }
 
     @Data
     public static class CreateRequest {

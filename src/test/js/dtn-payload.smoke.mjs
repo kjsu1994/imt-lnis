@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {payloadUrl, displayedJson, createPayloadViewer} from '../../main/resources/static/assets/dtn-payload.js';
+import {payloadUrl, displayedJson, createPayloadViewer, renderIqFile} from '../../main/resources/static/assets/dtn-payload.js';
 
 const original = '{\r\n  "note": "한글 <script>alert(1)</script>", "value": 1\r\n}\r\n';
 assert.equal(displayedJson(original, false), original);
@@ -11,11 +11,27 @@ assert.throws(() => payloadUrl('id', 'unknown'));
 class Element {
   constructor(tag) { this.tag = tag; this.children = []; this.value = ''; this.hidden = false; }
   append(...elements) { this.children.push(...elements); }
+  replaceChildren(...elements) { this.children = elements; }
+  querySelector(tag) { return this.children.find(e=>e.tag===tag); }
   setAttribute(name, value) { this[name] = value; }
   removeAttribute(name) { delete this[name]; }
 }
 globalThis.document = {createElement: tag => new Element(tag), createTextNode: text => ({textContent: text})};
 const container = new Element('section');
+const iqContainer = new Element('div');
+const iqResult = {verdict:'PASS',sizeBytes:2160000000,filePath:'/exchange/<unsafe>.bin',sha256:'ABC',preview:[[-1,1],[3,-3]]};
+renderIqFile(iqContainer,iqResult);
+assert.equal(iqContainer.children[0].children[0].textContent,'파일 검증 일치');
+assert.equal(iqContainer.children[0].children[1].textContent,'2.16 GB');
+assert.equal(iqContainer.children[1].textContent,iqResult.filePath);
+assert.equal(iqContainer.querySelector('details').open,false);
+iqContainer.querySelector('details').open=true;
+renderIqFile(iqContainer,{...iqResult,verdict:'FAIL'});
+assert.equal(iqContainer.children[0].children[0].className,'pill error');
+assert.equal(iqContainer.querySelector('details').open,true);
+renderIqFile(iqContainer,null,'수신 대기');
+assert.equal(iqContainer.children.length,1);
+assert.equal(iqContainer.children[0].textContent,'수신 대기');
 const viewer = createPayloadViewer(container);
 // 안내 문구 추가/삭제와 무관하게 실제 제어 요소로 찾는다.
 const controls = container.children.find(element => element.className === 'dtn-payload-controls');
@@ -92,16 +108,15 @@ assert.equal(receiverPanel.children[1].children[1].href, payloadUrl('received-te
 console.log('PASS: receiver-only original JSON and download');
 const senderContainer = new Element('section');
 const senderViewer = createPayloadViewer(senderContainer, {sentOnly: true});
-const senderControls = senderContainer.children.find(element => element.className === 'dtn-payload-controls');
+const senderControls = senderContainer.children.find(element => element.className?.includes('dtn-payload-controls'));
 assert.equal(senderControls.children[1].hidden, true);
 await senderViewer.setJob({testId: 'sent-test', sentPayloadAvailable: true});
-await senderControls.children[0].onclick();
 const senderPanel = senderContainer.children.find(element => element.children?.some(child => child.tag === 'textarea'));
 assert.equal(senderPanel.children[2].value, displayedJson(original, true));
-assert.equal(senderPanel.children[1].children[1].href, payloadUrl('sent-test', 'sent', true));
-const senderPretty = senderPanel.children[1].children[0].children[0];
+assert.equal(senderControls.children[3].href, payloadUrl('sent-test', 'sent', true));
+const senderPretty = senderControls.children[2].children[0];
 assert.equal(senderPretty.checked, true);
-senderPanel.children[1].children[2].onclick();
+senderControls.children[0].onclick();
 await senderViewer.setJob({testId: 'sent-test', sentPayloadAvailable: true});
 assert.equal(senderPanel.hidden, true, 'polling must preserve manual collapse');
 await senderViewer.setJob({testId: 'pending-test', sentPayloadAvailable: false});
@@ -111,3 +126,11 @@ assert.equal(senderPanel.hidden, false, 'new payload opens when available');
 assert.equal(senderPretty.checked, true);
 assert.equal(senderPanel.children[2].value, displayedJson(original, true));
 console.log('PASS: automatic pretty opening, delayed availability and manual collapse persistence');
+assert.equal(senderControls.children[0].textContent,'송신 JSON 원문');
+assert.equal(senderPanel.children[1].children.length,0,'separate close/download toolbar removed on sender');
+assert.equal(senderControls.children[0]['aria-expanded'],'true');
+senderControls.children[0].onclick();
+assert.equal(senderPanel.hidden,true);
+await senderControls.children[0].onclick();
+assert.equal(senderPanel.hidden,false);
+console.log('PASS: sender title toggle and header download');

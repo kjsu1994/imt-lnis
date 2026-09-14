@@ -8,12 +8,15 @@ const source = readFileSync(new URL('../../main/resources/static/assets/dtn-rece
   .replace(/^import .*;\r?\n/gm, '').replace(/initialize\(\);\s*$/, 'globalThis.ready = initialize();');
 const elements = new Map([...html.matchAll(/id="([^"]+)"/g)].map(([, id]) => [id, {
   value: '', textContent: '', hidden: false, disabled: false,
+  setAttribute(key, value) { this[key] = value; },
   replaceChildren(...options) { this.options = options; this.value = options[0]?.value ?? ''; },
   removeAttribute(key) { delete this[key]; }, focus() {}, select() {}
 }]));
 let nextTests = [], report = {}, reportRequest = null;
 const requests = [];
 const context = {
+  renderIqFile() {},
+  createDtnLog: () => ({write() {},setContext() {},refresh() {}}),
   document: {getElementById(id) { assert.ok(elements.has(id), 'DOM missing: ' + id); return elements.get(id); }},
   createPayloadViewer(container, options) { assert.equal(options.receivedOnly, true); return {setJob() {}}; },
   createObservationView() { return {setData() {}, select() {}}; },
@@ -43,6 +46,27 @@ assert.equal(elements.get('receiver-IQ_SAMPLE').className,'active');
 assert.equal(elements.get('receiver-AFS_METADATA').className,'');
 assert.equal(elements.get('step-process').textContent,'③ I/Q 파일 검증');
 assert.equal(elements.get('receive-state').textContent,'I/Q 파일 검증 완료');
+for (const testType of ['GNSS_RAW', 'AFS_METADATA', 'IQ_SAMPLE']) {
+  for (const senderMode of ['DTN', 'HDTN']) for (const receiverMode of ['DTN', 'HDTN']) {
+    context.renderSummary({testType, senderMode, receiverMode, state: 'COMPLETED'});
+    assert.equal(elements.get('dtn-observations').hidden, testType === 'IQ_SAMPLE');
+    for (const type of ['GNSS_RAW', 'AFS_METADATA', 'IQ_SAMPLE']) {
+      const button = elements.get('receiver-' + type);
+      assert.equal(button.className, type === testType ? 'active' : '');
+      assert.equal(button.disabled, true);
+    }
+    for (const tx of ['DTN', 'HDTN']) for (const rx of ['DTN', 'HDTN']) {
+      const button = elements.get('receiver-mode-' + tx + '-' + rx);
+      assert.equal(button.className, tx === senderMode && rx === receiverMode ? 'active' : '');
+      assert.equal(button['aria-pressed'], String(tx === senderMode && rx === receiverMode));
+      assert.equal(button.disabled, true);
+    }
+  }
+}
+context.renderSummary(null);
+assert.equal(elements.get('dtn-observations').hidden, false);
+assert.equal(elements.get('receiver-mode-HDTN-HDTN').className, '');
+assert.equal(elements.get('receiver-IQ_SAMPLE').className, '');
 
 const done = {testId: 'completed', state: 'COMPLETED', dtnReceived: true, receivedEpochs: 2, updatedAt: '2026-09-11T00:00:00Z'};
 const waiting = {testId: 'waiting', state: 'WAITING_DTN', receivedEpochs: 0};

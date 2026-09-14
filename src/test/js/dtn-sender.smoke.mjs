@@ -5,7 +5,7 @@ import vm from 'node:vm';
 const html = readFileSync(new URL('../../main/resources/static/dtn-sender.html', import.meta.url), 'utf8');
 const capturePanel = html.split('id="dtn-capture-panel"')[1].split('</div>')[0];
 assert.ok(!html.includes('class="card dtn-comparison-card"'), 'PVT comparison must not occupy a separate card');
-assert.ok(html.split('송신 기준 지구 PVT')[1].split('</section>')[0].includes('id="dtn-comparison"'), 'comparison stays inside sender PVT section');
+assert.ok(!html.includes('id="dtn-comparison"') && !html.includes('id="dtn-report"'), 'comparison and report link are receiver-only');
 assert.ok(capturePanel.includes('id="dtn-baud"'), 'serial speed remains available in COM input');
 assert.ok(!capturePanel.includes('<details'), 'serial settings must be visible without expanding');
 const source = readFileSync(new URL('../../main/resources/static/assets/dtn.js', import.meta.url), 'utf8')
@@ -24,6 +24,8 @@ const intervals = [];
 const tx = {agentId: 'sender-1', role: 'SENDER', state: 'READY'}, rx = {agentId: 'receiver-1', role: 'RECEIVER', state: 'READY'};
 const observations = {epochs: [{observation: {week: 2400, receiverTowSeconds: 1, observations: []}}]};
 const context = {
+  renderIqFile() {},
+  createDtnLog: () => ({write() {},setContext() {},refresh() {}}),
   document: {visibilityState: 'visible', getElementById: id => { assert.ok(elements.has(id), 'missing ' + id); return elements.get(id); }, querySelectorAll: () => []},
   createPayloadViewer: () => ({setJob() {}}),
   createObservationView: () => ({setData(data) { loaded = data; }}),
@@ -44,7 +46,7 @@ const context = {
     else if (url.endsWith('/node/connection')) body = {ip: '127.0.0.1', port: 18091, editable: true};
     else if (url.endsWith('/tests') && options.method === 'POST') { starts++; currentJob = {testId: 't1', state: 'PREPARING', updatedAt: '1'}; body = currentJob; }
     else if (url.endsWith('/tests')) body = [];
-    else if (url.endsWith('/inputs')) {
+    else if (url.endsWith('/inputs?dtn=true')) {
       if (failUpload) return {ok: false, json: async () => ({message: 'bad input'})};
       body = {inputId: 'input1'};
     }
@@ -119,8 +121,8 @@ const report = {
 resolveHealth({ok: true, json: async () => report});
 await checking;
 assert.match(healthUrl, /adapterUrl=http%3A%2F%2F127\.0\.0\.1%3A18092$/);
-assert.equal(elements.get('dtn-adapter-status').textContent, '정상연결');
-assert.equal(elements.get('dtn-adapter-status').className, 'pill online');
+assert.equal(elements.get('dtn-adapter-status').textContent, '연결됨');
+assert.equal(elements.get('dtn-adapter-dot').className, 'connection-dot online');
 assert.match(elements.get('dtn-adapter-health-json').textContent, /"rawResponse": "{\\"status\\":\\"ready\\"}"/);
 assert.match(elements.get('dtn-adapter-health-time').textContent, /마지막 확인/);
 assert.equal(elements.get('dtn-adapter-health').disabled, false);
@@ -128,7 +130,7 @@ assert.equal(elements.get('dtn-send').disabled, true, 'health check must not unl
 healthFetch = async () => { throw new Error('server unreachable'); };
 await elements.get('dtn-adapter-health').onclick();
 assert.equal(elements.get('dtn-adapter-status').textContent, '연결실패');
-assert.equal(elements.get('dtn-adapter-status').className, 'pill error', 'old success must not survive a failed check');
+assert.equal(elements.get('dtn-adapter-dot').className, 'connection-dot offline', 'old success must not survive a failed check');
 assert.match(elements.get('dtn-adapter-health-json').textContent, /server unreachable/);
 assert.equal(elements.get('dtn-adapter-health').disabled, false);
 console.log('PASS: adapter status JSON, URL derivation, collapsible details, polling and manual retry');
@@ -136,7 +138,7 @@ console.log('PASS: adapter status JSON, URL derivation, collapsible details, pol
 healthFetch = async () => ({ok: true, json: async () => ({...report, adapter: report.receiver})});
 await elements.get('dtn-adapter-health').onclick();
 assert.equal(elements.get('dtn-adapter-status').textContent, '시험대기');
-assert.equal(elements.get('dtn-adapter-status').className, 'pill warning');
+assert.equal(elements.get('dtn-adapter-dot').className, 'connection-dot unknown');
 healthFetch = () => new Promise(resolve => { resolveHealth = resolve; });
 const stale = elements.get('dtn-adapter-health').onclick();
 elements.get('dtn-send-url').value = 'http://changed:8080';
@@ -164,3 +166,16 @@ vm.runInContext("iqJob={id:'old',state:'READY',file:{}}; clearIqSelection(); upd
 assert.equal(elements.get('iq-file').textContent,'');
 assert.equal(elements.get('iq-saved').value,'');
 console.log('PASS: I/Q GNSS requirement, COM controls, active generation visibility and stale file reset');
+const savedAddresses = new Map();
+context.localStorage = {getItem: key => savedAddresses.get(key), setItem: (key, value) => savedAddresses.set(key, value)};
+healthFetch = async () => ({ok: true, json: async () => report});
+elements.get('dtn-send-url').disabled = false;
+elements.get('dtn-send-url').value = 'http://saved-adapter:8080';
+await elements.get('dtn-adapter-save').onclick();
+assert.equal(savedAddresses.get('lnis.adapter-url.dtn'), 'http://saved-adapter:8080');
+vm.runInContext("initAdapterHealth('http://default:8080')", context);
+assert.equal(elements.get('dtn-send-url').value, 'http://saved-adapter:8080');
+elements.get('dtn-send-url').value = 'javascript:alert(1)';
+await elements.get('dtn-adapter-save').onclick();
+assert.equal(savedAddresses.get('lnis.adapter-url.dtn'), 'http://saved-adapter:8080');
+console.log('PASS: adapter address browser persistence, restore and invalid address rejection');

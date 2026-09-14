@@ -67,8 +67,10 @@ public final class DtnWorker {
 
   private void process(UUID id, String requested, byte[] data) {
     try {
-      DtnModels.AgentResult result = requested.startsWith("PREPARE") ? processor.prepare(id, data, "PREPARE_RAW".equals(requested))
-          : processor.receive(id, json.readValue(data, DtnModels.Transfer.class));
+      java.util.function.BiConsumer<String,String> progress=(stage,message)->output.accept(id,
+          json.createObjectNode().set("progress",json.createObjectNode().put("stage",stage).put("message",message)));
+      DtnModels.AgentResult result = requested.startsWith("PREPARE") ? processor.prepare(id, data, "PREPARE_RAW".equals(requested),progress)
+          : processor.receive(id, json.readValue(data, DtnModels.Transfer.class),progress);
       send(id, result);
     } catch (Exception | LinkageError e) { sendError(id, new IllegalStateException(e)); }
     finally {

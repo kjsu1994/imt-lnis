@@ -31,12 +31,18 @@ public final class DtnProcessor {
   }
 
   public AgentResult prepare(UUID id, byte[] source, boolean raw) {
+    return prepare(id,source,raw,(stage,message)->{});
+  }
+  public AgentResult prepare(UUID id, byte[] source, boolean raw, java.util.function.BiConsumer<String,String> progress) {
     if (source.length == 0 || source.length > DtnModels.MAX_INPUT_BYTES)
       throw new IllegalArgumentException("DTN 수집 입력은 1 MiB 이하로 제한됩니다.");
     var records = GrawCodec.splitLengthPrefixed(source);
     AgentResult result = new AgentResult();
     result.setObservations(server.shared.model.DtnObservationView.fromRecords(records));
+    progress.accept("PVT","지구 PVT 계산 시작 · "+records.size()+" records");
+    long started=System.nanoTime();
     try (var pvt = new NativePvtCodec(nativeDirectory)) { result.setPvt(pvt.calculate(records)); }
+    progress.accept("PVT","계산 요청 처리 종료 · "+((System.nanoTime()-started)/1_000_000)+" ms · 유효성은 결과에서 확인");
     Transfer transfer = new Transfer();
     transfer.setTestId(id);
     transfer.setSourceSha256(Hashing.hex(Hashing.sha256Digest().digest(source)));
@@ -45,11 +51,14 @@ public final class DtnProcessor {
       transfer.setFormat("LNIS-GRAW-RAW-v1");
       transfer.setTestType("GNSS_RAW");
       transfer.setGrawBase64(Base64.getEncoder().encodeToString(source));
+      progress.accept("JSON 준비","GNSS RAW Base64 준비 완료 · "+source.length+" bytes · "+records.size()+" records · SHA-256 "+transfer.getSourceSha256());
       result.setTransfer(transfer);
       return result;
     }
+    progress.accept("AFS 변환","GRAW 분할 → SB2 시간·항법 구성 → SB3/SB4 원본 배치 → 기존 인코더 실행");
     var frames = new AfsFrameBuilder(afs).prepare(records,
         new TestOptions(TestType.TEST_A_NORMAL, 0, 0, 0, Map.of()), 1).frames();
+    progress.accept("AFS 변환","인코딩 완료 · "+frames.size()+" frames · 프레임당 750 bytes");
     List<DtnModels.Frame> output = new ArrayList<>();
     for (var frame : frames) {
       DtnModels.Frame item = new DtnModels.Frame();
@@ -60,20 +69,25 @@ public final class DtnProcessor {
       item.setFrameBase64(Base64.getEncoder().encodeToString(frame.payload()));
       output.add(item);
     }
+    progress.accept("JSON 준비","AFS 프레임 Base64·시간 메타데이터 구성 완료");
     transfer.setFrames(output);
     result.setTransfer(transfer);
     return result;
   }
 
   public AgentResult receive(UUID id, Transfer transfer) {
+    return receive(id,transfer,(stage,message)->{});
+  }
+  public AgentResult receive(UUID id, Transfer transfer, java.util.function.BiConsumer<String,String> progress) {
     if (transfer != null && "LNIS-GRAW-RAW-v1".equals(transfer.getFormat()))
-      return receiveRaw(id, transfer);
+      return receiveRaw(id, transfer,progress);
     if (transfer == null || !id.equals(transfer.getTestId()) || transfer.getSchemaVersion() != 1
         || !DtnModels.PROFILE.equals(transfer.getProfile()) || !"LNIS-GRAW-AFS-v1".equals(transfer.getFormat())
         || !"AFS_METADATA".equals(transfer.getTestType()) || transfer.getGrawBase64() != null
         || transfer.getPrn() != 1 || transfer.getFrames() == null || transfer.getFrames().isEmpty()
         || transfer.getFrames().size() > 20000 || transfer.getRecordCount() < 1)
       throw new IllegalArgumentException("지원하지 않는 DTN payload입니다.");
+    progress.accept("AFS 복원","복호화·CRC·순서·시간 메타데이터 검사 시작 · "+transfer.getFrames().size()+" frames");
     AfsReassembler reassembler = new AfsReassembler();
     int index = 0;
     for (var frame : transfer.getFrames()) {
@@ -86,6 +100,7 @@ public final class DtnProcessor {
       reassembler.add(AfsRawFragmentCodec.decode(AfsRawFragmentCodec.fromSbBits(decoded.sb3())));
       reassembler.add(AfsRawFragmentCodec.decode(AfsRawFragmentCodec.fromSbBits(decoded.sb4())));
     }
+    progress.accept("AFS 복원","전체 프레임 복호화·CRC·시간 정보 검사 통과");
     var records = reassembler.completeRecords();
     if (reassembler.incompleteCount() != 0 || records.size() != transfer.getRecordCount())
       throw new IllegalArgumentException("수신 GRAW 레코드가 부족합니다.");
@@ -98,13 +113,18 @@ public final class DtnProcessor {
     }
     if (!Hashing.hex(Hashing.sha256Digest().digest(source.toByteArray())).equals(transfer.getSourceSha256()))
       throw new IllegalArgumentException("복원 데이터 SHA-256 불일치");
+    progress.accept("AFS 복원","GRAW 복원·SHA-256 검증 완료 · "+records.size()+" records · "+source.size()+" bytes");
     AgentResult result = new AgentResult();
     result.setObservations(server.shared.model.DtnObservationView.fromRecords(records));
+    progress.accept("PVT","지구 PVT 계산 시작 · "+records.size()+" records");
+    long started=System.nanoTime();
     try (var pvt = new NativePvtCodec(nativeDirectory)) { result.setPvt(pvt.calculate(records)); }
+    progress.accept("PVT","계산 요청 처리 종료 · "+((System.nanoTime()-started)/1_000_000)+" ms · 유효성은 결과에서 확인");
     return result;
   }
 
-  private AgentResult receiveRaw(UUID id, Transfer transfer) {
+  private AgentResult receiveRaw(UUID id, Transfer transfer, java.util.function.BiConsumer<String,String> progress) {
+    progress.accept("RAW 복원","Base64 복원·크기·SHA-256·레코드 수 확인 시작");
     if (!id.equals(transfer.getTestId()) || transfer.getSchemaVersion() != 1
         || !"GNSS_RAW".equals(transfer.getTestType())
         || !DtnModels.PROFILE.equals(transfer.getProfile()) || transfer.getFrames() != null
@@ -117,9 +137,13 @@ public final class DtnProcessor {
       throw new IllegalArgumentException("RAW 입력 크기 또는 SHA-256 불일치");
     var records = GrawCodec.splitLengthPrefixed(source);
     if (records.size() != transfer.getRecordCount()) throw new IllegalArgumentException("RAW 레코드 수 불일치");
+    progress.accept("RAW 복원","크기·SHA-256·레코드 수 검증 통과 · "+records.size()+" records · "+source.length+" bytes");
     AgentResult result = new AgentResult();
     result.setObservations(server.shared.model.DtnObservationView.fromRecords(records));
+    progress.accept("PVT","지구 PVT 계산 시작 · "+records.size()+" records");
+    long started=System.nanoTime();
     try (var pvt = new NativePvtCodec(nativeDirectory)) { result.setPvt(pvt.calculate(records)); }
+    progress.accept("PVT","계산 요청 처리 종료 · "+((System.nanoTime()-started)/1_000_000)+" ms · 유효성은 결과에서 확인");
     return result;
   }
 }

@@ -48,6 +48,40 @@ class H2PersistenceIntegrationTest {
   @Autowired private RealtimeEventRepository realtimeEvents;
   @Autowired private EventService eventService;
   @Autowired private SessionRepository sessions;
+  @Autowired private server.central.dtn.DtnLogService dtnLogs;
+  @Autowired private org.springframework.jdbc.core.JdbcTemplate jdbc;
+
+  @Test
+  void dtnPreparationSnapshotsSurviveExpiryAndRemainLocal() {
+    UUID input=UUID.randomUUID(), trial=UUID.randomUUID(), second=UUID.randomUUID();
+    dtnLogs.add(input,"INPUT","PVT",true,"계산 시작");
+    dtnLogs.add(input,"INPUT","WARN","PVT",false,"항법정보 부족");
+    dtnLogs.copy(input,trial,"TEST");
+    dtnLogs.copy(input,second,"TEST");
+    assertEquals(2,dtnLogs.read(trial,0).size());
+    assertEquals(2,dtnLogs.read(second,0).size());
+    var first=dtnLogs.read(input,0).getFirst();
+    assertEquals(1,dtnLogs.read(input,first.getSequence()).size());
+    assertEquals(first.getOccurredAt(),dtnLogs.read(trial,0).getFirst().getOccurredAt());
+    jdbc.update("update dtn_log set occurred_at=? where scope_id in (?,?,?)",
+        java.sql.Timestamp.from(Instant.now().minusSeconds(8*86400)),input,trial,second);
+    dtnLogs.cleanup();
+    assertTrue(dtnLogs.read(input,0).isEmpty());
+    assertEquals(2,dtnLogs.read(trial,0).size());
+    assertTrue(dtnLogs.read(UUID.randomUUID(),0).isEmpty());
+  }
+
+  @Test
+  void failedInputValidationKeepsDiagnosticLogAfterRollback() {
+    var input=inputs.create("broken.graw",3,InputKind.GRAW_UPLOAD);
+    dtnLogs.add(input.inputId(),"INPUT","파일 적용",false,"시작");
+    inputs.append(input.inputId(),0,new byte[]{1,2,3});
+    assertThrows(RuntimeException.class,()->inputs.complete(input.inputId()));
+    assertTrue(dtnLogs.read(input.inputId(),0).stream().anyMatch(e->"ERROR".equals(e.getLevel())));
+    dtnLogs.add(input.inputId(),"INPUT","ERROR","인증",false,"Bearer secret-token\nnext line");
+    assertFalse(dtnLogs.read(input.inputId(),0).getLast().getMessage().contains("secret-token"));
+    inputs.remove(input.inputId());
+  }
 
   @Test
   void storesAgentAndMaintainsSingleActiveSessionLock() {

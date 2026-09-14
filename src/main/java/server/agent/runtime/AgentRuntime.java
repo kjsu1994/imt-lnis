@@ -263,10 +263,14 @@ public final class AgentRuntime implements AutoCloseable {
     var settings = json.treeToValue(args, SerialCaptureService.Settings.class);
     var capturedPvt = new AtomicReference<List<server.shared.model.DtnModels.Pvt>>();
     var selection = settings.singleEpoch() ? new server.shared.codec.SingleEpochCapture(records -> {
+      status(sessionId,EventType.GNSS_STATUS,0,"PvtCalculating","관측값·항법정보 후보 확보 · 지구 PVT 계산 중",Map.of());
       try (var pvt = new server.agent.codec.NativePvtCodec(config.nativeDirectory())) {
         var results = pvt.calculate(records);
         var result = results.getFirst();
-        if (!result.isPositionValid() || !result.isVelocityValid()) return false;
+        if (!result.isPositionValid() || !result.isVelocityValid()) {
+          status(sessionId,EventType.GNSS_STATUS,0,"PvtWaiting","유효한 위치·속도 해 미확보 · 추가 관측값·항법정보 대기",Map.of());
+          return false;
+        }
         capturedPvt.set(results);
         return true;
       }

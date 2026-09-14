@@ -1,12 +1,13 @@
-import {initAdapterHealth} from './dtn-adapter-health.js?v=20260914-transfer-v2';
-import {createPayloadViewer} from './dtn-payload.js?v=20260914-auto-pretty';
-import {createObservationView, numeric} from './dtn-observations.js?v=20260914-navigation';
+import {createDtnLog} from './dtn-log.js?v=20260915-iq-compact';
+import {initAdapterHealth} from './dtn-adapter-health.js?v=20260914-adapter-inline';
+import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20260915-iq-compact';
+import {createObservationView, numeric} from './dtn-observations.js?v=20260915-iq-compact';
 
 const api = '/lnis/api/v1', $ = id => document.getElementById(id);
 const payload = createPayloadViewer($('dtn-payload'), {sentOnly: true});
 let inputId = null, agents = [], busy = false, job = null, config = {}, peerConfig = null;
 let selectedType = 'AFS_METADATA', senderMode = 'DTN', receiverMode = 'HDTN';
-let pvt = [], comparison = null, epochIndex = 0, reportKey = '', lastEvent = '', lastAgentState = '';
+let pvt = [], epochIndex = 0, reportKey = '', lastEvent = '', lastAgentState = '';
 let polling = false, inputMode = 'upload';
 let captureId = null, captureError = '';
 let iqJob = null;
@@ -25,11 +26,8 @@ async function request(path, options = {}) {
 }
 const post = (path, body) => request(path, {method: 'POST', headers: {'Content-Type': 'application/json'},
   body: body === undefined ? undefined : JSON.stringify(body)});
-function log(message, level = 'INFO') {
-  const time = new Date().toLocaleTimeString('ko-KR', {hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit'});
-  $('dtn-log').textContent = ($('dtn-log').textContent + time + ' [' + level + '] ' + message + '\n').slice(-16000);
-  $('dtn-log').scrollTop = $('dtn-log').scrollHeight;
-}
+const logView=createDtnLog($('dtn-log'));
+function log(message,level='INFO') { logView.write(message,level); }
 function pill(id, text, state = '') { $(id).textContent = text; $(id).className = 'pill ' + state; }
 function destination(text, state = 'unknown') {
   $('destination-state').textContent = text; $('destination-dot').className = 'connection-dot ' + state;
@@ -55,9 +53,7 @@ function renderPvt() {
   pill('pvt-validity', !value ? '계산 대기' : '위치 ' + (value.positionValid ? '유효' : '무효') + ' · 속도 ' + (value.velocityValid ? '유효' : '무효'),
     !value ? '' : value.positionValid && value.velocityValid ? 'online' : 'warning');
   $('pvt-message').textContent = value?.message || '지구 ECEF · GPS L1 C/A · 전송시험 시작 시 계산';
-  const delta = comparison?.epochs?.[epochIndex];
-  $('dtn-comparison').textContent = '위치 차이 ' + numeric(delta?.positionDifferenceMeters, 6) + ' m · 속도 차이 ' +
-    numeric(delta?.velocityDifferenceMetersPerSecond, 6) + ' m/s · 시계오차 차이 ' + numeric(delta?.clockDifferenceSeconds, 12) + ' s';
+
 }
 function updateControls() {
   const tx = agents.find(a => a.agentId === $('dtn-sender').value);
@@ -80,10 +76,11 @@ function updateControls() {
       : iqJob?.state === 'READY' ? '선택한 I/Q 파일을 전송합니다.' : 'GNSS 입력 적용 후 90초 I/Q를 생성하세요.';
 }
 function renderIq() {
-  if (!iqJob) { $('iq-state').textContent = '파일 선택 또는 생성 대기'; $('iq-file').textContent = ''; $('iq-progress').value = 0; return; }
+  if(iqJob?.id && !active()) logView.setContext(iqJob.id,'IQ');
+  if (!iqJob) { $('iq-state').textContent = '파일 선택 또는 생성 대기'; renderIqFile($('iq-file'), null, ''); $('iq-progress').value = 0; return; }
   $('iq-state').textContent = iqJob.message;
   $('iq-progress').value = Math.min(100, 100 * (iqJob.generatedBytes || 0) / (iqJob.expectedBytes || 1));
-  $('iq-file').textContent = iqJob.file ? JSON.stringify({file:iqJob.file, preview:iqJob.preview}, null, 2) : '';
+  renderIqFile($('iq-file'), iqJob.file ? {...iqJob.file, preview:iqJob.preview} : null, '송신 파일 준비 완료');
 }
 async function loadIqFiles() {
   iqFiles = await request('/dtn/iq');
@@ -111,9 +108,10 @@ $('iq-cancel').onclick = async () => {
   updateControls();
 };
 function resetResult() {
-  job = null; reportKey = ''; lastEvent = ''; pvt = []; comparison = null; epochIndex = 0;
-  payload.setJob(null); renderPvt(); $('dtn-report').hidden = true; $('dtn-report').removeAttribute('href');
-  $('dtn-result').textContent = '시험 대기'; pill('dtn-test-status', '시험 대기');
+  job = null; reportKey = ''; lastEvent = ''; pvt = []; epochIndex = 0;
+  $('dtn-iq-result').hidden = true;
+  renderIqFile($('dtn-iq-result'), null, '');
+  payload.setJob(null); renderPvt(); pill('dtn-test-status', '시험 대기');
 }
 function clearIqSelection() {
   iqJob = null; $('iq-saved').value = ''; renderIq();
@@ -124,7 +122,8 @@ async function upload(file) {
   busy = true; inputId = null; clearIqSelection(); resetResult(); view.setData(null); updateControls();
   try {
     $('dtn-input-state').textContent = '입력 확인 중'; $('dtn-upload-progress').value = 0;
-    const input = await post('/inputs', {fileName: file.name, size: file.size, kind: 'GRAW_UPLOAD'});
+    const input = await post('/inputs?dtn=true', {fileName: file.name, size: file.size, kind: 'GRAW_UPLOAD'});
+    logView.setContext(input.inputId,'INPUT');
     await request('/inputs/' + input.inputId + '/chunks/0', {
       method: 'PUT', headers: {'Content-Type': 'application/octet-stream'}, body: new Uint8Array(await file.arrayBuffer())});
     const complete = await post('/inputs/' + input.inputId + '/complete');
@@ -135,7 +134,7 @@ async function upload(file) {
     catch (error) { pvt = []; log('PVT 미리보기 불가 · ' + error.message, 'WARN'); }
     view.setData(observations); renderPvt();
     $('dtn-upload-progress').value = 100; $('dtn-input-state').textContent = file.name + ' · ' + complete.recordCount + '건';
-    log('입력 완료 · ' + file.name);
+    log('입력 완료 · ' + file.name); void logView.refresh();
   } catch (error) {
     inputId = null; view.setData(null); $('dtn-input-state').textContent = '입력 실패'; throw error;
   } finally { busy = false; updateControls(); }
@@ -152,6 +151,7 @@ $('dtn-start').onclick = async () => {
       portName: $('dtn-port').value, baudRate: Number($('dtn-baud').value), protocolId: 'UBX',
       receiverModel: 'u-blox EVK-F9T', sessionName: 'DTN single epoch', singleEpoch: true});
     captureId = input.inputId;
+    logView.setContext(captureId,'INPUT');
     const deadline = Date.now() + 140000;
     while (true) {
       if (captureError) throw new Error(captureError);
@@ -178,6 +178,7 @@ if ($('dtn-replay')) $('dtn-replay').onclick = async () => {
   $('dtn-input-state').textContent = '합성 레코드 수집 재생 중 · 실장비 아님';
   try {
     const input = await post('/dtn/example/replay');
+    logView.setContext(input.inputId,'INPUT');
     const observations = await request('/dtn/inputs/' + input.inputId + '/observations');
     pvt = await request('/dtn/inputs/' + input.inputId + '/pvt');
     inputId = input.inputId; view.setData(observations); renderPvt();
@@ -226,7 +227,7 @@ $('dtn-connection-test').onclick = () => connectPeer(false);
 $('dtn-connection-save').onclick = () => connectPeer(true);
 for (const id of ['dtn-receiver-ip', 'dtn-receiver-port']) $(id).oninput = () => { destination('주소 변경 · 미확인'); $('dtn-connection-message').textContent = ''; };
 $('dtn-send-url').oninput = updateControls;
-$('dtn-log-clear').onclick = () => { $('dtn-log').textContent = ''; };
+
 $('dtn-refresh').onclick = async () => {
   try { await post('/agents/' + encodeURIComponent($('dtn-sender').value) + '/serial-ports/refresh'); log('COM 포트 조회 요청'); }
   catch (e) { log(e.message, 'ERROR'); }
@@ -243,17 +244,19 @@ $('dtn-send').onclick = async () => {
   finally { busy = false; updateControls(); }
 };
 function renderSummary() {
+  $('dtn-iq-result').hidden = job?.testType !== 'IQ_SAMPLE';
+  renderIqFile($('dtn-iq-result'), job?.testType === 'IQ_SAMPLE' ? job.fileResult : null,
+    job?.state === 'FAILED' ? '수신 파일 검증 실패 · 로그를 확인하세요.' : '수신 파일 검증 대기');
+  if(job?.testId) logView.setContext(job.testId);
   if (!job) return;
   const names = {PREPARING: job.testType === 'IQ_SAMPLE' ? 'I/Q 파일 확인 중' : '입력 준비·기준 PVT 계산 중', WAITING_DTN: '외부 전달·수신 대기', WAITING_RECEIVER: '수신 처리 대기',
     CALCULATING: '복원·PVT 계산 중', COMPLETED: '처리 완료', FAILED: '시험 실패', INCONCLUSIVE: '판정 불가', CANCELLED: '취소'};
   pill('dtn-test-status', names[job.state] || job.state, active() ? 'warning' : job.verdict === 'PASS' ? 'online' : 'warning');
-  $('dtn-result').textContent = (job.verdict ? ({PASS: '일치', FAIL: '불일치', INCONCLUSIVE: '판정 불가'}[job.verdict] || job.verdict) : names[job.state] || job.state);
+
   payload.setJob(job);
-  if (job.fileResult) {
-    $('dtn-comparison').textContent = 'I/Q 파일 ' + job.fileResult.verdict + ' · ' + job.fileResult.sizeBytes + ' bytes · SHA-256 ' + job.fileResult.sha256;
-  }
+
   const key = job.testId + ':' + job.state + ':' + job.updatedAt;
-  if (key !== lastEvent) { log((names[job.state] || job.state) + ' · ' + (job.message || '')); lastEvent = key; }
+  lastEvent = key;
 }
 async function poll() {
   if (polling) return;
@@ -290,10 +293,10 @@ async function poll() {
         if (next.testType !== 'IQ_SAMPLE' && (next.referenceEpochs || next.verdict) && key !== reportKey) {
           const report = await request('/dtn/tests/' + id + '/report');
           if (job?.testId === id && !busy) {
-            pvt = report.referencePvt || []; comparison = report.comparison;
+            pvt = report.referencePvt || [];
             if (report.observations) view.setData(report.observations, true);
             renderPvt(); reportKey = key;
-            $('dtn-report').href = api + '/dtn/tests/' + id + '/report'; $('dtn-report').hidden = false;
+
           }
         }
       }

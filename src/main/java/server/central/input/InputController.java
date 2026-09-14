@@ -18,11 +18,21 @@ import java.util.UUID;
 /** GRAW 입력을 청크 단위로 등록하고 검증하는 API를 제공한다. */
 public class InputController {
     private final InputBufferService inputBufferService;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private server.central.dtn.DtnLogService logs;
 
     /* GRAW 입력 등록 */
     @PostMapping
-    public ResponseEntity<InputBufferEntity> create(
-            @Valid @RequestBody CreateInputRequest request)
+    public ResponseEntity<InputBufferEntity> createLogged(
+            @Valid @RequestBody CreateInputRequest request, @RequestParam(defaultValue="false") boolean dtn)
+    {
+        var result=create(request);
+        if(dtn && logs!=null) logs.add(result.getBody().inputId(),"INPUT","파일 적용",false,
+            "파일 적용 시작 · "+request.fileName()+" · "+request.size()+" bytes");
+        return result;
+    }
+
+    public ResponseEntity<InputBufferEntity> create(CreateInputRequest request)
     {
         InputBufferEntity response =
                 inputBufferService.create(request.fileName(), request.size(), request.kind());
@@ -37,6 +47,7 @@ public class InputController {
             @PathVariable UUID inputId, @PathVariable long index, @RequestBody byte[] body)
     {
         InputBufferEntity response = inputBufferService.append(inputId, index, body);
+        if(logs!=null && logs.exists(inputId)) logs.add(inputId,"INPUT","업로드",true,"청크 저장 완료 · "+response.receivedSize()+" bytes");
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
 

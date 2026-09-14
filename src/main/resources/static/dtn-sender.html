@@ -4,8 +4,8 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>LNIS DTN Sender</title>
   <link rel="stylesheet" href="/lnis/assets/app.css?v=20260914-transfer-v2">
-  <link rel="stylesheet" href="/lnis/assets/dtn-payload.css?v=20260914-download-button">
-  <link rel="stylesheet" href="/lnis/assets/dtn-ui.css?v=20260914-synthetic-tools">
+  <link rel="stylesheet" href="/lnis/assets/dtn-payload.css?v=20260915-iq-compact">
+  <link rel="stylesheet" href="/lnis/assets/dtn-ui.css?v=20260915-iq-compact">
 </head>
 <body data-page="dtn-sender">
 <header>
@@ -50,10 +50,12 @@
       <div class="adapter-url-controls">
         <label><span>DTN 어댑터 서버 주소</span>
           <input id="dtn-send-url" type="url" placeholder="http://어댑터-IP:포트" autocomplete="off"></label>
+        <div class="adapter-connection-state"><span id="dtn-adapter-dot" class="connection-dot unknown" aria-hidden="true"></span><small>송신 → 송신 adapter</small><strong id="dtn-adapter-status" role="status" aria-live="polite">미확인</strong></div>
+        <button id="dtn-adapter-save" type="button" title="이 브라우저에 주소 저장·적용">저장·적용</button>
         <button id="dtn-adapter-health" type="button" aria-controls="dtn-adapter-health-results">연결 확인</button>
       </div>
       <details id="dtn-adapter-health-results" class="adapter-health-results" aria-busy="false">
-        <summary><span id="dtn-adapter-status" class="pill" role="status" aria-live="polite">미확인</span><span class="adapter-health-toggle">상세 보기</span></summary>
+        <summary><span class="adapter-health-toggle">상세 보기</span></summary>
         <div class="adapter-health-content">
           <div class="adapter-health-item"><small id="dtn-adapter-detail">연결 확인을 기다립니다.</small></div>
           <small id="dtn-adapter-health-time" class="adapter-health-time">10초마다 자동 확인</small>
@@ -93,7 +95,8 @@
       <div class="compact-input-row"><button id="iq-generate" type="button">90초 I/Q 생성</button><button id="iq-cancel" type="button" disabled>생성 취소</button>
         <progress id="iq-progress" max="100" value="0" aria-label="I/Q 파일 생성"></progress></div>
       <p id="iq-state" role="status">생성 대기 · 12 MHz · 약 2.16 GB · 파일 경로만 REST로 전달</p>
-      <pre id="iq-file" class="result-console">GNSS 항법정보 기반 AFS I/Q · 수신 검증은 파일 크기·해시 기준</pre>
+      <div id="iq-file" class="iq-file-view"></div>
+      <div id="dtn-iq-result" class="iq-file-view" hidden></div>
     </div>
   </section>
   <section class="card epoch-observation-card" id="dtn-observations"></section>
@@ -111,17 +114,12 @@
       <div class="pvt-value"><span>수신기 시계오차</span><strong id="pvt-clock">—</strong><small>s</small></div>
     </div>
     <small id="pvt-message">지구 ECEF · GPS L1 C/A · 전송시험 시작 시 계산</small>
-    <div class="dtn-comparison-card" role="status" aria-label="송·수신 PVT 비교">
-    <strong>송·수신 비교</strong>
-    <pre id="dtn-result" class="result-console">시험 대기</pre>
-    <div id="dtn-comparison" class="observation-summary">위치 차이 — · 속도 차이 — · 시계오차 차이 —</div>
-    <a id="dtn-report" hidden target="_blank" rel="noopener">상세 PVT 결과</a>
-    </div>
+
   </section>
   <div class="dtn-output-grid">
   <section id="dtn-payload" class="card"></section>
-  <section class="card"><div class="card-title"><h2>송수신 로그</h2><button id="dtn-log-clear" type="button">화면 로그 지우기</button></div><pre id="dtn-log" class="log" aria-label="PC 시간 기준 로그"></pre></section>
+  <section class="card"><div class="card-title dtn-log-tools"><h2>송수신 로그</h2><select id="dtn-log-history" aria-label="로그 시험 기록"><option value="">현재 작업</option></select><button id="dtn-log-detail" type="button" aria-pressed="false">상세 로그</button><a id="dtn-log-download" aria-disabled="true">다운로드</a><button id="dtn-log-clear" type="button" title="저장 로그는 삭제하지 않습니다">화면 지우기</button></div><pre id="dtn-log" class="log" aria-label="PC 시간 기준 로그"></pre></section>
   </div>
 </main>
-<script type="module" src="/lnis/assets/dtn.js?v=20260914-auto-pretty"></script>
+<script type="module" src="/lnis/assets/dtn.js?v=20260915-iq-compact"></script>
 </body></html>

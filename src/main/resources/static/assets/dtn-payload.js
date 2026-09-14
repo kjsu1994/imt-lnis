@@ -1,4 +1,47 @@
 // JSON 본문은 HTML로 해석하지 않는다. 정렬 보기는 화면에만 적용하고 다운로드는 원문 API를 사용한다.
+const iqViews = new WeakMap();
+export function renderIqFile(container, data, label = '파일 준비 완료') {
+  const key = JSON.stringify([data, label]);
+  if (iqViews.get(container) === key) return;
+  iqViews.set(container, key);
+  const expanded = container.querySelector?.('details')?.open === true;
+  const node = (tag, text, className) => {
+    const e = document.createElement(tag);
+    if (text !== undefined) e.textContent = text;
+    if (className) e.className = className;
+    return e;
+  };
+  container.replaceChildren();
+  if (!data) { container.append(node('small', label)); return; }
+  const summary = node('div', undefined, 'iq-file-summary');
+  summary.append(node('span', data.verdict === 'PASS' ? '파일 검증 일치' : data.verdict === 'FAIL' ? '파일 검증 불일치' : label,
+    'pill ' + (data.verdict === 'PASS' ? 'online' : data.verdict === 'FAIL' ? 'error' : '')));
+  const size = Number.isFinite(data.sizeBytes) ? (data.sizeBytes / 1e9).toFixed(2) + ' GB' : '크기 정보 없음';
+  summary.append(node('strong', size));
+  if (data.durationSeconds) summary.append(node('span', data.durationSeconds + '초'));
+  if (data.sampleRateHz) summary.append(node('span', data.sampleRateHz / 1e6 + ' MHz'));
+  const path = node('div', data.filePath || '경로 정보 없음', 'iq-file-path');
+  const details = node('details'); details.open = expanded;
+  details.append(node('summary', '해시 · I/Q 샘플 상세'));
+  details.append(node('div', '파일 크기 · ' + (Number.isFinite(data.sizeBytes) ? data.sizeBytes.toLocaleString('ko-KR') + ' bytes' : '—')));
+  details.append(node('div', 'SHA-256 · ' + (data.sha256 || '—'), 'iq-file-path'));
+  if (Array.isArray(data.preview) && data.preview.length) {
+    details.append(node('small', '파일 앞부분 ' + data.preview.length + '쌍 · 전체 샘플 아님'));
+    const table = node('table', undefined, 'iq-sample-table');
+    const head = node('thead'), row = node('tr');
+    for (const title of ['번호', 'I', 'Q']) { const th = node('th', title); th.scope = 'col'; row.append(th); }
+    head.append(row); table.append(head);
+    const body = node('tbody');
+    data.preview.forEach((pair, i) => {
+      const tr = node('tr');
+      for (const value of [i + 1, pair?.[0] ?? '—', pair?.[1] ?? '—']) tr.append(node('td', String(value)));
+      body.append(tr);
+    });
+    table.append(body);
+    const scroll = node('div', undefined, 'iq-sample-scroll'); scroll.tabIndex = 0; scroll.append(table); details.append(scroll);
+  }
+  container.append(summary, path, details);
+}
 export function payloadUrl(testId, direction, download = false) {
   if (!['sent', 'received'].includes(direction)) throw new Error('지원하지 않는 JSON 방향입니다.');
   return '/lnis/api/v1/dtn/tests/' + encodeURIComponent(testId) + '/payload/' + direction +
@@ -18,7 +61,7 @@ export function createPayloadViewer(container, {receivedOnly = false, sentOnly =
   const title = create('h2', receivedOnly ? '수신 JSON 원문' : sentOnly ? '송신 JSON 원문' : '송수신 JSON 원문');
   const controls = create('div');
   controls.className = 'dtn-payload-controls';
-  const sent = create('button', '송신 원문');
+  const sent = create('button', sentOnly ? '송신 JSON 원문' : '송신 원문');
   const received = create('button', '수신 원문');
   sent.type = received.type = 'button';
   sent.disabled = received.disabled = true;
@@ -43,7 +86,12 @@ export function createPayloadViewer(container, {receivedOnly = false, sentOnly =
   close.type = 'button';
   const toolbar = create('div');
   toolbar.className = 'dtn-payload-controls';
-  toolbar.append(prettyLabel, download, close);
+  if (sentOnly) {
+    controls.append(prettyLabel, download);
+    controls.className += ' dtn-payload-header';
+    download.className = 'dtn-payload-download';
+    toolbar.hidden = true;
+  } else toolbar.append(prettyLabel, download, close);
   const text = create('textarea');
   text.readOnly = true;
   text.rows = 9;
@@ -52,7 +100,8 @@ export function createPayloadViewer(container, {receivedOnly = false, sentOnly =
   text.className = 'dtn-payload-text';
   text.setAttribute('aria-label', '선택한 시험의 JSON 본문');
   panel.append(caption, toolbar, text);
-  container.append(title, controls, status, panel);
+  if (!sentOnly) container.append(title);
+  container.append(controls, status, panel);
   let job = null, original = '', generation = 0, pending = null;
   let automaticKey = null;
 
@@ -104,10 +153,20 @@ export function createPayloadViewer(container, {receivedOnly = false, sentOnly =
       pretty.onchange();
     } catch (error) {
       if (requestGeneration === generation && error.name !== 'AbortError') status.textContent = 'JSON 조회 실패: ' + error.message;
+    } finally {
+      if (requestGeneration === generation) pending = null;
     }
   }
 
-  sent.onclick = () => show('sent');
+  sent.onclick = () => {
+    if (sentOnly && (!panel.hidden || pending)) {
+      generation++; pending?.abort(); pending=null;
+      panel.hidden=true; sent.setAttribute('aria-expanded','false');
+      status.textContent='JSON 보기를 닫았습니다.';
+      return;
+    }
+    return show('sent');
+  };
   received.onclick = () => show('received');
   pretty.onchange = () => {
     if (pretty.disabled || !original) return;
@@ -122,7 +181,7 @@ export function createPayloadViewer(container, {receivedOnly = false, sentOnly =
         automaticKey = null;
         reset();
         status.textContent = nextJob
-          ? (receivedOnly ? '수신 원문 버튼으로 접수 당시 JSON을 확인하세요.' : sentOnly ? '송신 원문 버튼으로 전송 JSON을 확인하세요.' : '준비된 송신 또는 수신 JSON을 선택하세요.')
+          ? (receivedOnly ? '수신 원문 버튼으로 접수 당시 JSON을 확인하세요.' : sentOnly ? '송신 JSON 원문 버튼으로 확인하세요.' : '준비된 송신 또는 수신 JSON을 선택하세요.')
           : '시험을 선택하세요.';
       }
       job = nextJob || null;

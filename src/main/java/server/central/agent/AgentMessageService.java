@@ -41,6 +41,7 @@ public class AgentMessageService {
     private final FrameEvidenceService frameEvidenceService;
     private final AgentConnectionRegistry connectionRegistry;
     private DtnService dtnService;
+    @Autowired(required=false) private server.central.dtn.DtnLogService logs;
 
     /** 기존 생성자 계약을 유지하며 DTN 경로만 별도로 주입한다. */
     @Autowired
@@ -67,6 +68,10 @@ public class AgentMessageService {
             case HEARTBEAT -> handleHeartbeat(envelope);
             case STATUS -> {
                 Progress progress = objectMapper.treeToValue(envelope.payload(), Progress.class);
+                if(progress.type()==EventType.GNSS_STATUS && logs!=null && logs.exists(envelope.sessionId()))
+                    logs.capture(envelope.sessionId(),progress.stage(),progress.message());
+                if(progress.type()==EventType.ERROR && logs!=null && logs.exists(envelope.sessionId()))
+                    logs.add(envelope.sessionId(),"INPUT","ERROR","COM 수집",false,progress.message());
                 if (progress.type() == EventType.GNSS_STATUS && "SingleEpochComplete".equals(progress.stage())) {
                     Object pvt = progress.counters() == null ? null : progress.counters().get("pvt");
                     if (pvt == null) {
@@ -134,13 +139,15 @@ public class AgentMessageService {
                         result);
                 sessionService.onResult(envelope.sessionId());
             }
-            case ERROR ->
+            case ERROR -> {
+                    if(logs!=null && logs.exists(envelope.sessionId())) logs.add(envelope.sessionId(),"INPUT","ERROR","COM 수집",false,envelope.payload().path("message").asText("장치 처리 오류"));
                     eventService.publish(
                             EventType.ERROR,
                             envelope.agentId(),
                             envelope.role(),
                             envelope.sessionId(),
                             envelope.payload());
+            }
             default -> {}
         }
     }

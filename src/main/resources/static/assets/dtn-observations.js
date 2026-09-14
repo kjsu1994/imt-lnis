@@ -24,10 +24,10 @@ export function observationCells(o) {
 export function createObservationView(container, onSelect = () => {}) {
   if (!container) return {setData() {}, select() {}};
   container.innerHTML = `
-    <div class="card-title"><div><span class="section-kicker">GNSS RAW · UBX 해석값</span><h2>GNSS 수집 데이터</h2></div>
-      <label>GNSS 기준시간 <select data-epoch aria-label="관측 시점"></select></label></div>
+    <div class="gnss-data-header"><h2>GNSS 수집 데이터</h2>
+      <label>GNSS 기준시간 <select data-epoch aria-label="관측 시점"></select></label>
     <div class="observation-summary"><span data-source>데이터 없음</span><span data-nav>항법정보 —</span>
-      <span data-count>관측 신호 —</span><span data-status></span></div>
+      <span data-count>관측 신호 —</span><span data-status></span></div></div>
     <h3>관측값 · RAWX</h3>
     <div class="epoch-table-viewport" tabindex="0" aria-label="GNSS 관측값 표">
       <table class="epoch-observation-table"><caption>위성·신호별 관측값</caption><thead><tr>
@@ -44,7 +44,7 @@ export function createObservationView(container, onSelect = () => {}) {
         <th>신호 ID</th><th>주파수 ID</th><th>버전</th><th>워드 수</th><th>수신 워드 <small>HEX · 32 bit</small></th>
       </tr></thead><tbody data-navigation></tbody></table></div>
     <details data-record-details><summary>저장된 전체 필드 보기 · JSON</summary><pre data-records class="log"></pre></details>
-    <small>GRAW에 저장된 RAWX·SFRBX 및 수집 정보입니다. 수신기의 다른 출력 메시지는 현재 저장하지 않습니다.</small>`;
+    `;
   const select = container.querySelector('[data-epoch]');
   const body = container.querySelector('tbody');
   let data = null;

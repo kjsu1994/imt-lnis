@@ -24,6 +24,8 @@ public class InputBufferService {
     private final Duration completedRetention;
     private final InputBufferRepository inputBufferRepository;
     private final SessionRepository sessionRepository;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private server.central.dtn.DtnLogService logs;
 
     public InputBufferService(
             InputBufferRepository inputBufferRepository,
@@ -107,6 +109,9 @@ public class InputBufferService {
     public synchronized InputBufferEntity complete(UUID id, String capturedPvtJson)
     {
         InputBufferEntity current = get(id);
+        boolean recording=logs!=null && logs.exists(id);
+        if(recording) logs.add(id,"INPUT","GRAW 검증",true,"구조·CRC·크기·SHA-256 검사 시작");
+        try {
         if (capturedPvtJson != null && current.kind() != InputKind.GNSS_CAPTURE)
             throw new IllegalArgumentException("Capture PVT requires a GNSS capture input");
         // 전체 파일을 한 배열로 합치지 않고 청크를 순차 공급해 큰 GRAW에서도 검증 메모리를 제한한다.
@@ -142,7 +147,12 @@ public class InputBufferService {
         // 메타데이터만 먼저 만료돼 고아 청크가 남지 않도록 모든 청크 TTL도 같은 시점으로 연장한다.
         inputBufferRepository.touchChunks(id, current.chunkCount(), completedRetention);
         inputBufferRepository.completeFile(id);
+        if(recording) logs.add(id,"INPUT","GRAW 검증",false,"입력 검증 완료 · "+result.records()+" records · "+result.size()+" bytes · SHA-256 "+result.sha256());
         return complete;
+        } catch(RuntimeException error) {
+            if(recording) logs.add(id,"INPUT","ERROR","GRAW 검증",false,error.getMessage()+" · 입력 파일·수집 상태를 확인하세요.");
+            throw error;
+        }
     }
 
     public InputBufferEntity get(UUID id)

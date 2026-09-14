@@ -1,15 +1,17 @@
-import {initAdapterHealth} from './dtn-adapter-health.js?v=20260914-transfer-v2';
-import {createPayloadViewer} from './dtn-payload.js?v=20260914-auto-pretty';
-import {createObservationView} from './dtn-observations.js?v=20260914-navigation';
+import {createDtnLog} from './dtn-log.js?v=20260915-iq-compact';
+import {initAdapterHealth} from './dtn-adapter-health.js?v=20260914-adapter-inline';
+import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20260915-iq-compact';
+import {createObservationView} from './dtn-observations.js?v=20260915-iq-compact';
 
 const api = '/lnis/api/v1';
 const $ = id => document.getElementById(id);
 const payloadViewer = createPayloadViewer($('dtn-payload'), {receivedOnly: true});
 let tests = [], epochs = [], selectedId = '', renderVersion = 0, polling = false;
 let reportKey = '', lastEvent = '';
-let referenceEpochs = [];
+let referenceEpochs = [], comparisonEpochs = [];
 function setComparison(report = {}) {
   referenceEpochs = Array.isArray(report.referencePvt) ? report.referencePvt : [];
+  comparisonEpochs = report.comparison?.epochs || [];
   const verdict = report.comparison?.verdict;
   pill('pvt-match', verdict === 'PASS' ? '전체 PVT 일치' : verdict === 'FAIL' ? '전체 PVT 불일치' : 'PVT 비교 불가',
     verdict === 'PASS' ? 'online' : verdict === 'FAIL' ? 'error' : 'warning');
@@ -25,12 +27,8 @@ async function get(path) {
   return response.json();
 }
 
-function log(message) {
-  // 자동 갱신으로 브라우저 로그가 무한히 늘어나지 않도록 최근 내역만 유지한다.
-  const target = $('dtn-log');
-  target.textContent = (target.textContent + new Date().toLocaleTimeString('ko-KR', {hour12: false}) + ' ' + message + '\n').slice(-12000);
-  target.scrollTop = target.scrollHeight;
-}
+const logView=createDtnLog($('dtn-log'));
+function log(message,level='INFO') { logView.write(message,level); }
 
 function pill(id, text, state = '') {
   $(id).textContent = text;
@@ -50,6 +48,8 @@ function time(value) {
 function renderEpoch() {
   observations.select(Number($('pvt-epoch').value));
   const pvt = epochs[Number($('pvt-epoch').value)];
+  const delta = pvt && comparisonEpochs.find(e=>e.week===pvt.week && e.towSeconds===pvt.towSeconds);
+  $('pvt-differences').textContent = '위치 차이 '+number(delta?.positionDifferenceMeters,6)+' m · 속도 차이 '+number(delta?.velocityDifferenceMetersPerSecond,6)+' m/s · 시계오차 차이 '+number(delta?.clockDifferenceSeconds,12)+' s';
   const reference = pvt && referenceEpochs.find(value => value.week === pvt.week && value.towSeconds === pvt.towSeconds);
   ['x', 'y', 'z'].forEach((axis, index) => {
     $('reference-' + axis).textContent = number(reference?.positionValid ? reference.ecefMeters?.[index] : null);
@@ -83,12 +83,22 @@ function setEpochs(values, preserve = false) {
 }
 
 function renderSummary(job) {
+  $('dtn-observations').hidden = job?.testType === 'IQ_SAMPLE';
   const types = {GNSS_RAW: 'GNSS RAW', AFS_METADATA: 'AFS Frame + Metadata', IQ_SAMPLE: 'I/Q Sample'};
   $('receiver-type').textContent = types[job?.testType] || '시험 선택 대기';
-  for (const type of Object.keys(types)) $('receiver-' + type).className = job?.testType === type ? 'active' : '';
+  const selectReadOnly = (id, selected) => {
+    const button = $(id);
+    button.className = selected ? 'active' : '';
+    button.disabled = true;
+    button.setAttribute('aria-pressed', String(selected));
+  };
+  for (const type of Object.keys(types)) selectReadOnly('receiver-' + type, job?.testType === type);
+  for (const sender of ['DTN', 'HDTN']) for (const receiver of ['DTN', 'HDTN'])
+    selectReadOnly('receiver-mode-' + sender + '-' + receiver,
+      job?.senderMode === sender && job?.receiverMode === receiver);
   $('receiver-mode').textContent = job?.senderMode && job?.receiverMode ? job.senderMode + ' → ' + job.receiverMode : '경로 정보 없음';
   $('receiver-iq').hidden = job?.testType !== 'IQ_SAMPLE';
-  $('receiver-iq-result').textContent = job?.fileResult ? JSON.stringify(job.fileResult, null, 2) : 'I/Q 파일 수신·검증 대기';
+  renderIqFile($('receiver-iq-result'), job?.fileResult, job?.state === 'FAILED' ? 'I/Q 파일 검증 실패 · 로그를 확인하세요.' : 'I/Q 파일 수신·검증 대기');
   const failed = ['FAILED', 'CANCELLED', 'INCONCLUSIVE'].includes(job?.state);
   const completed = job?.state === 'COMPLETED';
   const received = !!job?.dtnReceived;
@@ -117,6 +127,7 @@ async function renderTest(force = false) {
   const job = tests.find(item => item.testId === $('dtn-tests').value);
   const changed = selectedId !== (job?.testId || '');
   selectedId = job?.testId || '';
+  logView.setContext(selectedId);
   payloadViewer.setJob(job);
   renderSummary(job);
   if (changed || !job) {
@@ -129,7 +140,7 @@ async function renderTest(force = false) {
   }
   if (!job) return;
   const event = job.testId + ':' + job.state + ':' + job.updatedAt;
-  if (event !== lastEvent) { log(job.testId + ' · ' + job.state + ' · ' + (job.message || '')); lastEvent = event; }
+  lastEvent = event;
   if (!job.receivedEpochs) return;
   $('dtn-report').href = api + '/dtn/tests/' + encodeURIComponent(job.testId) + '/report';
   $('dtn-report').hidden = false;
@@ -219,7 +230,7 @@ async function initialize() {
 $('dtn-tests').onchange = () => renderTest();
 $('pvt-epoch').onchange = renderEpoch;
 $('dtn-refresh').onclick = () => poll(true);
-$('dtn-log-clear').onclick = () => { $('dtn-log').textContent = ''; };
+
 $('copy-receive-url').onclick = async () => {
   try {
     await navigator.clipboard.writeText($('receive-url').value);

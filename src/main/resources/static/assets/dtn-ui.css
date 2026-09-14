@@ -767,6 +767,13 @@ body[data-page="dtn-sender"] #dtn-upload-panel .upload-progress-field progress {
   body[data-page="dtn-sender"] #dtn-upload-panel .upload-progress-field { grid-column: 1 / -1; }
 }
 body[data-page^="dtn-"] .observation-summary { display: flex; flex-wrap: wrap; gap: 12px 24px; color: #516178; padding: 12px 0; font-size: 13px; }
+body[data-page^="dtn-"] .gnss-data-header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; }
+body[data-page^="dtn-"] .gnss-data-header h2 { margin: 0; }
+body[data-page^="dtn-"] .gnss-data-header label { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0; min-width: 0; }
+body[data-page^="dtn-"] .gnss-data-header select { width: auto; max-width: 100%; margin: 0; }
+body[data-page^="dtn-"] .gnss-data-header .observation-summary { margin-left: auto; padding: 0; gap: 4px 12px; font-size: 12px; justify-content: flex-end; }
+body[data-page^="dtn-"] .gnss-data-header .observation-summary span { white-space: nowrap; }
+body[data-page^="dtn-"] .epoch-observation-card h3 { margin: 10px 0 6px; font-size: 13px; }
 body[data-page^="dtn-"] .connection-dot.unknown { background: #94a3b8; box-shadow: none; }
 body[data-page^="dtn-"] .epoch-table-viewport { max-height: 350px; overflow: auto; }
 body[data-page^="dtn-"] .epoch-observation-table thead { position: sticky; top: 0; background: #f1f5f9; z-index: 1; }
@@ -796,13 +803,24 @@ body[data-page^="dtn-"] .transport-mode-section > button { margin-top: 10px; }
 
 /* Adapter probes remain available while a transfer is running. */
 body[data-page^="dtn-"] .adapter-url-row { display: block; margin-top: 16px; }
-body[data-page^="dtn-"] .adapter-url-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 10px; }
+body[data-page^="dtn-"] .dtn-log-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+body[data-page^="dtn-"] .dtn-log-tools h2 { margin: 0 auto 0 0; }
+body[data-page^="dtn-"] .dtn-log-tools button,
+body[data-page^="dtn-"] .dtn-log-tools a,
+body[data-page^="dtn-"] .dtn-log-tools select { width: auto; margin: 0; padding: 6px 8px; font-size: 12px; }
+body[data-page^="dtn-"] .dtn-log-tools select { max-width: 160px; min-width: 0; }
+body[data-page^="dtn-"] .dtn-log-tools a { border: 1px solid var(--line); border-radius: 8px; text-decoration: none; }
+body[data-page^="dtn-"] #dtn-log-detail[aria-pressed="true"] { background: #dff2ec; color: #116b55; }
+body[data-page^="dtn-"] .adapter-url-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; align-items: end; gap: 10px; }
+body[data-page^="dtn-"] .adapter-connection-state { display: flex; align-items: center; gap: 8px; min-height: 41px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; white-space: nowrap; }
+body[data-page^="dtn-"] .adapter-url-controls label { margin: 0; }
+body[data-page^="dtn-"] #dtn-adapter-save { order: 1; }
 body[data-page^="dtn-"] .adapter-url-controls label { display: block; min-width: 0; }
 body[data-page^="dtn-"] .adapter-url-controls label span { display: block; margin-bottom: 6px; }
 body[data-page^="dtn-"] .adapter-url-controls input { width: 100%; min-width: 0; margin: 0; }
 body[data-page^="dtn-"] .adapter-url-controls button { flex-shrink: 0; white-space: nowrap; }
 body[data-page^="dtn-"] .adapter-url-help { display: block; margin-top: 7px; color: var(--muted); }
-body[data-page^="dtn-"] .adapter-health-results { margin-top: 10px; padding: 12px; border-radius: 8px; background: #f7f9fb; }
+body[data-page^="dtn-"] .adapter-health-results { margin-top: 6px; padding: 0; }
 body[data-page^="dtn-"] .adapter-health-item { display: flex; align-items: flex-start; flex-direction: column; gap: 6px; min-width: 0; }
 body[data-page^="dtn-"] .adapter-health-item small { max-width: 100%; overflow-wrap: anywhere; word-break: break-word; color: var(--muted); }
 body[data-page^="dtn-"] .adapter-health-results > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; list-style: none; }
@@ -816,8 +834,9 @@ body[data-page^="dtn-"] .adapter-health-time { grid-column: 1 / -1; color: var(-
 body[data-page^="dtn-"] .adapter-health-developer { grid-column: 1 / -1; }
 body[data-page^="dtn-"] .adapter-health-developer summary { cursor: pointer; color: var(--teal); font-size: 12px; font-weight: 700; }
 body[data-page^="dtn-"] .adapter-health-developer pre { max-height: 320px; margin: 10px 0 0; padding: 12px; overflow: auto; border-radius: 7px; background: #102630; color: #c6dde2; white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.5 ui-monospace, Consolas, monospace; }
-@media (max-width: 600px) {
-  body[data-page^="dtn-"] .adapter-url-controls { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 900px) {
+  body[data-page^="dtn-"] .adapter-url-controls { grid-template-columns: minmax(0, 1fr) auto auto; }
+  body[data-page^="dtn-"] .adapter-url-controls label { grid-column: 1 / -1; }
   body[data-page^="dtn-"] .adapter-url-controls button { width: 100%; margin-left: 0; }
   body[data-page^="dtn-"] .adapter-health-content { grid-template-columns: minmax(0, 1fr); }
   body[data-page^="dtn-"] .adapter-health-item,

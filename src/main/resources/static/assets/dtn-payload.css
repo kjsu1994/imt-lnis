@@ -11,7 +11,19 @@
 .card:has(> .dtn-payload-controls) > p { flex-basis: 100%; margin: 0; font-size: 12px; color: var(--muted); }
 .card:has(> .dtn-payload-controls) > div:not(.dtn-payload-controls) { width: 100%; min-width: 0; }
 .card:has(> .dtn-payload-controls) [hidden] { display: none !important; }
+.iq-file-view { display: grid; gap: 8px; font-size: 13px; min-width: 0; }
+.iq-file-summary { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.iq-file-path { overflow-wrap: anywhere; font-family: Consolas, monospace; color: #526773; }
+.iq-file-view details > summary { cursor: pointer; color: #35515d; font-weight: 600; }
+.iq-file-view details > div, .iq-file-view details > small { margin-top: 8px; }
+.iq-sample-scroll { max-height: 180px; overflow: auto; }
+.iq-sample-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.iq-sample-table th, .iq-sample-table td { padding: 4px 12px; text-align: right; border-bottom: 1px solid #e4ebee; }
+.iq-sample-table th { position: sticky; top: 0; background: #f4f7f8; }
 .dtn-payload-controls label { margin: 0; }
+.dtn-payload-header { width: 100%; }
+.dtn-payload-header > button:first-child { font-size: 16px; }
+.dtn-payload-header .dtn-payload-download { margin-left: auto; }
 .dtn-payload-controls a {
   display: inline-flex;
   align-items: center;

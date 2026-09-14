@@ -28,6 +28,8 @@ public class NodeDtnService implements DtnNodeLink {
     private final NodePeerClient peerClient;
     private final DtnRepository repository;
     private final ObjectMapper mapper;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private server.central.dtn.DtnLogService logs;
 
     @Override
     public boolean sender()
@@ -115,6 +117,7 @@ public class NodeDtnService implements DtnNodeLink {
         job.setCreatedAt(Instant.now());
         job.setUpdatedAt(job.getCreatedAt());
         repository.saveAndFlush(job);
+        if (logs != null) logs.add(job.getId(),"TEST","시험 등록",false,"시험 접수 완료 · 외부 DTN/HDTN 데이터 수신 대기");
         return view(job);
     }
 

@@ -1,10 +1,13 @@
 # LNIS API 명세서
 
-현재 소스 코드에 구현된 LNIS 중앙 서버의 REST API와 WebSocket 계약입니다.
+현재 소스 코드에 구현된 LNIS 송신·수신 독립 노드 및 기존 중앙 서버의 REST API와 WebSocket 계약입니다.
+
+최종 확인: 2026-09-14. **외부 DTN/HDTN 어댑터 개발자에게는 맨 아래 15장 전체를 전달하세요.** 1~14장은 LNIS 내부 개발·운영용입니다.
 
 - 기준 버전: `1.0.0`
-- Agent WebSocket protocol: `2`
-- 기본 서버 주소: `http://192.168.1.72:8088`
+- Agent WebSocket protocol: `3`
+- 현재 개발 주소: 송신 `http://192.168.219.100:8090`, 수신 `http://192.168.219.100:8091`
+- 운영은 송신·수신 각각 다른 PC입니다. 앞쪽의 `192.168.1.72:8088` 예시는 기존 중앙 서버 주소이므로 실제 노드 주소로 바꿉니다.
 - REST 기본 경로: `/lnis/api/v1`
 - 인코딩: UTF-8
 - 시간: ISO-8601 UTC 문자열
@@ -239,9 +242,9 @@ DELETE /lnis/api/v1/inputs/{inputId}
 
 명시적 삭제는 세션 참조 여부와 관계없이 메타데이터와 파일을 제거하므로 주의합니다.
 
-## 5.1 DTN Adapter Health
+## 5.1 화면용 어댑터 상태 조회
 
-어댑터 외부 계약은 [13.1](#131-구현할-엔드포인트와-health)에 통합했습니다.
+어댑터 외부 계약은 문서 마지막 **15장**에 통합했습니다.
 화면은 `GET /lnis/api/v1/dtn/adapter-health?adapterUrl=...`로 LNIS에 조회를 요청합니다. 어댑터가 구현할 경로는 아닙니다.
 
 ## 6. GNSS Capture
@@ -260,8 +263,8 @@ Content-Type: application/json
   "baudRate": 115200,
   "protocolId": "ubx",
   "sessionName": "현장 수집 1",
-  "receiverModel": "ZED-F9P",
-  "firmwareVersion": "1.32",
+  "receiverModel": "u-blox EVK-F9T",
+  "firmwareVersion": "",
   "dtrEnabled": false,
   "rtsEnabled": false
 }
@@ -506,7 +509,7 @@ Handshake에는 `X-LNIS-Agent-Id`와 `Authorization: Bearer ...`가 필요합니
 
 ```json
 {
-  "protocolVersion": 2,
+  "protocolVersion": 3,
   "type": "HEARTBEAT",
   "messageId": "e933e096-3ddf-45a7-a27e-a30a30d829ee",
   "correlationId": null,
@@ -538,6 +541,7 @@ Handshake에는 `X-LNIS-Agent-Id`와 `Authorization: Bearer ...`가 필요합니
 | `/lnis/test/sender` | 기존 Sender 호환 주소 |
 | `/lnis/test/receiver` | 기존 Receiver 호환 주소 |
 | `/lnis/dtntest/sender` | DTN 송수신 및 PVT 비교 화면 |
+| `/lnis/dtntest/receiver` | 수신 데이터·독립 계산 PVT·읽기 전용 시험 설정 |
 
 ## 12. 일반 사용 순서
 
@@ -563,190 +567,9 @@ POST /captures/{id}/complete
 POST /sessions
 ```
 
-## 13. DTN/HDTN 어댑터 개발자 공유 계약
+## 13. DTN 화면·시험 제어 API — LNIS 내부용
 
-**어댑터 개발자는 13.1~13.3만 구현하면 됩니다.** 그 외 입력·시험 생성·노드 관리 API는 LNIS 내부용입니다.
-LNIS가 시험 종류와 경로, 전달 데이터를 정합니다. 어댑터가 DTN/HDTN 기동·BPv7 생성·전송·수신·해제를 담당합니다.
-I/Q는 파일 경로만 REST로 전달하며 바이너리를 JSON/Base64로 보내지 않습니다.
-
-### 13.1 구현할 엔드포인트와 Health
-
-| 호출자 → 제공자 | API | 용도 |
-|---|---|---|
-| 송신 LNIS → 송신 어댑터 | `GET /sender/health` | 로컬 송신 어댑터 상태 |
-| 수신 LNIS → 수신 어댑터 | `GET /receiver/health` | 로컬 수신 어댑터 상태 |
-| 송신 LNIS → 송신 어댑터 | `POST /transfers` | 시험 경로와 원본 데이터 또는 I/Q 파일 참조 접수 |
-| 수신 어댑터 → 수신 LNIS | `POST /lnis/api/v1/dtn/receive` | 원래 JSON 전달 및 수신 처리 요청 |
-
-- 각 PC의 `dtn_adapter=http://어댑터-IP:포트`를 설정합니다. 전송은 기본 `/transfers`를 사용하며 전체 경로 설정도 허용합니다.
-- Health는 주소의 scheme/host/port에 역할별 경로를 붙입니다. 수신 LNIS가 송신 어댑터 Health까지 조회하지 않습니다.
-- Health는 10초마다 GET, 최대 5초·16 KiB 응답 제한입니다. 리다이렉트는 따르지 않습니다.
-- Health 응답: HTTP 200, `Content-Type: application/json`, `{"status":"ready"}` 또는 `{"status":"busy"}`. 선택 `message` 필드 허용.
-- `ready`는 시험 접수 가능, `busy`는 처리 중입니다. 다른 상태는 정상 준비로 판정하지 않으며 비-2xx/연결 오류는 연결 실패입니다.
-- 현재 Health는 인증 헤더 없는 읽기 전용 API입니다. 토큰·내부 경로 등 민감정보를 반환하지 말고 신뢰된 시험망에서만 제공합니다.
-- 별도 모드 설정 API는 사용하지 않습니다. **각 전송 요청의 `senderMode`, `receiverMode`를 보고 기동**합니다.
-- EID, lifetime, convergence layer는 어댑터 자체 설정입니다. LNIS JSON에 중복 정의하지 않습니다.
-
-### 13.2 송신 LNIS → 어댑터: 시험별 요청 JSON
-
-공통 HTTP 헤더:
-
-```http
-POST /transfers
-Content-Type: application/json
-Authorization: Bearer <LNIS_DTN_SEND_TOKEN>
-```
-
-송신 인증 토큰은 설정한 경우 사용합니다. 운영에서는 토큰을 설정하세요. LNIS는 설정된 전송 URL에만 해당 토큰을 보냅니다.
-전체 요청은 UTF-8 JSON이며 최대 16 MiB입니다. 요청 제한 시간은 30초이므로 파일 전달 완료를 기다리지 말고 접수를 응답하세요.
-
-| 공통 필드 | 타입·값 |
-|---|---|
-| schemaVersion | 정수 `1` |
-| testId | LNIS가 발급한 시험 UUID. 모든 단계에서 유지 |
-| testType | `GNSS_RAW`, `AFS_METADATA`, `IQ_SAMPLE` |
-| senderMode | `DTN` 또는 `HDTN`: 송신 측 기동 모드 |
-| receiverMode | `DTN` 또는 `HDTN`: 수신 측 기동 모드 |
-| profile | RAW/AFS: `POCKETSDR-GPS-L1CA-SPP-v1`, I/Q: `LANS-AFS-IQ-v1` |
-| format | 아래 유형별 데이터 형식 |
-
-네 가지 경로 DTN→DTN, DTN→HDTN, HDTN→DTN, HDTN→HDTN을 모두 지원해야 합니다.
-선택값은 시험 시작 시 확정되며, 어댑터는 전송 중 UI 변경과 무관하게 이 요청값을 사용합니다.
-다음 예시의 Base64·해시는 설명용 자리표시자입니다.
-
-#### A. GNSS RAW
-
-```json
-{
-  "schemaVersion": 1,
-  "testId": "438a4035-a13c-4b49-a278-0e5fb7f774bd",
-  "testType": "GNSS_RAW",
-  "senderMode": "DTN",
-  "receiverMode": "HDTN",
-  "profile": "POCKETSDR-GPS-L1CA-SPP-v1",
-  "format": "LNIS-GRAW-RAW-v1",
-  "sourceSha256": "<원본 GRAW SHA-256: 대문자 HEX 64자리>",
-  "recordCount": 19,
-  "prn": 1,
-  "grawBase64": "<length-prefixed GRAW 파일 전체 바이트의 Base64>"
-}
-```
-
-`grawBase64`는 최대 1 MiB 원본 GRAW 파일입니다. 관측 시각·의사거리·도플러·항법 레코드가 포함됩니다.
-UBX 직렬 바이트 원문과는 다릅니다. 어댑터는 내용을 해석·반올림·재계산하지 않고 그대로 전달합니다.
-`recordCount`는 관측 시점 수가 아니라 GRAW 전체 레코드 수이며 `prn`은 공통 모델의 호환 필드입니다.
-
-#### B. AFS Frame + Metadata
-
-```json
-{
-  "schemaVersion": 1,
-  "testId": "438a4035-a13c-4b49-a278-0e5fb7f774bd",
-  "testType": "AFS_METADATA",
-  "senderMode": "HDTN",
-  "receiverMode": "DTN",
-  "profile": "POCKETSDR-GPS-L1CA-SPP-v1",
-  "format": "LNIS-GRAW-AFS-v1",
-  "sourceSha256": "<복원할 원본 GRAW SHA-256: 대문자 HEX 64자리>",
-  "recordCount": 19,
-  "prn": 1,
-  "frames": [
-    {"index": 0, "week": 2400, "afsItow": 83, "toi": 33, "frameBase64": "<750바이트 AFS 프레임의 Base64>"}
-  ]
-}
-```
-
-- 원본 관측·항법 GRAW는 AFS 프레임에 담겨 있습니다. 의사거리나 원본 GRAW를 별도 중복 필드로 전송하지 않습니다.
-- `frames` 배열 순서를 유지합니다. `index`는 0부터 연속, `frameBase64`는 750바이트/1,000문자입니다.
-- `week`, `afsItow`, `toi`는 AFS 시간 메타데이터이며 `afsItow` 단위는 1,200초 구간입니다.
-- `prn=1`은 AFS 시험 PRN으로, 원본 GPS 관측 위성 PRN과 다릅니다.
-- `referencePvt`에는 송신 측이 실제 계산한 PVT 배열을 포함합니다(GNSS_RAW / AFS_METADATA). 각 항목은 `week`, `towSeconds`, `positionValid`, `velocityValid`, `ecefMeters`(X/Y/Z, m), `velocityMetersPerSecond`(X/Y/Z, m/s), `receiverClockBiasSeconds`(s), `satellitesUsed`, `message`입니다. 어댑터는 수정 없이 전달합니다. 수신 LNIS는 이 값을 계산 입력으로 사용하지 않고, 원본 데이터로 독립 계산한 결과와 화면에서 비교합니다. 과거 요청의 누락/null은 허용하며 비교 불가로 표시합니다. I/Q에는 적용하지 않습니다. 일치 허용치는 위치 0.001 m, 속도 0.001 m/s, 시계 오차 1e-9 s이며 관측 시각·유효성도 검사합니다.
-
-#### C. I/Q Sample: 파일 주소만 전달
-
-```json
-{
-  "schemaVersion": 1,
-  "testId": "438a4035-a13c-4b49-a278-0e5fb7f774bd",
-  "testType": "IQ_SAMPLE",
-  "senderMode": "HDTN",
-  "receiverMode": "HDTN",
-  "profile": "LANS-AFS-IQ-v1",
-  "format": "LNIS-IQ-FILE-v1",
-  "file": {
-    "filePath": "/exchange/438a4035-a13c-4b49-a278-0e5fb7f774bd.bin",
-    "sizeBytes": 2160000000,
-    "sha256": "<BIN SHA-256: 대문자 HEX 64자리>",
-    "durationSeconds": 90,
-    "sampleRateHz": 12000000,
-    "sampleFormat": "IQ_INTERLEAVED_INT8",
-    "quantizationBits": 2
-  }
-}
-```
-
-- **어댑터는 `testType=IQ_SAMPLE`일 때만 `file.filePath`에서 파일을 읽습니다. HTTP 파일 다운로드 URL이 아닙니다.**
-- 송신 PC에서 LNIS와 어댑터에 같은 공유 폴더를 `/exchange`로 마운트합니다. Windows의 `C:\\...` 경로를 보내지 않습니다.
-- 저장 형식은 I, Q 각각 signed 8-bit, 값은 -3/-1/+1/+3입니다. 2비트 packed 형식이 아닙니다.
-- 새로 생성하는 파일은 수집 GRAW의 GPS LNAV·지구 PVT를 입력으로 기존 LANS AFS 변조기를 실행한 출력입니다. 관측 PRN별 항법정보를 원본 SB2 형식에 넣고, 각 채널의 프레임을 반복·합산해 90초를 구성합니다. SB3/SB4 시험 패턴과 TOI 갱신은 원본을 유지합니다. F9T에서 기록한 실측 RF I/Q는 아닙니다.
-- 원본 SB2에는 전체 GPS LNAV 보정항이 들어가지 않습니다. 따라서 본 시험은 I/Q 파일 전달·무결성 검증이며 I/Q 복조 후 지구 PVT 일치를 보장하지 않습니다. 초기 지구 위치·속도에서 90초 등속 운동을 가정하며 대기 지연은 재현하지 않습니다. 과거 저장 파일은 생성 당시 모델을 따릅니다.
-- 송신 LNIS가 생성 완료·파일 크기·SHA-256을 검증한 뒤 요청합니다. `.part` 파일은 가져가지 않습니다.
-- 어댑터는 JSON과 BIN을 연계하여 전달합니다. BIN은 DTN/HDTN으로 전달하고 JSON 본문에는 넣지 않습니다.
-- 수신 어댑터는 **수신 PC의 별도 공유 폴더**에 동일한 `/exchange/<파일 UUID>.bin` 경로로 복원합니다. 양 PC의 디스크가 같은 것은 아닙니다.
-- 임시 파일에 수신한 뒤 완료 파일로 원자적 변경하고, 원본 크기·해시를 확인한 다음 아래 콜백을 호출합니다.
-- 경로·크기·해시를 포함해 JSON을 수정하지 않습니다. 테스트 UUID와 파일 UUID는 서로 다를 수 있습니다.
-- LNIS는 수신 BIN 크기·해시를 다시 확인합니다. 수신 I/Q에서 PVT를 계산하지 않습니다.
-- 양쪽 완료 파일은 명시적으로 정리할 때까지 보관합니다. 어댑터는 LNIS 소유 송신 파일을 임의 삭제하지 않습니다.
-
-#### 어댑터의 접수 응답
-
-HTTP 202 권장:
-
-```json
-{"testId":"438a4035-a13c-4b49-a278-0e5fb7f774bd","accepted":true}
-```
-
-현재 LNIS는 HTTP 2xx를 접수 성공으로 판단합니다. 파일 가져오기·DTN 전달 완료를 의미하지 않습니다.
-접수 불가는 비-2xx로 응답하세요(형식 400, 인증 401, 다른 시험 처리 중/충돌 409, 내부 오류 500).
-LNIS는 송신 POST를 자동 재시도하지 않습니다. 어댑터는 동일 시험 중복 접수로 프로세스나 파일 전달을 중복 시작하지 않아야 합니다.
-
-### 13.3 수신 어댑터 → 수신 LNIS: 콜백
-
-```http
-POST http://<수신-LNIS-IP>:<port>/lnis/api/v1/dtn/receive
-Content-Type: application/json
-Authorization: Bearer <LNIS_DTN_RECEIVE_TOKEN>
-```
-
-**본문은 13.2에서 접수한 JSON 전체 그대로입니다.** `testType`, 두 모드, 원본 데이터 또는 파일 메타데이터를 모두 유지합니다.
-별도 외피로 감싸거나 전송 시각·결과 필드를 추가하지 않습니다. JSON 객체 키 순서와 공백은 변경 가능하지만 값·배열 순서는 유지해야 합니다.
-바이트 단위 수신 원문은 최초 접수본을 저장합니다. URL·수신 토큰은 어댑터 환경에 설정하고 JSON에 넣지 않습니다.
-
-- RAW/AFS: 전달한 JSON이 준비되면 호출합니다.
-- I/Q: 수신 PC 공유 폴더에 BIN 복원이 완료된 후 호출합니다.
-- LNIS 간 시험 사전 등록은 LNIS가 처리합니다. 어댑터가 내부 `/node/peer/**` API를 호출하지 않습니다.
-
-성공 응답 HTTP 202:
-
-```json
-{"testId":"438a4035-a13c-4b49-a278-0e5fb7f774bd","accepted":true,"state":"WAITING_RECEIVER"}
-```
-
-202는 JSON 접수·저장 완료입니다. 이후 수신 LNIS가 RAW/AFS 복원·PVT 계산 또는 I/Q 파일 검증을 수행합니다.
-같은 JSON 재접수는 재계산하지 않고 현재 상태를 반환합니다. 완료 후 재접수하면 state가 COMPLETED일 수도 있습니다.
-
-| 응답 | 의미 |
-|---|---|
-| 400 | 시험 없음, 변경된 JSON, 잘못된 값·JSON |
-| 401 | 수신 Bearer 토큰 누락·불일치 |
-| 409 | 수신 노드가 아님 또는 신규 접수를 받을 상태가 아님 |
-| 413 | JSON 본문 16 MiB 초과 |
-
-오류 본문은 LNIS의 ProblemDetail 형식(`status`, `detail` 등)입니다.
-수신 파일 불일치는 비동기 검증에서 시험 FAILED로 기록될 수 있으므로 202를 최종 성공으로 표시하지 않습니다.
-현재 시험 전체 제한 시간은 10분입니다. 어댑터의 지연 전달 시험이 이보다 길면 LNIS 제한도 함께 조정해야 합니다.
-
-### 13.4 화면용 제어 API
+### 13.1 화면용 제어 API
 
 아래는 어댑터가 호출할 API가 아닙니다.
 
@@ -765,6 +588,10 @@ Authorization: Bearer <LNIS_DTN_RECEIVE_TOKEN>
 - `POST /lnis/api/v1/dtn/tests`: 수집 완료 입력으로 기준 계산, AFS 생성 및 외부 전송을 시작한다.
 - `GET /lnis/api/v1/dtn/tests/{id}`: 상태 요약.
 - `GET /lnis/api/v1/dtn/tests/{id}/report`: 기준/수신 PVT, 관측 시각별 비교 JSON.
+- `GET /lnis/api/v1/dtn/inputs/{id}/observations`: 완료 GRAW의 `epochs`, `navigationCount`, `receiver`, `navigation`, `records`. 항법 메시지는 수집 순서·중복을 보존합니다. `navigation`의 항목은 `sequence`, `capturedAt`, `message`이며 `records`는 저장된 메시지 종류와 해석 필드 전체를 제공합니다. 외부 전송 JSON에 이 화면용 객체를 추가하지 않습니다.
+- `GET /lnis/api/v1/dtn/inputs/{id}/pvt`: 입력의 지구 PVT 배열. 수신기의 NAV-PVT 출력이 아닌 프로그램의 재계산 결과입니다.
+- 현재 GRAW는 RAWX·SFRBX·수집 메타데이터를 보존합니다. NAV-PVT·NMEA 등 모든 수신기 출력의 원문 기록은 아닙니다.
+- 합성 재생 버튼은 HTML `#dtn-development[hidden]`으로 기본 숨김입니다. 개발자 도구에서 숨김을 해제할 수 있으나 서버의 개발 예제 옵션도 활성화되어 있어야 합니다. F9T 예제 버튼과 합성 다운로드 링크는 화면에서 제거했습니다.
 
 시험 시작 요청:
 
@@ -806,7 +633,16 @@ Authorization: Bearer <LNIS_DTN_RECEIVE_TOKEN>
 - 시험 요약/보고서 응답의 `sendUrl`로 실제 선택한 대상을 확인한다. 과거 시험에는 이 값이 없을 수 있다.
 - `/dtn/config`에 `defaultSendUrl`, `receiveConfigured`, `defaultSendTokenConfigured`를 추가한다. 토큰 자체는 반환하지 않는다.
 
-### 13.5 PVT 의미와 판정
+### 내부 처리 로그
+
+내부 처리 로그: `GET /lnis/api/v1/dtn/logs?scopeId={UUID}&after=0`.
+`scopeId`는 입력·I/Q 작업·시험 ID이며, 응답은 `entries`, `nextSequence`, `hasMore`입니다(페이지당 최대 500건).
+각 항목은 `sequence`, `scopeId`, `scopeType`, `occurredAt`(UTC), `level`, `stage`, `detail`, `message`를 포함합니다.
+`download=true`는 해당 작업의 전체 상세 로그를 UTF-8 TXT로 반환합니다. 화면은 PC의 현지 시각으로 표시합니다.
+DTN 파일 업로드는 `POST /lnis/api/v1/inputs?dtn=true`로 로그 기록을 시작합니다. 시험 생성 시 준비 로그를 복사하며 각 PC의 로그만 저장합니다.
+시험 로그는 보존하고, 시험에 연결하지 않은 준비 로그는 7일 후 정리합니다. 화면 지우기는 서버 기록을 삭제하지 않습니다. 어댑터 요청 JSON에는 로그를 추가하지 않습니다.
+
+### 13.2 PVT 의미와 판정
 
 
 현재 계산 프로파일은 GPS L1 C/A 단독 측위다. 다중 GNSS 전체 지원을 의미하지 않는다.
@@ -826,22 +662,12 @@ V는 ECEF 속도, 단위 m/s. T 비교 항목은 수신기 시계 오차, 단위
 비교 가능한 위치 또는 속도 해가 없으면 INCONCLUSIVE.
 이 판정은 전달 전후 계산 일치성이지 절대 위치 정확도 인증이 아니다.
 
-### 13.6 운영 설정
+### 13.3 운영 설정
 
-운영 폴더의 .env에 설정한 뒤 서버를 재시작한다.
+화면의 어댑터 주소 `저장·적용`은 해당 브라우저·역할에 저장한다. 새로고침 시 복원하며 서버 `.env`와 인증 토큰은 변경하지 않는다.
 
-```dotenv
-dtn_adapter=http://<이-PC에-연결된-DTN-어댑터-IP>:<port>
-LNIS_DTN_SEND_TOKEN=<외부에서 요구하는 경우 송신 인증 토큰>
-LNIS_DTN_RECEIVE_TOKEN=<LNIS가 발급해 외부 수신부에 전달할 토큰>
-```
-
-외부 담당자에게 알릴 callback 주소:
-`http://192.168.1.72:8088/lnis/api/v1/dtn/receive`.
-IP는 실제 중앙 서버 주소에 맞춰 변경한다.
-기존 `server` 실행 모드에서는 Receiver PC의 주소를 callback으로 지정하지 않는다.
-`node` 실행 모드에서는 callback을 **수신 노드 주소**로 지정한다. 기존 `server` 모드와 callback 소유권이 다르다.
-외부 DTN 미연결 상태의 시험용 왕복 서버는 실제 BPv7 동작을 검증하지 않는다.
+운영 폴더 `.env`의 어댑터 주소·인증 설정은 [문서 하단 연동 계약](#adapter-contract)을 따른다. 변경 후 서버를 재시작한다.
+운영 `node` 모드의 콜백 대상은 수신 PC의 LNIS이다. 레거시 `server` 모드는 중앙 서버가 접수한다.
 
 ### DTN 역할별 화면 및 최근 시험 조회
 
@@ -878,14 +704,14 @@ IP는 실제 중앙 서버 주소에 맞춰 변경한다.
 | `receivedPayloadAvailable` | 수신 저장본 조회 가능 여부 |
 | `receivedOriginalAvailable` | 공백·줄바꿈까지 보존한 수신 원문 존재 여부 |
 
-양쪽 DTN 화면에 송신/수신 JSON 보기 버튼, 원문/정렬 표시 선택, 다운로드를 제공한다.
+송신 화면에는 송신 원문, 수신 화면에는 수신 원문을 제공한다. 본문 준비 시 기본 펼침·정렬 보기 체크 상태이며, 수동으로 접으면 같은 시험의 자동 갱신에서는 다시 열지 않는다. 새 시험은 다시 자동 표시한다.
 정렬은 브라우저 표시에만 적용하며 다운로드 파일과 저장된 원문은 변경하지 않는다.
 
 ## 14. 독립 노드 관리 API
 
 ### 화면에서 수신 노드 연결 설정
 
-DTN 수신 화면은 시험 목록과 보고서를 조회만 한다. 외부 어댑터용 수신 주소는 노드의 baseUrl에 /lnis/api/v1/dtn/receive를 붙여 표시하며, 수신 인증 토큰 설정 여부만 노출한다. JSON 접수 후 복원·PVT 계산은 자동 수행되고, 화면의 새로고침은 재계산을 요청하지 않는다. 수신 노드의 COMPLETED는 수신 계산 완료이며 최종 PASS가 아니다. 수신 화면은 같은 관측 시각의 송신 기준 PVT와 독립 계산한 수신 PVT를 좌우로 표시하며, 기존 비교 기준으로 전체 PVT 일치/불일치/비교 불가를 표시한다. 송신 화면에서도 기존 비교 결과를 유지한다.
+DTN 수신 화면은 시험 목록과 보고서를 조회만 한다. 외부 어댑터용 수신 주소는 노드의 baseUrl에 /lnis/api/v1/dtn/receive를 붙여 표시하며, 수신 인증 토큰 설정 여부만 노출한다. JSON 접수 후 복원·PVT 계산은 자동 수행되고, 화면의 새로고침은 재계산을 요청하지 않는다. 수신 노드의 COMPLETED는 수신 계산 완료이며 최종 PASS가 아니다. 수신 화면은 같은 관측 시각의 송신 기준 PVT와 독립 계산한 수신 PVT를 좌우로 표시하며, 기존 비교 기준으로 전체 PVT 일치/불일치/비교 불가를 표시한다. 송신 화면에는 기준 PVT만 표시하며 서버의 최종 비교 판정은 유지한다. 수신 GNSS 수집 데이터 표는 GNSS RAW와 AFS 시험에서 표시하고 I/Q 시험에서는 숨긴다.
 
 독립 송신 노드의 AFS/DTN 화면에서 공통으로 사용한다. 관리 토큰은 서버 설정을 사용하며 요청·응답에 토큰 값을 넣지 않는다.
 
@@ -993,3 +819,253 @@ Linux 독립 노드 Compose는 `deployment/node`에 있으며 기존 중앙 서�
 관리 요청은 고정된 상대 주소만 사용하며 자동 재송신·리다이렉트를 하지 않는다. 연결 실패 중에는 다음 상태 조회를 기다리고 전체 시험 제한 시간을 유지한다. 재시작으로 사라진 AFS 실행은 취소하고, 메모리에서 진행하던 DTN PREPARING/CALCULATING은 FAILED로 기록한다. 영속 저장된 WAITING_DTN/WAITING_RECEIVER는 기존 접수 대기를 계속한다. 수신 대기 제한은 시험 등록 후 10분이다.
 
 역할 선택 화면은 상대 노드 URL로 이동한다. 수신 PC에서 수집/업로드/전송 시작 API를 호출하면 `409`로 거부한다. 기존 `server` 모드의 화면 및 API 동작은 유지한다.
+
+---
+
+<a id="adapter-contract"></a>
+
+## 15. DTN/HDTN 어댑터 개발자 전달용 — 여기부터 문서 끝까지 공유
+
+계약 확인일: 2026-09-14 · UTF-8 JSON · 전송 `schemaVersion=1`.
+
+### 구성과 담당 범위
+
+```text
+송신 PC: LNIS Sender → 송신 어댑터 → DTN/HDTN
+                                    ↓ 전송
+수신 PC: LNIS Receiver ← 수신 어댑터 ← DTN/HDTN
+```
+
+- 각 PC에서 LNIS와 해당 역할의 어댑터가 함께 동작합니다. 송신 PC와 수신 PC의 DB·디스크는 별개입니다.
+- 현재 같은 개발 PC의 8090/8091은 두 PC를 모사한 설정일 뿐이며 운영 주소·포트는 환경별로 설정합니다.
+- 어댑터는 GNSS 파싱, AFS 프레임 생성·복호화, PVT 계산을 하지 않습니다. LNIS가 만든 JSON을 보존하고, 선택 경로로 운반합니다.
+- 콜백 URL과 인증 토큰은 어댑터 설정값입니다. 요청 JSON에 callback URL이나 인증 정보를 추가하지 않습니다.
+- `http://lnis-dev-relay:8080`은 Docker 내부의 개발용 REST 중계이며 실제 DTN/HDTN이 아닙니다. 실제 어댑터는 아래 계약을 구현하고 주소를 교체합니다.
+
+**이 장만 복사해서 어댑터 개발자에게 전달하면 됩니다.** 입력·시험 생성·노드 관리 API는 LNIS 내부용이며 어댑터 구현 대상이 아닙니다.
+LNIS가 시험 종류와 경로, 전달 데이터를 정합니다. 어댑터가 DTN/HDTN 기동·BPv7 생성·전송·수신·해제를 담당합니다.
+I/Q는 파일 경로만 REST로 전달하며 바이너리를 JSON/Base64로 보내지 않습니다.
+
+### 15.1 구현할 엔드포인트와 Health
+
+| 호출자 → 제공자 | API | 용도 |
+|---|---|---|
+| 송신 LNIS → 송신 어댑터 | `GET /sender/health` | 로컬 송신 어댑터 상태 |
+| 수신 LNIS → 수신 어댑터 | `GET /receiver/health` | 로컬 수신 어댑터 상태 |
+| 송신 LNIS → 송신 어댑터 | `POST /transfers` | 시험 경로와 원본 데이터 또는 I/Q 파일 참조 접수 |
+| 수신 어댑터 → 수신 LNIS | `POST /lnis/api/v1/dtn/receive` | 원래 JSON 전달 및 수신 처리 요청 |
+
+- 각 PC의 `dtn_adapter=http://어댑터-IP:포트`를 설정합니다. 전송은 기본 `/transfers`를 사용하며 전체 경로 설정도 허용합니다.
+- Health는 주소의 scheme/host/port에 역할별 경로를 붙입니다. 수신 LNIS가 송신 어댑터 Health까지 조회하지 않습니다.
+- Health는 10초마다 GET, 최대 5초·16 KiB 응답 제한입니다. 리다이렉트는 따르지 않습니다.
+- Health 응답: HTTP 200, `Content-Type: application/json`, `{"status":"ready"}` 또는 `{"status":"busy"}`. 선택 `message` 필드 허용.
+- `ready`는 시험 접수 가능, `busy`는 처리 중입니다. 다른 상태는 정상 준비로 판정하지 않으며 비-2xx/연결 오류는 연결 실패입니다.
+- LNIS 화면에서 `ready`는 정상연결(`ok=true`), `busy`는 시험대기(`ok=false`)입니다. Health 주기 조회는 화면이 열려 있을 때 이루어집니다. LNIS의 `/dtn/adapter-health`는 내부 조회 API이며 어댑터가 구현할 경로가 아닙니다.
+- 현재 Health는 인증 헤더 없는 읽기 전용 API입니다. 토큰·내부 경로 등 민감정보를 반환하지 말고 신뢰된 시험망에서만 제공합니다.
+- 별도 모드 설정 API는 사용하지 않습니다. **각 전송 요청의 `senderMode`, `receiverMode`를 보고 기동**합니다.
+- EID, lifetime, convergence layer는 어댑터 자체 설정입니다. LNIS JSON에 중복 정의하지 않습니다.
+
+### 15.2 송신 LNIS → 어댑터: 시험별 요청 JSON
+
+공통 HTTP 헤더:
+
+```http
+POST /transfers
+Content-Type: application/json
+Authorization: Bearer <LNIS_DTN_SEND_TOKEN>
+```
+
+송신 인증 토큰은 설정한 경우 사용합니다. 운영에서는 토큰을 설정하세요. LNIS는 설정된 전송 URL에만 해당 토큰을 보냅니다.
+전체 요청은 UTF-8 JSON이며 최대 16 MiB입니다. 요청 제한 시간은 30초이므로 파일 전달 완료를 기다리지 말고 접수를 응답하세요.
+
+| 공통 필드 | 타입·값 |
+|---|---|
+| schemaVersion | 정수 `1` |
+| testId | LNIS가 발급한 시험 UUID. 모든 단계에서 유지 |
+| testType | `GNSS_RAW`, `AFS_METADATA`, `IQ_SAMPLE` |
+| senderMode | `DTN` 또는 `HDTN`: 송신 측 기동 모드 |
+| receiverMode | `DTN` 또는 `HDTN`: 수신 측 기동 모드 |
+| profile | RAW/AFS: `POCKETSDR-GPS-L1CA-SPP-v1`, I/Q: `LANS-AFS-IQ-v1` |
+| format | 아래 유형별 데이터 형식 |
+| referencePvt | GNSS_RAW/AFS_METADATA에 포함되는 송신 기준 PVT 배열. 아래 규칙 참조. IQ_SAMPLE에는 없음 |
+
+네 가지 경로 DTN→DTN, DTN→HDTN, HDTN→DTN, HDTN→HDTN을 모두 지원해야 합니다.
+선택값은 시험 시작 시 확정되며, 어댑터는 전송 중 UI 변경과 무관하게 이 요청값을 사용합니다.
+다음 예시의 Base64·해시는 설명용 자리표시자입니다.
+프레임 배열도 설명을 위해 한 항목만 표시했습니다. 예시를 그대로 시험 입력으로 사용하지 마세요. 현재 LNIS가 보내는 모든 필드를 보존해야 하며, 표에 없는 필드가 있어도 삭제하거나 기본값을 새로 추가하지 않습니다.
+
+#### 공통 PVT 필드 — GNSS_RAW / AFS_METADATA
+
+두 유형의 요청에는 다음 `referencePvt`가 함께 들어갑니다. 수신기는 이를 계산 입력으로 사용하지 않고, 수신 데이터로 독립 계산한 PVT와 비교·표시합니다. 어댑터는 재계산하거나 숫자를 반올림하지 않습니다.
+
+```json
+{
+  "referencePvt": [{
+    "week": 2400,
+    "towSeconds": 100000.0,
+    "positionValid": true,
+    "velocityValid": true,
+    "ecefMeters": [-3049086.2376831067, 4046274.1024044757, 3861624.97488378],
+    "velocityMetersPerSecond": [-674.6603865750864, 417.4570716281086, 1394.7745784465806],
+    "receiverClockBiasSeconds": -2.4781070279303227e-13,
+    "satellitesUsed": 5,
+    "message": ""
+  }]
+}
+```
+
+위 값은 합성 검증 데이터의 예시이며 실측값이 아닙니다. `week`·`towSeconds`는 GPS 관측 시각이고, 위치는 지구 ECEF X/Y/Z(m), 속도는 ECEF X/Y/Z(m/s), 시계 오차는 초(s)입니다. PVT 실패도 전송 가능한 시험이므로 `positionValid=false` 또는 `velocityValid=false`일 수 있고 관련 값은 null/생략될 수 있습니다. 0으로 치환하지 않습니다. 과거 요청에는 `referencePvt`가 없을 수 있습니다.
+
+아래 A/B 예시는 간결성을 위해 `referencePvt`를 생략했습니다. 실제 송신 요청에 포함된 배열은 반드시 콜백까지 그대로 전달합니다.
+
+#### A. GNSS RAW
+
+```json
+{
+  "schemaVersion": 1,
+  "testId": "438a4035-a13c-4b49-a278-0e5fb7f774bd",
+  "testType": "GNSS_RAW",
+  "senderMode": "DTN",
+  "receiverMode": "HDTN",
+  "profile": "POCKETSDR-GPS-L1CA-SPP-v1",
+  "format": "LNIS-GRAW-RAW-v1",
+  "sourceSha256": "<원본 GRAW SHA-256: 대문자 HEX 64자리>",
+  "recordCount": 19,
+  "prn": 1,
+  "grawBase64": "<length-prefixed GRAW 파일 전체 바이트의 Base64>"
+}
+```
+
+`grawBase64`는 최대 1 MiB 원본 GRAW 파일입니다. 관측 시각·의사거리·도플러·항법 레코드가 포함됩니다.
+UBX 직렬 바이트 원문과는 다릅니다. 어댑터는 내용을 해석·반올림·재계산하지 않고 그대로 전달합니다.
+`recordCount`는 관측 시점 수가 아니라 GRAW 전체 레코드 수이며 `prn`은 공통 모델의 호환 필드입니다.
+
+#### B. AFS Frame + Metadata
+
+```json
+{
+  "schemaVersion": 1,
+  "testId": "438a4035-a13c-4b49-a278-0e5fb7f774bd",
+  "testType": "AFS_METADATA",
+  "senderMode": "HDTN",
+  "receiverMode": "DTN",
+  "profile": "POCKETSDR-GPS-L1CA-SPP-v1",
+  "format": "LNIS-GRAW-AFS-v1",
+  "sourceSha256": "<복원할 원본 GRAW SHA-256: 대문자 HEX 64자리>",
+  "recordCount": 19,
+  "prn": 1,
+  "frames": [
+    {"index": 0, "week": 2400, "afsItow": 83, "toi": 33, "frameBase64": "<750바이트 AFS 프레임의 Base64>"}
+  ]
+}
+```
+
+- 원본 관측·항법 GRAW는 AFS 프레임에 담겨 있습니다. 의사거리나 원본 GRAW를 별도 중복 필드로 전송하지 않습니다.
+- `frames` 배열 순서를 유지합니다. `index`는 0부터 연속, `frameBase64`는 750바이트/1,000문자입니다.
+- `week`, `afsItow`, `toi`는 AFS 시간 메타데이터이며 `afsItow` 단위는 1,200초 구간입니다.
+- `prn=1`은 AFS 시험 PRN으로, 원본 GPS 관측 위성 PRN과 다릅니다.
+
+
+#### C. I/Q Sample: 파일 주소만 전달
+
+```json
+{
+  "schemaVersion": 1,
+  "testId": "438a4035-a13c-4b49-a278-0e5fb7f774bd",
+  "testType": "IQ_SAMPLE",
+  "senderMode": "HDTN",
+  "receiverMode": "HDTN",
+  "profile": "LANS-AFS-IQ-v1",
+  "format": "LNIS-IQ-FILE-v1",
+  "file": {
+    "filePath": "/exchange/438a4035-a13c-4b49-a278-0e5fb7f774bd.bin",
+    "sizeBytes": 2160000000,
+    "sha256": "<BIN SHA-256: 대문자 HEX 64자리>",
+    "durationSeconds": 90,
+    "sampleRateHz": 12000000,
+    "sampleFormat": "IQ_INTERLEAVED_INT8",
+    "quantizationBits": 2
+  }
+}
+```
+
+- **어댑터는 `testType=IQ_SAMPLE`일 때만 `file.filePath`에서 파일을 읽습니다. HTTP 파일 다운로드 URL이 아닙니다.**
+- 송신 PC에서 LNIS와 어댑터에 같은 공유 폴더를 `/exchange`로 마운트합니다. Windows의 `C:\\...` 경로를 보내지 않습니다.
+- 저장 형식은 I, Q 각각 signed 8-bit, 값은 -3/-1/+1/+3입니다. 2비트 packed 형식이 아닙니다.
+- LNIS가 GRAW 기반 AFS 변조기로 생성한 90초 파일이며 실측 RF 기록이 아닙니다. 어댑터는 생성·복조하지 않습니다.
+- 송신 LNIS가 생성 완료·파일 크기·SHA-256을 검증한 뒤 요청합니다. `.part` 파일은 가져가지 않습니다.
+- 어댑터는 JSON과 BIN을 연계하여 전달합니다. BIN은 DTN/HDTN으로 전달하고 JSON 본문에는 넣지 않습니다.
+- 수신 어댑터는 **수신 PC의 별도 공유 폴더**에 동일한 `/exchange/<파일 UUID>.bin` 경로로 복원합니다. 양 PC의 디스크가 같은 것은 아닙니다.
+- 임시 파일에 수신한 뒤 완료 파일로 원자적 변경하고, 원본 크기·해시를 확인한 다음 아래 콜백을 호출합니다.
+- 경로·크기·해시를 포함해 JSON을 수정하지 않습니다. 테스트 UUID와 파일 UUID는 서로 다를 수 있습니다.
+- LNIS는 수신 BIN 크기·해시를 다시 확인합니다. 수신 I/Q에서 PVT를 계산하지 않습니다.
+- 양쪽 완료 파일은 명시적으로 정리할 때까지 보관합니다. 어댑터는 LNIS 소유 송신 파일을 임의 삭제하지 않습니다.
+
+#### 어댑터의 접수 응답
+
+HTTP 202 권장:
+
+```json
+{"testId":"438a4035-a13c-4b49-a278-0e5fb7f774bd","accepted":true}
+```
+
+현재 LNIS는 HTTP 2xx를 접수 성공으로 판단합니다. 파일 가져오기·DTN 전달 완료를 의미하지 않습니다.
+접수 불가는 비-2xx로 응답하세요(형식 400, 인증 401, 다른 시험 처리 중/충돌 409, 내부 오류 500).
+LNIS는 송신 POST를 자동 재시도하지 않습니다. 어댑터는 동일 시험 중복 접수로 프로세스나 파일 전달을 중복 시작하지 않아야 합니다.
+
+### 15.3 수신 어댑터 → 수신 LNIS: 콜백
+
+```http
+POST http://<수신-LNIS-IP>:<port>/lnis/api/v1/dtn/receive
+Content-Type: application/json
+Authorization: Bearer <LNIS_DTN_RECEIVE_TOKEN>
+```
+
+**본문은 15.2에서 접수한 JSON 전체 그대로입니다.** `testType`, 두 모드, 원본 데이터 또는 파일 메타데이터를 모두 유지합니다.
+별도 외피로 감싸거나 전송 시각·결과 필드를 추가하지 않습니다. JSON 객체 키 순서와 공백은 변경 가능하지만 값·배열 순서는 유지해야 합니다.
+바이트 단위 수신 원문은 최초 접수본을 저장합니다. URL·수신 토큰은 어댑터 환경에 설정하고 JSON에 넣지 않습니다.
+
+- RAW/AFS: 전달한 JSON이 준비되면 호출합니다.
+- I/Q: 수신 PC 공유 폴더에 BIN 복원이 완료된 후 호출합니다.
+- LNIS 간 시험 사전 등록은 LNIS가 처리합니다. 어댑터가 내부 `/node/peer/**` API를 호출하지 않습니다.
+
+성공 응답 HTTP 202:
+
+```json
+{"testId":"438a4035-a13c-4b49-a278-0e5fb7f774bd","accepted":true,"state":"WAITING_RECEIVER"}
+```
+
+202는 JSON 접수·저장 완료입니다. 이후 수신 LNIS가 RAW/AFS 복원·PVT 계산 또는 I/Q 파일 검증을 수행합니다.
+같은 JSON 재접수는 재계산하지 않고 현재 상태를 반환합니다. 완료 후 재접수하면 state가 COMPLETED일 수도 있습니다.
+
+| 응답 | 의미 |
+|---|---|
+| 400 | 시험 없음, 변경된 JSON, 잘못된 값·JSON |
+| 401 | 수신 Bearer 토큰 누락·불일치 |
+| 409 | 수신 노드가 아님 또는 신규 접수를 받을 상태가 아님 |
+| 413 | JSON 본문 16 MiB 초과 |
+
+400/401/409 오류 본문은 LNIS의 ProblemDetail 형식(`status`, `detail` 등)입니다. 413은 현재 `{"message":"JSON은 16 MiB 이하입니다."}`를 반환합니다.
+수신 파일 불일치는 비동기 검증에서 시험 FAILED로 기록될 수 있으므로 202를 최종 성공으로 표시하지 않습니다.
+현재 시험 전체 제한 시간은 10분입니다. 어댑터의 지연 전달 시험이 이보다 길면 LNIS 제한도 함께 조정해야 합니다.
+
+### 15.4 환경 설정·인계 체크리스트
+
+| 설정 주체 | 설정값 | 용도 |
+|---|---|---|
+| 송신 LNIS | `dtn_adapter=http://<송신-어댑터>:<port>` | POST 전송 및 송신 health 대상 |
+| 송신 LNIS·송신 어댑터 | `LNIS_DTN_SEND_TOKEN`과 일치하는 Bearer 비밀값 | 송신 요청 인증 |
+| 수신 LNIS | `dtn_adapter=http://<수신-어댑터>:<port>` | 수신 health 대상 |
+| 수신 LNIS·수신 어댑터 | `LNIS_DTN_RECEIVE_TOKEN`과 일치하는 Bearer 비밀값 | 콜백 인증. 미설정 시 LNIS 접수 거부 |
+| 수신 어댑터 | `http://<수신-LNIS-IP>:<port>/lnis/api/v1/dtn/receive` | JSON 콜백 주소 |
+| 각 PC | 동일 논리 경로 `/exchange`의 로컬 공유 폴더 | 해당 PC의 LNIS·어댑터 사이 BIN 접근 |
+
+어댑터 프로그램의 설정 변수 이름은 자유이며 표의 LNIS 변수명과 같은 이름일 필요는 없습니다. 두 인증 연결의 비밀값은 각각 상대방과 일치해야 합니다. LNIS 간 관리 토큰은 어댑터에 전달하지 않습니다.
+
+컨테이너 안의 `localhost`는 해당 컨테이너 자신입니다. 같은 PC라도 컨테이너·WSL·호스트 간에 접근 가능한 주소를 사용하세요. I/Q는 양 PC에 동일한 논리 파일 경로를 사용하며, 한쪽 절대 경로를 다른 값으로 바꿔 콜백하면 동일성 검증에서 거부됩니다.
+
+인수 확인: **3개 시험 × 4개 경로**, 원본 JSON 보존, I/Q 크기·해시 일치, 중복 접수 방지를 검증합니다.
+파일 크기는 signed 32-bit 범위를 넘으므로 **64-bit 정수와 스트리밍 I/O**를 사용합니다.
+콜백 응답 유실 시 같은 JSON으로 재요청할 수 있습니다. 400/401/409는 원인을 해결하고 재요청하세요.
+
+현재 별도 어댑터 진행률·실패 통지·최종 판정 콜백 API는 없습니다. 송신 접수 실패는 비-2xx, 접수 이후 미도착은 LNIS 시험 제한 시간으로 처리합니다. 더 긴 지연·별도 오류 통지가 필요하면 계약 변경을 먼저 협의합니다.
