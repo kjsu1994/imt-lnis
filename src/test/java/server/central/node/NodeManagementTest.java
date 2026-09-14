@@ -10,6 +10,8 @@ import server.shared.model.LnisModels.AgentRole;
 import server.shared.model.LnisModels.AgentState;
 
 import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -87,6 +89,33 @@ class NodeManagementTest {
         }
     }
 
+    @Test
+    void preservesRemoteConflictDetail() throws Exception
+    {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/lnis/api/v1/node/peer/afs/commands", exchange -> {
+            try (exchange) {
+                byte[] body = "{\"detail\":\"수신 실행기가 오프라인이거나 시험 진행 중입니다.\"}"
+                        .getBytes(StandardCharsets.UTF_8);
+                exchange.sendResponseHeaders(409, body.length);
+                exchange.getResponseBody().write(body);
+            }
+        });
+        server.start();
+        try {
+            NodeProperties properties = new NodeProperties(environment().withProperty("lnis.node.peer-url",
+                    "http://127.0.0.1:" + server.getAddress().getPort()));
+            NodePeerClient client = new NodePeerClient(properties, objectMapper);
+            IllegalStateException error = assertThrows(IllegalStateException.class,
+                    () -> client.exchange("/lnis/api/v1/node/peer/afs/commands",
+                            Map.of("command", "ARM_RECEIVER"), Map.class, 4096));
+            assertTrue(error.getMessage().contains("HTTP 409"));
+            assertEquals(409, assertInstanceOf(NodePeerClient.RemoteRequestException.class, error).statusCode());
+            assertTrue(error.getMessage().contains("수신 실행기가 오프라인이거나 시험 진행 중입니다."));
+        } finally {
+            server.stop(0);
+        }
+    }
     private MockEnvironment environment()
     {
         return new MockEnvironment().withProperty("lnis.node.role", "sender")

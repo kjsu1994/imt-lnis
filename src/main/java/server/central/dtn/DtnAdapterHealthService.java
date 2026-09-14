@@ -1,5 +1,7 @@
 package server.central.dtn;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.net.URI;
 import java.net.http.*;
 import java.time.*;
@@ -8,36 +10,47 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-/** Read-only probes of the configured adapter endpoints, independent of trial state. */
+/** Read-only probes derived from the Sender and Receiver adapter base URLs. */
 @Service
 public class DtnAdapterHealthService {
-  public record EndpointHealth(String url, boolean ok, Integer httpStatus,
-      long elapsedMillis, String message) {}
+  public record EndpointHealth(String url, boolean ok, Integer httpStatus, long elapsedMillis,
+      String status, String message, JsonNode response, String rawResponse) {}
   public record HealthReport(Instant checkedAt, EndpointHealth sender, EndpointHealth receiver) {}
 
   private final HttpClient client;
-  private final String senderUrl;
-  private final String receiverUrl;
+  private final ObjectMapper json;
+  private final String defaultSendUrl;
+  private final String defaultReceiveUrl;
   private final Duration timeout;
 
   @Autowired
-  public DtnAdapterHealthService(
-      @Value("${lnis.dtn.sender-adapter-health-url:http://192.168.1.154:8080/sender/health}") String senderUrl,
-      @Value("${lnis.dtn.receiver-adapter-health-url:http://192.168.1.154:8080/receiver/health}") String receiverUrl) {
+  public DtnAdapterHealthService(ObjectMapper json,
+      @Value("${lnis.dtn.send-url:}") String defaultSendUrl,
+      @Value("${lnis.dtn.receive-url:}") String defaultReceiveUrl) {
     this(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3))
-        .followRedirects(HttpClient.Redirect.NEVER).build(), senderUrl, receiverUrl, Duration.ofSeconds(5));
+        .followRedirects(HttpClient.Redirect.NEVER).build(), json, defaultSendUrl,
+        defaultReceiveUrl, Duration.ofSeconds(5));
   }
 
-  DtnAdapterHealthService(HttpClient client, String senderUrl, String receiverUrl, Duration timeout) {
+  DtnAdapterHealthService(HttpClient client, ObjectMapper json, String defaultSendUrl,
+      String defaultReceiveUrl, Duration timeout) {
     this.client = client;
-    this.senderUrl = senderUrl;
-    this.receiverUrl = receiverUrl;
+    this.json = json;
+    this.defaultSendUrl = defaultSendUrl;
+    this.defaultReceiveUrl = defaultReceiveUrl;
     this.timeout = timeout;
   }
 
-  public HealthReport check() {
-    var sender = probe(senderUrl);
-    var receiver = probe(receiverUrl);
+  /** Legacy callers may continue supplying one adapter address for both roles. */
+  public HealthReport check(String adapterUrl) {
+    return check(adapterUrl, adapterUrl);
+  }
+
+  public HealthReport check(String sendUrl, String receiveUrl) {
+    String senderValue = configured(sendUrl, defaultSendUrl, null);
+    String receiverValue = configured(receiveUrl, defaultReceiveUrl, senderValue);
+    var sender = probe(healthUrl(adapterBase(senderValue, "송신"), "sender"));
+    var receiver = probe(healthUrl(adapterBase(receiverValue, "수신"), "receiver"));
     var senderResult = sender.join();
     var receiverResult = receiver.join();
     return new HealthReport(Instant.now(), senderResult, receiverResult);
@@ -47,29 +60,65 @@ public class DtnAdapterHealthService {
     long started = System.nanoTime();
     try {
       URI uri = URI.create(url);
-      if (!("http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme()))
-          || uri.getHost() == null || uri.getUserInfo() != null || uri.getFragment() != null)
-        throw new IllegalArgumentException("Invalid health URL");
       var request = HttpRequest.newBuilder(uri).timeout(timeout).GET().build();
-      return client.sendAsync(request, HttpResponse.BodyHandlers.discarding())
+      return client.sendAsync(request, HttpResponse.BodyHandlers.ofString())
           .orTimeout(timeout.toMillis(), TimeUnit.MILLISECONDS)
           .handle((response, error) -> {
-            if (error != null) return failure(url, started, error);
-            int status = response.statusCode();
-            boolean ok = status >= 200 && status < 300;
-            return new EndpointHealth(url, ok, status, elapsed(started), ok ? "응답 정상" : "응답 오류");
+            if (error != null) return failure(url, started);
+            int httpStatus = response.statusCode();
+            JsonNode body = parse(response.body());
+            if (httpStatus < 200 || httpStatus >= 300)
+              return new EndpointHealth(url, false, httpStatus, elapsed(started), null,
+                  "연결실패", body, response.body());
+            String adapterStatus = body == null ? null : body.path("status").asText(null);
+            if ("ready".equalsIgnoreCase(adapterStatus))
+              return new EndpointHealth(url, true, httpStatus, elapsed(started), "ready",
+                  "정상연결", body, response.body());
+            if ("busy".equalsIgnoreCase(adapterStatus))
+              return new EndpointHealth(url, false, httpStatus, elapsed(started), "busy",
+                  "시험대기", body, response.body());
+            return new EndpointHealth(url, false, httpStatus, elapsed(started), adapterStatus,
+                "상태확인 필요", body, response.body());
           });
     } catch (IllegalArgumentException error) {
       return CompletableFuture.completedFuture(new EndpointHealth(url, false, null,
-          elapsed(started), "주소 설정 오류"));
+          elapsed(started), null, "주소 설정 오류", null, null));
     }
   }
 
-  private EndpointHealth failure(String url, long started, Throwable error) {
-    while (error.getCause() != null) error = error.getCause();
-    String message = error instanceof HttpTimeoutException || error instanceof TimeoutException
-        ? "응답 시간 초과" : "연결 실패";
-    return new EndpointHealth(url, false, null, elapsed(started), message);
+  private EndpointHealth failure(String url, long started) {
+    return new EndpointHealth(url, false, null, elapsed(started), null,
+        "연결실패", null, null);
+  }
+
+  private JsonNode parse(String body) {
+    try { return body == null || body.isBlank() ? null : json.readTree(body); }
+    catch (Exception ignored) { return null; }
+  }
+
+  private static String configured(String requested, String configured, String fallback) {
+    if (requested != null && !requested.isBlank()) return requested;
+    if (configured != null && !configured.isBlank()) return configured;
+    if (fallback != null && !fallback.isBlank()) return fallback;
+    throw new IllegalStateException("외부 어댑터 서버 주소가 설정되지 않았습니다.");
+  }
+
+  private static URI adapterBase(String value, String role) {
+    URI uri = URI.create(value.trim());
+    if (!("http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme()))
+        || uri.getHost() == null || uri.getUserInfo() != null || uri.getFragment() != null
+        || uri.getPort() == 0 || uri.getPort() > 65535)
+      throw new IllegalArgumentException("외부 " + role + " 어댑터 서버 주소가 올바르지 않습니다.");
+    return uri;
+  }
+
+  private static String healthUrl(URI base, String role) {
+    try {
+      return new URI(base.getScheme(), null, base.getHost(), base.getPort(),
+          "/" + role + "/health", null, null).toString();
+    } catch (Exception error) {
+      throw new IllegalArgumentException("헬스체크 URL을 만들 수 없습니다.", error);
+    }
   }
 
   private static long elapsed(long started) {

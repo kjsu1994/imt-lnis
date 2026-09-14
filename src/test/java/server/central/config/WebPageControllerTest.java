@@ -35,8 +35,8 @@ class WebPageControllerTest {
         .andExpect(redirectedUrl("/lnis/afstest/sender"));
     mvc.perform(get("/lnis/afstest/sender"))
         .andExpect(status().isOk())
-        .andExpect(forwardedUrl("/sender.html"));
-    mvc.perform(get("/sender.html"))
+        .andExpect(forwardedUrl("/afs-sender.html"));
+    mvc.perform(get("/afs-sender.html"))
         .andExpect(status().isOk())
         .andExpect(content().string(org.hamcrest.Matchers.containsString("Sender 시험 제어")));
     mvc.perform(get("/lnis/test/sender")).andExpect(status().isOk());

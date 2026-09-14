@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.util.stream.Collectors;
+import server.central.node.NodePeerClient;
 
 @RestControllerAdvice
 /** API 예외를 일관된 RFC 9457 ProblemDetail 응답으로 변환한다. */
@@ -36,6 +37,14 @@ public class ApiExceptionHandler {
         return problem(HttpStatus.BAD_REQUEST, message, request);
     }
 
+    @ExceptionHandler(NodePeerClient.RemoteRequestException.class)
+    ResponseEntity<ProblemDetail> remoteRequest(
+            NodePeerClient.RemoteRequestException error, HttpServletRequest request)
+    {
+        HttpStatus status = HttpStatus.resolve(error.statusCode());
+        return problem(status == null ? HttpStatus.BAD_GATEWAY : status, error, request);
+    }
+
     @ExceptionHandler(IllegalStateException.class)
     ResponseEntity<ProblemDetail> conflict(Exception error, HttpServletRequest request)
     {
@@ -59,4 +68,3 @@ public class ApiExceptionHandler {
         return ResponseEntity.status(status).body(detail);
     }
 }
-

@@ -15,13 +15,13 @@ public class WebPageController {
     @GetMapping({"/lnis/afstest/sender", "/lnis/test/sender"})
     String sender()
     {
-        return "forward:/sender.html";
+        return "forward:/afs-sender.html";
     }
 
     @GetMapping({"/lnis/afstest/receiver", "/lnis/test/receiver"})
     String receiver()
     {
-        return "forward:/receiver.html";
+        return "forward:/afs-receiver.html";
     }
 
     @GetMapping("/lnis/dtntest/sender")

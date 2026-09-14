@@ -18,6 +18,21 @@ import java.util.concurrent.TimeoutException;
 @Profile("node")
 public class NodePeerClient {
     private static final int MAX_STATUS_BYTES = 16 * 1024;
+
+    public static final class RemoteRequestException extends IllegalStateException {
+        private final int statusCode;
+
+        RemoteRequestException(int statusCode, String message)
+        {
+            super(message);
+            this.statusCode = statusCode;
+        }
+
+        public int statusCode()
+        {
+            return statusCode;
+        }
+    }
     private final NodeProperties nodeProperties;
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
@@ -85,7 +100,9 @@ public class NodePeerClient {
             // 헤더 이후 본문이 멈추는 경우도 포함해 전체 조회 시간에 제한을 둔다.
             HttpResponse<byte[]> response = pending.get(5, TimeUnit.SECONDS);
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                throw new IllegalStateException("상대 노드 상태 조회 실패: HTTP " + response.statusCode());
+                throw new RemoteRequestException(response.statusCode(),
+                        "상대 노드 요청 거부: HTTP " + response.statusCode()
+                                + remoteDetail(response.body()));
             }
             return objectMapper.readValue(response.body(), responseType);
         } catch (InterruptedException error) {
@@ -99,6 +116,15 @@ public class NodePeerClient {
             if (!pending.isDone()) {
                 pending.cancel(true);
             }
+        }
+    }
+    private String remoteDetail(byte[] body)
+    {
+        try {
+            String detail = objectMapper.readTree(body).path("detail").asText();
+            return detail.isBlank() ? "" : " · " + detail;
+        } catch (Exception ignored) {
+            return "";
         }
     }
 }

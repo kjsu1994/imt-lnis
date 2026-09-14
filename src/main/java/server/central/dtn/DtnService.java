@@ -57,6 +57,9 @@ public class DtnService {
     @Value("${lnis.dtn.send-url:}")
     private String sendUrl;
 
+    @Value("${lnis.dtn.receive-url:}")
+    private String receiveUrl;
+
     @Value("${lnis.dtn.send-token:}")
     private String sendToken;
 
@@ -88,22 +91,22 @@ public class DtnService {
     /* 외부 연동 준비 여부와 지원 규격 조회 */
     public Map<String, Object> configuration()
     {
-        return Map.of(
-                "exampleEnabled", exampleEnabled,
-                "adapterControlConfigured", !senderAdapterControlUrl.isBlank() && !receiverAdapterControlUrl.isBlank(),
-                "configured",
-                !sendUrl.isBlank() && (sendingNode() || !receiveToken.isBlank()),
-                "defaultSendUrl", sendUrl,
-                "receiveConfigured", !receiveToken.isBlank(),
-                "sendReady", sendingNode() || !receiveToken.isBlank(),
-                "nodeRole", nodeLink == null ? "CENTRAL" : (sendingNode() ? "SENDER" : "RECEIVER"),
-                "defaultSendTokenConfigured", !sendToken.isBlank(),
-                "profile",
-                DtnModels.PROFILE,
-                "maximumInputBytes",
-                DtnModels.MAX_INPUT_BYTES);
+        return Map.ofEntries(
+                Map.entry("exampleEnabled", exampleEnabled),
+                Map.entry("adapterControlConfigured",
+                        !senderAdapterControlUrl.isBlank() && !receiverAdapterControlUrl.isBlank()),
+                Map.entry("configured",
+                        !sendUrl.isBlank() && (sendingNode() || !receiveToken.isBlank())),
+                Map.entry("defaultSendUrl", sendUrl),
+                Map.entry("defaultReceiveUrl", receiveUrl.isBlank() ? sendUrl : receiveUrl),
+                Map.entry("receiveConfigured", !receiveToken.isBlank()),
+                Map.entry("sendReady", sendingNode() || !receiveToken.isBlank()),
+                Map.entry("nodeRole",
+                        nodeLink == null ? "CENTRAL" : (sendingNode() ? "SENDER" : "RECEIVER")),
+                Map.entry("defaultSendTokenConfigured", !sendToken.isBlank()),
+                Map.entry("profile", DtnModels.PROFILE),
+                Map.entry("maximumInputBytes", DtnModels.MAX_INPUT_BYTES));
     }
-
     /* 입력과 Agent를 확인한 뒤 기준 PVT 계산 및 AFS 생성을 요청한다. */
     public synchronized DtnJob create(UUID inputId, String sender, String receiver)
     {

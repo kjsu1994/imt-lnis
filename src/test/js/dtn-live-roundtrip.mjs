@@ -33,7 +33,7 @@ try {
   const preview = await json(tx + '/dtn/inputs/' + input.inputId + '/observations');
   assert.equal(preview.epochs.length, 1); assert.equal(preview.navigationCount, 0);
   const job = await json(tx + '/dtn/tests', 'POST', {inputId: input.inputId,
-    senderAgentId: 'sender-1', receiverAgentId: 'receiver-1', sendUrl: 'http://127.0.0.1:18092/transfers'});
+    senderAgentId: 'sender-1', receiverAgentId: 'receiver-1', sendUrl: 'http://127.0.0.1:18092'});
   let status;
   for (let i = 0; i < 80; i++) {
     status = await json(tx + '/dtn/tests/' + job.testId);

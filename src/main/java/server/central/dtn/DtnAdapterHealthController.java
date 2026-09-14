@@ -12,7 +12,14 @@ public class DtnAdapterHealthController {
   private final DtnAdapterHealthService health;
 
   @GetMapping
-  public ResponseEntity<DtnAdapterHealthService.HealthReport> check() {
-    return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(health.check());
+  public ResponseEntity<DtnAdapterHealthService.HealthReport> check(
+      @RequestParam(required = false) String sendUrl,
+      @RequestParam(required = false) String receiveUrl,
+      @RequestParam(required = false) String transferUrl) {
+    String legacyUrl = transferUrl == null || transferUrl.isBlank() ? null : transferUrl;
+    String sender = sendUrl == null || sendUrl.isBlank() ? legacyUrl : sendUrl;
+    String receiver = receiveUrl == null || receiveUrl.isBlank() ? legacyUrl : receiveUrl;
+    return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+        .body(health.check(sender, receiver));
   }
 }

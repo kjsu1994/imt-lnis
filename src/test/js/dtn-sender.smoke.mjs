@@ -12,25 +12,27 @@ class Element {
 }
 const elements = new Map([...html.matchAll(/id="([^"]+)"/g)].map(([, id]) => [id, new Element()]));
 let loaded = null, currentJob = null, failUpload = false, starts = 0;
-let healthFetch, healthCalls = 0;
+let healthFetch, healthCalls = 0, healthUrl;
+const intervals = [];
 const tx = {agentId: 'sender-1', role: 'SENDER', state: 'READY'}, rx = {agentId: 'receiver-1', role: 'RECEIVER', state: 'READY'};
 const observations = {epochs: [{observation: {week: 2400, receiverTowSeconds: 1, observations: []}}]};
 const context = {
-  document: {getElementById: id => { assert.ok(elements.has(id), 'missing ' + id); return elements.get(id); }, querySelectorAll: () => []},
+  document: {visibilityState: 'visible', getElementById: id => { assert.ok(elements.has(id), 'missing ' + id); return elements.get(id); }, querySelectorAll: () => []},
   createPayloadViewer: () => ({setJob() {}}),
   createObservationView: () => ({setData(data) { loaded = data; }}),
   numeric: (n, d = 3) => typeof n === 'number' && Number.isFinite(n) ? n.toFixed(d) : '—',
   Option: function(text, value) { this.value = value; },
   location: {protocol: 'http:', host: '127.0.0.1:18090'}, WebSocket: class {},
-  URL, AbortSignal, setInterval() {}, setTimeout() {},
+  URL, AbortSignal, setInterval(callback, delay) { intervals.push({callback, delay}); }, setTimeout() {},
   fetch: async (url, options) => {
-    if (url.endsWith('/adapter-health')) {
-      healthCalls++;
+    if (url.includes('/adapter-health?')) {
+      healthCalls++; healthUrl = url;
       assert.equal(options.method, undefined, 'health checks use GET');
       return healthFetch();
     }
     let body = {};
-    if (url.endsWith('/config')) body = {maximumInputBytes: 1048576, exampleEnabled: false};
+    if (url.endsWith('/config')) body = {maximumInputBytes: 1048576, exampleEnabled: false,
+      defaultSendUrl: 'http://sender.default:8080', defaultReceiveUrl: 'http://receiver.default:8080'};
     else if (url.endsWith('/agents')) body = [tx, rx];
     else if (url.endsWith('/node/connection')) body = {ip: '127.0.0.1', port: 18091, editable: true};
     else if (url.endsWith('/tests') && options.method === 'POST') { starts++; currentJob = {testId: 't1', state: 'PREPARING', updatedAt: '1'}; body = currentJob; }
@@ -54,7 +56,9 @@ vm.createContext(context); vm.runInContext(source, context); await context.ready
 assert.equal(elements.get('dtn-example').hidden, true);
 assert.equal(elements.get('dtn-start').disabled, true);
 assert.equal(elements.get('dtn-send').disabled, true);
-elements.get('dtn-send-url').value = 'http://127.0.0.1:18092/transfers';
+assert.equal(elements.get('dtn-send-url').value, 'http://sender.default:8080');
+assert.equal(elements.get('dtn-receive-url').value, 'http://receiver.default:8080');
+elements.get('dtn-send-url').value = 'http://127.0.0.1:18092';
 const file = {name: 'capture.graw', size: 10, arrayBuffer: async () => new ArrayBuffer(10)};
 await context.upload(file);
 assert.equal(loaded, observations);
@@ -83,8 +87,10 @@ assert.equal(elements.get('dtn-port').disabled, false);
 console.log('PASS: serial one-shot completion, PVT preview and transfer readiness');
 
 await elements.get('dtn-send').onclick();
+assert.ok(intervals.some(value => value.delay === 10000), 'adapter health polls every 10 seconds');
 let resolveHealth;
 healthFetch = () => new Promise(resolve => { resolveHealth = resolve; });
+elements.get('dtn-receive-url').value = 'http://localhost:18092';
 const checking = elements.get('dtn-adapter-health').onclick();
 assert.equal(elements.get('dtn-adapter-health').disabled, true);
 assert.match(elements.get('dtn-adapter-sender-health').textContent, /확인 중/);
@@ -92,20 +98,26 @@ await elements.get('dtn-adapter-health').onclick();
 assert.equal(healthCalls, 1, 'duplicate probes must be prevented');
 const report = {
   checkedAt: '2026-09-14T01:00:00Z',
-  sender: {ok: true, message: '응답 정상', httpStatus: 200, elapsedMillis: 12, url: 'http://192.168.1.154:8080/sender/health'},
-  receiver: {ok: false, message: '응답 오류', httpStatus: 503, elapsedMillis: 13, url: 'http://192.168.1.154:8080/receiver/health'}
+  sender: {ok: true, status: 'ready', message: '정상연결', httpStatus: 200, elapsedMillis: 12,
+    url: 'http://127.0.0.1:18092/sender/health', response: {status: 'ready'}, rawResponse: '{"status":"ready"}'},
+  receiver: {ok: false, status: 'busy', message: '시험대기', httpStatus: 200, elapsedMillis: 13,
+    url: 'http://127.0.0.1:18092/receiver/health', response: {status: 'busy'}, rawResponse: '{"status":"busy"}'}
 };
 resolveHealth({ok: true, json: async () => report});
 await checking;
+assert.match(healthUrl, /sendUrl=http%3A%2F%2F127\.0\.0\.1%3A18092&receiveUrl=http%3A%2F%2Flocalhost%3A18092/);
+assert.equal(elements.get('dtn-adapter-sender-health').textContent, 'Sender · 정상연결');
 assert.equal(elements.get('dtn-adapter-sender-health').className, 'pill online');
-assert.equal(elements.get('dtn-adapter-receiver-health').className, 'pill error');
-assert.match(elements.get('dtn-adapter-receiver-detail').textContent, /503/);
+assert.equal(elements.get('dtn-adapter-receiver-health').textContent, 'Receiver · 시험대기');
+assert.equal(elements.get('dtn-adapter-receiver-health').className, 'pill warning');
+assert.match(elements.get('dtn-adapter-health-json').textContent, /"rawResponse": "{\\"status\\":\\"ready\\"}"/);
 assert.match(elements.get('dtn-adapter-health-time').textContent, /마지막 확인/);
 assert.equal(elements.get('dtn-adapter-health').disabled, false);
 assert.equal(elements.get('dtn-send').disabled, true, 'health check must not unlock the active trial');
 healthFetch = async () => { throw new Error('server unreachable'); };
 await elements.get('dtn-adapter-health').onclick();
-assert.match(elements.get('dtn-adapter-sender-health').textContent, /확인 불가/);
-assert.equal(elements.get('dtn-adapter-sender-health').className, 'pill warning', 'old success must not survive a failed check');
+assert.equal(elements.get('dtn-adapter-sender-health').textContent, 'Sender · 연결실패');
+assert.equal(elements.get('dtn-adapter-sender-health').className, 'pill error', 'old success must not survive a failed check');
+assert.match(elements.get('dtn-adapter-health-json').textContent, /server unreachable/);
 assert.equal(elements.get('dtn-adapter-health').disabled, false);
-console.log('PASS: adapter health partial failure, duplicate prevention, retry and independent trial controls');
+console.log('PASS: adapter status JSON, URL derivation, collapsible details, polling and manual retry');

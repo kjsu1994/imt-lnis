@@ -49,18 +49,27 @@
     </div>
     <small id="dtn-connection-message" role="status"></small>
     <div class="adapter-url-row">
-      <label for="dtn-send-url">외부 어댑터 전송 URL</label>
       <div class="adapter-url-controls">
-        <input id="dtn-send-url" type="url" placeholder="http://어댑터-IP:포트/transfers" autocomplete="off">
-        <button id="dtn-adapter-health" type="button" aria-controls="dtn-adapter-health-results">어댑터 연결 확인</button>
+        <label><span>Sender Adapter 서버 주소</span>
+          <input id="dtn-send-url" type="url" placeholder="http://Sender-IP:포트" autocomplete="off"></label>
+        <label><span>Receiver Adapter 서버 주소</span>
+          <input id="dtn-receive-url" type="url" placeholder="http://Receiver-IP:포트" autocomplete="off"></label>
+        <button id="dtn-adapter-health" type="button" aria-controls="dtn-adapter-health-results">두 어댑터 연결 확인</button>
       </div>
-      <div id="dtn-adapter-health-results" class="adapter-health-results" role="status" aria-live="polite" aria-busy="false">
-        <div class="adapter-health-item"><span id="dtn-adapter-sender-health" class="pill">Sender · 미확인</span>
-          <small id="dtn-adapter-sender-detail">버튼을 눌러 상태를 확인하세요.</small></div>
-        <div class="adapter-health-item"><span id="dtn-adapter-receiver-health" class="pill">Receiver · 미확인</span>
-          <small id="dtn-adapter-receiver-detail">버튼을 눌러 상태를 확인하세요.</small></div>
-        <small id="dtn-adapter-health-time" class="adapter-health-time">LNIS 서버에서 각 어댑터의 HTTP 응답을 확인합니다.</small>
-      </div>
+      <small class="adapter-url-help">각 서버 주소에 전송(`/transfers`)과 역할별 헬스 경로를 자동 적용합니다.</small>
+      <details id="dtn-adapter-health-results" class="adapter-health-results" aria-busy="false">
+        <summary><span class="adapter-health-summary" role="status" aria-live="polite">
+          <span id="dtn-adapter-sender-health" class="pill">Sender · 미확인</span>
+          <span id="dtn-adapter-receiver-health" class="pill">Receiver · 미확인</span>
+        </span><span class="adapter-health-toggle">상세 보기</span></summary>
+        <div class="adapter-health-content">
+          <div class="adapter-health-item"><strong>Sender</strong><small id="dtn-adapter-sender-detail">버튼을 눌러 상태를 확인하세요.</small></div>
+          <div class="adapter-health-item"><strong>Receiver</strong><small id="dtn-adapter-receiver-detail">버튼을 눌러 상태를 확인하세요.</small></div>
+          <small id="dtn-adapter-health-time" class="adapter-health-time">10초마다 LNIS 서버에서 자동 확인합니다.</small>
+          <details class="adapter-health-developer"><summary>개발자 모드 · JSON 원문</summary>
+            <pre id="dtn-adapter-health-json">아직 확인 결과가 없습니다.</pre></details>
+        </div>
+      </details>
     </div>
   </section>
   <section class="card" id="dtn-input-card">
