@@ -750,6 +750,8 @@ body[data-page^="dtn-"] .dtn-output-grid .log { flex: 1; min-height: 0; max-heig
 @media (max-width: 900px) { .dtn-output-grid { grid-template-columns: minmax(0, 1fr); } }
 body[data-page^="dtn-"] .destination-row { grid-template-columns: minmax(180px, 1fr) 90px auto auto; }
 body[data-page="dtn-sender"] .destination-status { min-height: 40px; }
+body[data-page="dtn-sender"] .connection-actions { display: flex; align-items: center; gap: 10px; }
+body[data-page="dtn-sender"] .connection-actions button { white-space: nowrap; }
 body[data-page="dtn-sender"] .destination-status > div { display: flex; align-items: center; gap: 10px; white-space: nowrap; }
 body[data-page^="dtn-"] .card { min-width: 0; }
 body[data-page^="dtn-"] .card h2 { margin-bottom: 12px; }

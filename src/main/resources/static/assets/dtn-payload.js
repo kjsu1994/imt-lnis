@@ -62,7 +62,7 @@ export function createPayloadViewer(container, {receivedOnly = false, sentOnly =
   const controls = create('div');
   controls.className = 'dtn-payload-controls';
   const sent = create('button', sentOnly ? '송신 JSON 원문' : '송신 원문');
-  const received = create('button', '수신 원문');
+  const received = create('button', receivedOnly ? '수신 JSON 원문' : '수신 원문');
   sent.type = received.type = 'button';
   sent.disabled = received.disabled = true;
   // 수신 노드에는 송신 원문이 없으므로 불필요한 버튼을 노출하지 않는다.
@@ -86,7 +86,7 @@ export function createPayloadViewer(container, {receivedOnly = false, sentOnly =
   close.type = 'button';
   const toolbar = create('div');
   toolbar.className = 'dtn-payload-controls';
-  if (sentOnly) {
+  if (sentOnly || receivedOnly) {
     controls.append(prettyLabel, download);
     controls.className += ' dtn-payload-header';
     download.className = 'dtn-payload-download';
@@ -100,7 +100,7 @@ export function createPayloadViewer(container, {receivedOnly = false, sentOnly =
   text.className = 'dtn-payload-text';
   text.setAttribute('aria-label', '선택한 시험의 JSON 본문');
   panel.append(caption, toolbar, text);
-  if (!sentOnly) container.append(title);
+  if (!sentOnly && !receivedOnly) container.append(title);
   container.append(controls, status, panel);
   let job = null, original = '', generation = 0, pending = null;
   let automaticKey = null;
@@ -158,16 +158,17 @@ export function createPayloadViewer(container, {receivedOnly = false, sentOnly =
     }
   }
 
-  sent.onclick = () => {
-    if (sentOnly && (!panel.hidden || pending)) {
+  function toggle(direction, button, singleDirection) {
+    if (singleDirection && (!panel.hidden || pending)) {
       generation++; pending?.abort(); pending=null;
-      panel.hidden=true; sent.setAttribute('aria-expanded','false');
+      panel.hidden=true; button.setAttribute('aria-expanded','false');
       status.textContent='JSON 보기를 닫았습니다.';
       return;
     }
-    return show('sent');
-  };
-  received.onclick = () => show('received');
+    return show(direction);
+  }
+  sent.onclick = () => toggle('sent', sent, sentOnly);
+  received.onclick = () => toggle('received', received, receivedOnly);
   pretty.onchange = () => {
     if (pretty.disabled || !original) return;
     try { text.value = displayedJson(original, pretty.checked); }
@@ -181,7 +182,7 @@ export function createPayloadViewer(container, {receivedOnly = false, sentOnly =
         automaticKey = null;
         reset();
         status.textContent = nextJob
-          ? (receivedOnly ? '수신 원문 버튼으로 접수 당시 JSON을 확인하세요.' : sentOnly ? '송신 JSON 원문 버튼으로 확인하세요.' : '준비된 송신 또는 수신 JSON을 선택하세요.')
+          ? (receivedOnly ? '수신 JSON 원문 버튼으로 접수 당시 JSON을 확인하세요.' : sentOnly ? '송신 JSON 원문 버튼으로 확인하세요.' : '준비된 송신 또는 수신 JSON을 선택하세요.')
           : '시험을 선택하세요.';
       }
       job = nextJob || null;

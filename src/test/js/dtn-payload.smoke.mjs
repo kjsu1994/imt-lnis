@@ -96,15 +96,24 @@ console.log('PASS: DTN JSON original/pretty/download, availability and stale-res
 // 수신 전용 화면에서 송신 버튼만 숨기고 원문 조회·다운로드 계약은 동일하게 유지한다.
 const receiverContainer = new Element('section');
 const receiverViewer = createPayloadViewer(receiverContainer, {receivedOnly: true});
-const receiverControls = receiverContainer.children.find(element => element.className === 'dtn-payload-controls');
+const receiverControls = receiverContainer.children.find(element => element.className?.includes('dtn-payload-controls'));
 assert.equal(receiverControls.children[0].hidden, true);
 await receiverViewer.setJob({testId: 'received-test', receivedPayloadAvailable: true});
 assert.equal(receiverControls.children[1].disabled, false);
 globalThis.fetch = async () => ({ok: true, text: async () => original, headers: {get: () => 'original'}});
 await receiverControls.children[1].onclick();
 const receiverPanel = receiverContainer.children.find(element => element.children?.some(child => child.tag === 'textarea'));
+assert.equal(receiverPanel.hidden, true);
+await receiverViewer.setJob({testId:'received-test',receivedPayloadAvailable:true});
+assert.equal(receiverPanel.hidden,true,'polling preserves receiver collapse');
+await receiverControls.children[1].onclick();
+assert.equal(receiverPanel.hidden,false);
+assert.equal(receiverControls.children[1].textContent,'수신 JSON 원문');
+assert.equal(receiverControls.children[1]['aria-expanded'],'true');
+assert.equal(receiverControls.children[2].children[0].checked,true);
+assert.equal(receiverPanel.children[1].children.length,0);
 assert.equal(receiverPanel.children[2].value, displayedJson(original, true));
-assert.equal(receiverPanel.children[1].children[1].href, payloadUrl('received-test', 'received', true));
+assert.equal(receiverControls.children[3].href, payloadUrl('received-test', 'received', true));
 console.log('PASS: receiver-only original JSON and download');
 const senderContainer = new Element('section');
 const senderViewer = createPayloadViewer(senderContainer, {sentOnly: true});

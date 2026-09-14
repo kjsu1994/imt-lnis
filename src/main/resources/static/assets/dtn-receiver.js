@@ -1,7 +1,7 @@
-import {createDtnLog} from './dtn-log.js?v=20260915-iq-compact';
+import {createDtnLog} from './dtn-log.js?v=20260915-json-toggle';
 import {initAdapterHealth} from './dtn-adapter-health.js?v=20260914-adapter-inline';
-import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20260915-iq-compact';
-import {createObservationView} from './dtn-observations.js?v=20260915-iq-compact';
+import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20260915-json-toggle';
+import {createObservationView} from './dtn-observations.js?v=20260915-json-toggle';
 
 const api = '/lnis/api/v1';
 const $ = id => document.getElementById(id);
