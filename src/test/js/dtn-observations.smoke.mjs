@@ -23,3 +23,15 @@ assert.deepEqual(navigationCells({sequence: 7, capturedAt: '2026-09-14T00:00:00Z
   words: [0, 4294967295, 2147483648]
 }}), [7, '2026-09-14T00:00:00Z', 'GPS', 19, 0, 0, 2, 3, '00000000 FFFFFFFF 80000000']);
 console.log('PASS: SFRBX sequence, all words and unsigned 32-bit HEX');
+
+assert.equal(numeric(null, 3, '-'), '-');
+assert.equal(numeric('1.2', 3, '-'), '-');
+assert.equal(numeric(NaN, 3, '-'), '-');
+assert.equal(numeric(Infinity, 3, '-'), '-');
+assert.equal(numeric(0, 9, '-'), '0.000000000');
+assert.equal(numeric(-1.23456, 3, '-'), '-1.235');
+for (const id of [0, 2, 6, 99]) {
+  const nav = navigationCells({message: {constellationId:id, words:[]}});
+  assert.equal(observationCells({...raw, constellationId:id})[0], nav[2]);
+}
+console.log('PASS: sender/receiver missing values, precision and shared constellation names');

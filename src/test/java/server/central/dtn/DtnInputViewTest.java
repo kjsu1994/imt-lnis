@@ -13,6 +13,8 @@ class DtnInputViewTest {
     var entity = mock(InputBufferEntity.class);
     UUID id = UUID.randomUUID();
     when(inputs.get(id)).thenReturn(entity);
+    when(entity.inputId()).thenReturn(id);
+    when(inputs.readChunks(any(), anyInt())).thenCallRealMethod();
     var controller = new DtnInputViewController(inputs, new com.fasterxml.jackson.databind.ObjectMapper());
     assertThrows(IllegalArgumentException.class, () -> controller.observations(id));
     when(entity.complete()).thenReturn(true);
@@ -29,6 +31,8 @@ class DtnInputViewTest {
         new server.shared.codec.GrawCodec.ObservationEpoch(1, 2400, 18, 1, 1, java.util.List.of())));
     byte[] raw = java.nio.ByteBuffer.allocate(record.length + 4).putInt(record.length).put(record).array();
     when(inputs.get(id)).thenReturn(entity);
+    when(entity.inputId()).thenReturn(id);
+    when(inputs.readChunks(any(), anyInt())).thenCallRealMethod();
     when(entity.complete()).thenReturn(true);
     when(entity.receivedSize()).thenReturn((long) raw.length);
     when(entity.chunkCount()).thenReturn(1L);

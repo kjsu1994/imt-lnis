@@ -1,6 +1,6 @@
 // Shared DTN-only observation display. Device values are never inserted as HTML.
-export const numeric = (value, digits = 3) =>
-  typeof value === 'number' && Number.isFinite(value) ? value.toFixed(digits) : '—';
+export const numeric = (value, digits = 3, missing = '—') =>
+  typeof value === 'number' && Number.isFinite(value) ? value.toFixed(digits) : missing;
 const constellation = id => ['GPS', 'SBAS', 'Galileo', 'BeiDou', 'IMES', 'QZSS', 'GLONASS', 'NavIC'][id] || ('GNSS ' + id);
 export function navigationCells(item) {
   const n = item.message;
@@ -10,7 +10,7 @@ export function navigationCells(item) {
 }
 
 export function observationCells(o) {
-  const gnss = ['GPS', 'SBAS', 'Galileo', 'BeiDou', 'IMES', 'QZSS', 'GLONASS', 'NavIC'][o.constellationId] || ('GNSS ' + o.constellationId);
+  const gnss = constellation(o.constellationId);
   const prValid = (o.trackingStatus & 1) !== 0;
   const cpValid = (o.trackingStatus & 2) !== 0;
   return [gnss, o.satelliteId, o.constellationId === 0 && o.signalId === 0 ? 'L1 C/A (0)' : 'ID ' + o.signalId,

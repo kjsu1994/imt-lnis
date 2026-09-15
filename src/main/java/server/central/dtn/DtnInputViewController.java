@@ -1,6 +1,5 @@
 package server.central.dtn;
 
-import java.io.ByteArrayOutputStream;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -56,14 +55,6 @@ public class DtnInputViewController {
     if (!input.complete() || input.receivedSize() <= 0
         || input.receivedSize() > DtnModels.MAX_INPUT_BYTES)
       throw new IllegalArgumentException("완료된 1 MiB 이하 GRAW 입력이 필요합니다.");
-    var bytes = new ByteArrayOutputStream();
-    for (long i = 0; i < input.chunkCount(); i++) {
-      byte[] chunk = inputs.chunk(id, i);
-      if ((long) bytes.size() + chunk.length > DtnModels.MAX_INPUT_BYTES)
-        throw new IllegalArgumentException("입력 크기 초과");
-      bytes.writeBytes(chunk);
-    }
-    if (bytes.size() != input.receivedSize()) throw new IllegalArgumentException("입력 크기 불일치");
-    return GrawCodec.splitLengthPrefixed(bytes.toByteArray());
+    return GrawCodec.splitLengthPrefixed(inputs.readChunks(input, DtnModels.MAX_INPUT_BYTES));
   }
 }

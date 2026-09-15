@@ -2,7 +2,7 @@ import {requestJson} from '../common/http.js?v=20260915-structure';
 import {createDtnLog} from './dtn-log.js?v=20260915-structure';
 import {initAdapterHealth} from './dtn-adapter-health.js?v=20260915-structure';
 import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20260915-structure';
-import {createObservationView} from './dtn-observations.js?v=20260915-structure';
+import {createObservationView, numeric} from './dtn-observations.js?v=20260915-input-cleanup';
 
 const api = '/lnis/api/v1';
 const $ = id => document.getElementById(id);
@@ -36,7 +36,7 @@ function pill(id, text, state = '') {
 }
 
 function number(value, digits = 3) {
-  return typeof value === 'number' && Number.isFinite(value) ? value.toFixed(digits) : '-';
+  return numeric(value, digits, '-');
 }
 
 function time(value) {

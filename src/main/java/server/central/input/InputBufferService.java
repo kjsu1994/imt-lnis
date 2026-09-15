@@ -7,6 +7,7 @@ import server.central.config.StorageProperties;
 import server.central.session.SessionRepository;
 import server.shared.model.LnisModels.InputKind;
 
+import java.io.ByteArrayOutputStream;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
@@ -169,6 +170,23 @@ public class InputBufferService {
             throw new IllegalArgumentException("Input chunk not found");
         }
         return value;
+    }
+
+    /** 메모리에 읽는 입력의 상한과 저장된 크기를 검증한다. 완료 여부는 호출 기능에서 확인한다. */
+    public byte[] readChunks(InputBufferEntity input, int maximumBytes)
+    {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        for (long i = 0; i < input.chunkCount(); i++) {
+            byte[] chunk = chunk(input.inputId(), i);
+            if ((long) bytes.size() + chunk.length > maximumBytes) {
+                throw new IllegalArgumentException("입력 크기 초과");
+            }
+            bytes.writeBytes(chunk);
+        }
+        if (bytes.size() != input.receivedSize()) {
+            throw new IllegalArgumentException("입력 크기 불일치");
+        }
+        return bytes.toByteArray();
     }
 
     @Transactional

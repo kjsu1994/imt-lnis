@@ -3,6 +3,7 @@ package server.central.dtn;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import java.util.*;
+import server.shared.model.DtnModels;
 
 @RestController
 @RequestMapping("/lnis/api/v1/dtn/iq")
@@ -21,16 +22,9 @@ public class IqController {
     if(logs!=null) logs.add(request.inputId(),"INPUT","I/Q 준비",true,"I/Q 생성 요청 · 입력 및 지구 PVT 확인");
     try {
     var input=inputs.get(request.inputId());
-    if(!input.complete() || input.receivedSize()<=0 || input.receivedSize()>1048576)
+    if(!input.complete() || input.receivedSize()<=0 || input.receivedSize()>DtnModels.MAX_INPUT_BYTES)
       throw new IllegalArgumentException("완료된 1 MiB 이하 GNSS 입력이 필요합니다.");
-    var bytes=new java.io.ByteArrayOutputStream();
-    for(long i=0;i<input.chunkCount();i++) {
-      byte[] chunk=inputs.chunk(request.inputId(),i);
-      if(bytes.size()+chunk.length>1048576) throw new IllegalArgumentException("입력 크기 초과");
-      bytes.writeBytes(chunk);
-    }
-    if(bytes.size()!=input.receivedSize()) throw new IllegalArgumentException("입력 크기 불일치");
-    var records=server.shared.codec.GrawCodec.splitLengthPrefixed(bytes.toByteArray());
+    var records=server.shared.codec.GrawCodec.splitLengthPrefixed(inputs.readChunks(input,DtnModels.MAX_INPUT_BYTES));
     if(calculator==null) throw new IllegalStateException("지구 PVT 계산기가 필요합니다.");
     long started=System.nanoTime();
     if(logs!=null) logs.add(request.inputId(),"INPUT","PVT",true,"I/Q 입력용 지구 PVT 계산 시작");

@@ -1,4 +1,5 @@
 import {pageSource} from './browser-source.mjs';
+import {numeric} from '../../main/resources/static/assets/dtn/dtn-observations.js';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
@@ -15,6 +16,7 @@ const elements = new Map([...html.matchAll(/id="([^"]+)"/g)].map(([, id]) => [id
 let nextTests = [], report = {}, reportRequest = null;
 const requests = [];
 const context = {
+  numeric,
   renderIqFile() {},
   createDtnLog: () => ({write() {},setContext() {},refresh() {}}),
   document: {getElementById(id) { assert.ok(elements.has(id), 'DOM missing: ' + id); return elements.get(id); }},
