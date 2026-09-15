@@ -5,13 +5,13 @@ import {
     setPill,
     downloads,
     renderMetrics,
-} from './api.js?v=20260824-integrated-report';
+} from '../common/api.js?v=20260915-structure';
 import {
     formatEventLog,
     describeTestType,
     describeTestCondition,
-} from './event-log.js?v=20260823-frame7';
-import { renderFrameEvidence } from './frame-evidence.js?v=20260824-frame-label';
+} from './event-log.js?v=20260915-structure';
+import { renderFrameEvidence } from './frame-evidence.js?v=20260915-structure';
 
 const $ = (id) => document.getElementById(id);
 const eventLog = $('event-log');

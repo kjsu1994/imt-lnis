@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {payloadUrl, displayedJson, createPayloadViewer, renderIqFile} from '../../main/resources/static/assets/dtn-payload.js';
+import {payloadUrl, displayedJson, createPayloadViewer, renderIqFile} from '../../main/resources/static/assets/dtn/dtn-payload.js';
 
 const original = '{\r\n  "note": "한글 <script>alert(1)</script>", "value": 1\r\n}\r\n';
 assert.equal(displayedJson(original, false), original);

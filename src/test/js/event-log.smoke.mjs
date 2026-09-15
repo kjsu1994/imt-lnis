@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { formatEventLog } from '../../main/resources/static/assets/event-log.js';
+import { formatEventLog } from '../../main/resources/static/assets/afs/event-log.js';
 
 const sessionId = 'event-log-regression-test';
 

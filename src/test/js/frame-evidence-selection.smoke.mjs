@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {
     frameOptionLabel,
     selectInitialFrameIndex,
-} from '../../main/resources/static/assets/frame-evidence.js';
+} from '../../main/resources/static/assets/afs/frame-evidence.js';
 
 const summaries = [
     {

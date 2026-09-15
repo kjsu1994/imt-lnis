@@ -63,6 +63,8 @@ tasks.register('webTest') {
     description = '브라우저 JavaScript 회귀시험을 실행한다.'
     doLast {
         [
+                'src/test/js/http.smoke.mjs',
+                'src/test/js/assets.smoke.mjs',
                 'src/test/js/event-log.smoke.mjs',
                 'src/test/js/frame-evidence-selection.smoke.mjs',
                 'src/test/js/result-presentation.smoke.mjs',

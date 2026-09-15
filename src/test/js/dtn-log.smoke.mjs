@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {createDtnLog,logLine} from '../../main/resources/static/assets/dtn-log.js';
+import {createDtnLog,logLine} from '../../main/resources/static/assets/dtn/dtn-log.js';
 class Element {
   constructor(){this.value='';this.textContent='';this.scrollTop=0;this.scrollHeight=100;this.clientHeight=100;}
   setAttribute(k,v){this[k]=v;} removeAttribute(k){delete this[k];}

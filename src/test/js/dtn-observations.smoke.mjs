@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {numeric, observationCells, navigationCells} from '../../main/resources/static/assets/dtn-observations.js';
+import {numeric, observationCells, navigationCells} from '../../main/resources/static/assets/dtn/dtn-observations.js';
 
 assert.equal(numeric(null), '—');
 assert.equal(numeric(NaN), '—');

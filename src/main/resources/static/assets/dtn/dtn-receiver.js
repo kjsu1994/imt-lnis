@@ -1,7 +1,8 @@
-import {createDtnLog} from './dtn-log.js?v=20260915-json-toggle';
-import {initAdapterHealth} from './dtn-adapter-health.js?v=20260915-clear';
-import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20260915-json-toggle';
-import {createObservationView} from './dtn-observations.js?v=20260915-json-toggle';
+import {requestJson} from '../common/http.js?v=20260915-structure';
+import {createDtnLog} from './dtn-log.js?v=20260915-structure';
+import {initAdapterHealth} from './dtn-adapter-health.js?v=20260915-structure';
+import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20260915-structure';
+import {createObservationView} from './dtn-observations.js?v=20260915-structure';
 
 const api = '/lnis/api/v1';
 const $ = id => document.getElementById(id);
@@ -22,10 +23,8 @@ const observations = createObservationView($('dtn-observations'), index => {
 });
 observations.setData(null);
 
-async function get(path) {
-  const response = await fetch(api + path, {cache: 'no-store'});
-  if (!response.ok) throw new Error('HTTP ' + response.status);
-  return response.json();
+function get(path) {
+  return requestJson(path, {cache: 'no-store'}, {errorDetails: false});
 }
 
 const logView=createDtnLog($('dtn-log'));

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { buildResultPresentation } from '../../main/resources/static/assets/api.js';
+import { buildResultPresentation } from '../../main/resources/static/assets/common/api.js';
 
 const result = {
     role: 'RECEIVER',

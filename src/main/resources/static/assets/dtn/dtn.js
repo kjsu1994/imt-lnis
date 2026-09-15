@@ -1,7 +1,8 @@
-import {createDtnLog} from './dtn-log.js?v=20260915-json-toggle';
-import {initAdapterHealth} from './dtn-adapter-health.js?v=20260915-clear';
-import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20260915-json-toggle';
-import {createObservationView, numeric} from './dtn-observations.js?v=20260915-json-toggle';
+import {requestJson} from '../common/http.js?v=20260915-structure';
+import {createDtnLog} from './dtn-log.js?v=20260915-structure';
+import {initAdapterHealth, validAdapterUrl} from './dtn-adapter-health.js?v=20260915-structure';
+import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20260915-structure';
+import {createObservationView, numeric} from './dtn-observations.js?v=20260915-structure';
 
 const api = '/lnis/api/v1', $ = id => document.getElementById(id);
 const payload = createPayloadViewer($('dtn-payload'), {sentOnly: true});
@@ -18,11 +19,8 @@ const locked = () => busy || active() || generatingIq();
 const view = createObservationView($('dtn-observations'), index => { epochIndex = index; renderPvt(); });
 view.setData(null);
 
-async function request(path, options = {}) {
-  const response = await fetch(api + path, {cache: 'no-store', ...options});
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body.detail || body.message || ('HTTP ' + response.status));
-  return body;
+function request(path, options = {}) {
+  return requestJson(path, {cache: 'no-store', ...options}, {allowEmpty: true});
 }
 const post = (path, body) => request(path, {method: 'POST', headers: {'Content-Type': 'application/json'},
   body: body === undefined ? undefined : JSON.stringify(body)});
@@ -32,14 +30,7 @@ function pill(id, text, state = '') { $(id).textContent = text; $(id).className 
 function destination(text, state = 'unknown') {
   $('destination-state').textContent = text; $('destination-dot').className = 'connection-dot ' + state;
 }
-function buildAdapterUrl(id) {
-  const value = $(id).value.trim();
-  try {
-    const url = new URL(value);
-    return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password ? value : null;
-  } catch { return null; }
-}
-const buildSendUrl = () => buildAdapterUrl('dtn-send-url');
+const buildSendUrl = () => validAdapterUrl($('dtn-send-url').value);
 const urlValid = () => !!buildSendUrl();
 function renderPvt() {
   const value = pvt[epochIndex];

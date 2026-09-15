@@ -29,6 +29,25 @@ class WebPageControllerTest {
   }
 
   @Test
+  void legacyAssetsRedirectToResolvableModulesAndStyles() throws Exception {
+    var aliases = java.util.Map.ofEntries(
+        java.util.Map.entry("app.css", "common/app.css"),
+        java.util.Map.entry("sender.js", "afs/sender.js"),
+        java.util.Map.entry("receiver.js", "afs/receiver.js"),
+        java.util.Map.entry("dtn.js", "dtn/dtn.js"),
+        java.util.Map.entry("dtn-payload.css", "dtn/dtn-ui.css"),
+        java.util.Map.entry("dtn-receiver.css", "dtn/dtn-ui.css"),
+        java.util.Map.entry("dtn-adapter-health.js", "dtn/dtn-adapter-health.js"));
+    for (var alias : aliases.entrySet()) {
+      mvc.perform(get("/lnis/assets/" + alias.getKey())).andExpect(status().isFound())
+          .andExpect(redirectedUrl("/lnis/assets/" + alias.getValue()));
+      mvc.perform(get("/lnis/assets/" + alias.getValue())).andExpect(status().isOk());
+    }
+    mvc.perform(get("/lnis/dtntest/sender/clear")).andExpect(status().isOk());
+    mvc.perform(get("/lnis/dtntest/receiver/clear")).andExpect(status().isOk());
+  }
+
+  @Test
   void servesNewAndLegacyPagesWithoutNginx() throws Exception {
     mvc.perform(get("/"))
         .andExpect(status().isFound())
@@ -49,10 +68,14 @@ class WebPageControllerTest {
         .andExpect(content().string(org.hamcrest.Matchers.containsString("/lnis/dtntest/receiver")));
     mvc.perform(get("/dtn-receiver.html")).andExpect(status().isOk())
         .andExpect(content().string(org.hamcrest.Matchers.containsString("/lnis/dtntest/sender")));
-    mvc.perform(get("/lnis/assets/dtn-receiver.js")).andExpect(status().isOk());
+    mvc.perform(get("/lnis/assets/dtn-receiver.js")).andExpect(status().isFound())
+        .andExpect(redirectedUrl("/lnis/assets/dtn/dtn-receiver.js"));
+    mvc.perform(get("/lnis/assets/dtn/dtn-receiver.js")).andExpect(status().isOk());
     mvc.perform(get("/lnis/api/v1/dtn/tests")).andExpect(status().isOk())
         .andExpect(jsonPath("$").isArray());
-    mvc.perform(get("/lnis/assets/api.js")).andExpect(status().isOk());
+    mvc.perform(get("/lnis/assets/api.js")).andExpect(status().isFound())
+        .andExpect(redirectedUrl("/lnis/assets/common/api.js"));
+    mvc.perform(get("/lnis/assets/common/api.js")).andExpect(status().isOk());
     mvc.perform(get("/lnis/api/v1/discovery"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.service").value("lnis-server"));

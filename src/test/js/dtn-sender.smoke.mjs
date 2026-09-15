@@ -1,3 +1,4 @@
+import {pageSource} from './browser-source.mjs';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
@@ -8,8 +9,7 @@ assert.ok(!html.includes('class="card dtn-comparison-card"'), 'PVT comparison mu
 assert.ok(!html.includes('id="dtn-comparison"') && !html.includes('id="dtn-report"'), 'comparison and report link are receiver-only');
 assert.ok(capturePanel.includes('id="dtn-baud"'), 'serial speed remains available in COM input');
 assert.ok(!capturePanel.includes('<details'), 'serial settings must be visible without expanding');
-const source = readFileSync(new URL('../../main/resources/static/assets/dtn.js', import.meta.url), 'utf8')
-  .replace(/^import .*;\r?\n/gm, '').replace(/initialize\(\);\s*$/, 'globalThis.ready = initialize();');
+const source = pageSource('dtn.js');
 class Element {
   constructor() { this.value = ''; this.files = []; this.textContent = ''; this.classList = {toggle() {}}; }
   replaceChildren(...children) { this.value = children[0]?.value ?? ''; }
@@ -61,7 +61,7 @@ const context = {
     return {ok: true, json: async () => body};
   }
 };
-vm.createContext(context); vm.runInContext(readFileSync(new URL('../../main/resources/static/assets/dtn-adapter-health.js', import.meta.url), 'utf8').replace('export function', 'function') + '\n' + source, context); await context.ready;
+vm.createContext(context); vm.runInContext(source, context); await context.ready;
 assert.equal(elements.has('dtn-example'), false);
 assert.equal(html.includes('합성 GRAW 다운로드'), false);
 assert.equal(html.includes('합성 데이터 · 실측 아님'), false);
@@ -186,7 +186,7 @@ const cleared = vm.createContext({...context, location: {...context.location, pa
     if (url.endsWith('/dtn/tests')) { clearedHistoryRequests++; return {ok: true, json: async () => [{testId:'previous',state:'COMPLETED'}]}; }
     return context.fetch(url, options);
   }});
-vm.runInContext(readFileSync(new URL('../../main/resources/static/assets/dtn-adapter-health.js', import.meta.url), 'utf8').replace('export function', 'function') + '\n' + source, cleared);
+vm.runInContext(source, cleared);
 await cleared.ready;
 assert.equal(clearedHistoryRequests, 0);
 assert.equal(savedAddresses.has('lnis.adapter-url.dtn'), false);

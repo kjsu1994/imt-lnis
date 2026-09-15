@@ -1,3 +1,58 @@
+/* JSON and I/Q views */
+.dtn-payload-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.card:has(> .dtn-payload-controls) { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; }
+.card:has(> .dtn-payload-controls) > h2 { margin: 0; margin-right: auto; }
+.card > .dtn-payload-controls { margin: 0; }
+.card:has(> .dtn-payload-controls) > p { flex-basis: 100%; margin: 0; font-size: 12px; color: var(--muted); }
+.card:has(> .dtn-payload-controls) > div:not(.dtn-payload-controls) { width: 100%; min-width: 0; }
+.card:has(> .dtn-payload-controls) [hidden] { display: none !important; }
+.iq-file-view { display: grid; gap: 8px; font-size: 13px; min-width: 0; }
+.iq-file-summary { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.iq-file-path { overflow-wrap: anywhere; font-family: Consolas, monospace; color: #526773; }
+.iq-file-view details > summary { cursor: pointer; color: #35515d; font-weight: 600; }
+.iq-file-view details > div, .iq-file-view details > small { margin-top: 8px; }
+.iq-sample-scroll { max-height: 180px; overflow: auto; }
+.iq-sample-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.iq-sample-table th, .iq-sample-table td { padding: 4px 12px; text-align: right; border-bottom: 1px solid #e4ebee; }
+.iq-sample-table th { position: sticky; top: 0; background: #f4f7f8; }
+.dtn-payload-controls label { margin: 0; }
+.dtn-payload-header { width: 100%; }
+.dtn-payload-header > button { font-size: 16px; }
+.dtn-payload-header .dtn-payload-download { margin-left: auto; }
+.dtn-payload-controls a {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #c7d4d8;
+  border-radius: 8px;
+  background: #f7f9f9;
+  color: #35515d;
+  padding: 9px 13px;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+.dtn-payload-controls a:hover { filter: brightness(.97); }
+.dtn-payload-controls a:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.dtn-payload-controls input[type="checkbox"] { width: auto; }
+.dtn-payload-text {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 200px;
+  white-space: pre;
+  overflow: auto;
+  resize: vertical;
+  font-family: Consolas, monospace;
+  font-size: 13px;
+}
+
+/* Shared DTN layout and role overrides */
 .connection-summary {
     display: flex;
 
@@ -7,7 +62,6 @@
 
     flex-wrap: wrap;
 }
-
 
 .connection-item {
     display: flex;
@@ -19,12 +73,9 @@
     font-size: 12px;
 }
 
-
 .connection-item strong {
     color: var(--ink);
 }
-
-
 
 .connection-dot {
     display: inline-block;
@@ -37,7 +88,6 @@
     background: #9caeb5;
 }
 
-
 .connection-dot.online {
     background: #19a974;
 
@@ -45,15 +95,12 @@
             0 0 0 3px rgba(25, 169, 116, .15);
 }
 
-
 .connection-dot.offline {
     background: #d54b4b;
 
     box-shadow:
             0 0 0 3px rgba(213, 75, 75, .12);
 }
-
-
 
 /* =========================================================
  * 시험 데이터 종류
@@ -70,7 +117,6 @@
     margin-bottom: 20px;
 }
 
-
 .test-type-button {
     padding: 14px;
 
@@ -79,7 +125,6 @@
     border: 1px solid var(--line);
 }
 
-
 .test-type-button.active {
     background: var(--teal);
 
@@ -87,8 +132,6 @@
 
     color: #fff;
 }
-
-
 
 /* =========================================================
  * DTN / HDTN 전송 방식
@@ -106,7 +149,6 @@
     background: #fbfcfc;
 }
 
-
 .transport-mode-title {
     display: flex;
 
@@ -117,7 +159,6 @@
     margin-bottom: 10px;
 }
 
-
 .transport-mode-title span {
     color: var(--muted);
 
@@ -126,13 +167,11 @@
     font-weight: 700;
 }
 
-
 .transport-mode-title strong {
     color: var(--navy);
 
     font-size: 13px;
 }
-
 
 .transport-mode-selector {
     display: grid;
@@ -142,7 +181,6 @@
 
     gap: 8px;
 }
-
 
 .transport-mode-button {
     padding: 11px 10px;
@@ -156,11 +194,9 @@
     cursor: pointer;
 }
 
-
 .transport-mode-button:hover {
     border-color: var(--teal);
 }
-
 
 .transport-mode-button.active {
     border-color: var(--teal);
@@ -170,13 +206,11 @@
     color: #fff;
 }
 
-
 .transport-mode-button:disabled {
     cursor: not-allowed;
 
     opacity: .6;
 }
-
 
 .transport-mode-message {
     margin: 10px 0 0;
@@ -185,8 +219,6 @@
 
     font-size: 12px;
 }
-
-
 
 /* =========================================================
  * 목적지
@@ -205,11 +237,9 @@
     align-items: end;
 }
 
-
 .port-field input {
     text-align: center;
 }
-
 
 .destination-status {
     display: flex;
@@ -229,25 +259,20 @@
     background: #fbfcfc;
 }
 
-
 .destination-status small,
 .destination-status strong {
     display: block;
 }
 
-
 .destination-status small {
     color: var(--muted);
 }
-
 
 .destination-status strong {
     margin-top: 2px;
 
     font-size: 13px;
 }
-
-
 
 /* =========================================================
  * 입력 방식
@@ -271,13 +296,11 @@ body[data-page^="dtn-"] .receiver-pvt-pair .pvt-grid { grid-template-columns: re
     margin-bottom: 18px;
 }
 
-
 .input-mode {
     padding: 7px 13px;
 
     font-size: 12px;
 }
-
 
 .input-mode.active {
     background: var(--navy);
@@ -287,14 +310,9 @@ body[data-page^="dtn-"] .receiver-pvt-pair .pvt-grid { grid-template-columns: re
     color: #fff;
 }
 
-
-
 /* =========================================================
  * 상세 통신 설정
  * ========================================================= */
-
-
-
 
 /* =========================================================
  * 공통 버튼
@@ -307,8 +325,6 @@ body[data-page^="dtn-"] .receiver-pvt-pair .pvt-grid { grid-template-columns: re
 
     padding: 12px;
 }
-
-
 
 /* =========================================================
  * GNSS 에포크 원본 관측값
@@ -522,8 +538,6 @@ body[data-page^="dtn-"] .receiver-pvt-pair .pvt-grid { grid-template-columns: re
     font-size: 12px;
 }
 
-
-
 /* =========================================================
  * GNSS 시간
  * ========================================================= */
@@ -532,12 +546,10 @@ body[data-page^="dtn-"] .receiver-pvt-pair .pvt-grid { grid-template-columns: re
     text-align: right;
 }
 
-
 .gnss-time span,
 .gnss-time strong {
     display: block;
 }
-
 
 .gnss-time span {
     font-size: 11px;
@@ -545,14 +557,11 @@ body[data-page^="dtn-"] .receiver-pvt-pair .pvt-grid { grid-template-columns: re
     color: var(--muted);
 }
 
-
 .gnss-time strong {
     margin-top: 3px;
 
     color: var(--navy);
 }
-
-
 
 /* =========================================================
  * PVT
@@ -567,7 +576,6 @@ body[data-page^="dtn-"] .receiver-pvt-pair .pvt-grid { grid-template-columns: re
     gap: 10px;
 }
 
-
 .pvt-value {
     padding: 13px;
 
@@ -578,13 +586,11 @@ body[data-page^="dtn-"] .receiver-pvt-pair .pvt-grid { grid-template-columns: re
     background: #fbfcfc;
 }
 
-
 .pvt-value span,
 .pvt-value strong,
 .pvt-value small {
     display: block;
 }
-
 
 .pvt-value span {
     color: var(--muted);
@@ -592,19 +598,15 @@ body[data-page^="dtn-"] .receiver-pvt-pair .pvt-grid { grid-template-columns: re
     font-size: 11px;
 }
 
-
 .pvt-value strong {
     margin-top: 4px;
 
     font-size: 16px;
 }
 
-
 .pvt-value small {
     margin-top: 2px;
 }
-
-
 
 /* =========================================================
  * 전송 시험
@@ -620,11 +622,9 @@ body[data-page^="dtn-"] .receiver-pvt-pair .pvt-grid { grid-template-columns: re
     gap: 20px;
 }
 
-
 .test-action-card h2 {
     margin-bottom: 4px;
 }
-
 
 .test-action-card p {
     margin: 0;
@@ -632,14 +632,11 @@ body[data-page^="dtn-"] .receiver-pvt-pair .pvt-grid { grid-template-columns: re
     color: var(--muted);
 }
 
-
 .test-start-button {
     min-width: 210px;
 
     padding: 13px 20px;
 }
-
-
 
 /* =========================================================
  * 시험 결과
@@ -657,8 +654,6 @@ body[data-page^="dtn-"] .receiver-pvt-pair .pvt-grid { grid-template-columns: re
     white-space: pre-wrap;
 }
 
-
-
 /* =========================================================
  * Responsive
  * ========================================================= */
@@ -669,28 +664,23 @@ body[data-page^="dtn-"] .receiver-pvt-pair .pvt-grid { grid-template-columns: re
         grid-template-columns: 1fr;
     }
 
-
     .transport-mode-selector {
         grid-template-columns:
             repeat(2, minmax(0, 1fr));
     }
 
-
     .destination-row {
         grid-template-columns: 1fr;
     }
-
 
     .pvt-grid {
         grid-template-columns:
             repeat(2, 1fr);
     }
 
-
     .test-action-card {
         display: block;
     }
-
 
     .test-start-button {
         width: 100%;
@@ -843,4 +833,46 @@ body[data-page^="dtn-"] .adapter-health-developer pre { max-height: 320px; margi
   body[data-page^="dtn-"] .adapter-health-content { grid-template-columns: minmax(0, 1fr); }
   body[data-page^="dtn-"] .adapter-health-item,
   body[data-page^="dtn-"] .adapter-health-time { min-width: 0; overflow-wrap: anywhere; }
+}
+
+/* Receiver-only layout */
+/* 수신 화면은 조작보다 관찰이 중심이다. 핵심 상태는 펼치고 상세 원문/로그는 필요할 때 연다. */
+body[data-page="dtn-receiver"] main { display: grid; gap: 14px; }
+body[data-page="dtn-receiver"] .status-strip { margin: 0; }
+body[data-page="dtn-receiver"] .destination-row { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; }
+body[data-page="dtn-receiver"] .destination-row > label { flex: 1 1 260px; min-width: 0; margin: 0; }
+body[data-page="dtn-receiver"] .destination-status { flex: 0 0 auto; min-height: 40px; padding: 8px 12px; box-sizing: border-box; }
+body[data-page="dtn-receiver"] .destination-status > div { display: flex; align-items: center; gap: 10px; white-space: nowrap; }
+body[data-page="dtn-receiver"] :is(.test-type-selector, .transport-mode-selector) button.active:disabled { opacity: 1; color: var(--teal); background: #e6f4f0; border-color: #a6d6c8; }
+.receiver-overview .card-title, .receiver-pvt .card-title { margin-bottom: 10px; flex-wrap: wrap; gap: 8px; }
+.receiver-overview .card-title h2, .receiver-pvt .card-title h2 { margin: 0; }
+.receiver-endpoint, .receiver-selection, .receiver-epoch-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.receiver-endpoint label, .receiver-selection label, .receiver-epoch-row label { margin: 0; white-space: nowrap; }
+.receiver-endpoint input { flex: 1 1 320px; min-width: 0; margin: 0; font-family: Consolas, monospace; }
+.receiver-endpoint button, .receiver-selection button { margin: 0; white-space: nowrap; }
+.receiver-selection { margin-top: 16px; }
+.receiver-selection select { flex: 1 1 300px; min-width: 0; margin: 0; }
+.receiver-flow { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; padding: 0; margin: 14px 0 10px; }
+.receiver-flow li { padding: 6px 12px; border: 1px solid var(--line); border-radius: 7px; color: var(--muted); }
+.receiver-flow .done { color: var(--teal); background: #e6f4f0; border-color: #a6d6c8; }
+.receiver-flow .active { color: var(--amber); background: #fff4d9; border-color: #e8cf91; }
+.receiver-flow .failed { color: var(--red); background: #ffe9e9; border-color: #efbcbc; }
+.receiver-result-line { display: flex; flex-wrap: wrap; gap: 6px 12px; overflow-wrap: anywhere; }
+.receiver-error { color: var(--red); }
+.receiver-meta { display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: 12px; color: var(--muted); margin-top: 7px; overflow-wrap: anywhere; }
+.receiver-result-links { display: flex; flex-wrap: wrap; gap: 12px; font-size: 13px; }
+.receiver-epoch-row { margin: 12px 0; }
+.receiver-epoch-row select { flex: 1 1 280px; min-width: 0; margin: 0; }
+.receiver-pvt .pvt-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 8px; }
+.receiver-pvt .pvt-value { padding: 10px; min-width: 0; }
+.receiver-pvt .pvt-value strong { overflow-wrap: anywhere; }
+.receiver-payload h2 { margin-bottom: 10px; }
+.receiver-payload .dtn-payload-controls { margin-bottom: 0; }
+.receiver-payload p:empty { display: none; }
+.receiver-log summary { cursor: pointer; font-weight: 700; }
+.receiver-log-actions { display: flex; justify-content: end; margin-top: 8px; }
+.receiver-log .log { height: 180px; }
+@media(max-width: 600px) {
+  .receiver-pvt .pvt-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .receiver-endpoint input { flex-basis: 100%; }
 }

@@ -1,16 +1,12 @@
 // AFS/DTN 송신 화면이 함께 사용하는 작은 연결 설정 패널이다.
-const endpoint = '/lnis/api/v1/node/connection';
+import {requestJson} from './http.js?v=20260915-structure';
 
-export async function connectionRequest(method, body) {
-  const response = await fetch(endpoint + (method === 'POST' ? '/test' : ''), {
+export function connectionRequest(method, body) {
+  return requestJson('/node/connection' + (method === 'POST' ? '/test' : ''), {
     method, cache: 'no-store',
     headers: body ? {'Content-Type': 'application/json'} : {},
     body: body ? JSON.stringify(body) : undefined
-  });
-  if (response.status === 404 && method === 'GET') return null; // 기존 중앙 서버 화면은 변경하지 않는다.
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.detail || data.message || ('HTTP ' + response.status));
-  return data;
+  }, {notFoundIsNull: method === 'GET'});
 }
 
 // 기존 전송 설정 안의 입력란에 연결한다. 별도 카드나 폼을 만들지 않는다.

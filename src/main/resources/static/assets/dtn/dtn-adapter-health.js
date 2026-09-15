@@ -1,3 +1,11 @@
+export function validAdapterUrl(value) {
+  const address = value.trim();
+  try {
+    const url = new URL(address);
+    return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password ? address : null;
+  } catch { return null; }
+}
+
 export function initAdapterHealth(defaultUrl, log = () => {}) {
   const $ = id => document.getElementById(id);
   const input = $('dtn-send-url'), button = $('dtn-adapter-health');

@@ -1,11 +1,11 @@
+import {pageSource} from './browser-source.mjs';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 
 // 수신 화면의 실제 스크립트를 실행한다. 운영 DB에 시험 자료를 넣지 않는 DOM/API 대역이다.
 const html = readFileSync(new URL('../../main/resources/static/dtn-receiver.html', import.meta.url), 'utf8');
-const source = readFileSync(new URL('../../main/resources/static/assets/dtn-receiver.js', import.meta.url), 'utf8')
-  .replace(/^import .*;\r?\n/gm, '').replace(/initialize\(\);\s*$/, 'globalThis.ready = initialize();');
+const source = pageSource('dtn-receiver.js');
 const elements = new Map([...html.matchAll(/id="([^"]+)"/g)].map(([, id]) => [id, {
   value: '', textContent: '', hidden: false, disabled: false,
   setAttribute(key, value) { this[key] = value; },
@@ -34,7 +34,7 @@ const context = {
   }
 };
 vm.createContext(context);
-vm.runInContext(readFileSync(new URL('../../main/resources/static/assets/dtn-adapter-health.js', import.meta.url), 'utf8').replace('export function', 'function') + '\n' + source, context);
+vm.runInContext(source, context);
 await context.ready;
 assert.equal(elements.get('receive-url').value, 'http://192.168.1.72:8089/lnis/api/v1/dtn/receive');
 assert.equal(elements.get('receive-state').textContent, '수신 대기');
@@ -129,7 +129,7 @@ console.log('PASS: receiver empty/completed/invalid/failed states, epochs, stale
 nextTests = [done];
 const cleared = vm.createContext({...context, location: {...context.location, pathname: '/lnis/dtntest/receiver/clear'}});
 elements.get('dtn-tests').value = '';
-vm.runInContext(readFileSync(new URL('../../main/resources/static/assets/dtn-adapter-health.js', import.meta.url), 'utf8').replace('export function', 'function') + '\n' + source, cleared);
+vm.runInContext(source, cleared);
 await cleared.ready;
 assert.equal(elements.get('dtn-tests').value, '', 'clear must not auto-select stored tests');
 await cleared.poll();

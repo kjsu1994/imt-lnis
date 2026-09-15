@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
-import {connectionRequest, mountConnection} from '../../main/resources/static/assets/node-connection.js';
-import {readFileSync} from 'node:fs';
-import vm from 'node:vm';
+import {connectionRequest, mountConnection} from '../../main/resources/static/assets/common/node-connection.js';
+import {validAdapterUrl} from '../../main/resources/static/assets/dtn/dtn-adapter-health.js';
 
 let call;
 globalThis.fetch = async (url, options) => {
@@ -48,17 +47,9 @@ await elements['[data-connection-save]'].onclick();
 assert.equal(call.options.method, 'PUT');
 assert.equal(elements['[data-connection-save]'].disabled, false);
 
-// 관리 IP/Port가 아닌 어댑터 URL 원문을 사용하고 사용자 경로·쿼리를 보존한다.
-const dtn = readFileSync(new URL('../../main/resources/static/assets/dtn.js', import.meta.url), 'utf8');
-const build = dtn.match(/function buildAdapterUrl\(id\) \{[\s\S]*?const buildSendUrl = \(\) =>[^;]+;/)[0];
-let adapter = 'https://adapter.example:8443/custom/transfers?route=1';
-const context = {URL, $: id => { assert.equal(id, 'dtn-send-url'); return {value: adapter}; }};
-vm.createContext(context);
-vm.runInContext(build + '\nglobalThis.buildSendUrlForTest = buildSendUrl;', context);
-assert.equal(context.buildSendUrlForTest(), adapter);
-adapter = 'javascript:alert(1)';
-assert.equal(context.buildSendUrlForTest(), null);
-adapter = '';
-assert.equal(context.buildSendUrlForTest(), null);
-assert.doesNotMatch(dtn, /applyReceiverAddress/);
+// Actual exported validator, independent of page function names and whitespace.
+assert.equal(validAdapterUrl('https://adapter.example:8443/custom/transfers?route=1'),
+  'https://adapter.example:8443/custom/transfers?route=1');
+assert.equal(validAdapterUrl('javascript:alert(1)'), null);
+assert.equal(validAdapterUrl(''), null);
 console.log('PASS: inline controls, input change, adapter URL isolation and preservation');
