@@ -13,7 +13,7 @@ Java와 네이티브 실행기는 같은 컨테이너/JVM에서 동작합니다.
 
 Windows의 WSL Docker에서 실행할 때는 `START.cmd`/`STOP.cmd`를 편의상 사용할 수 있습니다. 이 도우미는 Docker만 제어하며 Windows Agent를 실행하지 않습니다. USB 연결은 자동 구성하지 않습니다.
 
-기존 중앙 서버용 `gradlew.bat build`는 독립 노드로 전환된 운영 폴더를 덮어쓰지 않도록 중단됩니다. 독립 노드 배포는 `linuxNodeDistZip` 산출물을 사용하며 기존 `.env`와 `DB`는 유지하세요.
+기존 중앙 서버용 `gradlew.bat deployComposeBundle`은 독립 노드로 전환된 운영 폴더를 덮어쓰지 않도록 중단됩니다. 독립 노드 배포는 `linuxNodeDistZip` 산출물을 사용하며 기존 `.env`와 `DB`는 유지하세요.
 
 ## 실제 GNSS 수집
 
