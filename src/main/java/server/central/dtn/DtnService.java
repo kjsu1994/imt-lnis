@@ -137,6 +137,32 @@ public class DtnService {
     public synchronized DtnJob create(UUID inputId, String sender, String receiver, String requestedUrl,
             String testType, String senderMode, String receiverMode)
     {
+        URI destination = validateStart(sender, receiver, requestedUrl, testType, senderMode, receiverMode);
+        if ("IQ_SAMPLE".equals(testType)) {
+            if (iq == null || inputId == null) throw new IllegalArgumentException("생성된 I/Q 파일을 선택하세요.");
+            DtnJob job = newJob(sender, receiver, destination, testType, senderMode, receiverMode);
+            job.setIqFileId(inputId);
+            beginLog(job, inputId);
+            update(job, "PREPARING", "I/Q 파일 무결성 확인 중");
+            Thread.ofVirtual().name("iq-prepare").start(() -> prepareIq(job, inputId, senderMode, receiverMode));
+            return job;
+        }
+        byte[] data = readInput(inputId);
+        DtnJob job = newJob(sender, receiver, destination, testType, senderMode, receiverMode);
+        job.setInputId(inputId);
+        beginLog(job,inputId);
+        update(job, "PREPARING", "기준 PVT 계산 및 " + testType + " 준비 중");
+        try {
+            sendChunks(job, sender, "GNSS_RAW".equals(testType) ? "PREPARE_RAW" : "PREPARE", data);
+        } catch (RuntimeException e) {
+            fail(job, e);
+        }
+        return job;
+    }
+
+    private URI validateStart(String sender, String receiver, String requestedUrl, String testType,
+            String senderMode, String receiverMode)
+    {
         if (senderMode == null || receiverMode == null || !List.of("DTN", "HDTN").contains(senderMode) || !List.of("DTN", "HDTN").contains(receiverMode))
             throw new IllegalArgumentException("전송 경로는 DTN 또는 HDTN을 선택하세요.");
         if (testType == null || !List.of("AFS_METADATA", "GNSS_RAW", "IQ_SAMPLE").contains(testType))
@@ -162,34 +188,27 @@ public class DtnService {
         if (rx.role() != AgentRole.RECEIVER) {
             throw new IllegalArgumentException("Receiver 역할 오류");
         }
-        if ("IQ_SAMPLE".equals(testType)) {
-            if (iq == null || inputId == null) throw new IllegalArgumentException("생성된 I/Q 파일을 선택하세요.");
-            DtnJob job = new DtnJob();
-            job.setId(UUID.randomUUID()); job.setTestType(testType); job.setDevelopment(development);
-            job.setIqFileId(inputId);
-            job.setSenderMode(senderMode); job.setReceiverMode(receiverMode);
-            job.setSendUrl(destination.toString()); job.setSenderAgentId(sender); job.setReceiverAgentId(receiver);
-            job.setCreatedAt(Instant.now()); beginLog(job,inputId); update(job, "PREPARING", "I/Q 파일 무결성 확인 중");
-            Thread.ofVirtual().name("iq-prepare").start(() -> {
-                try {
-                    IqFile file = iq.completed(inputId);
-                    trace(job.getId(),"I/Q 검증",false,"송신 파일 크기·SHA-256 확인 완료 · "+file.sizeBytes()+" bytes · "+file.sha256());
-                    Transfer transfer = new Transfer(); transfer.setTestId(job.getId());
-                    transfer.setTestType(testType); transfer.setFormat("LNIS-IQ-FILE-v1");
-                    transfer.setProfile("LANS-AFS-IQ-v1");
-                    transfer.setSenderMode(senderMode); transfer.setReceiverMode(receiverMode); transfer.setFile(file);
-                    synchronized (this) {
-                        if (!"PREPARING".equals(get(job.getId()).getState())) return;
-                        var packet = objectMapper.valueToTree(transfer);
-                        ((com.fasterxml.jackson.databind.node.ObjectNode)packet).remove(List.of("prn", "recordCount"));
-                        job.setSentJson(objectMapper.writeValueAsString(packet));
-                        update(job, "WAITING_DTN", "I/Q 파일 경로 전달 및 수신 대기");
-                    }
-                    sendExternal(job.getId(), job.getSentJson());
-                } catch (Exception error) { synchronized (this) { if (ACTIVE.contains(get(job.getId()).getState())) fail(job, error); } }
-            });
-            return job;
-        }
+        return destination;
+    }
+
+    private DtnJob newJob(String sender, String receiver, URI destination, String testType,
+            String senderMode, String receiverMode)
+    {
+        DtnJob job = new DtnJob();
+        job.setId(UUID.randomUUID());
+        job.setTestType(testType);
+        job.setSenderMode(senderMode);
+        job.setReceiverMode(receiverMode);
+        job.setDevelopment(development);
+        job.setSendUrl(destination.toString());
+        job.setSenderAgentId(sender);
+        job.setReceiverAgentId(receiver);
+        job.setCreatedAt(Instant.now());
+        return job;
+    }
+
+    private byte[] readInput(UUID inputId)
+    {
         if (inputId == null) throw new IllegalArgumentException("GNSS 입력을 선택하세요.");
         InputBufferEntity input = inputBufferService.get(inputId);
         if (!input.complete()
@@ -204,25 +223,27 @@ public class DtnService {
         if (data.size() != input.receivedSize()) {
             throw new IllegalStateException("입력 크기 불일치");
         }
-        DtnJob job = new DtnJob();
-        job.setId(UUID.randomUUID());
-        job.setTestType(testType);
-        job.setSenderMode(senderMode);
-        job.setReceiverMode(receiverMode);
-        job.setDevelopment(development);
-        job.setSendUrl(destination.toString());
-        job.setInputId(inputId);
-        job.setSenderAgentId(sender);
-        job.setReceiverAgentId(receiver);
-        job.setCreatedAt(Instant.now());
-        beginLog(job,inputId);
-        update(job, "PREPARING", "기준 PVT 계산 및 " + testType + " 준비 중");
+        return data.toByteArray();
+    }
+
+    private void prepareIq(DtnJob job, UUID inputId, String senderMode, String receiverMode)
+    {
         try {
-            sendChunks(job, sender, "GNSS_RAW".equals(testType) ? "PREPARE_RAW" : "PREPARE", data.toByteArray());
-        } catch (RuntimeException e) {
-            fail(job, e);
-        }
-        return job;
+            IqFile file = iq.completed(inputId);
+            trace(job.getId(),"I/Q 검증",false,"송신 파일 크기·SHA-256 확인 완료 · "+file.sizeBytes()+" bytes · "+file.sha256());
+            Transfer transfer = new Transfer(); transfer.setTestId(job.getId());
+            transfer.setTestType(job.getTestType()); transfer.setFormat("LNIS-IQ-FILE-v1");
+            transfer.setProfile("LANS-AFS-IQ-v1");
+            transfer.setSenderMode(senderMode); transfer.setReceiverMode(receiverMode); transfer.setFile(file);
+            synchronized (this) {
+                if (!"PREPARING".equals(get(job.getId()).getState())) return;
+                var packet = objectMapper.valueToTree(transfer);
+                ((com.fasterxml.jackson.databind.node.ObjectNode)packet).remove(List.of("prn", "recordCount"));
+                job.setSentJson(objectMapper.writeValueAsString(packet));
+                update(job, "WAITING_DTN", "I/Q 파일 경로 전달 및 수신 대기");
+            }
+            sendExternal(job.getId(), job.getSentJson());
+        } catch (Exception error) { synchronized (this) { if (ACTIVE.contains(get(job.getId()).getState())) fail(job, error); } }
     }
 
     /** 브라우저 저장소에 의존하지 않아 별도 수신 PC에서도 최근 시험을 볼 수 있다. */

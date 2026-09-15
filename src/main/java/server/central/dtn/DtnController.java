@@ -107,14 +107,24 @@ public class DtnController {
     public ResponseEntity<Map<String, Object>> create(@Valid @RequestBody CreateRequest request)
             throws Exception
     {
-        DtnJob dtnJob = request.getSenderMode() != null || request.getReceiverMode() != null
-                ? dtnService.create("IQ_SAMPLE".equals(request.getTestType()) ? request.getIqFileId() : request.getInputId(), request.getSenderAgentId(), request.getReceiverAgentId(),
-                        request.getSendUrl(), request.getTestType(), request.getSenderMode(), request.getReceiverMode())
-                : !"AFS_METADATA".equals(request.getTestType())
-                ? dtnService.create("IQ_SAMPLE".equals(request.getTestType()) ? request.getIqFileId() : request.getInputId(), request.getSenderAgentId(), request.getReceiverAgentId(), request.getSendUrl(), request.getTestType())
-                : request.getSendUrl() == null || request.getSendUrl().isBlank()
-                ? dtnService.create(request.getInputId(), request.getSenderAgentId(), request.getReceiverAgentId())
-                : dtnService.create(request.getInputId(), request.getSenderAgentId(), request.getReceiverAgentId(), request.getSendUrl());
+        UUID inputId = request.getInputId();
+        if ("IQ_SAMPLE".equals(request.getTestType())) {
+            inputId = request.getIqFileId();
+        }
+
+        DtnJob dtnJob;
+        if (request.getSenderMode() != null || request.getReceiverMode() != null) {
+            dtnJob = dtnService.create(inputId, request.getSenderAgentId(), request.getReceiverAgentId(),
+                    request.getSendUrl(), request.getTestType(), request.getSenderMode(), request.getReceiverMode());
+        } else if (!"AFS_METADATA".equals(request.getTestType())) {
+            dtnJob = dtnService.create(inputId, request.getSenderAgentId(), request.getReceiverAgentId(),
+                    request.getSendUrl(), request.getTestType());
+        } else if (request.getSendUrl() == null || request.getSendUrl().isBlank()) {
+            dtnJob = dtnService.create(inputId, request.getSenderAgentId(), request.getReceiverAgentId());
+        } else {
+            dtnJob = dtnService.create(inputId, request.getSenderAgentId(), request.getReceiverAgentId(),
+                    request.getSendUrl());
+        }
 
         Map<String, Object> response = summary(dtnJob);
         return new ResponseEntity<>(response, HttpStatus.ACCEPTED);
