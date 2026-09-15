@@ -168,16 +168,13 @@ async function poll(force = false) {
   polling = true;
   $('dtn-refresh').disabled = true;
   try {
-    const [agents, nextTests, config] = await Promise.all([get('/agents'), get('/dtn/tests'), get('/dtn/config')]);
+    const [agents, nextTests] = await Promise.all([get('/agents'), get('/dtn/tests')]);
     tests = nextTests;
     const connection = await get('/node/connection').catch(() => ({}));
     $('reverse-state').textContent = connection.peerOnline == null ? '미확인' : connection.peerOnline ? '연결됨' : '연결 끊김';
     $('reverse-dot').className = 'connection-dot ' + (connection.peerOnline == null ? 'unknown' : connection.peerOnline ? 'online' : 'offline');
     pill('dtn-server-status', '서버 연결됨', 'online');
     renderAgents(agents);
-    pill('receive-auth', config.receiveConfigured ? '수신 인증 설정됨' : '수신 인증 미설정',
-      config.receiveConfigured ? 'online' : 'warning');
-    $('receive-auth').title = '외부 어댑터는 LNIS_DTN_RECEIVE_TOKEN과 같은 Bearer 토큰을 사용해야 합니다. 관리 토큰과 별개입니다.';
     const selected = $('dtn-tests').value;
     $('dtn-tests').replaceChildren(...(clearScreen ? [new Option('시험 선택 · 화면 초기화됨', '')] : []), ...(tests.length ? tests.map(job =>
       new Option(time(job.createdAt) + ' · ' + job.state + ' · ' + job.testId.slice(0, 8), job.testId))
@@ -199,15 +196,6 @@ async function poll(force = false) {
 async function initialize() {
   try { const config = await get('/dtn/config'); initAdapterHealth(config.adapterUrl || '', log); }
   catch (error) { initAdapterHealth('', log); log(error.message); }
-  $('receive-url').value = location.origin + api + '/dtn/receive';
-  try {
-    const response = await fetch(api + '/node', {cache: 'no-store'});
-    if (response.ok) {
-      const node = await response.json();
-      // 컨테이너 내부 IP가 아니라 외부에서 접근하도록 설정한 공개 주소를 표시한다.
-      if (node.baseUrl) $('receive-url').value = node.baseUrl.replace(/\/$/, '') + api + '/dtn/receive';
-    }
-  } catch { /* 중앙 서버 모드에서는 현재 브라우저 주소를 사용한다. */ }
   try {
     const connection = await get('/node/connection');
     $('sender-address').value = connection.baseUrl || '';
@@ -221,15 +209,4 @@ $('dtn-tests').onchange = () => renderTest();
 $('pvt-epoch').onchange = renderEpoch;
 $('dtn-refresh').onclick = () => poll(true);
 
-$('copy-receive-url').onclick = async () => {
-  try {
-    await navigator.clipboard.writeText($('receive-url').value);
-    $('receive-help').textContent = '수신 API 주소를 복사했습니다.';
-  } catch {
-    // 일반 LAN HTTP에서는 클립보드 API가 차단될 수 있으므로 수동 복사를 돕는다.
-    $('receive-url').focus();
-    $('receive-url').select();
-    $('receive-help').textContent = '선택된 주소를 Ctrl+C로 복사하세요.';
-  }
-};
 initialize();

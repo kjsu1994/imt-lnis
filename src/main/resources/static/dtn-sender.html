@@ -4,7 +4,7 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>LNIS DTN Sender</title>
   <link rel="stylesheet" href="/lnis/assets/common/app.css?v=20260915-structure">
-  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20260915-settings">
+  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20260915-sender-primary">
 </head>
 <body data-page="dtn-sender">
 <header>
@@ -96,16 +96,16 @@
   </section>
   </div>
   <div id="dtn-main-view">
-  <section class="card sender-actions" aria-label="시험 실행">
+  <section class="sender-actions" aria-label="시험 실행">
     <div class="sender-summary">
       <strong id="dtn-condition-summary">AFS Frame + Metadata · DTN → HDTN</strong>
       <span id="dtn-input-summary">데이터 없음</span>
       <span class="sender-connection"><span id="dtn-peer-summary-dot" class="connection-dot unknown" aria-hidden="true"></span>수신 서비스 <strong id="dtn-peer-summary">미확인</strong></span>
       <span class="sender-connection"><span id="dtn-adapter-summary-dot" class="connection-dot unknown" aria-hidden="true"></span>송신 adapter <strong id="dtn-adapter-summary">미확인</strong></span>
-    </div>
-    <div class="dtn-send-actions"><p id="dtn-message" role="status"></p>
       <button id="dtn-start" type="button" hidden disabled title="유효한 지구 PVT 한 시점 확보 후 자동 종료 · 최대 120초">수집 시작</button>
-      <button id="dtn-send" type="button" class="primary" disabled>전송시험 시작</button></div>
+      <button id="dtn-send" type="button" class="primary" disabled>전송시험 시작</button>
+    </div>
+    <p id="dtn-message" role="status"></p>
     <div id="dtn-iq-panel" class="hidden">
       <div class="compact-input-row"><button id="iq-generate" type="button">90초 I/Q 생성</button><button id="iq-cancel" type="button" disabled>생성 취소</button>
         <progress id="iq-progress" max="100" value="0" aria-label="I/Q 파일 생성"></progress></div>

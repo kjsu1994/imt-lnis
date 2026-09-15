@@ -840,11 +840,17 @@ body[data-page="dtn-sender"] :is(#dtn-main-view, #dtn-settings-view) { display: 
 body[data-page="dtn-sender"] .settings-heading { gap: 12px; flex-wrap: wrap; }
 body[data-page="dtn-sender"] .settings-heading h2 { margin: 0; }
 body[data-page="dtn-sender"] :is(#dtn-settings-lock, #dtn-settings-feedback) { margin: 0; padding: 8px 12px; background: #fff0cc; border-radius: 8px; overflow-wrap: anywhere; }
-body[data-page="dtn-sender"] .sender-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; font-size: 13px; margin-bottom: 12px; overflow-wrap: anywhere; }
+body[data-page="dtn-sender"] .sender-actions { min-width: 0; }
+body[data-page="dtn-sender"] .sender-summary { display: flex; align-items: center; gap: 16px; font-size: 13px; white-space: nowrap; overflow-x: auto; padding: 2px 0; }
+body[data-page="dtn-sender"] .sender-summary > * { flex-shrink: 0; }
 body[data-page="dtn-sender"] .sender-connection { display: inline-flex; align-items: center; gap: 7px; }
 body[data-page="dtn-sender"] .sender-connection .connection-dot { flex-shrink: 0; }
-body[data-page="dtn-sender"] .sender-actions .dtn-send-actions { flex-wrap: wrap; }
-body[data-page="dtn-sender"] .sender-actions .dtn-send-actions p { margin-right: auto; }
+body[data-page="dtn-sender"] .sender-summary button:not(.primary) { background: none; border: 0; border-radius: 0; padding: 6px 2px; color: var(--teal); font-size: 13px; }
+body[data-page="dtn-sender"] .sender-summary button:not(.primary):hover:not(:disabled) { text-decoration: underline; }
+body[data-page="dtn-sender"] .sender-summary button:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
+body[data-page="dtn-sender"] #dtn-send { margin-left: auto; }
+body[data-page="dtn-sender"] #dtn-message { margin: 4px 0 0; font-size: 12px; color: var(--muted); }
+body[data-page="dtn-sender"] #dtn-message:empty { display: none; }
 body[data-page="dtn-sender"] #dtn-settings-open[aria-expanded="true"] { background: #d9f3eb; color: #06725d; }
 @media (max-width: 600px) {
   body[data-page="dtn-sender"] header { flex-wrap: wrap; }
@@ -866,10 +872,9 @@ body[data-page="dtn-receiver"] .destination-status > div { display: flex; align-
 .receiver-route > span { color: var(--muted); }
 .receiver-overview .card-title, .receiver-pvt .card-title { margin-bottom: 10px; flex-wrap: wrap; gap: 8px; }
 .receiver-overview .card-title h2, .receiver-pvt .card-title h2 { margin: 0; }
-.receiver-endpoint, .receiver-selection, .receiver-epoch-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
-.receiver-endpoint label, .receiver-selection label, .receiver-epoch-row label { margin: 0; white-space: nowrap; }
-.receiver-endpoint input { flex: 1 1 320px; min-width: 0; margin: 0; font-family: Consolas, monospace; }
-.receiver-endpoint button, .receiver-selection button { margin: 0; white-space: nowrap; }
+.receiver-selection, .receiver-epoch-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.receiver-selection label, .receiver-epoch-row label { margin: 0; white-space: nowrap; }
+.receiver-selection button { margin: 0; white-space: nowrap; }
 .receiver-trial-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 24px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
 .receiver-trial-grid > div { min-width: 0; }
 .receiver-selection { margin: 0; }
@@ -888,10 +893,7 @@ body[data-page="dtn-receiver"] .destination-status > div { display: flex; align-
 .receiver-connection-heading { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px 12px; margin-bottom: 6px; }
 .receiver-connection-status { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; }
 body[data-page="dtn-receiver"] .receiver-adapter .adapter-url-controls { grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; }
-.receiver-connections input, .receiver-connections button, .receiver-endpoint input, .receiver-endpoint button { padding: 8px 10px; font-size: 13px; }
-.receiver-overview .receiver-endpoint { margin-top: 10px; }
-.receiver-endpoint .pill { padding: 4px 8px; }
-#receive-help:empty { display: none; }
+.receiver-connections input, .receiver-connections button { padding: 8px 10px; font-size: 13px; }
 @media (max-width: 1000px) {
   .receiver-connections, .receiver-trial-grid { grid-template-columns: minmax(0, 1fr); }
 }
@@ -913,5 +915,4 @@ body[data-page="dtn-receiver"] .receiver-adapter .adapter-url-controls { grid-te
 .receiver-log .log { height: 180px; }
 @media(max-width: 600px) {
   .receiver-pvt .pvt-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .receiver-endpoint input { flex-basis: 100%; }
 }

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>LNIS DTN Receiver</title>
   <link rel="stylesheet" href="/lnis/assets/common/app.css?v=20260915-structure">
-  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20260915-receiver-records">
+  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20260915-receiver-no-endpoint">
 </head>
 <body data-page="dtn-receiver">
 <header>
@@ -60,13 +60,6 @@
       </details>
     </div>
     </div>
-    <div class="receiver-endpoint">
-      <label for="receive-url">수신 API · POST</label>
-      <input id="receive-url" readonly aria-label="외부 DTN 또는 HDTN 어댑터에서 호출할 수신 API 주소">
-      <button id="copy-receive-url" type="button">주소 복사</button>
-      <span id="receive-auth" class="pill warning">인증 설정 확인 중</span>
-    </div>
-    <small id="receive-help" role="status"></small>
 
     <div class="receiver-trial-grid">
     <div>
@@ -147,6 +140,6 @@
   </section>
   </div>
 </main>
-<script type="module" src="/lnis/assets/dtn/dtn-receiver.js?v=20260915-receiver-summary"></script>
+<script type="module" src="/lnis/assets/dtn/dtn-receiver.js?v=20260915-receiver-no-endpoint"></script>
 </body>
 </html>

@@ -38,7 +38,9 @@ const context = {
 vm.createContext(context);
 vm.runInContext(source, context);
 await context.ready;
-assert.equal(elements.get('receive-url').value, 'http://192.168.1.72:8089/lnis/api/v1/dtn/receive');
+for (const id of ['receive-url', 'copy-receive-url', 'receive-auth', 'receive-help']) assert.equal(elements.has(id), false);
+assert.equal(requests.filter(url => url.endsWith('/dtn/config')).length, 1, 'adapter config is loaded once, not polled for removed authentication UI');
+assert.equal(requests.some(url => url.endsWith('/node')), false, 'removed endpoint display does not request a public URL');
 assert.equal(elements.get('receive-state').textContent, '수신 대기');
 assert.match(elements.get('dtn-receiver-status').textContent, /처리 중/);
 assert.equal(elements.get('dtn-report').hidden, true);
@@ -116,7 +118,7 @@ await context.poll();
 assert.equal(elements.get('step-process').className, 'failed');
 assert.equal(elements.get('receive-message').textContent, 'AFS 검증 실패');
 assert.ok(!html.includes('id="dtn-process"'));
-console.log('PASS: receiver empty/completed/invalid/failed states, epochs, stale-response guard, endpoint and read-only UI');
+console.log('PASS: receiver empty/completed/invalid/failed states, epochs, stale-response guard and read-only UI without endpoint controls');
 
 nextTests = [done];
 const cleared = vm.createContext({...context, location: {...context.location, pathname: '/lnis/dtntest/receiver/clear'}});
