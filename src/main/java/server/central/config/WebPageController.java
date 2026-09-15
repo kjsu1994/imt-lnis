@@ -24,14 +24,14 @@ public class WebPageController {
         return "forward:/afs-receiver.html";
     }
 
-    @GetMapping("/lnis/dtntest/sender")
+    @GetMapping({"/lnis/dtntest/sender", "/lnis/dtntest/sender/clear"})
     String dtn()
     {
         return "forward:/dtn-sender.html";
     }
 
     /** 수신 PC도 중앙 서버의 동일한 시험 결과를 조회한다. */
-    @GetMapping("/lnis/dtntest/receiver")
+    @GetMapping({"/lnis/dtntest/receiver", "/lnis/dtntest/receiver/clear"})
     String dtnReceiver()
     {
         return "forward:/dtn-receiver.html";

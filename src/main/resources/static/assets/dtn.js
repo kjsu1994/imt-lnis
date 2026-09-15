@@ -1,5 +1,5 @@
 import {createDtnLog} from './dtn-log.js?v=20260915-json-toggle';
-import {initAdapterHealth} from './dtn-adapter-health.js?v=20260914-adapter-inline';
+import {initAdapterHealth} from './dtn-adapter-health.js?v=20260915-clear';
 import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20260915-json-toggle';
 import {createObservationView, numeric} from './dtn-observations.js?v=20260915-json-toggle';
 
@@ -330,7 +330,9 @@ async function initialize() {
       peerConfig = await request('/node/connection');
       $('dtn-receiver-ip').value = peerConfig.ip || ''; $('dtn-receiver-port').value = peerConfig.port;
     } catch { $('dtn-connection-message').textContent = '상대 서비스 주소 설정을 사용할 수 없습니다.'; }
-    const recent = await request('/dtn/tests'); job = recent[0] || null;
+    if (!location.pathname?.endsWith('/clear')) {
+      const recent = await request('/dtn/tests'); job = recent[0] || null;
+    }
     await poll(); socket(); log('DTN 송신 화면 준비 완료');
   } catch (e) { log(e.message, 'ERROR'); }
   setInterval(poll, 2000);

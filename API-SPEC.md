@@ -824,9 +824,7 @@ Linux 독립 노드 Compose는 `deployment/node`에 있으며 기존 중앙 서�
 
 <a id="adapter-contract"></a>
 
-## 15. DTN/HDTN 어댑터 개발자 전달용 — 여기부터 문서 끝까지 공유
-
-계약 확인일: 2026-09-14 · UTF-8 JSON · 전송 `schemaVersion=1`.
+## 15. DTN/HDTN 어댑터
 
 ### 구성과 담당 범위
 
@@ -835,16 +833,6 @@ Linux 독립 노드 Compose는 `deployment/node`에 있으며 기존 중앙 서�
                                     ↓ 전송
 수신 PC: LNIS Receiver ← 수신 어댑터 ← DTN/HDTN
 ```
-
-- 각 PC에서 LNIS와 해당 역할의 어댑터가 함께 동작합니다. 송신 PC와 수신 PC의 DB·디스크는 별개입니다.
-- 현재 같은 개발 PC의 8090/8091은 두 PC를 모사한 설정일 뿐이며 운영 주소·포트는 환경별로 설정합니다.
-- 어댑터는 GNSS 파싱, AFS 프레임 생성·복호화, PVT 계산을 하지 않습니다. LNIS가 만든 JSON을 보존하고, 선택 경로로 운반합니다.
-- 콜백 URL과 인증 토큰은 어댑터 설정값입니다. 요청 JSON에 callback URL이나 인증 정보를 추가하지 않습니다.
-- `http://lnis-dev-relay:8080`은 Docker 내부의 개발용 REST 중계이며 실제 DTN/HDTN이 아닙니다. 실제 어댑터는 아래 계약을 구현하고 주소를 교체합니다.
-
-**이 장만 복사해서 어댑터 개발자에게 전달하면 됩니다.** 입력·시험 생성·노드 관리 API는 LNIS 내부용이며 어댑터 구현 대상이 아닙니다.
-LNIS가 시험 종류와 경로, 전달 데이터를 정합니다. 어댑터가 DTN/HDTN 기동·BPv7 생성·전송·수신·해제를 담당합니다.
-I/Q는 파일 경로만 REST로 전달하며 바이너리를 JSON/Base64로 보내지 않습니다.
 
 ### 15.1 구현할 엔드포인트와 Health
 

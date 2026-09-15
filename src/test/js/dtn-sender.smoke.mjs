@@ -167,7 +167,7 @@ assert.equal(elements.get('iq-file').textContent,'');
 assert.equal(elements.get('iq-saved').value,'');
 console.log('PASS: I/Q GNSS requirement, COM controls, active generation visibility and stale file reset');
 const savedAddresses = new Map();
-context.localStorage = {getItem: key => savedAddresses.get(key), setItem: (key, value) => savedAddresses.set(key, value)};
+context.localStorage = {getItem: key => savedAddresses.get(key), removeItem: key => savedAddresses.delete(key), setItem: (key, value) => savedAddresses.set(key, value)};
 healthFetch = async () => ({ok: true, json: async () => report});
 elements.get('dtn-send-url').disabled = false;
 elements.get('dtn-send-url').value = 'http://saved-adapter:8080';
@@ -179,3 +179,18 @@ elements.get('dtn-send-url').value = 'javascript:alert(1)';
 await elements.get('dtn-adapter-save').onclick();
 assert.equal(savedAddresses.get('lnis.adapter-url.dtn'), 'http://saved-adapter:8080');
 console.log('PASS: adapter address browser persistence, restore and invalid address rejection');
+
+let clearedHistoryRequests = 0;
+const cleared = vm.createContext({...context, location: {...context.location, pathname: '/lnis/dtntest/sender/clear'},
+  fetch: async (url, options) => {
+    if (url.endsWith('/dtn/tests')) { clearedHistoryRequests++; return {ok: true, json: async () => [{testId:'previous',state:'COMPLETED'}]}; }
+    return context.fetch(url, options);
+  }});
+vm.runInContext(readFileSync(new URL('../../main/resources/static/assets/dtn-adapter-health.js', import.meta.url), 'utf8').replace('export function', 'function') + '\n' + source, cleared);
+await cleared.ready;
+assert.equal(clearedHistoryRequests, 0);
+assert.equal(savedAddresses.has('lnis.adapter-url.dtn'), false);
+assert.equal(elements.get('dtn-send-url').value, 'http://sender.default:8080');
+assert.equal(vm.runInContext('job', cleared), null);
+assert.equal(vm.runInContext('inputId', cleared), null);
+console.log('PASS: sender clear starts without previous job or input');

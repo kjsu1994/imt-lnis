@@ -1,11 +1,12 @@
 import {createDtnLog} from './dtn-log.js?v=20260915-json-toggle';
-import {initAdapterHealth} from './dtn-adapter-health.js?v=20260914-adapter-inline';
+import {initAdapterHealth} from './dtn-adapter-health.js?v=20260915-clear';
 import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20260915-json-toggle';
 import {createObservationView} from './dtn-observations.js?v=20260915-json-toggle';
 
 const api = '/lnis/api/v1';
 const $ = id => document.getElementById(id);
 const payloadViewer = createPayloadViewer($('dtn-payload'), {receivedOnly: true});
+const clearScreen = location.pathname?.endsWith('/clear') === true;
 let tests = [], epochs = [], selectedId = '', renderVersion = 0, polling = false;
 let reportKey = '', lastEvent = '';
 let referenceEpochs = [], comparisonEpochs = [];
@@ -189,7 +190,7 @@ async function poll(force = false) {
       config.receiveConfigured ? 'online' : 'warning');
     $('receive-auth').title = '외부 어댑터는 LNIS_DTN_RECEIVE_TOKEN과 같은 Bearer 토큰을 사용해야 합니다. 관리 토큰과 별개입니다.';
     const selected = $('dtn-tests').value;
-    $('dtn-tests').replaceChildren(...(tests.length ? tests.map(job =>
+    $('dtn-tests').replaceChildren(...(clearScreen ? [new Option('시험 선택 · 화면 초기화됨', '')] : []), ...(tests.length ? tests.map(job =>
       new Option(time(job.createdAt) + ' · ' + job.state + ' · ' + job.testId.slice(0, 8), job.testId))
       : [new Option('등록된 시험 없음', '')]));
     if (tests.some(job => job.testId === selected)) $('dtn-tests').value = selected;

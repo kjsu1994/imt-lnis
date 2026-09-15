@@ -125,3 +125,14 @@ assert.equal(elements.get('step-process').className, 'failed');
 assert.equal(elements.get('receive-message').textContent, 'AFS 검증 실패');
 assert.ok(!html.includes('id="dtn-process"'));
 console.log('PASS: receiver empty/completed/invalid/failed states, epochs, stale-response guard, endpoint and read-only UI');
+
+nextTests = [done];
+const cleared = vm.createContext({...context, location: {...context.location, pathname: '/lnis/dtntest/receiver/clear'}});
+elements.get('dtn-tests').value = '';
+vm.runInContext(readFileSync(new URL('../../main/resources/static/assets/dtn-adapter-health.js', import.meta.url), 'utf8').replace('export function', 'function') + '\n' + source, cleared);
+await cleared.ready;
+assert.equal(elements.get('dtn-tests').value, '', 'clear must not auto-select stored tests');
+await cleared.poll();
+assert.equal(elements.get('dtn-tests').value, '', 'polling must preserve cleared selection');
+assert.equal(elements.get('dtn-report').hidden, true);
+console.log('PASS: receiver clear preserves empty selection through polling');

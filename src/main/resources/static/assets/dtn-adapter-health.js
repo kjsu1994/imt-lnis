@@ -4,7 +4,10 @@ export function initAdapterHealth(defaultUrl, log = () => {}) {
   const save = $('dtn-adapter-save');
   const storageKey = 'lnis.adapter-url.' + (document.body?.dataset?.page || 'dtn');
   input.value = defaultUrl;
-  try { input.value = localStorage.getItem(storageKey) || defaultUrl; } catch { /* Storage may be disabled. */ }
+  try {
+    if (location.pathname?.endsWith('/clear')) localStorage.removeItem(storageKey);
+    input.value = localStorage.getItem(storageKey) || defaultUrl;
+  } catch { /* Storage may be disabled. */ }
   let checking = false, revision = 0, lastState = '';
   const reportState = (state, automatic) => {
     if (!automatic || state !== lastState) log('어댑터 연결 확인 · ' + state);

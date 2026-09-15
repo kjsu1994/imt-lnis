@@ -27,7 +27,8 @@ public class NodeRoleFilter extends OncePerRequestFilter {
         boolean receiver = properties.getRole() == AgentRole.RECEIVER;
         if ("GET".equals(request.getMethod())) {
             String opposite = receiver ? "sender" : "receiver";
-            if (path.equals("/lnis/afstest/" + opposite) || path.equals("/lnis/dtntest/" + opposite)) {
+            if (path.equals("/lnis/afstest/" + opposite) || path.equals("/lnis/dtntest/" + opposite)
+                    || path.equals("/lnis/dtntest/" + opposite + "/clear")) {
                 if (properties.getPeerBaseUrl() == null) {
                     response.sendError(409, "상대 노드 주소를 설정하세요.");
                 } else {
