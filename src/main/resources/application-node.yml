@@ -1,6 +1,0 @@
-spring:
-  task:
-    scheduling:
-      pool:
-        # 원격 HTTP 응답 대기가 로컬 heartbeat와 시험 watchdog을 정지시키지 않게 분리한다.
-        size: 4

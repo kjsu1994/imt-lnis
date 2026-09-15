@@ -1,3 +1,4 @@
+# Common settings
 spring:
   application:
     name: lnis
@@ -16,3 +17,118 @@ management:
     health:
       probes:
         enabled: true
+
+---
+
+# Web server (also active in node mode)
+server:
+  port: 8088
+  forward-headers-strategy: framework
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+  tomcat:
+    max-http-form-post-size: 2MB
+    max-swallow-size: 2MB
+
+spring:
+  config:
+    activate:
+      on-profile: "server"
+  datasource:
+    url: ${LNIS_DB_URL:jdbc:h2:file:./data/lnis}
+    username: ${LNIS_DB_USERNAME:sa}
+    password: ${LNIS_DB_PASSWORD:}
+    driver-class-name: org.h2.Driver
+  servlet:
+    multipart:
+      enabled: false
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          time_zone: UTC
+  h2:
+    console:
+      enabled: false
+
+lnis:
+  dtn:
+    send-url: ${dtn_adapter:${LNIS_DTN_SEND_URL:}}
+    receive-url: ${dtn_adapter:${LNIS_DTN_RECEIVE_URL:${LNIS_DTN_SEND_URL:}}}
+    send-token: ${LNIS_DTN_SEND_TOKEN:}
+    receive-token: ${LNIS_DTN_RECEIVE_TOKEN:}
+  agent-tokens: ${LNIS_AGENT_TOKENS:sender-1=change-me-sender,receiver-1=change-me-receiver}
+  storage:
+    data-directory: ${LNIS_DATA_DIR:./data}
+    incomplete-retention: ${LNIS_INCOMPLETE_RETENTION:PT1H}
+    completed-retention: ${LNIS_COMPLETED_RETENTION:PT24H}
+    cleanup-delay: ${LNIS_CLEANUP_DELAY:PT10M}
+
+---
+
+# Integrated node scheduling
+spring:
+  config:
+    activate:
+      on-profile: "node"
+  task:
+    scheduling:
+      pool:
+        # 원격 HTTP 응답 대기가 로컬 heartbeat와 시험 watchdog을 정지시키지 않게 분리한다.
+        size: 4
+
+---
+
+# Standalone Agent shared settings
+spring:
+  config:
+    activate:
+      on-profile: "sender | receiver"
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration
+      - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.jpa.JpaRepositoriesAutoConfiguration
+
+lnis:
+  server:
+    ws: ${LNIS_SERVER_WS:ws://localhost:8088/lnis/agent/ws}
+  native:
+    dir: ${LNIS_NATIVE_DIR:native}
+
+---
+
+# Standalone Sender Agent
+spring:
+  config:
+    activate:
+      on-profile: "sender"
+
+lnis:
+  agent:
+    id: ${LNIS_AGENT_ID:sender-1}
+    role: SENDER
+    token: ${LNIS_AGENT_TOKEN:change-me-sender}
+
+---
+
+# Standalone Receiver Agent
+spring:
+  config:
+    activate:
+      on-profile: "receiver"
+
+lnis:
+  agent:
+    id: ${LNIS_AGENT_ID:receiver-1}
+    role: RECEIVER
+    token: ${LNIS_AGENT_TOKEN:change-me-receiver}
