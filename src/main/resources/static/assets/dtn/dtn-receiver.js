@@ -86,16 +86,6 @@ function renderSummary(job) {
   $('dtn-observations').hidden = job?.testType === 'IQ_SAMPLE';
   const types = {GNSS_RAW: 'GNSS RAW', AFS_METADATA: 'AFS Frame + Metadata', IQ_SAMPLE: 'I/Q Sample'};
   $('receiver-type').textContent = types[job?.testType] || '시험 선택 대기';
-  const selectReadOnly = (id, selected) => {
-    const button = $(id);
-    button.className = selected ? 'active' : '';
-    button.disabled = true;
-    button.setAttribute('aria-pressed', String(selected));
-  };
-  for (const type of Object.keys(types)) selectReadOnly('receiver-' + type, job?.testType === type);
-  for (const sender of ['DTN', 'HDTN']) for (const receiver of ['DTN', 'HDTN'])
-    selectReadOnly('receiver-mode-' + sender + '-' + receiver,
-      job?.senderMode === sender && job?.receiverMode === receiver);
   $('receiver-mode').textContent = job?.senderMode && job?.receiverMode ? job.senderMode + ' → ' + job.receiverMode : '경로 정보 없음';
   $('receiver-iq').hidden = job?.testType !== 'IQ_SAMPLE';
   renderIqFile($('receiver-iq-result'), job?.fileResult, job?.state === 'FAILED' ? 'I/Q 파일 검증 실패 · 로그를 확인하세요.' : 'I/Q 파일 수신·검증 대기');

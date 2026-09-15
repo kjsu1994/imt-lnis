@@ -44,31 +44,21 @@ assert.match(elements.get('dtn-receiver-status').textContent, /처리 중/);
 assert.equal(elements.get('dtn-report').hidden, true);
 vm.runInContext("renderSummary({testType:'IQ_SAMPLE',state:'COMPLETED'})",context);
 assert.equal(elements.get('receiver-type').textContent,'I/Q Sample');
-assert.equal(elements.get('receiver-IQ_SAMPLE').className,'active');
-assert.equal(elements.get('receiver-AFS_METADATA').className,'');
+assert.ok(!html.includes('class="test-type-selector"') && !html.includes('class="transport-mode-selector"'), 'receiver displays only the received selection, without option buttons');
 assert.equal(elements.get('step-process').textContent,'③ I/Q 파일 검증');
 assert.equal(elements.get('receive-state').textContent,'I/Q 파일 검증 완료');
 for (const testType of ['GNSS_RAW', 'AFS_METADATA', 'IQ_SAMPLE']) {
   for (const senderMode of ['DTN', 'HDTN']) for (const receiverMode of ['DTN', 'HDTN']) {
     context.renderSummary({testType, senderMode, receiverMode, state: 'COMPLETED'});
     assert.equal(elements.get('dtn-observations').hidden, testType === 'IQ_SAMPLE');
-    for (const type of ['GNSS_RAW', 'AFS_METADATA', 'IQ_SAMPLE']) {
-      const button = elements.get('receiver-' + type);
-      assert.equal(button.className, type === testType ? 'active' : '');
-      assert.equal(button.disabled, true);
-    }
-    for (const tx of ['DTN', 'HDTN']) for (const rx of ['DTN', 'HDTN']) {
-      const button = elements.get('receiver-mode-' + tx + '-' + rx);
-      assert.equal(button.className, tx === senderMode && rx === receiverMode ? 'active' : '');
-      assert.equal(button['aria-pressed'], String(tx === senderMode && rx === receiverMode));
-      assert.equal(button.disabled, true);
-    }
+    assert.equal(elements.get('receiver-type').textContent, {GNSS_RAW:'GNSS RAW',AFS_METADATA:'AFS Frame + Metadata',IQ_SAMPLE:'I/Q Sample'}[testType]);
+    assert.equal(elements.get('receiver-mode').textContent, senderMode + ' → ' + receiverMode);
   }
 }
 context.renderSummary(null);
 assert.equal(elements.get('dtn-observations').hidden, false);
-assert.equal(elements.get('receiver-mode-HDTN-HDTN').className, '');
-assert.equal(elements.get('receiver-IQ_SAMPLE').className, '');
+assert.equal(elements.get('receiver-mode').textContent, '경로 정보 없음');
+assert.equal(elements.get('receiver-type').textContent, '시험 선택 대기');
 
 const done = {testId: 'completed', state: 'COMPLETED', dtnReceived: true, receivedEpochs: 2, updatedAt: '2026-09-11T00:00:00Z'};
 const waiting = {testId: 'waiting', state: 'WAITING_DTN', receivedEpochs: 0};

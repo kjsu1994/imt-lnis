@@ -6,7 +6,7 @@ export function validAdapterUrl(value) {
   } catch { return null; }
 }
 
-export function initAdapterHealth(defaultUrl, log = () => {}) {
+export function initAdapterHealth(defaultUrl, log = () => {}, onStatus = () => {}) {
   const $ = id => document.getElementById(id);
   const input = $('dtn-send-url'), button = $('dtn-adapter-health');
   const save = $('dtn-adapter-save');
@@ -24,6 +24,7 @@ export function initAdapterHealth(defaultUrl, log = () => {}) {
   const status = (text, tone = '') => {
     $('dtn-adapter-status').textContent = text;
     $('dtn-adapter-dot').className = 'connection-dot ' + (tone === 'online' ? 'online' : tone === 'error' ? 'offline' : 'unknown');
+    onStatus(text, $('dtn-adapter-dot').className);
   };
   const previousInput = input.oninput;
   input.oninput = event => {

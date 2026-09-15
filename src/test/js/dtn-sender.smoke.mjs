@@ -6,6 +6,18 @@ import vm from 'node:vm';
 
 const html = readFileSync(new URL('../../main/resources/static/dtn-sender.html', import.meta.url), 'utf8');
 const capturePanel = html.split('id="dtn-capture-panel"')[1].split('</div>')[0];
+const settingsMarkup = html.split('id="dtn-settings-view"')[1].split('id="dtn-main-view"')[0];
+const mainMarkup = html.split('id="dtn-main-view"')[1];
+for (const id of ['dtn-send-url', 'dtn-receiver-ip', 'dtn-port', 'dtn-baud', 'dtn-graw-file', 'dtn-upload', 'iq-saved', 'iq-delete', 'dtn-development']) {
+  assert.ok(settingsMarkup.includes('id="' + id + '"'), id + ' belongs in settings');
+  assert.ok(!mainMarkup.includes('id="' + id + '"'));
+}
+for (const id of ['dtn-start', 'dtn-send', 'iq-generate', 'iq-cancel', 'iq-file', 'dtn-observations', 'dtn-payload', 'dtn-log']) {
+  assert.ok(mainMarkup.includes('id="' + id + '"'), id + ' stays on main view');
+  assert.ok(!settingsMarkup.includes('id="' + id + '"'));
+}
+const ids = [...html.matchAll(/id="([^"]+)"/g)].map(match => match[1]);
+assert.equal(new Set(ids).size, ids.length, 'controls are moved, not duplicated');
 assert.ok(!html.includes('class="card dtn-comparison-card"'), 'PVT comparison must not occupy a separate card');
 assert.ok(!html.includes('id="dtn-comparison"') && !html.includes('id="dtn-report"'), 'comparison and report link are receiver-only');
 assert.ok(capturePanel.includes('id="dtn-baud"'), 'serial speed remains available in COM input');
@@ -15,10 +27,12 @@ class Element {
   constructor() { this.value = ''; this.files = []; this.textContent = ''; this.classList = {toggle() {}}; }
   replaceChildren(...children) { this.value = children[0]?.value ?? ''; }
   setAttribute() {} removeAttribute(key) { delete this[key]; } reportValidity() { return true; }
+  focus() { this.focused = true; }
 }
 const elements = new Map([...html.matchAll(/id="([^"]+)"/g)].map(([, id]) => [id, new Element()]));
 assert.match(html, /id="dtn-development"[^>]*\bhidden\b/);
 elements.get('dtn-development').hidden = true;
+elements.get('dtn-settings-view').hidden = true;
 let loaded = null, currentJob = null, failUpload = false, starts = 0;
 let healthFetch, healthCalls = 0, healthUrl;
 const intervals = [];
@@ -33,6 +47,7 @@ const context = {
   numeric,
   Option: function(text, value) { this.value = value; },
   location: {protocol: 'http:', host: '127.0.0.1:18090'}, WebSocket: class {},
+  window: {scrollY: 250, scrollTo({top}) { this.scrollY = top; }},
   URL, AbortSignal, setInterval(callback, delay) { intervals.push({callback, delay}); }, setTimeout() {},
   fetch: async (url, options) => {
     if (url.includes('/adapter-health?')) {
@@ -76,18 +91,43 @@ assert.equal(elements.get('dtn-send-url').value, 'http://sender.default:8080');
 assert.equal(elements.has('dtn-receive-url'), false);
 elements.get('dtn-send-url').value = 'http://127.0.0.1:18092';
 const file = {name: 'capture.graw', size: 10, arrayBuffer: async () => new ArrayBuffer(10)};
-await context.upload(file);
+elements.get('dtn-graw-file').files = [file];
+const timerCount = intervals.length;
+await elements.get('dtn-settings-open').onclick();
+assert.equal(elements.get('dtn-main-view').hidden, true);
+assert.equal(elements.get('dtn-settings-view').hidden, false);
+assert.equal(elements.get('dtn-settings-title').focused, true);
+const uploading = context.upload(file);
+assert.equal(elements.get('dtn-settings-lock').hidden, false);
+assert.equal(elements.get('dtn-graw-file').disabled, true);
+await uploading;
+assert.equal(elements.get('dtn-settings-view').hidden, false, 'file apply stays in settings');
+assert.match(elements.get('dtn-settings-feedback').textContent, /입력 완료/);
+assert.match(elements.get('dtn-input-summary').textContent, /capture.graw/);
+await elements.get('dtn-settings-close').onclick();
+assert.equal(elements.get('dtn-main-view').hidden, false);
+assert.equal(context.window.scrollY, 250);
+assert.equal(elements.get('dtn-graw-file').files[0], file, 'selected file survives navigation');
+assert.equal(intervals.length, timerCount, 'navigation does not start extra polling');
+assert.equal(elements.get('dtn-development').hidden, true);
 assert.equal(loaded, observations);
 assert.equal(elements.get('dtn-send').disabled, false);
 await elements.get('dtn-send').onclick();
 assert.equal(starts, 1);
 assert.equal(elements.get('dtn-upload').disabled, true);
+await elements.get('dtn-settings-open').onclick();
+assert.equal(elements.get('dtn-settings-view').hidden, false, 'settings remain readable during transfer');
+assert.equal(elements.get('dtn-settings-lock').hidden, false);
+assert.equal(elements.get('dtn-adapter-save').disabled, true);
+await elements.get('dtn-settings-close').onclick();
 await elements.get('dtn-send').onclick();
 assert.equal(starts, 1, 'duplicate start prevented');
 currentJob = {testId: 't1', state: 'COMPLETED', referenceEpochs: 1, verdict: 'INCONCLUSIVE', updatedAt: '2'};
 await context.poll();
 assert.equal(elements.get('pvt-x').textContent, '—', 'invalid PVT must never show stale coordinates');
 assert.equal(elements.get('dtn-upload').disabled, false);
+assert.equal(elements.get('dtn-settings-lock').hidden, true);
+assert.equal(elements.get('dtn-adapter-save').disabled, false);
 failUpload = true;
 await assert.rejects(context.upload(file));
 assert.equal(loaded, null);
@@ -96,7 +136,10 @@ console.log('PASS: sender upload, preview, disabled example/capture, duplicate s
 elements.get('dtn-port').value = '/dev/ttyACM0';
 elements.get('dtn-port').onchange();
 assert.equal(elements.get('dtn-start').disabled, false);
-await elements.get('dtn-start').onclick();
+const capturing = elements.get('dtn-start').onclick();
+assert.equal(elements.get('dtn-settings-lock').hidden, false);
+assert.equal(elements.get('dtn-port').disabled, true);
+await capturing;
 assert.equal(elements.get('pvt-x').textContent, '1.000');
 assert.equal(elements.get('dtn-send').disabled, false);
 assert.equal(elements.get('dtn-port').disabled, false);
@@ -124,6 +167,8 @@ await checking;
 assert.match(healthUrl, /adapterUrl=http%3A%2F%2F127\.0\.0\.1%3A18092$/);
 assert.equal(elements.get('dtn-adapter-status').textContent, '연결됨');
 assert.equal(elements.get('dtn-adapter-dot').className, 'connection-dot online');
+assert.equal(elements.get('dtn-adapter-summary').textContent, '연결됨');
+assert.equal(elements.get('dtn-adapter-summary-dot').className, 'connection-dot online');
 assert.match(elements.get('dtn-adapter-health-json').textContent, /"rawResponse": "{\\"status\\":\\"ready\\"}"/);
 assert.match(elements.get('dtn-adapter-health-time').textContent, /마지막 확인/);
 assert.equal(elements.get('dtn-adapter-health').disabled, false);
@@ -163,6 +208,11 @@ elements.get('dtn-iq-panel').classList.toggle = (name, hidden) => { if(name==='h
 vm.runInContext("selectedType='AFS_METADATA'; iqJob={id:'running',state:'GENERATING'}; updateInputPanels(); updateControls();",context);
 assert.equal(iqPanelHidden,false,'reload during generation keeps cancel visible even on another trial tab');
 assert.equal(elements.get('iq-cancel').disabled,false);
+assert.equal(elements.get('dtn-adapter-save').disabled,true);
+vm.runInContext("inputMode='capture'; updateInputPanels();",context);
+assert.equal(elements.get('dtn-start').hidden,false);
+vm.runInContext("inputMode='upload'; updateInputPanels();",context);
+assert.equal(elements.get('dtn-start').hidden,true);
 vm.runInContext("iqJob={id:'old',state:'READY',file:{}}; clearIqSelection(); updateControls();",context);
 assert.equal(elements.get('iq-file').textContent,'');
 assert.equal(elements.get('iq-saved').value,'');

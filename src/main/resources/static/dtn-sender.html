@@ -4,14 +4,14 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>LNIS DTN Sender</title>
   <link rel="stylesheet" href="/lnis/assets/common/app.css?v=20260915-structure">
-  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20260915-structure">
+  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20260915-settings">
 </head>
 <body data-page="dtn-sender">
 <header>
   <div><span class="eyebrow">LNIS DTN VALIDATOR</span><h1>DTN 송수신 시험</h1>
     <nav class="test-suite-tabs" hidden><a href="/lnis/afstest/sender">AFS Frame 시험</a>
       <a class="active" href="/lnis/dtntest/sender" aria-current="page">DTN 송수신 시험</a></nav></div>
-  <nav class="role-nav"><a class="active" href="/lnis/dtntest/sender">Sender</a><a href="/lnis/dtntest/receiver">Receiver</a></nav>
+  <nav class="role-nav"><a class="active" href="/lnis/dtntest/sender">Sender</a><a href="/lnis/dtntest/receiver">Receiver</a><button id="dtn-settings-open" type="button" aria-controls="dtn-settings-view" aria-expanded="false">설정</button></nav>
 </header>
 <main>
   <section class="status-strip">
@@ -20,6 +20,10 @@
     <span id="dtn-receiver-status" class="pill">수신 처리기 확인 중</span>
     <span id="dtn-test-status" class="pill">시험 대기</span>
   </section>
+  <div id="dtn-settings-view" hidden>
+    <div class="card-title settings-heading"><h2 id="dtn-settings-title" tabindex="-1">송신 설정</h2><button id="dtn-settings-close" type="button">시험 화면으로</button></div>
+    <p id="dtn-settings-lock" role="status" hidden>처리 중에는 설정을 변경할 수 없습니다.</p>
+    <p id="dtn-settings-feedback" role="status" hidden></p>
   <section class="card">
     <div class="card-title"><h2>시험 설정</h2><span class="pill">송신</span></div>
     <div class="test-type-selector" aria-label="시험 데이터 유형">
@@ -67,8 +71,6 @@
   <section class="card" id="dtn-input-card">
     <div class="card-title dtn-input-header">
       <div class="dtn-input-heading"><h2>GNSS 입력</h2><strong id="dtn-input-state" role="status">데이터 없음</strong></div>
-      <div class="dtn-send-actions"><p id="dtn-message" role="status"></p>
-        <button id="dtn-send" type="button" class="primary" disabled>전송시험 시작</button></div>
     </div>
     <div class="compact-tabs">
       <button type="button" class="input-mode" data-input-mode="capture">COM 포트</button>
@@ -81,7 +83,6 @@
       <label>COM 포트<select id="dtn-port"><option value="">포트 선택</option></select></label>
       <button id="dtn-refresh" type="button">포트 조회</button>
       <label class="serial-settings">통신 속도 (baud)<select id="dtn-baud"><option>9600</option><option>38400</option><option>57600</option><option selected>115200</option><option>230400</option><option>460800</option><option>921600</option></select></label>
-      <button id="dtn-start" type="button" disabled title="유효한 지구 PVT 한 시점 확보 후 자동 종료 · 최대 120초">수집 시작</button>
     </div>
     <div id="dtn-upload-panel" class="compact-input-row">
       <label>capture.graw<input id="dtn-graw-file" type="file" accept=".graw,application/octet-stream"></label>
@@ -89,8 +90,23 @@
       <label class="upload-progress-field">파일 적용 상태
         <progress id="dtn-upload-progress" max="100" value="0" aria-label="파일 적용 상태" title="파일 업로드·검증 완료 시 채워집니다. 전송시험 진행률이 아닙니다."></progress></label>
     </div>
-    <div id="dtn-iq-panel" class="hidden">
+    <div id="dtn-iq-settings" class="hidden">
       <div class="compact-input-row"><label>저장된 I/Q<select id="iq-saved"><option value="">저장된 파일 없음</option></select></label><button id="iq-delete" type="button" disabled>선택 파일 삭제</button></div>
+    </div>
+  </section>
+  </div>
+  <div id="dtn-main-view">
+  <section class="card sender-actions" aria-label="시험 실행">
+    <div class="sender-summary">
+      <strong id="dtn-condition-summary">AFS Frame + Metadata · DTN → HDTN</strong>
+      <span id="dtn-input-summary">데이터 없음</span>
+      <span class="sender-connection"><span id="dtn-peer-summary-dot" class="connection-dot unknown" aria-hidden="true"></span>수신 서비스 <strong id="dtn-peer-summary">미확인</strong></span>
+      <span class="sender-connection"><span id="dtn-adapter-summary-dot" class="connection-dot unknown" aria-hidden="true"></span>송신 adapter <strong id="dtn-adapter-summary">미확인</strong></span>
+    </div>
+    <div class="dtn-send-actions"><p id="dtn-message" role="status"></p>
+      <button id="dtn-start" type="button" hidden disabled title="유효한 지구 PVT 한 시점 확보 후 자동 종료 · 최대 120초">수집 시작</button>
+      <button id="dtn-send" type="button" class="primary" disabled>전송시험 시작</button></div>
+    <div id="dtn-iq-panel" class="hidden">
       <div class="compact-input-row"><button id="iq-generate" type="button">90초 I/Q 생성</button><button id="iq-cancel" type="button" disabled>생성 취소</button>
         <progress id="iq-progress" max="100" value="0" aria-label="I/Q 파일 생성"></progress></div>
       <p id="iq-state" role="status">생성 대기 · 12 MHz · 약 2.16 GB · 파일 경로만 REST로 전달</p>
@@ -119,6 +135,7 @@
   <section id="dtn-payload" class="card"></section>
   <section class="card"><div class="card-title dtn-log-tools"><h2>송수신 로그</h2><select id="dtn-log-history" aria-label="로그 시험 기록"><option value="">현재 작업</option></select><button id="dtn-log-detail" type="button" aria-pressed="false">상세 로그</button><a id="dtn-log-download" aria-disabled="true">다운로드</a><button id="dtn-log-clear" type="button" title="저장 로그는 삭제하지 않습니다">화면 지우기</button></div><pre id="dtn-log" class="log" aria-label="PC 시간 기준 로그"></pre></section>
   </div>
+  </div>
 </main>
-<script type="module" src="/lnis/assets/dtn/dtn.js?v=20260915-input-cleanup"></script>
+<script type="module" src="/lnis/assets/dtn/dtn.js?v=20260915-settings"></script>
 </body></html>

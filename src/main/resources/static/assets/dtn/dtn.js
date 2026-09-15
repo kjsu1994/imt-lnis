@@ -1,6 +1,6 @@
 import {requestJson} from '../common/http.js?v=20260915-structure';
 import {createDtnLog} from './dtn-log.js?v=20260915-structure';
-import {initAdapterHealth, validAdapterUrl} from './dtn-adapter-health.js?v=20260915-structure';
+import {initAdapterHealth, validAdapterUrl} from './dtn-adapter-health.js?v=20260915-settings';
 import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20260915-structure';
 import {createObservationView, numeric} from './dtn-observations.js?v=20260915-input-cleanup';
 
@@ -25,10 +25,35 @@ function request(path, options = {}) {
 const post = (path, body) => request(path, {method: 'POST', headers: {'Content-Type': 'application/json'},
   body: body === undefined ? undefined : JSON.stringify(body)});
 const logView=createDtnLog($('dtn-log'));
-function log(message,level='INFO') { logView.write(message,level); }
+function log(message,level='INFO') {
+  logView.write(message,level);
+  if (!$('dtn-settings-view').hidden && (busy || level === 'ERROR')) {
+    $('dtn-settings-feedback').hidden = false;
+    $('dtn-settings-feedback').textContent = message;
+  }
+}
+let mainScrollY = 0;
+function showSettings(open) {
+  if (open && $('dtn-settings-view').hidden) mainScrollY = window.scrollY;
+  $('dtn-settings-view').hidden = !open;
+  $('dtn-main-view').hidden = open;
+  $('dtn-settings-open').setAttribute('aria-expanded', String(open));
+  (open ? $('dtn-settings-title') : $('dtn-settings-open')).focus({preventScroll: true});
+  window.scrollTo({top: open ? 0 : mainScrollY, behavior: 'instant'});
+}
+$('dtn-settings-open').onclick = () => showSettings($('dtn-settings-view').hidden);
+$('dtn-settings-close').onclick = () => showSettings(false);
+function updateInputSummary() {
+  const type = {GNSS_RAW: 'GNSS RAW', AFS_METADATA: 'AFS Frame + Metadata', IQ_SAMPLE: 'I/Q Sample'}[selectedType];
+  $('dtn-condition-summary').textContent = type + ' · ' + senderMode + ' → ' + receiverMode;
+  const source = inputMode === 'capture' ? 'COM ' + ($('dtn-port').value || '미선택') : 'capture.graw';
+  $('dtn-input-summary').textContent = source + ' · ' + $('dtn-input-state').textContent;
+}
 function pill(id, text, state = '') { $(id).textContent = text; $(id).className = 'pill ' + state; }
 function destination(text, state = 'unknown') {
   $('destination-state').textContent = text; $('destination-dot').className = 'connection-dot ' + state;
+  $('dtn-peer-summary').textContent = text;
+  $('dtn-peer-summary-dot').className = 'connection-dot ' + state;
 }
 const buildSendUrl = () => validAdapterUrl($('dtn-send-url').value);
 const urlValid = () => !!buildSendUrl();
@@ -47,6 +72,8 @@ function renderPvt() {
 
 }
 function updateControls() {
+  updateInputSummary();
+  $('dtn-settings-lock').hidden = !locked();
   const tx = agents.find(a => a.agentId === $('dtn-sender').value);
   const rx = agents.find(a => a.agentId === $('dtn-receiver').value);
   $('dtn-start').disabled = locked() || ! $('dtn-port').value || tx?.state !== 'READY';
@@ -56,7 +83,7 @@ function updateControls() {
   $('iq-cancel').disabled = !generatingIq();
   $('iq-saved').disabled = locked();
   $('iq-delete').disabled = locked() || iqJob?.state !== 'READY';
-  for (const id of ['dtn-upload', 'dtn-graw-file', 'dtn-send-url']) $(id).disabled = locked();
+  for (const id of ['dtn-upload', 'dtn-graw-file', 'dtn-send-url', 'dtn-adapter-save']) $(id).disabled = locked();
   if ($('dtn-replay')) $('dtn-replay').disabled = locked();
   $('dtn-refresh').disabled = locked() || tx?.state !== 'READY';
   for (const button of document.querySelectorAll('.test-type-button,.transport-mode-button,.input-mode')) button.disabled = locked();
@@ -181,9 +208,12 @@ if ($('dtn-replay')) $('dtn-replay').onclick = async () => {
 function updateInputPanels() {
   const iq = selectedType === 'IQ_SAMPLE';
   $('dtn-iq-panel').classList.toggle('hidden', !iq && !generatingIq());
+  $('dtn-iq-settings').classList.toggle('hidden', !iq && !generatingIq());
+  $('dtn-start').hidden = inputMode !== 'capture';
   $('dtn-capture-panel').classList.toggle('hidden', inputMode !== 'capture');
   $('dtn-upload-panel').classList.toggle('hidden', inputMode !== 'upload');
   for (const button of document.querySelectorAll('.input-mode')) button.classList.toggle('active', button.dataset.inputMode === inputMode);
+  updateInputSummary();
 }
 for (const button of document.querySelectorAll('.input-mode')) button.onclick = () => { inputMode = button.dataset.inputMode; updateInputPanels(); };
 for (const button of document.querySelectorAll('.test-type-button')) button.onclick = () => {
@@ -199,6 +229,7 @@ for (const button of document.querySelectorAll('.transport-mode-button')) button
     other.classList.toggle('active', other === button); other.setAttribute('aria-pressed', String(other === button));
   }
   $('dtn-transport-mode-state').textContent = senderMode + ' → ' + receiverMode + ' · 전송 요청에 포함';
+  updateInputSummary();
 };
 async function connectPeer(save) {
   if (!$('dtn-receiver-ip').reportValidity() || !$('dtn-receiver-port').reportValidity()) return;
@@ -315,7 +346,10 @@ async function initialize() {
     config = await request('/dtn/config');
     if (config.iqEnabled) await loadIqFiles();
     $('dtn-send-url').value = config.defaultSendUrl || '';
-    initAdapterHealth(config.adapterUrl || config.defaultSendUrl || '', log);
+    initAdapterHealth(config.adapterUrl || config.defaultSendUrl || '', log, (text, className) => {
+      $('dtn-adapter-summary').textContent = text;
+      $('dtn-adapter-summary-dot').className = className;
+    });
       $('dtn-transport-mode-state').textContent = senderMode + ' → ' + receiverMode + ' · 전송 요청에 포함';
     try {
       peerConfig = await request('/node/connection');

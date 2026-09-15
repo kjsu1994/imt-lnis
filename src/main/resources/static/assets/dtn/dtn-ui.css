@@ -835,6 +835,22 @@ body[data-page^="dtn-"] .adapter-health-developer pre { max-height: 320px; margi
   body[data-page^="dtn-"] .adapter-health-time { min-width: 0; overflow-wrap: anywhere; }
 }
 
+/* Sender views retain the same controls and state while switching panels. */
+body[data-page="dtn-sender"] :is(#dtn-main-view, #dtn-settings-view) { display: grid; gap: 14px; min-width: 0; }
+body[data-page="dtn-sender"] .settings-heading { gap: 12px; flex-wrap: wrap; }
+body[data-page="dtn-sender"] .settings-heading h2 { margin: 0; }
+body[data-page="dtn-sender"] :is(#dtn-settings-lock, #dtn-settings-feedback) { margin: 0; padding: 8px 12px; background: #fff0cc; border-radius: 8px; overflow-wrap: anywhere; }
+body[data-page="dtn-sender"] .sender-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; font-size: 13px; margin-bottom: 12px; overflow-wrap: anywhere; }
+body[data-page="dtn-sender"] .sender-connection { display: inline-flex; align-items: center; gap: 7px; }
+body[data-page="dtn-sender"] .sender-connection .connection-dot { flex-shrink: 0; }
+body[data-page="dtn-sender"] .sender-actions .dtn-send-actions { flex-wrap: wrap; }
+body[data-page="dtn-sender"] .sender-actions .dtn-send-actions p { margin-right: auto; }
+body[data-page="dtn-sender"] #dtn-settings-open[aria-expanded="true"] { background: #d9f3eb; color: #06725d; }
+@media (max-width: 600px) {
+  body[data-page="dtn-sender"] header { flex-wrap: wrap; }
+  body[data-page="dtn-sender"] .role-nav { margin-left: auto; }
+}
+
 /* Receiver-only layout */
 /* 수신 화면은 조작보다 관찰이 중심이다. 핵심 상태는 펼치고 상세 원문/로그는 필요할 때 연다. */
 body[data-page="dtn-receiver"] main { display: grid; gap: 14px; }
@@ -843,23 +859,46 @@ body[data-page="dtn-receiver"] .destination-row { display: flex; flex-wrap: wrap
 body[data-page="dtn-receiver"] .destination-row > label { flex: 1 1 260px; min-width: 0; margin: 0; }
 body[data-page="dtn-receiver"] .destination-status { flex: 0 0 auto; min-height: 40px; padding: 8px 12px; box-sizing: border-box; }
 body[data-page="dtn-receiver"] .destination-status > div { display: flex; align-items: center; gap: 10px; white-space: nowrap; }
-body[data-page="dtn-receiver"] :is(.test-type-selector, .transport-mode-selector) button.active:disabled { opacity: 1; color: var(--teal); background: #e6f4f0; border-color: #a6d6c8; }
+.receiver-test-summary { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 18px; margin-bottom: 14px; }
+.receiver-test-summary h2 { margin: 0; }
+.receiver-test-summary > strong { font-size: 14px; color: var(--teal); }
+.receiver-route { display: inline-flex; align-items: baseline; flex-wrap: wrap; gap: 8px; font-size: 13px; }
+.receiver-route > span { color: var(--muted); }
 .receiver-overview .card-title, .receiver-pvt .card-title { margin-bottom: 10px; flex-wrap: wrap; gap: 8px; }
 .receiver-overview .card-title h2, .receiver-pvt .card-title h2 { margin: 0; }
 .receiver-endpoint, .receiver-selection, .receiver-epoch-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .receiver-endpoint label, .receiver-selection label, .receiver-epoch-row label { margin: 0; white-space: nowrap; }
 .receiver-endpoint input { flex: 1 1 320px; min-width: 0; margin: 0; font-family: Consolas, monospace; }
 .receiver-endpoint button, .receiver-selection button { margin: 0; white-space: nowrap; }
-.receiver-selection { margin-top: 16px; }
-.receiver-selection select { flex: 1 1 300px; min-width: 0; margin: 0; }
-.receiver-flow { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; padding: 0; margin: 14px 0 10px; }
-.receiver-flow li { padding: 6px 12px; border: 1px solid var(--line); border-radius: 7px; color: var(--muted); }
+.receiver-trial-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 24px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.receiver-trial-grid > div { min-width: 0; }
+.receiver-selection { margin: 0; }
+.receiver-selection select { flex: 1 1 180px; min-width: 0; margin: 0; }
+.receiver-selection select, .receiver-selection button { padding: 8px 10px; font-size: 13px; }
+.receiver-flow { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; padding: 0; margin: 0 0 7px; }
+.receiver-flow li { padding: 5px 9px; border: 1px solid var(--line); border-radius: 7px; color: var(--muted); font-size: 12px; }
 .receiver-flow .done { color: var(--teal); background: #e6f4f0; border-color: #a6d6c8; }
 .receiver-flow .active { color: var(--amber); background: #fff4d9; border-color: #e8cf91; }
 .receiver-flow .failed { color: var(--red); background: #ffe9e9; border-color: #efbcbc; }
-.receiver-result-line { display: flex; flex-wrap: wrap; gap: 6px 12px; overflow-wrap: anywhere; }
+.receiver-result-line { display: flex; flex-wrap: wrap; gap: 4px 10px; overflow-wrap: anywhere; font-size: 13px; }
 .receiver-error { color: var(--red); }
-.receiver-meta { display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: 12px; color: var(--muted); margin-top: 7px; overflow-wrap: anywhere; }
+.receiver-meta { display: flex; flex-wrap: wrap; gap: 3px 12px; font-size: 11px; color: var(--muted); margin-top: 6px; overflow-wrap: anywhere; }
+.receiver-connections { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 24px; }
+.receiver-connections > div { min-width: 0; }
+.receiver-connection-heading { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px 12px; margin-bottom: 6px; }
+.receiver-connection-status { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; }
+body[data-page="dtn-receiver"] .receiver-adapter .adapter-url-controls { grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; }
+.receiver-connections input, .receiver-connections button, .receiver-endpoint input, .receiver-endpoint button { padding: 8px 10px; font-size: 13px; }
+.receiver-overview .receiver-endpoint { margin-top: 10px; }
+.receiver-endpoint .pill { padding: 4px 8px; }
+#receive-help:empty { display: none; }
+@media (max-width: 1000px) {
+  .receiver-connections, .receiver-trial-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 480px) {
+  body[data-page="dtn-receiver"] .receiver-adapter .adapter-url-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .receiver-adapter .adapter-url-controls > input { grid-column: 1 / -1; }
+}
 .receiver-result-links { display: flex; flex-wrap: wrap; gap: 12px; font-size: 13px; }
 .receiver-epoch-row { margin: 12px 0; }
 .receiver-epoch-row select { flex: 1 1 280px; min-width: 0; margin: 0; }

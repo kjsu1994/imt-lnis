@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>LNIS DTN Receiver</title>
   <link rel="stylesheet" href="/lnis/assets/common/app.css?v=20260915-structure">
-  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20260915-structure">
+  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20260915-receiver-records">
 </head>
 <body data-page="dtn-receiver">
 <header>
@@ -30,32 +30,22 @@
   </section>
 
   <section class="card receiver-overview">
-    <div class="card-title">
-      <h2>시험 설정 · 수신</h2>
-      <small id="receiver-type">시험 선택 대기</small>
+    <div class="receiver-test-summary" aria-label="수신 시험 설정">
+      <h2>수신 시험</h2>
+      <strong id="receiver-type">시험 선택 대기</strong>
+      <span class="receiver-route"><span>전송 경로</span><strong id="receiver-mode">경로 정보 없음</strong></span>
     </div>
-    <div class="test-type-selector" aria-label="지원 시험 유형">
-      <button disabled id="receiver-GNSS_RAW">GNSS RAW</button><button disabled id="receiver-AFS_METADATA">AFS Frame + Metadata</button><button disabled id="receiver-IQ_SAMPLE">I/Q Sample</button>
-    </div>
-    <div class="transport-mode-section"><div class="transport-mode-title"><span>전송 경로</span><strong id="receiver-mode">시험 선택 대기</strong></div>
-      <div class="transport-mode-selector" aria-label="수신 JSON의 전송 경로"><button disabled id="receiver-mode-DTN-HDTN">DTN → HDTN</button><button disabled id="receiver-mode-DTN-DTN">DTN → DTN</button><button disabled id="receiver-mode-HDTN-DTN">HDTN → DTN</button><button disabled id="receiver-mode-HDTN-HDTN">HDTN → HDTN</button></div></div>
-    <div class="destination-row"><label>상대 송신 서비스<input id="sender-address" readonly placeholder="주소 정보 없음"></label>
-      <div class="destination-status"><span id="reverse-dot" class="connection-dot unknown"></span><div><small>수신 → 송신 서비스</small><strong id="reverse-state">미확인</strong></div></div>
-      <span class="pill">COM 수집은 송신 측에서 수행</span></div>
-    <!-- 외부 어댑터가 호출할 주소다. 관리 API나 송신 어댑터의 /transfers와 구분한다. -->
-    <div class="receiver-endpoint">
-      <label for="receive-url">수신 API <span class="pill">POST</span></label>
-      <input id="receive-url" readonly aria-label="외부 DTN 또는 HDTN 어댑터에서 호출할 수신 API 주소">
-      <button id="copy-receive-url" type="button">주소 복사</button>
-      <span id="receive-auth" class="pill warning">인증 설정 확인 중</span>
-    </div>
-    <small id="receive-help" role="status">외부 DTN/HDTN 수신 어댑터가 이 주소로 JSON을 전달합니다.</small>
-
-    <div class="adapter-url-row">
+    <div class="receiver-connections">
+      <div>
+        <div class="receiver-connection-heading"><label for="sender-address">상대 송신 서비스</label>
+          <span class="receiver-connection-status" title="수신 → 송신 서비스"><span id="reverse-dot" class="connection-dot unknown" aria-hidden="true"></span><strong id="reverse-state">미확인</strong></span></div>
+        <input id="sender-address" readonly placeholder="주소 정보 없음">
+      </div>
+    <div class="receiver-adapter">
+      <div class="receiver-connection-heading"><label for="dtn-send-url">수신 어댑터 서버 주소</label>
+        <span class="receiver-connection-status" title="수신 → 수신 adapter"><span id="dtn-adapter-dot" class="connection-dot unknown" aria-hidden="true"></span><strong id="dtn-adapter-status" role="status" aria-live="polite">미확인</strong></span></div>
       <div class="adapter-url-controls">
-        <label><span>DTN 어댑터 서버 주소</span>
-          <input id="dtn-send-url" type="url" placeholder="http://어댑터-IP:포트" autocomplete="off"></label>
-        <div class="adapter-connection-state"><span id="dtn-adapter-dot" class="connection-dot unknown" aria-hidden="true"></span><small>수신 → 수신 adapter</small><strong id="dtn-adapter-status" role="status" aria-live="polite">미확인</strong></div>
+        <input id="dtn-send-url" type="url" placeholder="http://어댑터-IP:포트" autocomplete="off">
         <button id="dtn-adapter-save" type="button" title="이 브라우저에 주소 저장·적용">저장·적용</button>
         <button id="dtn-adapter-health" type="button" aria-controls="dtn-adapter-health-results">연결 확인</button>
       </div>
@@ -69,13 +59,29 @@
         </div>
       </details>
     </div>
+    </div>
+    <div class="receiver-endpoint">
+      <label for="receive-url">수신 API · POST</label>
+      <input id="receive-url" readonly aria-label="외부 DTN 또는 HDTN 어댑터에서 호출할 수신 API 주소">
+      <button id="copy-receive-url" type="button">주소 복사</button>
+      <span id="receive-auth" class="pill warning">인증 설정 확인 중</span>
+    </div>
+    <small id="receive-help" role="status"></small>
 
+    <div class="receiver-trial-grid">
+    <div>
     <div class="receiver-selection">
       <label for="dtn-tests">시험 기록</label>
       <select id="dtn-tests"><option value="">등록된 시험 없음</option></select>
       <button id="dtn-refresh" type="button">새로고침</button>
-      <small id="last-updated">2초마다 자동 갱신</small>
     </div>
+    <div class="receiver-meta">
+      <span>시험 ID <code id="test-id">-</code></span>
+      <span>갱신 시각 <span id="test-updated">-</span></span>
+      <span id="last-updated">2초마다 자동 갱신</span>
+    </div>
+    </div>
+    <div>
     <ol class="receiver-flow" aria-label="수신 처리 단계">
       <li id="step-register">① 시험 등록</li>
       <li id="step-receive">② JSON 수신</li>
@@ -85,9 +91,7 @@
       <strong id="receive-state" role="status" aria-live="polite">수신 대기</strong>
       <span id="receive-message">송신 측 시험 시작을 기다립니다.</span>
     </div>
-    <div class="receiver-meta">
-      <span>시험 ID <code id="test-id">-</code></span>
-      <span>갱신 시각 <span id="test-updated">-</span></span>
+    </div>
     </div>
   </section>
 
@@ -143,6 +147,6 @@
   </section>
   </div>
 </main>
-<script type="module" src="/lnis/assets/dtn/dtn-receiver.js?v=20260915-input-cleanup"></script>
+<script type="module" src="/lnis/assets/dtn/dtn-receiver.js?v=20260915-receiver-summary"></script>
 </body>
 </html>
