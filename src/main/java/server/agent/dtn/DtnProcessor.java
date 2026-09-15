@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import server.agent.codec.NativeAfsCodec;
-import server.agent.codec.NativePvtCodec;
+import server.shared.codec.NativePvtCodec;
 import server.agent.afs.*;
 import server.shared.codec.GrawCodec;
 import server.shared.codec.Hashing;

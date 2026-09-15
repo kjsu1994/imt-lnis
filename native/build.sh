@@ -11,18 +11,39 @@ cd /work
 # Normalize only build copies so patches behave identically on Windows and Linux.
 find . -type f \( -name '*.c' -o -name '*.h' \) -exec sed -i 's/\r$//' {} +
 for p in /src/patches/*.patch; do
+    # The complete receiver uses upstream's full header, not the codec-only shim.
+    if [[ "${1:-}" == receiver && "$p" == */03-decoder-includes.patch ]]; then continue; fi
     patch --batch --forward --fuzz=0 -p1 < "$p"
 done
 # Expose exactly the patched files for maintenance; keep originals only in vendor.
 mkdir -p /out/modified-sources
-cp --parents LANS-AFS-SIM/afs_nav.c LANS-AFS-SIM/afs_sim.c \
-    PocketSDR-AFS/src/sdr_ldpc_afs.c /out/modified-sources/
+cp --parents LANS-AFS-SIM/afs_nav.c LANS-AFS-SIM/afs_sim.c /out/modified-sources/
+if [[ "${1:-}" != receiver ]]; then
+    cp --parents PocketSDR-AFS/src/sdr_ldpc_afs.c /out/modified-sources/
+fi
 lans=LANS-AFS-SIM
 rtk=PocketSDR-AFS/lib/RTKLIB/src
 common=(-O2 -ffunction-sections -fdata-sections -I. -I"$rtk" -I"$lans" -I"$lans/pocketsdr")
 rtk_sources=()
 for f in rtkcmn rcvraw pntpos ephemeris preceph sbas ionex; do rtk_sources+=("$rtk/$f.c"); done
 case "${1:-}" in
+receiver)
+    mkdir -p /out/iq /work/receiver-objects
+    cd /work/receiver-objects
+    # All SDR originals are compiled together; unused sections are discarded.
+    gcc -O2 -ffunction-sections -fdata-sections -DLNIS_IQ_RECEIVER -DSVR_REUSEADDR \
+        -I"/work/$rtk" -c /work/"$rtk"/*.c
+    gcc -O2 -I/work/LDPC-codes '-DRAND_FILE="/app/iq/randfile"' -c /work/LDPC-codes/*.c
+    g++ -O2 -ffunction-sections -fdata-sections -DLNIS_IQ_RECEIVER \
+        -I"/work/$rtk" -I/work/PocketSDR-AFS/src -c \
+        /work/PocketSDR-AFS/src/*.c /work/PocketSDR-AFS/app/pocket_trk/pocket_trk.c
+    g++ -Wl,--gc-sections -o /out/iq/pocket_trk *.o -lfftw3f -lusb-1.0 -lfec -lm -lpthread
+    cp /work/LDPC-codes/randfile /out/iq/
+    cd /work
+    cp --parents PocketSDR-AFS/src/sdr_ch.c PocketSDR-AFS/src/sdr_nav.c \
+        PocketSDR-AFS/src/sdr_rcv.c PocketSDR-AFS/src/sdr_pvt.c PocketSDR-AFS/src/sdr_func.c \
+        "$rtk/rtklib.h" /out/modified-sources/
+    ;;
 iq)
     mkdir -p /out/iq
     gcc "${common[@]}" -static -fopenmp -Wl,--gc-sections -I"$lans/ldpc" \
@@ -59,7 +80,7 @@ codec)
     gcc --version > /out/verification/toolchain.txt
     x86_64-w64-mingw32-gcc --version >> /out/verification/toolchain.txt
     ;;
-*) echo 'Usage: build.sh iq|codec (inside the build container)' >&2; exit 2 ;;
+*) echo 'Usage: build.sh iq|codec|receiver (inside the build container)' >&2; exit 2 ;;
 esac
 # Prove the checked-in inputs were not patched in place.
 cd /src/vendor

@@ -1,4 +1,5 @@
 package server.agent.codec;
+import server.shared.codec.NativeLibraryPath;
 
 import com.sun.jna.Library;
 import com.sun.jna.Native;

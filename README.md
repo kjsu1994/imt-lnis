@@ -42,7 +42,7 @@ DTN의 GNSS 수집 데이터 화면은 관측값(RAWX)과 항법정보(SFRBX)를
 |---|---|---|
 | GNSS RAW | 원본 GRAW 바이트의 Base64 | 입력 무결성·송수신 지구 PVT |
 | AFS + Metadata | GRAW를 담은 AFS 프레임 | 복원 무결성·송수신 지구 PVT |
-| I/Q Sample | 90초 BIN의 공유 경로·크기·해시 | 수신 파일 크기·SHA-256 |
+| I/Q Sample | 90초 BIN 경로·크기·해시 + GPS LNAV + 초기 기준 PVT | 파일 무결성·I/Q 추적 관측값·보조 항법 기반 지구 PVT 오차 |
 
 PVT는 지구 ECEF GPS L1 SPP입니다. 송수신 일치는 계산 재현성 검증이며 실제 위치 정확도 보증이 아닙니다.
 수신 화면은 전송 JSON의 송신 기준 PVT와 독립 계산한 수신 PVT를 좌우로 비교하고, 일치 여부와 차이를 표시합니다. 기준값이 없는 과거 시험은 비교 불가로 표시합니다. 송신 화면에는 기준 PVT만 표시하며 서버의 비교 판정은 유지합니다.
@@ -51,10 +51,11 @@ PVT는 지구 ECEF GPS L1 SPP입니다. 송수신 일치는 계산 재현성 검
 관측값만 있는 파일은 전달 가능하지만 PVT는 판정 불가입니다.
 
 I/Q는 송신에서 `LNIS_IQ_ENABLED=true`로 활성화합니다. 양쪽 LNIS와 **각자의 로컬 어댑터**가 공유 폴더를 `/exchange`에 마운트해야 합니다.
-COM/GRAW 입력 적용 → 지구 PVT 계산 → 90초 I/Q 생성 → 전송 순서입니다. GPS PRN별 LNAV를 원본 SB2에 넣고 각 프레임을 반복·합산합니다. AFS 변조·부호화는 원본을 사용하며, 원본의 공유 위상/난수 상태 충돌 방지를 위해 생성은 단일 스레드로 실행합니다. 초기 PVT의 등속 운동을 가정한 시험 신호이며 실측 RF 또는 I/Q 복조 PVT 검증은 아닙니다.
+COM/GRAW 입력 적용 → 지구 PVT 계산 → 90초 I/Q 생성 → 전송 → 수신 추적·지구 PVT 계산 순서입니다. GPS PRN별 LNAV를 원본 SB2에 넣고 각 프레임을 반복·합산합니다. AFS 변조·부호화는 원본을 사용하며, 원본의 공유 위상/난수 상태 충돌 방지를 위해 생성은 단일 스레드로 실행합니다. 초기 PVT의 등속 운동을 가정한 시험 신호이며 실측 RF가 아닙니다.
 기존 LANS AFS 시뮬레이터의 90초·12 MHz 출력은 2.16 GB입니다. REST로 파일 본문을 보내지 않습니다.
 빌드 사본에서 원본의 0.1초 부족한 출력 루프를 보정하며, 실제 바이트 수로 90초를 검증합니다. 원본 파일은 수정하지 않습니다.
-수신 어댑터는 수신 PC 폴더에 BIN을 완성한 다음 원래 JSON으로 콜백합니다. I/Q에서 지구 PVT를 복원하지 않습니다.
+수신 어댑터는 수신 PC 폴더에 BIN을 완성한 다음 원래 JSON으로 콜백합니다. LNIS가 PocketSDR의 AFS 탐색·추적·CRC 검증 후 의사거리·도플러·상대 누적 위상을 얻고, JSON의 GPS LNAV를 보조 항법정보로 사용하여 기존 RTKLIB 지구 PVT를 계산합니다. 송신 RAWX나 기준 좌표를 수신 계산에 넣지 않습니다.
+수신 화면에는 **I/Q 복원 관측값(수신기 RAWX 원본 아님)**, 보조 LNAV, 동일 샘플 시각의 기준/수신 PVT와 오차가 표시됩니다. 파일 `PASS`와 PVT `MEASURED`(오차 측정)는 별개이며, I/Q 정확도 합격 허용오차는 아직 설정하지 않았습니다. 추적 초기에는 PVT가 없을 수 있습니다. 메타데이터가 없는 과거 파일은 파일 검증만 가능하므로 PVT 시험에는 새로 생성하세요.
 
 ## 개발용 눈으로 확인
 
@@ -84,7 +85,7 @@ COM/GRAW 입력 적용 → 지구 PVT 계산 → 90초 I/Q 생성 → 전송 순
 - 합성 입력·예상 PVT: `build/dtn-example/synthetic-earth-pvt.graw`, 동일 이름 JSON
 - Linux 코덱: `build/native-linux/libLnisAfsCodec.so`
 - Windows 후보 DLL: `build/native-pvt/LnisAfsCodec.dll` — 기존 DLL을 자동 덮어쓰지 않습니다.
-- 90초 I/Q 생성기: `build/iq/afs_sim`
+- 90초 I/Q 생성기·수신 추적기: `build/iq/afs_sim`, `build/iq/pocket_trk`
 - 배포 ZIP: `gradlew.bat linuxNodeDistZip -PnativeCandidate=build/native-pvt`
 
 빌드는 **전체 JDK 21**, Docker Linux 컨테이너 환경, Node.js가 필요합니다. Windows는 `gradlew.bat`, WSL2/Linux는 `./gradlew`를 사용합니다. Linux에서 검증할 때는 `-PnativeCandidate=build/native-linux`를 지정합니다.

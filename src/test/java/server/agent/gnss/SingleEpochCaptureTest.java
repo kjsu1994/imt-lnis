@@ -5,7 +5,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.nio.file.Path;
 import java.util.List;
 import org.junit.jupiter.api.Test;
-import server.agent.codec.NativePvtCodec;
+import server.shared.codec.NativePvtCodec;
 import server.agent.codec.NativePvtIntegrationTest;
 import server.shared.codec.GrawCodec;
 

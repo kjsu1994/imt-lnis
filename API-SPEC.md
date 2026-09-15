@@ -711,7 +711,7 @@ V는 ECEF 속도, 단위 m/s. T 비교 항목은 수신기 시계 오차, 단위
 
 ### 화면에서 수신 노드 연결 설정
 
-DTN 수신 화면은 시험 목록과 보고서를 조회만 한다. 외부 어댑터용 수신 주소는 노드의 baseUrl에 /lnis/api/v1/dtn/receive를 붙여 표시하며, 수신 인증 토큰 설정 여부만 노출한다. JSON 접수 후 복원·PVT 계산은 자동 수행되고, 화면의 새로고침은 재계산을 요청하지 않는다. 수신 노드의 COMPLETED는 수신 계산 완료이며 최종 PASS가 아니다. 수신 화면은 같은 관측 시각의 송신 기준 PVT와 독립 계산한 수신 PVT를 좌우로 표시하며, 기존 비교 기준으로 전체 PVT 일치/불일치/비교 불가를 표시한다. 송신 화면에는 기준 PVT만 표시하며 서버의 최종 비교 판정은 유지한다. 수신 GNSS 수집 데이터 표는 GNSS RAW와 AFS 시험에서 표시하고 I/Q 시험에서는 숨긴다.
+JSON 접수 후 수신 복원·PVT 계산은 자동 수행된다. 새로고침은 재계산을 요청하지 않는다. COMPLETED는 처리 완료이며 최종 PASS와 구분한다. 수신 화면은 같은 시각의 기준·수신 PVT를 좌우로 표시한다. GNSS RAW·AFS는 기존 일치 판정, I/Q는 허용오차 미설정 상태의 오차 측정(MEASURED)을 표시한다. I/Q 추적 관측값과 보조 LNAV도 표로 표시하되 수신기 RAWX·SFRBX 원본과 구분한다. 메타데이터 없는 과거 I/Q 파일은 파일 검증만 수행한다.
 
 독립 송신 노드의 AFS/DTN 화면에서 공통으로 사용한다. 관리 토큰은 서버 설정을 사용하며 요청·응답에 토큰 값을 넣지 않는다.
 
@@ -875,7 +875,7 @@ Authorization: Bearer <LNIS_DTN_SEND_TOKEN>
 | receiverMode | `DTN` 또는 `HDTN`: 수신 측 기동 모드 |
 | profile | RAW/AFS: `POCKETSDR-GPS-L1CA-SPP-v1`, I/Q: `LANS-AFS-IQ-v1` |
 | format | 아래 유형별 데이터 형식 |
-| referencePvt | GNSS_RAW/AFS_METADATA에 포함되는 송신 기준 PVT 배열. 아래 규칙 참조. IQ_SAMPLE에는 없음 |
+| referencePvt | 송신 기준 PVT 배열. RAW/AFS는 관측 시점별, 신규 IQ_SAMPLE은 생성 시작 시점 1개. 비교용이며 수신 계산 입력이 아님 |
 
 네 가지 경로 DTN→DTN, DTN→HDTN, HDTN→DTN, HDTN→HDTN을 모두 지원해야 합니다.
 선택값은 시험 시작 시 확정되며, 어댑터는 전송 중 UI 변경과 무관하게 이 요청값을 사용합니다.
@@ -954,7 +954,9 @@ UBX 직렬 바이트 원문과는 다릅니다. 어댑터는 내용을 해석·�
 - `prn=1`은 AFS 시험 PRN으로, 원본 GPS 관측 위성 PRN과 다릅니다.
 
 
-#### C. I/Q Sample: 파일 주소만 전달
+#### C. I/Q Sample: 파일 주소 + 보조 항법정보
+
+아래는 구조 예시입니다. `gpsLnav`, `referencePvt` 배열 내용은 지면상 생략했으며 실제 요청에는 아래 표의 값이 채워집니다.
 
 ```json
 {
@@ -973,7 +975,17 @@ UBX 직렬 바이트 원문과는 다릅니다. 어댑터는 내용을 해석·�
     "sampleRateHz": 12000000,
     "sampleFormat": "IQ_INTERLEAVED_INT8",
     "quantizationBits": 2
-  }
+  },
+  "metadata": {
+    "signal": "AFSD",
+    "pvtMethod": "AFS_IQ_GPS_LNAV_ASSISTED-v1",
+    "week": 2400,
+    "towSeconds": 100000.0,
+    "trajectory": "ECEF_CONSTANT_VELOCITY",
+    "prns": [19, 23, 24, 28, 29],
+    "gpsLnav": []
+  },
+  "referencePvt": []
 }
 ```
 
@@ -986,8 +998,19 @@ UBX 직렬 바이트 원문과는 다릅니다. 어댑터는 내용을 해석·�
 - 수신 어댑터는 **수신 PC의 별도 공유 폴더**에 동일한 `/exchange/<파일 UUID>.bin` 경로로 복원합니다. 양 PC의 디스크가 같은 것은 아닙니다.
 - 임시 파일에 수신한 뒤 완료 파일로 원자적 변경하고, 원본 크기·해시를 확인한 다음 아래 콜백을 호출합니다.
 - 경로·크기·해시를 포함해 JSON을 수정하지 않습니다. 테스트 UUID와 파일 UUID는 서로 다를 수 있습니다.
-- LNIS는 수신 BIN 크기·해시를 다시 확인합니다. 수신 I/Q에서 PVT를 계산하지 않습니다.
+- LNIS가 파일 검증 → I/Q 탐색·추적·AFS CRC 검증 → 관측값 추출 → 보조 LNAV로 지구 PVT 계산을 수행합니다. 어댑터는 계산하지 않고 **metadata·referencePvt까지 변경 없이 전달**합니다.
 - 양쪽 완료 파일은 명시적으로 정리할 때까지 보관합니다. 어댑터는 LNIS 소유 송신 파일을 임의 삭제하지 않습니다.
+
+| I/Q 추가 항목 | 의미 / 수신 요구사항 |
+|---|---|
+| metadata.signal / pvtMethod | `AFSD` / `AFS_IQ_GPS_LNAV_ASSISTED-v1`. I/Q 단독 측위가 아닌 항법정보 보조 방식 |
+| metadata.week / towSeconds | BIN 첫 샘플의 GPS 주차·TOW(초). PC/콜백 시각으로 변경 금지 |
+| metadata.trajectory | `ECEF_CONSTANT_VELOCITY`: 초기 위치 + 속도 × 샘플 경과시간으로 기준 궤적 비교 |
+| metadata.prns | 생성에 사용한 중복 없는 GPS PRN 1~32, 4~32개 |
+| metadata.gpsLnav | `{ "prn": 19, "words24": [10개 정수] }` 배열. 선택 PRN마다 LNAV 서브프레임 1·2·3 필수. 워드는 0~16777215의 **패리티 제외 24-bit** 값이며 SFRBX 32-bit 원문이 아님. 최대 320개 레코드 |
+| referencePvt | 앞서 정의한 PVT 필드 구조의 배열 1개. 생성 시작 시각의 유효 ECEF 위치·속도·수신기 시계오차. 수신 측은 비교할 때만 사용 |
+
+수신 파일 무결성은 `fileResult.verdict=PASS`, I/Q PVT 오차 측정은 `comparison.verdict=MEASURED`로 구분합니다. 정확도 합격 허용오차는 미설정이며 RAW/AFS의 1 mm 재현성 기준을 RF 추적 합격 기준으로 사용하지 않습니다. 관측/항법 부족 시 PVT 비교는 `INCONCLUSIVE`입니다. metadata 없는 과거 I/Q는 파일 검증만 수행합니다. 이 항목들은 **LNIS 보고서**에 해당하며 어댑터 접수 응답을 확장할 필요는 없습니다.
 
 #### 어댑터의 접수 응답
 
@@ -1023,7 +1046,7 @@ Authorization: Bearer <LNIS_DTN_RECEIVE_TOKEN>
 {"testId":"438a4035-a13c-4b49-a278-0e5fb7f774bd","accepted":true,"state":"WAITING_RECEIVER"}
 ```
 
-202는 JSON 접수·저장 완료입니다. 이후 수신 LNIS가 RAW/AFS 복원·PVT 계산 또는 I/Q 파일 검증을 수행합니다.
+202는 JSON 접수·저장 완료입니다. 이후 수신 LNIS가 RAW/AFS 복원·PVT 계산 또는 I/Q 파일 검증·추적·보조 항법 기반 PVT 계산을 수행합니다.
 같은 JSON 재접수는 재계산하지 않고 현재 상태를 반환합니다. 완료 후 재접수하면 state가 COMPLETED일 수도 있습니다.
 
 | 응답 | 의미 |

@@ -71,11 +71,24 @@ for(const testType of ['GNSS_RAW','AFS_METADATA','IQ_SAMPLE']) {
  for(const [senderMode,receiverMode] of [['DTN','DTN'],['DTN','HDTN'],['HDTN','DTN'],['HDTN','HDTN']]) {
    const start=await call(tx,'/dtn/tests','POST',{inputId:testType==='IQ_SAMPLE'?null:inputId,iqFileId:iq.id,
       senderAgentId:'sender-1',receiverAgentId:'receiver-1',sendUrl:'http://relay:8080',testType,senderMode,receiverMode});
-   const job=await wait('/dtn/tests/'+start.testId,180); assert.equal(job.verdict,'PASS',JSON.stringify(job));
+   const job=await wait('/dtn/tests/'+start.testId,600); assert.equal(job.verdict,testType==='IQ_SAMPLE'?'MEASURED':'PASS',JSON.stringify(job));
    const sent=await (await fetch(tx+'/dtn/tests/'+start.testId+'/payload/sent')).text();
    const received=await (await fetch(rx+'/dtn/tests/'+start.testId+'/payload/received')).text(); assert.equal(received,sent);
    const wire=JSON.parse(sent); assert.equal(wire.testType,testType); assert.equal(wire.senderMode,senderMode); assert.equal(wire.receiverMode,receiverMode);
-   if(testType==='IQ_SAMPLE') {assert.equal(wire.file.sha256,completed.file.sha256);assert.ok(sent.length<5000);}
+   if(testType==='IQ_SAMPLE') {
+     assert.equal(wire.file.sha256,completed.file.sha256);assert.ok(sent.length<16000);
+     assert.equal(wire.metadata.pvtMethod,'AFS_IQ_GPS_LNAV_ASSISTED-v1');
+     assert.equal(wire.metadata.gpsLnav.length,15); assert.equal(wire.referencePvt.length,1);
+     const report=await call(rx,'/dtn/tests/'+start.testId+'/report');
+     assert.equal(report.fileResult.verdict,'PASS');assert.equal(report.comparison.verdict,'MEASURED');
+     assert.equal(report.observations.source,'IQ_TRACKING');
+     assert.ok(report.receivedPvt.filter(p=>p.positionValid && p.velocityValid).length>=30);
+     assert.ok(report.receivedPvt[0].towSeconds>wire.referencePvt[0].towSeconds);
+     // Fixture-only safety bounds, NOT production accuracy acceptance thresholds.
+     const measured=report.comparison.epochs.filter(e=>e.receivedValid);
+     assert.ok(measured.every(e=>e.positionDifferenceMeters<100 && e.velocityDifferenceMetersPerSecond<10));
+     assert.ok(measured.some(e=>e.positionDifferenceMeters>0.001),'I/Q results must not copy sender PVT');
+   }
    else { const report=await call(rx,'/dtn/tests/'+start.testId+'/report');assert.equal(report.comparison.verdict,'PASS');assert.deepEqual(report.referencePvt,report.receivedPvt); }
    for(const base of [tx,rx]) {
      const log = await call(base,'/dtn/logs?scopeId='+start.testId);

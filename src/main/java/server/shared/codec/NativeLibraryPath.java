@@ -1,15 +1,15 @@
-package server.agent.codec;
+package server.shared.codec;
 
 import java.nio.file.Path;
 import java.util.Locale;
 
 /** AFS와 PVT가 반드시 같은 운영체제용 라이브러리를 사용하도록 경로 선택을 통일한다. */
-final class NativeLibraryPath {
+public final class NativeLibraryPath {
     private NativeLibraryPath()
     {
     }
 
-    static Path resolve(Path directory)
+    public static Path resolve(Path directory)
     {
         return resolve(directory, System.getProperty("os.name", ""));
     }

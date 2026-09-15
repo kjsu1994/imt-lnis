@@ -264,7 +264,7 @@ public final class AgentRuntime implements AutoCloseable {
     var capturedPvt = new AtomicReference<List<server.shared.model.DtnModels.Pvt>>();
     var selection = settings.singleEpoch() ? new server.shared.codec.SingleEpochCapture(records -> {
       status(sessionId,EventType.GNSS_STATUS,0,"PvtCalculating","관측값·항법정보 후보 확보 · 지구 PVT 계산 중",Map.of());
-      try (var pvt = new server.agent.codec.NativePvtCodec(config.nativeDirectory())) {
+      try (var pvt = new server.shared.codec.NativePvtCodec(config.nativeDirectory())) {
         var results = pvt.calculate(records);
         var result = results.getFirst();
         if (!result.isPositionValid() || !result.isVelocityValid()) {

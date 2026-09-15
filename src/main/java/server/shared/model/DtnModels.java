@@ -24,6 +24,8 @@ public final class DtnModels {
     private String senderMode;
     private String receiverMode;
     private IqFile file;
+    /** I/Q tracking supplies observations; this metadata supplies GPS LNAV only. */
+    private IqMetadata metadata;
     private String sourceSha256;
     private int recordCount;
     private int prn = 1;
@@ -37,6 +39,10 @@ public final class DtnModels {
   /** A reference to a completed local shared file, never the I/Q binary body. */
   public record IqFile(String filePath, long sizeBytes, String sha256, int durationSeconds,
       int sampleRateHz, String sampleFormat, int quantizationBits) {}
+
+  public record IqNavigation(int prn, List<Integer> words24) {}
+  public record IqMetadata(String signal, String pvtMethod, int week, double towSeconds,
+      String trajectory, List<Integer> prns, List<IqNavigation> gpsLnav) {}
 
   /** frameBase64는 반드시 750바이트 AFS 프레임이며 관측 시각은 복원된 GRAW에 있다. */
   @Data @NoArgsConstructor

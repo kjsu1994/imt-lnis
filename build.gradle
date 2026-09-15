@@ -174,7 +174,7 @@ tasks.register('linuxNodeDistZip', Zip) {
     }
     from('build/iq') {
         into 'iq'
-        include 'afs_sim', '008_Weil1500hex210prns.txt', 'LICENSE.txt', 'default_almanac.txt'
+        include 'afs_sim', 'pocket_trk', 'randfile', '008_Weil1500hex210prns.txt', 'LICENSE.txt', 'default_almanac.txt'
     }
     from(tasks.named('bootJar').flatMap { it.archiveFile })
     from('build/native-linux/libLnisAfsCodec.so') { into 'native' }

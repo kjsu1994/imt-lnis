@@ -1,4 +1,4 @@
-package server.agent.codec;
+package server.shared.codec;
 
 import org.junit.jupiter.api.Test;
 

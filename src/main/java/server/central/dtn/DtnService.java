@@ -85,6 +85,8 @@ public class DtnService {
     private DtnNodeLink nodeLink;
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private IqService iq;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private IqReceiver iqReceiver;
 
     /** 기존 중앙 서버 모드는 그대로 두고 독립 노드 모드에서만 관리 통신을 연결한다. */
     @org.springframework.beans.factory.annotation.Autowired(required = false)
@@ -235,6 +237,11 @@ public class DtnService {
             transfer.setTestType(job.getTestType()); transfer.setFormat("LNIS-IQ-FILE-v1");
             transfer.setProfile("LANS-AFS-IQ-v1");
             transfer.setSenderMode(senderMode); transfer.setReceiverMode(receiverMode); transfer.setFile(file);
+            var source = iq.source(inputId, file);
+            if (source != null) {
+                transfer.setMetadata(source.metadata()); transfer.setReferencePvt(List.of(source.reference()));
+                job.setReferenceJson(objectMapper.writeValueAsString(transfer.getReferencePvt()));
+            }
             synchronized (this) {
                 if (!"PREPARING".equals(get(job.getId()).getState())) return;
                 var packet = objectMapper.valueToTree(transfer);
@@ -472,8 +479,9 @@ public class DtnService {
     public synchronized void tick()
     {
         for (DtnJob job : dtnRepository.findByStateIn(ACTIVE)) {
-            if (Instant.now().isAfter(job.getCreatedAt().plus(Duration.ofMinutes(10)))) {
-                fail(job, new IllegalStateException("DTN 시험 제한 시간 10분 초과"));
+            int timeoutMinutes="IQ_SAMPLE".equals(job.getTestType()) ? 20 : 10;
+            if (Instant.now().isAfter(job.getCreatedAt().plus(Duration.ofMinutes(timeoutMinutes)))) {
+                fail(job, new IllegalStateException("DTN 시험 제한 시간 "+timeoutMinutes+"분 초과"));
                 continue;
             }
             if (sendingNode() && "WAITING_DTN".equals(job.getState())) {
@@ -572,8 +580,16 @@ public class DtnService {
                     if (!"PASS".equals(verified.path("verdict").asText()) || file.sizeBytes() != verified.path("sizeBytes").asLong()
                             || !file.sha256().equals(verified.path("sha256").asText()))
                         throw new IllegalArgumentException("수신 I/Q 검증 결과 불일치");
-                    job.setFileResultJson(verified.toString()); job.setComparisonJson(verified.toString());
-                    update(job, "COMPLETED", "I/Q 송수신 크기·SHA-256 일치"); return;
+                    job.setFileResultJson(verified.toString());
+                    var sent = objectMapper.readValue(job.getSentJson(), Transfer.class);
+                    if (sent.getMetadata()!=null) {
+                        if (result.getPvt()==null) throw new IllegalArgumentException("I/Q 수신 PVT 결과 누락");
+                        job.setReceiverJson(objectMapper.writeValueAsString(result.getPvt()));
+                        var reference=IqReceiver.references(sent.getMetadata(),sent.getReferencePvt(),result.getPvt());
+                        job.setReferenceJson(objectMapper.writeValueAsString(reference));
+                        job.setComparisonJson(objectMapper.writeValueAsString(IqReceiver.comparison(reference,result.getPvt())));
+                    }
+                    update(job, "COMPLETED", "I/Q 파일 일치 · "+result.getMessage()); return;
                 }
                 if (result.getReceivedAt() == null || result.getPvt() == null || result.getPvt().isEmpty()) {
                     throw new IllegalArgumentException("수신 노드의 완료 결과가 불완전합니다.");
@@ -597,10 +613,29 @@ public class DtnService {
             var result = new LinkedHashMap<>(iq.verify(transfer.getFile()));
             trace(job.getId(),"I/Q 검증",true,"검증 완료 · "+result+" · "+((System.nanoTime()-started)/1_000_000)+" ms");
             result.put("preview", iq.preview(transfer.getFile()));
+            IqReceiver.Result decoded=null;
+            List<Pvt> reference=List.of();
+            Map<String,Object> comparison=Map.of("verdict","INCONCLUSIVE","message","과거 파일: I/Q PVT 메타데이터 없음");
+            if(transfer.getMetadata()!=null) {
+                if(iqReceiver==null) throw new IllegalStateException("I/Q 수신기 미설정");
+                decoded=iqReceiver.decode(iq.path(transfer.getFile()),transfer.getMetadata(),
+                    message->trace(job.getId(),"I/Q 복원",true,message));
+                // File verification and PVT accuracy are different results.
+                iq.verify(transfer.getFile()); // Detect replacement/modification during tracking.
+                reference=IqReceiver.references(transfer.getMetadata(),transfer.getReferencePvt(),decoded.pvt());
+                comparison=IqReceiver.comparison(reference,decoded.pvt());
+            }
             synchronized (this) {
                 if (!"CALCULATING".equals(get(job.getId()).getState())) return;
                 job.setFileResultJson(objectMapper.writeValueAsString(result));
-                update(job, "COMPLETED", "수신 I/Q 파일 크기·SHA-256 검증 완료");
+                job.setComparisonJson(objectMapper.writeValueAsString(comparison));
+                if(decoded!=null) {
+                    job.setReceiverJson(objectMapper.writeValueAsString(decoded.pvt()));
+                    job.setObservationsJson(objectMapper.writeValueAsString(decoded.observations()));
+                    job.setReferenceJson(objectMapper.writeValueAsString(reference));
+                }
+                update(job, "COMPLETED", decoded==null ? "파일 검증 완료 · 과거 파일은 PVT 메타데이터 없음"
+                    : "파일 검증 완료 · 항법정보 보조 I/Q PVT: "+comparison.get("verdict"));
             }
         } catch (Exception error) { synchronized (this) { if ("CALCULATING".equals(get(job.getId()).getState())) fail(job, error); } }
     }

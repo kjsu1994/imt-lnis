@@ -1,4 +1,4 @@
-package server.agent.codec;
+package server.shared.codec;
 
 import com.sun.jna.Library;
 import com.sun.jna.Native;
@@ -77,10 +77,23 @@ public final class NativePvtCodec implements AutoCloseable {
       input[i*4+2] = o.dopplerHz();
       input[i*4+3] = o.carrierToNoiseDbHz();
     }
+    return solve(epoch.week(), epoch.receiverTowSeconds(), input);
+  }
+
+  /** I/Q 복원 관측도 동일 RTKLIB 연결부를 사용한다. 참조 PVT는 받지 않는다. */
+  public void navigation(int prn, int week, int[] words) {
+    if (api.lnis_pvt_gps_navigation(context, prn, week, words, words.length) < 0)
+      throw new IllegalArgumentException("유효하지 않은 GPS LNAV 항법 데이터입니다.");
+  }
+
+  public Pvt solve(int week, double tow, double[] input) {
+    if (input.length == 0 || input.length % 4 != 0 || input.length > 128)
+      throw new IllegalArgumentException("PVT 관측 개수 오류");
+    Pvt pvt = new Pvt(); pvt.setWeek(week); pvt.setTowSeconds(tow);
     double[] result = new double[9];
     byte[] error = new byte[256];
-    int status = api.lnis_pvt_gps_solve(context, epoch.week(), epoch.receiverTowSeconds(),
-        input, observations.size(), result, error, error.length);
+    int status = api.lnis_pvt_gps_solve(context, week, tow,
+        input, input.length / 4, result, error, error.length);
     if (status < 0) throw new IllegalArgumentException("PVT 입력 범위 오류");
     int length = 0;
     while (length < error.length && error[length] != 0) length++;

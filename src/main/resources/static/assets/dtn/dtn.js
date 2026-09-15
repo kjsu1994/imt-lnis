@@ -2,7 +2,7 @@ import {requestJson} from '../common/http.js?v=20260915-structure';
 import {createDtnLog} from './dtn-log.js?v=20260915-structure';
 import {initAdapterHealth, validAdapterUrl} from './dtn-adapter-health.js?v=20260915-settings';
 import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20260915-structure';
-import {createObservationView, numeric} from './dtn-observations.js?v=20260915-input-cleanup';
+import {createObservationView, numeric} from './dtn-observations.js?v=20260916-iq-pvt-r3';
 
 const api = '/lnis/api/v1', $ = id => document.getElementById(id);
 const payload = createPayloadViewer($('dtn-payload'), {sentOnly: true});

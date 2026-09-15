@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {numeric, observationCells, navigationCells} from '../../main/resources/static/assets/dtn/dtn-observations.js';
+import {numeric, observationCells, navigationCells, createObservationView} from '../../main/resources/static/assets/dtn/dtn-observations.js';
 
 assert.equal(numeric(null), '—');
 assert.equal(numeric(NaN), '—');
@@ -35,3 +35,34 @@ for (const id of [0, 2, 6, 99]) {
   assert.equal(observationCells({...raw, constellationId:id})[0], nav[2]);
 }
 console.log('PASS: sender/receiver missing values, precision and shared constellation names');
+const iq=observationCells({source:'IQ_TRACKING',constellationId:0,satelliteId:19,signalId:0,
+  pseudorangeMeters:21000000,dopplerHz:100,carrierPhaseCycles:200,carrierToNoiseDbHz:45,trackingStatus:1});
+assert.equal(iq[2],'AFS Data · L1');
+assert.equal(iq[8],'—');
+assert.equal(iq[9],'PR 유효 · 위상 상대값');
+assert.equal(iq[7],undefined); // Never invent F9T lock-time or deviation codes for SDR observations.
+
+// Exercise the complete view update, including navigation rendering and epoch selection.
+const element = () => ({value: '0', children: [], append(child) { this.children.push(child); },
+  replaceChildren(...children) { this.children = children; }});
+globalThis.document = {createElement: element};
+globalThis.Option = function(text, value) { this.text = text; this.value = value; };
+const nodes = new Map();
+const container = {querySelector(selector) {
+  if (!nodes.has(selector)) nodes.set(selector, element());
+  return nodes.get(selector);
+}};
+const view = createObservationView(container);
+const navigation = [{sequence: 1, message: {constellationId: 0, satelliteId: 19, words: [0x8b0000, 0]}}];
+const epochs = [{observation: {week: 2400, receiverTowSeconds: 100021,
+  leapSeconds: 18, receiverStatus: 1, observations: [raw]}}];
+view.setData({source: 'IQ_TRACKING', navigationCount: 1, navigation, epochs});
+assert.equal(nodes.get('[data-navigation]').children[0].children[8].textContent, '8B0000 000000');
+assert.equal(nodes.get('[data-epoch]').disabled, false);
+view.setData({navigationCount: 1, navigation, epochs});
+assert.equal(nodes.get('[data-navigation]').children[0].children[8].textContent, '008B0000 00000000');
+view.setData(null);
+assert.equal(nodes.get('[data-epoch]').disabled, true);
+delete globalThis.document;
+delete globalThis.Option;
+console.log('PASS: full I/Q and GRAW view updates, navigation HEX widths and empty state');

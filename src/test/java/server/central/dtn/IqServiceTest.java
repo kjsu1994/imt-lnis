@@ -48,7 +48,7 @@ class IqServiceTest {
   @Test @org.junit.jupiter.api.condition.EnabledOnOs(org.junit.jupiter.api.condition.OS.WINDOWS)
   void earthInputRequiresMatchingValidEpochAndKeepsObservedPrns() throws Exception {
     var records = server.shared.codec.GrawCodec.splitLengthPrefixed(server.agent.codec.NativePvtIntegrationTest.validSample());
-    try (var calculator = new server.agent.codec.NativePvtCodec(Path.of("native/bin/win-x64"))) {
+    try (var calculator = new server.shared.codec.NativePvtCodec(Path.of("native/bin/win-x64"))) {
       var pvt = calculator.calculate(records).getFirst();
       String input = IqService.earthInput(records, pvt);
       assertTrue(input.startsWith("LNIS-IQ-EARTH-1 2400 100000.0 "));

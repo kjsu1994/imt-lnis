@@ -53,6 +53,7 @@ public class IqService {
     if (Files.isSymbolicLink(file)) throw new IllegalArgumentException("심볼릭 링크는 삭제할 수 없습니다.");
     Files.deleteIfExists(file);
     Files.deleteIfExists(root.resolve(id + ".json"));
+    Files.deleteIfExists(root.resolve(id + ".context.json"));
     jobs.remove(id);
   }
   public synchronized Map<String,Object> start() throws IOException {
@@ -127,11 +128,14 @@ public class IqService {
       trace(id,"I/Q 검증",true,"파일 출력 100% · 크기 확인 완료 · "+Files.size(part)+" bytes · 생성 소요 "+((System.nanoTime()-started)/1_000_000)+" ms");
       trace(id,"I/Q 검증",true,"SHA-256 계산 시작 · 아직 전송 준비 완료가 아닙니다.");
       String digest = sha256(part);
+      var context = IqReceiver.source(earthInput, digest);
       trace(id,"I/Q 검증",true,"SHA-256 계산 완료 · "+digest);
       synchronized (this) {
         if (!id.equals(active) || cancelled(id)) return;
         Files.move(part, root.resolve(id + ".bin"), StandardCopyOption.ATOMIC_MOVE);
         IqFile file = new IqFile("/exchange/" + id + ".bin", EXPECTED_BYTES, digest, 90, 12_000_000, "IQ_INTERLEAVED_INT8", 2);
+        json.writeValue(root.resolve(id + ".context.json").toFile(), context);
+        // The file manifest marks READY after its PVT context has been persisted.
         json.writeValue(root.resolve(id + ".json").toFile(), file);
         set(id, "READY", "파일 생성·크기·SHA-256 검증 완료", file);
       }
@@ -185,6 +189,16 @@ public class IqService {
     var job = status(id);
     if (!"READY".equals(job.get("state"))) throw new IllegalStateException("완료된 I/Q 파일만 전송할 수 있습니다.");
     IqFile file = (IqFile)job.get("file"); verify(file); return file;
+  }
+  /** Old files remain file-integrity-only; never invent missing generation metadata. */
+  public IqReceiver.Source source(UUID id, IqFile file) throws IOException {
+    Path context = root.resolve(id + ".context.json");
+    if (!Files.exists(context)) return null;
+    if (Files.isSymbolicLink(context) || Files.size(context)>1_048_576)
+      throw new IOException("I/Q 생성 메타데이터 경로·크기 오류");
+    var source=json.readValue(context.toFile(), IqReceiver.Source.class);
+    if (!file.sha256().equals(source.sha256())) throw new IOException("I/Q 파일과 생성 메타데이터 불일치");
+    IqReceiver.validate(source.metadata()); return source;
   }
   public Path path(IqFile file) throws IOException {
     if (file == null || file.filePath() == null || !file.filePath().matches("/exchange/[0-9a-fA-F-]{36}\\.bin"))

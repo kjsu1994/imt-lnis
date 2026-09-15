@@ -1,4 +1,5 @@
 package server.agent.codec;
+import server.shared.codec.NativePvtCodec;
 
 import static org.junit.jupiter.api.Assertions.*;
 import java.nio.ByteBuffer;

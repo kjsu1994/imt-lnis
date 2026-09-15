@@ -47,8 +47,12 @@ assert.equal(elements.get('dtn-report').hidden, true);
 vm.runInContext("renderSummary({testType:'IQ_SAMPLE',state:'COMPLETED'})",context);
 assert.equal(elements.get('receiver-type').textContent,'I/Q Sample');
 assert.ok(!html.includes('class="test-type-selector"') && !html.includes('class="transport-mode-selector"'), 'receiver displays only the received selection, without option buttons');
-assert.equal(elements.get('step-process').textContent,'③ I/Q 파일 검증');
-assert.equal(elements.get('receive-state').textContent,'I/Q 파일 검증 완료');
+assert.equal(elements.get('step-process').textContent,'③ I/Q 검증·추적·PVT');
+assert.equal(elements.get('receive-state').textContent,'I/Q 처리 완료');
+context.renderSummary({testType:'IQ_SAMPLE',state:'COMPLETED',receivedEpochs:69});
+assert.equal(elements.get('dtn-observations').hidden,false);
+context.setComparison({comparison:{verdict:'MEASURED'}});
+assert.match(elements.get('pvt-match').textContent,/오차 측정/);
 for (const testType of ['GNSS_RAW', 'AFS_METADATA', 'IQ_SAMPLE']) {
   for (const senderMode of ['DTN', 'HDTN']) for (const receiverMode of ['DTN', 'HDTN']) {
     context.renderSummary({testType, senderMode, receiverMode, state: 'COMPLETED'});

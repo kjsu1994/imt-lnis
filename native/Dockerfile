@@ -17,9 +17,19 @@ WORKDIR /src
 COPY . .
 RUN --network=none bash build.sh codec
 
+FROM ubuntu:24.04@sha256:224a1869083a311ef3f13648a154ba79832fbef6364d31493642ca03082da254 AS receiver
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential patch libfftw3-dev libusb-1.0-0-dev libfec-dev \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /src
+COPY . .
+RUN --network=none bash build.sh receiver
+
 FROM scratch AS artifacts
 COPY --from=iq /out/iq /iq
+COPY --from=receiver /out/iq /iq
 COPY --from=codec /out/native-linux /native-linux
 COPY --from=codec /out/native-pvt /native-pvt
 COPY --from=codec /out/verification /verification
 COPY --from=codec /out/modified-sources /modified-sources
+COPY --from=receiver /out/modified-sources /modified-sources

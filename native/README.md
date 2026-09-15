@@ -24,10 +24,20 @@ LANS에 포함된 mod2sparse와 LDPC-codes의 버전은 다르므로 임의로 �
 - `03-decoder-includes`: 디코더와 관계없는 FFTW/USB/CyAPI 헤더 대신 필요한 선언만 포함한다. Windows DLL도 미리 빌드된 `.a` 없이 동일 소스로 만든다.
 
 각 수정 위치의 `LNIS 변경` 주석에서 목적과 내용을 확인한다. 빌드 사본의 C/H 줄바꿈만 LF로 정규화하며 vendor에는 쓰지 않는다.
-빌드 후 `build/native-output/modified-sources/`에서 주석이 포함된 실제 수정본 3개를 직접 읽을 수 있다.
+빌드 후 `build/native-output/modified-sources/`에서 주석이 포함된 실제 수정본을 직접 읽을 수 있다.
 이 파일들은 빌드 때 재생성되므로 직접 고치지 말고 대응 패치를 수정한다.
 
 현재 입력 어댑터는 GPS L1 C/A를 지원한다. 다중 GNSS 전체 지원은 포함하지 않는다.
+
+### I/Q 지구 수신 경로
+
+실제 90초 파일 시험에서 발견한 원본 로그 버퍼의 CR/LF/NUL 길이 누락과 RTKLIB 스트림 옵션 배열(5→8항목)도 `04-iq-receiver.patch`로 보정한다. 원본은 그대로 보관하며 수정한 수신 경로는 AddressSanitizer로 전체 파일을 재검증한다.
+
+`04-iq-receiver.patch`는 원본 추적기의 탐색 도플러 범위·신호 임계값·GPS PRN 범위를 조정하고, CRC 통과 채널의 샘플 시각/코드 지연/도플러/누적 위상/C/N0를 출력한다. 원본 달 PVT 경로 대신 `IqReceiver` → 공유 `NativePvtCodec` → 기존 `lnis_pvt_gps_solve`로 연결한다. 실시간 채널 집계 경합을 피하려고 파일 처리 후 같은 샘플 시각끼리 합친다. 2 ms 상관 구간의 종료 TOW를 샘플 시작 시각으로 맞춰 의사거리를 구한다.
+
+원본 AFS SB2만으로 GPS LNAV의 모든 보정항을 보존하지 못하므로 선택 PRN의 LNAV를 JSON 메타데이터로 보조한다. 기준 PVT는 이 계산 경로에 넣지 않는다. 생성기 거리 감쇠 기준은 달의 5,200 km에서 GPS의 20,200 km로 변경하며 변조·LDPC·잡음 생성 방식은 유지한다. 현재 생성기는 대기 지연을 합성하지 않지만 기존 SPP 보정은 유지하므로 잡음·모델 차이에 따른 미터급 오차가 남는다. 수신 PVT를 기준값에 강제로 맞추지 않는다.
+
+추가 vendor 파일은 PocketSDR의 파일 입력·추적·복조와 링크에 필요한 RTKLIB 함수의 **주석 포함 원본**이다. SHA-256 목록으로 전부 검사한다. 기존 RAW/AFS용 코덱과 Windows DLL의 알고리즘·ABI는 바꾸지 않는다. Linux 수신 실행기는 FFTW/libusb/libfec 런타임을 사용하며 배포 이미지가 함께 설치한다.
 
 ## 원본 유지 원칙
 

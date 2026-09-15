@@ -2,7 +2,7 @@ import {requestJson} from '../common/http.js?v=20260915-structure';
 import {createDtnLog} from './dtn-log.js?v=20260915-structure';
 import {initAdapterHealth} from './dtn-adapter-health.js?v=20260915-structure';
 import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20260915-structure';
-import {createObservationView, numeric} from './dtn-observations.js?v=20260915-input-cleanup';
+import {createObservationView, numeric} from './dtn-observations.js?v=20260916-iq-pvt-r3';
 
 const api = '/lnis/api/v1';
 const $ = id => document.getElementById(id);
@@ -15,7 +15,7 @@ function setComparison(report = {}) {
   referenceEpochs = Array.isArray(report.referencePvt) ? report.referencePvt : [];
   comparisonEpochs = report.comparison?.epochs || [];
   const verdict = report.comparison?.verdict;
-  pill('pvt-match', verdict === 'PASS' ? '전체 PVT 일치' : verdict === 'FAIL' ? '전체 PVT 불일치' : 'PVT 비교 불가',
+  pill('pvt-match', verdict === 'MEASURED' ? 'I/Q PVT 오차 측정 · 허용오차 미설정' : verdict === 'PASS' ? '전체 PVT 일치' : verdict === 'FAIL' ? '전체 PVT 불일치' : 'PVT 비교 불가',
     verdict === 'PASS' ? 'online' : verdict === 'FAIL' ? 'error' : 'warning');
 }
 const observations = createObservationView($('dtn-observations'), index => {
@@ -83,7 +83,7 @@ function setEpochs(values, preserve = false) {
 }
 
 function renderSummary(job) {
-  $('dtn-observations').hidden = job?.testType === 'IQ_SAMPLE';
+  $('dtn-observations').hidden = job?.testType === 'IQ_SAMPLE' && !job?.receivedEpochs;
   const types = {GNSS_RAW: 'GNSS RAW', AFS_METADATA: 'AFS Frame + Metadata', IQ_SAMPLE: 'I/Q Sample'};
   $('receiver-type').textContent = types[job?.testType] || '시험 선택 대기';
   $('receiver-mode').textContent = job?.senderMode && job?.receiverMode ? job.senderMode + ' → ' + job.receiverMode : '경로 정보 없음';
@@ -93,11 +93,11 @@ function renderSummary(job) {
   const completed = job?.state === 'COMPLETED';
   const received = !!job?.dtnReceived;
   const iq = job?.testType === 'IQ_SAMPLE';
-  $('step-process').textContent = iq ? '③ I/Q 파일 검증' : '③ 복원·PVT 계산';
+  $('step-process').textContent = iq ? '③ I/Q 검증·추적·PVT' : '③ 복원·PVT 계산';
   const states = {
     PREPARING: '시험 준비 중', WAITING_DTN: '외부 JSON 수신 대기',
-    WAITING_RECEIVER: '수신 실행기 대기', CALCULATING: iq ? 'I/Q 파일 검증 중' : '복원·PVT 계산 중',
-    COMPLETED: iq ? 'I/Q 파일 검증 완료' : '수신 계산 완료', FAILED: '처리 실패', CANCELLED: '시험 취소',
+    WAITING_RECEIVER: '수신 실행기 대기', CALCULATING: iq ? 'I/Q 검증·추적·PVT 처리 중' : '복원·PVT 계산 중',
+    COMPLETED: iq ? 'I/Q 처리 완료' : '수신 계산 완료', FAILED: '처리 실패', CANCELLED: '시험 취소',
     INCONCLUSIVE: '판정 불가'
   };
   $('receive-state').textContent = job ? (states[job.state] || job.state) : '수신 대기';
