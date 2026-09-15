@@ -1,0 +1,17 @@
+diff --git a/PocketSDR-AFS/src/sdr_ldpc_afs.c b/PocketSDR-AFS/src/sdr_ldpc_afs.c
+index 60e8a82..72fc431 100644
+--- a/PocketSDR-AFS/src/sdr_ldpc_afs.c
++++ b/PocketSDR-AFS/src/sdr_ldpc_afs.c
+@@ -1,4 +1,11 @@
+-#include "pocket_sdr.h"
++/* LNIS 변경: AFS 디코더에 필요한 선언만 포함한다. 전체 수신기 헤더의
++ * FFTW/USB/CyAPI 의존성 없이 Linux와 Windows에서 동일한 LDPC를 소스 빌드한다.
++ * 아래 원본 LDPC 행렬, 반복 횟수, 확률 계산 및 복호화 알고리즘은 변경하지 않는다. */
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <stdint.h>
++#include "pocketsdr.h"
+ 
+ // constants -------------------------------------------------------------------
+ #define MAX_ITER  250

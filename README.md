@@ -75,15 +75,49 @@ COM/GRAW 입력 적용 → 지구 PVT 계산 → 90초 I/Q 생성 → 전송 순
 ## 빌드·검증
 
 ```powershell
-.\gradlew.bat test webTest bootJar
+.\gradlew.bat nativeBuild
+.\gradlew.bat check bootJar -PnativeCandidate=build/native-pvt
 .\gradlew.bat syntheticGraw
 ```
 
 - JAR: `build/libs/lnis.jar`
 - 합성 입력·예상 PVT: `build/dtn-example/synthetic-earth-pvt.graw`, 동일 이름 JSON
-- Linux 코덱: 기존 `native/build-linux.ps1`
-- I/Q 생성기: `native/build-iq.ps1 -OpenSourceDirectory <오픈소스 폴더>`
-- 배포 ZIP: `gradlew.bat linuxNodeDistZip -PlinuxNativeStage=<코덱 빌드 사본>`
+- Linux 코덱: `build/native-linux/libLnisAfsCodec.so`
+- Windows 후보 DLL: `build/native-pvt/LnisAfsCodec.dll` — 기존 DLL을 자동 덮어쓰지 않습니다.
+- 90초 I/Q 생성기: `build/iq/afs_sim`
+- 배포 ZIP: `gradlew.bat linuxNodeDistZip -PnativeCandidate=build/native-pvt`
+
+빌드는 **전체 JDK 21**, Docker Linux 컨테이너 환경, Node.js가 필요합니다. Windows는 `gradlew.bat`, WSL2/Linux는 `./gradlew`를 사용합니다. Linux에서 검증할 때는 `-PnativeCandidate=build/native-linux`를 지정합니다.
+특정 WSL 배포판이나 외부 `오픈소스` 폴더, 사전 컴파일된 `libldpc.a`/`libsdr.a`는 더 이상 필요하지 않습니다.
+
+### 원본·수정본 위치
+
+- `native/vendor/`: 필요한 원본 **파일 전체**를 주석·줄바꿈까지 그대로 보관합니다. 외부 프로젝트 전체를 복사한 것은 아닙니다.
+- `native/patches/`: 불가피한 수정만 보관합니다. 수정 위치의 `LNIS 변경` 주석에 목적과 내용을 적었습니다.
+- `native/lnis_*.c`, `native/iq_earth.c`: 서비스 입력·지구 PVT·AFS 연결 코드입니다.
+
+빌드는 원본 SHA-256 검증 후 컨테이너 내부 복사본에만 패치를 적용합니다. 원본 또는 패치가 맞지 않으면 실패하며 원본은 덮어쓰지 않습니다.
+주석이 포함된 실제 수정본은 빌드 후 `build/native-output/modified-sources/`에서 확인할 수 있습니다.
+자세한 출처·기능별 대응·수정 이유는 [네이티브 유지보수 안내](native/README.md)를 참고하세요.
+
+### 새 PC 배포
+
+`build/distributions/lnis-node-linux.zip`을 송신·수신 PC에 각각 풀고 `.env.example`을 `.env`로 복사해 역할과 주소를 설정합니다. 이후 `docker compose up -d --build`로 실행합니다.
+배포 폴더에 JAR·SO·I/Q 실행파일과 필수 데이터가 포함되어 있으므로 **실행 PC에는 JDK·컴파일러·외부 원본 소스가 필요하지 않습니다.** 최초 기본 이미지 다운로드에는 인터넷이 필요합니다.
+`licenses/native-sources.zip`에는 원본·패치·빌드 자료를 함께 제공합니다.
+
+독립 실행 회귀시험은 배포 ZIP을 `build/native-system/bundle`에 푼 뒤 아래 명령으로 실행합니다.
+18090/18091 포트를 사용하며 기존 8090/8091 서비스·DB를 건드리지 않습니다. 90초 I/Q 생성과 복사에 디스크 여유 공간이 필요합니다.
+
+```sh
+docker build -t lnis-native-verification:local build/native-system/bundle
+docker compose -f src/test/dtn-native-compose.yml up -d
+# 양쪽 서비스 시작 완료 후 실행 (앞서 syntheticGraw 실행 필요)
+node src/test/js/dtn-live-roundtrip.mjs
+docker compose -f src/test/dtn-native-compose.yml down
+```
+
+결과는 `build/native-system/results.json`에 기록합니다. 개발용 REST 중계 검증이며 실제 DTN/HDTN 동작 검증은 아닙니다.
 
 일반 `build`는 운영 폴더를 변경하지 않습니다. 배포는 명시적으로 수행합니다.
 실제 F9T·운영 WSL2 USB·실제 DTN/HDTN 연동은 합성 데이터 회귀시험과 별도로 확인해야 합니다.

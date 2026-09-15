@@ -9,6 +9,19 @@ import org.junit.jupiter.api.io.TempDir;
 import server.shared.model.DtnModels.*;
 
 class IqServiceTest {
+  @Test void statusSurvivesPartRemovalDuringCancellation() throws Exception {
+    var service = service(); UUID id = UUID.randomUUID();
+    var jobs = (java.util.Map<UUID,java.util.Map<String,Object>>) org.springframework.test.util.ReflectionTestUtils.getField(service, "jobs");
+    jobs.put(id, java.util.Map.of("id", id, "state", "CANCELLED"));
+    Path part = directory.resolve(id + ".bin.part");
+    try (var files = org.mockito.Mockito.mockStatic(Files.class, org.mockito.Mockito.CALLS_REAL_METHODS)) {
+      files.when(() -> Files.exists(part)).thenReturn(true);
+      files.when(() -> Files.size(part)).thenThrow(new NoSuchFileException(part.toString()));
+      var status = service.status(id);
+      assertEquals("CANCELLED", status.get("state"));
+      assertEquals(0L, status.get("generatedBytes"));
+    }
+  }
   @TempDir Path directory;
   private IqService service() { return new IqService(new ObjectMapper(), directory.toString(), directory.resolve("missing").toString(), false); }
   private IqFile file(String path) { return new IqFile(path, IqService.EXPECTED_BYTES, "A".repeat(64), 90, 12_000_000, "IQ_INTERLEAVED_INT8", 2); }

@@ -3,5 +3,7 @@
 !lnis.jar
 !native/
 !native/libLnisAfsCodec.so
+!iq/
+!iq/**
 !licenses/
 !licenses/**

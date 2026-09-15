@@ -153,7 +153,11 @@ public class IqService {
     if (job == null) throw new IllegalArgumentException("I/Q 작업을 찾을 수 없습니다.");
     var result = new LinkedHashMap<>(job);
     Path part = root.resolve(id + ".bin.part");
-    result.put("generatedBytes", Files.exists(part) ? Files.size(part) : "READY".equals(job.get("state")) ? EXPECTED_BYTES : 0);
+    // 취소/완료 처리 중 .part가 삭제·이동될 수 있다. exists→size 사이 경합도 정상 상태다.
+    long generated = "READY".equals(job.get("state")) ? EXPECTED_BYTES : 0;
+    try { generated = Files.size(part); }
+    catch (NoSuchFileException ignored) { /* 아직 생성 전이거나 이미 취소/완료됨 */ }
+    result.put("generatedBytes", generated);
     result.put("expectedBytes", EXPECTED_BYTES);
     if (job.get("file") instanceof IqFile file && "READY".equals(job.get("state"))) {
       try { result.put("preview", preview(file)); }

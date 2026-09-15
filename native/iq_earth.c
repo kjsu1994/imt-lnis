@@ -1,4 +1,5 @@
-/* Earth-only bridge for the existing AFS modulator. No change to the shared DLL ABI. */
+/* LNIS 소유 연결부: 달 샘플 대신 GNSS 지구 PVT와 LNAV를 원본 AFS 변조기에 공급한다.
+ * 원본 복사본이 아닌 서비스 구현이며 공유 DLL ABI/원본 변조 알고리즘은 변경하지 않는다. */
 #include "lnis_pvt.c"
 #include <omp.h>
 static lnis_pvt_context *earth;

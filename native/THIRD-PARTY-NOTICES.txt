@@ -31,3 +31,10 @@ trees distributed with this project.
 PVT extension also includes RTKLIB from the PocketSDR-AFS source tree.
 Copyright (c) 2007-2020, T. Takasu, All rights reserved.
 The complete RTKLIB notice and license are distributed in RTKLIB-README.txt.
+
+LDPC-codes (Radford M. Neal, 1995-2012) supplies the decoding routines.
+Its complete COPYRIGHT and LGPL texts, including the rand.c notices, are
+preserved in vendor/LDPC-codes inside licenses/native-sources.zip.
+The archive also contains the original LANS/PocketSDR license texts,
+LNIS integration sources and annotated patches. See its README.md for
+the local-snapshot provenance and source rebuild instructions.

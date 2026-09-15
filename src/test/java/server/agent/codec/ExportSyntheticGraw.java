@@ -9,6 +9,7 @@ public final class ExportSyntheticGraw {
     Path root = Path.of(args.length == 0 ? "build/dtn-example" : args[0]);
     Files.createDirectories(root);
     byte[] bytes = NativePvtIntegrationTest.validSample();
+    Files.write(root.resolve("observations-only.graw"), NativePvtIntegrationTest.sample());
     try (var codec = new NativePvtCodec(Path.of(System.getProperty("lnis.native.candidate", "native/bin/win-x64")))) {
       var pvt = codec.calculate(GrawCodec.splitLengthPrefixed(bytes)).getFirst();
       if (!pvt.isPositionValid() || !pvt.isVelocityValid()) throw new IllegalStateException(pvt.getMessage());

@@ -51,6 +51,9 @@ dependencies {
 
 tasks.named('test') {
     systemProperty 'lnis.native.candidate', providers.gradleProperty('nativeCandidate').orElse('native/bin/win-x64').get()
+    inputs.files(fileTree(providers.gradleProperty('nativeCandidate').orElse('native/bin/win-x64').get()) {
+        include '*.dll', '*.so'
+    })
     systemProperty 'lnis.f9t.source', providers.gradleProperty('f9tExampleSource').orElse('').get()
     useJUnitPlatform()
     testLogging {
@@ -84,6 +87,12 @@ tasks.register('webTest') {
 
 tasks.named('check') {
     dependsOn tasks.named('webTest')
+    dependsOn 'nativeSourceTest'
+}
+
+tasks.register('nativeSourceTest', Exec) {
+    group = 'verification'
+    commandLine 'node', 'src/test/js/native-source.smoke.mjs'
 }
 
 tasks.named('bootJar') {
@@ -100,6 +109,29 @@ tasks.register('syntheticGraw', JavaExec) {
     systemProperty 'lnis.native.candidate', providers.gradleProperty('nativeCandidate').orElse('native/bin/win-x64').get()
 }
 
+tasks.register('nativeBuild', Exec) {
+    dependsOn tasks.named('nativeSourceTest')
+    group = 'build'
+    description = '내부 원본과 패치로 Linux SO/IQ 및 Windows DLL을 Docker에서 빌드한다.'
+    commandLine 'docker', 'build', '--platform=linux/amd64', '--output',
+            "type=local,dest=${layout.buildDirectory.dir('native-output').get().asFile}",
+            '-f', 'native/Dockerfile', 'native'
+    doLast {
+        ['native-linux', 'native-pvt', 'iq'].each { name ->
+            copy { from("build/native-output/$name"); into("build/$name") }
+        }
+        if (System.getProperty('os.name').toLowerCase().contains('windows')) {
+            ['test_pvt.exe', 'test_afs.exe'].each { name ->
+                providers.exec {
+                    workingDir file('build/native-pvt')
+                    commandLine file("build/native-pvt/$name").absolutePath
+                }
+                        .result.get().assertNormalExitValue()
+            }
+        }
+    }
+}
+
 // 운영 배포와 분리된 검증 묶음이다. Linux JVM에서 실제 SO와 Java 경계를 함께 시험한다.
 tasks.register('linuxNativeVerificationZip', Zip) {
     group = 'verification'
@@ -113,7 +145,7 @@ tasks.register('linuxNativeVerificationZip', Zip) {
     from('build/native-linux/libLnisAfsCodec.so') { into 'native' }
     doFirst {
         if (!file('build/native-linux/libLnisAfsCodec.so').isFile()) {
-            throw new GradleException('먼저 native/build-linux.ps1로 Linux 후보 SO를 빌드하세요.')
+            throw new GradleException('먼저 nativeBuild로 Linux 후보 SO를 빌드하세요.')
         }
     }
 }
@@ -124,24 +156,17 @@ tasks.register('nativeLinuxSourcesZip', Zip) {
     description = 'SO 재빌드 자료 및 LDPC 원본 라이선스를 함께 보관한다.'
     archiveFileName = 'native-sources.zip'
     destinationDirectory = layout.buildDirectory.dir('distributions')
-    def nativeStage = providers.gradleProperty('linuxNativeStage')
-    from(nativeStage.orElse('build/missing-native-stage')) {
-        include '*.c', '*.h', 'build-linux.sh', 'rtk/**', 'pocketsdr/**', 'ldpc/**'
-        exclude '**/.git/**'
+    from('native') {
+        exclude 'bin/**'
     }
-    from('native/THIRD-PARTY-NOTICES.txt')
-    from('native/RTKLIB-README.txt')
-    doFirst {
-        if (!nativeStage.isPresent() || !file(nativeStage.get() + '/ldpc/COPYRIGHT').isFile()) {
-            throw new GradleException('native/build-linux.ps1 출력의 Build staging 경로를 -PlinuxNativeStage=...로 지정하세요.')
-        }
-    }
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
 }
 
 tasks.register('linuxNodeDistZip', Zip) {
     group = 'distribution'
     description = '동일 이미지로 송신/수신 PC에서 실행할 Linux Compose 묶음을 생성한다.'
-    dependsOn tasks.named('bootJar'), tasks.named('check'), tasks.named('nativeLinuxSourcesZip')
+    dependsOn tasks.named('bootJar'), tasks.named('check'), tasks.named('nativeLinuxSourcesZip'), tasks.named('nativeBuild')
     archiveFileName = 'lnis-node-linux.zip'
     destinationDirectory = layout.buildDirectory.dir('distributions')
     from('deployment/node') {
@@ -149,37 +174,44 @@ tasks.register('linuxNodeDistZip', Zip) {
     }
     from('build/iq') {
         into 'iq'
-        include 'afs_sim', '008_Weil1500hex210prns.txt', 'LICENSE.txt', 'sources.zip'
+        include 'afs_sim', '008_Weil1500hex210prns.txt', 'LICENSE.txt', 'default_almanac.txt'
     }
     from(tasks.named('bootJar').flatMap { it.archiveFile })
     from('build/native-linux/libLnisAfsCodec.so') { into 'native' }
     from(tasks.named('nativeLinuxSourcesZip').flatMap { it.archiveFile }) { into 'licenses' }
     from(['native/THIRD-PARTY-NOTICES.txt', 'native/RTKLIB-README.txt']) { into 'licenses' }
-    from(providers.gradleProperty('linuxNativeStage').map { it + '/ldpc' }) {
+    from('native/vendor/LDPC-codes') {
         include 'COPYRIGHT', 'LGPL'
         into 'licenses/ldpc'
     }
     doFirst {
         if (!file('build/iq/afs_sim').isFile()) {
-            throw new GradleException('먼저 native/build-iq.ps1로 I/Q 생성기를 빌드하세요.')
+            throw new GradleException('nativeBuild의 I/Q 결과물이 없습니다.')
         }
         if (!file('build/native-linux/libLnisAfsCodec.so').isFile()) {
-            throw new GradleException('먼저 native/build-linux.ps1로 Linux SO를 빌드하세요.')
+            throw new GradleException('nativeBuild의 Linux SO 결과물이 없습니다.')
         }
     }
 }
 
+// When both tasks are requested, never test or package an older native candidate.
+tasks.named('test') { mustRunAfter tasks.named('nativeBuild') }
+tasks.named('syntheticGraw') { mustRunAfter tasks.named('nativeBuild') }
+tasks.named('linuxNativeVerificationZip') { mustRunAfter tasks.named('nativeBuild') }
+
 tasks.register('agentDistZip', Zip) {
-    dependsOn tasks.named('bootJar')
+    dependsOn tasks.named('bootJar'), tasks.named('nativeBuild'), tasks.named('nativeLinuxSourcesZip')
     archiveFileName = 'lnis-agent-windows.zip'
     destinationDirectory = layout.buildDirectory.dir('distributions')
 
     from(tasks.named('bootJar').flatMap { it.archiveFile }) {
         rename { 'lnis.jar' }
     }
-    from('native/bin/win-x64') {
+    from('build/native-pvt') {
+        include 'LnisAfsCodec.dll'
         into 'native'
     }
+    from(tasks.named('nativeLinuxSourcesZip').flatMap { it.archiveFile }) { into 'licenses' }
     from('native/THIRD-PARTY-NOTICES.txt')
     from('native/RTKLIB-README.txt')
     from('config') {

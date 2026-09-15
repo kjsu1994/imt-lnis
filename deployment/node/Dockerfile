@@ -6,6 +6,7 @@ RUN useradd --system --uid 10001 lnis && mkdir -p /app/data /app/native \
 COPY lnis.jar /app/lnis.jar
 COPY native/libLnisAfsCodec.so /app/native/libLnisAfsCodec.so
 COPY iq /app/iq
+RUN chmod 755 /app/iq/afs_sim
 COPY licenses /app/licenses
 USER 10001
 EXPOSE 8088

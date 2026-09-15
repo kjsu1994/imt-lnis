@@ -1,0 +1,192 @@
+diff --git a/LANS-AFS-SIM/afs_sim.c b/LANS-AFS-SIM/afs_sim.c
+index a298c1c..615a4cb 100644
+--- a/LANS-AFS-SIM/afs_sim.c
++++ b/LANS-AFS-SIM/afs_sim.c
+@@ -1,3 +1,10 @@
++/* LNIS 변경: 달 샘플 대신 수집 GNSS의 지구 PVT/LNAV를 연결하는 함수 선언.
++ * 실제 변환은 LNIS 소유 iq_earth.c에 두며 원본 변조/FEC/반복 알고리즘을 유지한다. */
++int iq_earth_load(const char*,int*,double*,double*,double*);
++int iq_earth_fields(int,double*);
++void iq_earth_receiver(int,double,double*);
++void iq_earth_sat(int,int,double,double*,double*,double*);
++double iq_earth_range(int,int,double);
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <math.h>
+@@ -30,7 +37,8 @@
+ #endif
+ 
+ #define MAX_CHAR (512)
+-#define MAX_SAT (12)
++/* LNIS 변경: 원본 달 위성 12개 인덱스 대신 GPS PRN 1~32를 수용한다. */
++#define MAX_SAT (32)
+ 
+ #define PI 3.1415926535898
+ #define R2D 57.2957795131
+@@ -153,6 +161,8 @@ typedef struct
+ typedef struct
+ {
+     int vflg;
++    /* LNIS 변경: RTKLIB 항법정보와 채널을 실제 GPS PRN으로 연결한다. */
++    int earth_prn;
+ 
+     gpstime_t toe;
+     gpstime_t toc;
+@@ -433,7 +443,8 @@ void qcodegen(int* code, int prn) // L1CP code (IS-GPS-800)
+     return;
+ }
+ 
+-void timeadd(gpstime_t *g, double dt)
++/* LNIS 변경: RTKLIB timeadd와 이름 충돌을 방지한다. 함수와 호출의 이름만 변경한다. */
++void sim_timeadd(gpstime_t *g, double dt)
+ {
+     g->sec += dt;
+ 
+@@ -552,8 +563,11 @@ void neu2azel(double* azel, double* neu)
+     return;
+ }
+ 
+-void satpos(ephem_t eph, gpstime_t g, double* pos, double* vel, double* clk)
++/* LNIS 변경: RTKLIB satpos와 이름 충돌을 피하고 GPS LNAV 지구 궤도를 사용한다.
++ * 아래 원본 달 궤도 계산은 비교를 위해 남기되 지구 시험에서는 실행하지 않는다. */
++void sim_satpos(ephem_t eph, gpstime_t g, double* pos, double* vel, double* clk)
+ {
++    iq_earth_sat(eph.earth_prn, g.week, g.sec, pos, vel, clk); return;
+     double tk;
+     double mk;
+     double ek;
+@@ -828,13 +842,16 @@ double dotProd(double* x1, double* x2)
+ 
+ void computeRange(range_t* rho, ephem_t eph, gpstime_t g, double xyz[])
+ {
++    /* LNIS 변경: 지구 PVT 기준 거리와 1 ms 차분 거리율을 사용한다.
++     * 원본 달 기준 거리 계산 대신 기존 LNIS 지구 연결부를 호출한다. */
++    rho->range=iq_earth_range(eph.earth_prn,g.week,g.sec); rho->rate=(iq_earth_range(eph.earth_prn,g.week,g.sec+0.001)-rho->range)/0.001; rho->g=g; return;
+     double pos[3], vel[3], clk[2];
+     double los[3];
+     double tau;
+     double range, rate;
+ 
+     // SV position at time of the pseudorange observation.
+-    satpos(eph, g, pos, vel, clk);
++    sim_satpos(eph, g, pos, vel, clk);
+ 
+     // Receiver to satellite vector and light-time.
+     subVect(los, pos, xyz);
+@@ -884,7 +901,7 @@ void computeCodePhase(channel_t* chan, range_t rho0, range_t rho1, double dt)
+     // Signal transmission time
+     gt.sec = rho0.g.sec;
+     gt.week = rho0.g.week;
+-    timeadd(&gt, -rho0.range / SPEED_OF_LIGHT);
++    sim_timeadd(&gt, -rho0.range / SPEED_OF_LIGHT);
+     gpst2afst(&gt, &afst);
+     
+     iframe = afst.toi; // 1 frame = 12 sec
+@@ -1067,59 +1084,22 @@ int main(int argc, char** argv)
+ 		exit(-1);
+ 	}
+     
+-    // Set user location
+-
+-    if (llh[2] < -(R_MOON)) {
+-        // Default user location; Shackleton crater
+-        llh[0] = -89.66 / R2D;
+-        llh[1] = 129.20 / R2D;
+-        llh[2] = 100.0;
++    /* LNIS 변경: 달 기본 위치/알마낙 대신 수집 GNSS의 시각, 지구 PVT, GPS LNAV를
++     * 읽는다. 관측 PRN의 유효 항법정보가 4개 미만이면 달 샘플로 대체하지 않고 실패한다.
++     * 각 PRN의 SB2와 프레임 반복/합산은 이후 원본 처리 경로를 그대로 사용한다. */
++    neph=iq_earth_load(feph,&g0.week,&g0.sec,xyz,llh);
++    if(neph<4) { fprintf(stderr,"ERROR: Earth input requires valid PVT and GPS LNAV for at least four observed PRNs.\n"); return 2; }
++    memset(eph,0,sizeof(eph));
++    for(sv=0;sv<MAX_SAT;sv++) {
++        double v[10]; if(!iq_earth_fields(sv+1,v)) continue;
++        eph[sv].vflg=1; eph[sv].earth_prn=sv+1;
++        eph[sv].toe.week=eph[sv].toc.week=g0.week;
++        eph[sv].toe.sec=v[0]; eph[sv].toc.sec=v[1];
++        eph[sv].ecc=v[2]; eph[sv].sqrta=v[3]; eph[sv].m0=v[4]; eph[sv].omg0=v[5];
++        eph[sv].inc0=v[6]; eph[sv].aop=v[7]; eph[sv].af0=v[8]; eph[sv].af1=v[9];
+     }
+-
+-    llh2xyz(llh, xyz);
+-
+-    fprintf(stderr, "xyz = %11.1f, %11.1f, %11.1f\n", xyz[0], xyz[1], xyz[2]);
+-    fprintf(stderr, "llh = %11.6f, %11.6f, %11.1f\n", llh[0] * R2D, llh[1] * R2D, llh[2]);
+-
+-    // Read ephemeris
+-
+-    if (!*feph) {
+-        feph = "default_almanac.txt";
+-    }
+-
+-    neph = readAlmanac(eph, feph);
+-
+-    if (neph == -1) {
+-        fprintf(stderr, "ERROR: Failed to open ephemeris file.\n");
+-        exit(1);
+-    }
+-    
+-    // Set simulation start time
+-
+-    g0.week = -1;
+-
+-    if (neph > 0) {
+-        for (sv = 0; sv < MAX_SAT; sv++) {
+-            if (g0.week < 0 && eph[sv].vflg == 1) {
+-                g0 = eph[sv].toe;
+-                break;
+-            }
+-        }
+-    }
+-    else
+-    {
+-        fprintf(stderr, "ERROR: No valid ephemeris has been found.\n");
+-        exit(1);
+-    }
+-
+-    gpst2date(&g0, &t0);
+-    fprintf(stderr, "Start time = %4d/%02d/%02d,%02d:%02d:%02.0f (%d:%.0f)\n", t0.y, t0.m, t0.d, t0.hh, t0.mm, t0.sec, g0.week, g0.sec);
+-
+-    afstime_t afst;
+-    gpst2afst(&g0, &afst);
+-
+-    fprintf(stderr, "AFS time: WN = %d, ITOW = %d, TOI = %d, fsec = %.1f\n", afst.wn, afst.itow, afst.toi, afst.fsec);
+-
++    afstime_t afst; gpst2afst(&g0,&afst);
++    fprintf(stderr,"EARTH GNSS input: week=%d tow=%.9f xyz=%.3f %.3f %.3f\n",g0.week,g0.sec,xyz[0],xyz[1],xyz[2]);
+     // Check visible satellites
+ 
+     for (i = 0; i < MAX_SAT; i++)
+@@ -1131,7 +1111,7 @@ int main(int argc, char** argv)
+ 
+     for (sv = 0; sv < MAX_SAT; sv++) {
+         if (eph[sv].vflg == 1) {
+-            satpos(eph[sv], g0, pos, vel, clk);
++            sim_satpos(eph[sv], g0, pos, vel, clk);
+             subVect(los, pos, xyz);
+             xyz2neu(los, tmat, neu);
+             neu2azel(azel, neu);
+@@ -1332,6 +1312,12 @@ int main(int argc, char** argv)
+         }
+ 
+         bitncpy(chan[i].I.data[0] + 120, syms, 5880);
++        /* LNIS 변경: 실제 변조에 투입하는 PRN별 6000비트를 검증용으로 저장한다.
++         * 입력 프레임은 변경하지 않으며 증거 저장 실패는 시험 실패로 처리한다. */
++        char evidence_name[64]; snprintf(evidence_name,sizeof(evidence_name),"prn-%02d.afsbits",chan[i].prn);
++        FILE *evidence=fopen(evidence_name,"wb");
++        if(!evidence || fwrite(chan[i].I.data[0],1,6000,evidence)!=6000) { fprintf(stderr,"Frame evidence write failed\n"); return 2; }
++        fclose(evidence);
+         // 로그처리: 동기패턴과 SB01을 포함한 PRN 08의 최종 6000심볼을 C601로 기록한다.
+         if (chan[i].prn == 8) {
+             snprintf(afs_log_id, sizeof(afs_log_id), "C601-P%02d-T%02d",
+@@ -1353,7 +1339,9 @@ int main(int argc, char** argv)
+     // Update receiver time
+     grx.sec += 0.1;
+ 
+-    nsim = (int)((tsec - 0.1) * 10.0); // 10Hz update rate
++    /* LNIS 변경: 원본의 0.1초 차감으로 89.9초가 되는 문제를 보정한다.
++     * 0.1초 단위 반복을 900회 수행해 서비스에서 요청한 정확한 90초를 출력한다. */
++    nsim = (int)llround(tsec * 10.0); // 10Hz update rate
+ 
+     // Scale the per-sample noise amplitude to keep C/N0 constant across sampling rates.
+     fs_scale = sqrt(freq / FS_REF);

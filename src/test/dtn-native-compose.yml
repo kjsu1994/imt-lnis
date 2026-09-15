@@ -1,0 +1,52 @@
+# Isolated deployment-ZIP test. Never points at the user's running DB or exchange folders.
+name: lnis-native-verification
+services:
+  sender:
+    image: lnis-native-verification:local
+    ports: ["127.0.0.1:18090:18090"]
+    environment:
+      SERVER_PORT: "18090"
+      LNIS_NODE_ROLE: sender
+      LNIS_NODE_BASE_URL: http://sender:18090
+      LNIS_NODE_PEER_URL: http://receiver:18091
+      LNIS_NODE_MANAGEMENT_TOKEN: isolated-management-only
+      LNIS_NATIVE_DIR: /app/native
+      LNIS_DB_URL: jdbc:h2:file:/app/data/lnis
+      LNIS_DATA_DIR: /app/data
+      LNIS_IQ_ENABLED: "true"
+      LNIS_IQ_DIRECTORY: /exchange
+      dtn_adapter: http://relay:8080
+      LNIS_DTN_SEND_TOKEN: isolated-send-only
+      LNIS_DTN_RECEIVE_TOKEN: isolated-dtn-only
+    volumes:
+      - ../../build/native-system/sender-db:/app/data
+      - ../../build/native-system/sender-files:/exchange
+  receiver:
+    image: lnis-native-verification:local
+    ports: ["127.0.0.1:18091:18091"]
+    environment:
+      SERVER_PORT: "18091"
+      LNIS_NODE_ROLE: receiver
+      LNIS_NODE_BASE_URL: http://receiver:18091
+      LNIS_NODE_PEER_URL: http://sender:18090
+      LNIS_NODE_MANAGEMENT_TOKEN: isolated-management-only
+      LNIS_NATIVE_DIR: /app/native
+      LNIS_DB_URL: jdbc:h2:file:/app/data/lnis
+      LNIS_DATA_DIR: /app/data
+      LNIS_IQ_DIRECTORY: /exchange
+      dtn_adapter: http://relay:8080
+      LNIS_DTN_RECEIVE_TOKEN: isolated-dtn-only
+    volumes:
+      - ../../build/native-system/receiver-db:/app/data
+      - ../../build/native-system/receiver-files:/exchange
+  relay:
+    image: node:22-alpine
+    command: [node, /app/dev-relay.mjs]
+    environment:
+      RECEIVER_URL: http://receiver:18091/lnis/api/v1/dtn/receive
+      RECEIVE_TOKEN: isolated-dtn-only
+      SEND_TOKEN: isolated-send-only
+    volumes:
+      - ../../deployment/node/dev-relay.mjs:/app/dev-relay.mjs:ro
+      - ../../build/native-system/sender-files:/sender-files:ro
+      - ../../build/native-system/receiver-files:/receiver-files

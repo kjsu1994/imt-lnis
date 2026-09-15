@@ -1,2 +1,7 @@
 # Linux에서 실행하는 셸 스크립트는 Windows checkout에서도 LF를 유지한다.
 *.sh text eol=lf
+
+# Vendored files are byte-for-byte snapshots, including comments and line endings.
+native/vendor/** -text -filter
+native/patches/*.patch text eol=lf
+native/UPSTREAM-SHA256.txt text eol=lf
