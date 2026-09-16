@@ -41,7 +41,7 @@ export function createObservationView(container, onSelect = () => {}) {
     <h3 data-navigation-title>항법정보 · SFRBX</h3>
     <div class="epoch-table-viewport" tabindex="0" aria-label="GNSS 항법정보 표">
       <table class="epoch-observation-table"><caption data-navigation-caption>항법정보 · SFRBX · 수집된 전체 메시지</caption><thead><tr>
-        <th>수집 순번</th><th>수집 시각 <small>UTC</small></th><th>GNSS</th><th>위성</th>
+        <th title="원본 레코드의 수집 순번이며 총 건수가 아닙니다. 0~95는 96건입니다.">수집 순번</th><th>수집 시각 <small>UTC</small></th><th>GNSS</th><th>위성</th>
         <th>신호 ID</th><th>주파수 ID</th><th>버전</th><th>워드 수</th><th>수신 워드 <small data-word-width>HEX · 32 bit</small></th>
       </tr></thead><tbody data-navigation></tbody></table></div>
     <details data-record-details><summary>저장된 전체 필드 보기 · JSON</summary><pre data-records class="log"></pre></details>

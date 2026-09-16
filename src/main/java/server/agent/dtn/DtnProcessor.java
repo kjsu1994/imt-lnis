@@ -3,10 +3,8 @@ package server.agent.dtn;
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import server.agent.codec.NativeAfsCodec;
 import server.shared.codec.NativePvtCodec;
@@ -15,7 +13,6 @@ import server.shared.codec.GrawCodec;
 import server.shared.codec.Hashing;
 import server.shared.model.DtnModels;
 import server.shared.model.DtnModels.*;
-import server.shared.model.LnisModels.*;
 
 /** AFS 생성/복원기를 재사용하는 DTN 계산 작업이다. */
 public final class DtnProcessor {
@@ -37,12 +34,7 @@ public final class DtnProcessor {
     if (source.length == 0 || source.length > DtnModels.MAX_INPUT_BYTES)
       throw new IllegalArgumentException("DTN 수집 입력은 1 MiB 이하로 제한됩니다.");
     var records = GrawCodec.splitLengthPrefixed(source);
-    AgentResult result = new AgentResult();
-    result.setObservations(server.shared.model.DtnObservationView.fromRecords(records));
-    progress.accept("PVT","지구 PVT 계산 시작 · "+records.size()+" records");
-    long started=System.nanoTime();
-    try (var pvt = new NativePvtCodec(nativeDirectory)) { result.setPvt(pvt.calculate(records)); }
-    progress.accept("PVT","계산 요청 처리 종료 · "+((System.nanoTime()-started)/1_000_000)+" ms · 유효성은 결과에서 확인");
+    AgentResult result = calculate(records, progress);
     Transfer transfer = new Transfer();
     transfer.setTestId(id);
     transfer.setSourceSha256(Hashing.hex(Hashing.sha256Digest().digest(source)));
@@ -55,22 +47,11 @@ public final class DtnProcessor {
       result.setTransfer(transfer);
       return result;
     }
-    progress.accept("AFS 변환","GRAW 분할 → SB2 시간·항법 구성 → SB3/SB4 원본 배치 → 기존 인코더 실행");
-    var frames = new AfsFrameBuilder(afs).prepare(records,
-        new TestOptions(TestType.TEST_A_NORMAL, 0, 0, 0, Map.of()), 1).frames();
-    progress.accept("AFS 변환","인코딩 완료 · "+frames.size()+" frames · 프레임당 750 bytes");
-    List<DtnModels.Frame> output = new ArrayList<>();
-    for (var frame : frames) {
-      DtnModels.Frame item = new DtnModels.Frame();
-      item.setIndex(output.size());
-      item.setWeek(frame.week());
-      item.setAfsItow(frame.intervalOfWeek());
-      item.setToi(frame.timeOfInterval());
-      item.setFrameBase64(Base64.getEncoder().encodeToString(frame.payload()));
-      output.add(item);
-    }
-    progress.accept("JSON 준비","AFS 프레임 Base64·시간 메타데이터 구성 완료");
-    transfer.setFrames(output);
+    progress.accept("AFS 변환","GPS 항법정보 → 원본 형식 SB2 · SB3/SB4 0101 패턴 → 기존 인코더 실행");
+    AfsMetadataCodec.prepare(transfer, records, afs);
+    progress.accept("AFS 변환","인코딩 완료 · "+transfer.getFrames().size()+" frames · 프레임당 750 bytes");
+    AfsMetadataCodec.group(transfer);
+    progress.accept("JSON 준비","의사거리·도플러 관측값 및 SB2 외 항법정보 metadata 구성 완료");
     result.setTransfer(transfer);
     return result;
   }
@@ -79,6 +60,14 @@ public final class DtnProcessor {
     return receive(id,transfer,(stage,message)->{});
   }
   public AgentResult receive(UUID id, Transfer transfer, java.util.function.BiConsumer<String,String> progress) {
+    if (transfer != null && (AfsMetadataCodec.FORMAT.equals(transfer.getFormat())
+        || AfsMetadataCodec.GROUPED_FORMAT.equals(transfer.getFormat()))) {
+      if (!id.equals(transfer.getTestId())) throw new IllegalArgumentException("시험 ID 불일치");
+      progress.accept("AFS 복원","CRC·원본 0101 패턴 검사 → SB2 항법정보와 관측 metadata 결합");
+      var records = AfsMetadataCodec.restore(transfer, afs);
+      progress.accept("AFS 복원","GRAW 복원·SHA-256 검증 완료 · "+records.size()+" records");
+      return calculate(records, progress);
+    }
     if (transfer != null && "LNIS-GRAW-RAW-v1".equals(transfer.getFormat()))
       return receiveRaw(id, transfer,progress);
     if (transfer == null || !id.equals(transfer.getTestId()) || transfer.getSchemaVersion() != 1
@@ -114,13 +103,7 @@ public final class DtnProcessor {
     if (!Hashing.hex(Hashing.sha256Digest().digest(source.toByteArray())).equals(transfer.getSourceSha256()))
       throw new IllegalArgumentException("복원 데이터 SHA-256 불일치");
     progress.accept("AFS 복원","GRAW 복원·SHA-256 검증 완료 · "+records.size()+" records · "+source.size()+" bytes");
-    AgentResult result = new AgentResult();
-    result.setObservations(server.shared.model.DtnObservationView.fromRecords(records));
-    progress.accept("PVT","지구 PVT 계산 시작 · "+records.size()+" records");
-    long started=System.nanoTime();
-    try (var pvt = new NativePvtCodec(nativeDirectory)) { result.setPvt(pvt.calculate(records)); }
-    progress.accept("PVT","계산 요청 처리 종료 · "+((System.nanoTime()-started)/1_000_000)+" ms · 유효성은 결과에서 확인");
-    return result;
+    return calculate(records, progress);
   }
 
   private AgentResult receiveRaw(UUID id, Transfer transfer, java.util.function.BiConsumer<String,String> progress) {
@@ -138,6 +121,10 @@ public final class DtnProcessor {
     var records = GrawCodec.splitLengthPrefixed(source);
     if (records.size() != transfer.getRecordCount()) throw new IllegalArgumentException("RAW 레코드 수 불일치");
     progress.accept("RAW 복원","크기·SHA-256·레코드 수 검증 통과 · "+records.size()+" records · "+source.length+" bytes");
+    return calculate(records, progress);
+  }
+
+  private AgentResult calculate(List<byte[]> records, java.util.function.BiConsumer<String,String> progress) {
     AgentResult result = new AgentResult();
     result.setObservations(server.shared.model.DtnObservationView.fromRecords(records));
     progress.accept("PVT","지구 PVT 계산 시작 · "+records.size()+" records");

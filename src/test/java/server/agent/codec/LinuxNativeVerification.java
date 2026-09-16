@@ -22,7 +22,7 @@ public final class LinuxNativeVerification {
             assertEquals(1, codec.abiVersion());
             DtnProcessor processor = new DtnProcessor(codec, directory);
             UUID id = UUID.randomUUID();
-            AgentResult prepared = processor.prepare(id, NativePvtIntegrationTest.sample());
+            AgentResult prepared = processor.prepare(id, NativePvtIntegrationTest.sample(), true);
             AgentResult received = processor.receive(id, prepared.getTransfer());
             assertEquals(prepared.getPvt(), received.getPvt());
             assertFalse(received.getPvt().getFirst().isPositionValid());

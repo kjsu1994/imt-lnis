@@ -29,6 +29,16 @@ LANS에 포함된 mod2sparse와 LDPC-codes의 버전은 다르므로 임의로 �
 
 현재 입력 어댑터는 GPS L1 C/A를 지원한다. 다중 GNSS 전체 지원은 포함하지 않는다.
 
+### AFS + Metadata 전송 (v2/v3)
+
+서비스 연결부 `src/main/java/server/agent/dtn/AfsMetadataCodec.java`에서 GPS LNAV를 원본 `afs_sim.c:eph2sbf`와 같은 SB2 배치로 옮긴다. toe/toc, e, sqrtA, i0, Ω0, ω, M0, af0/af1을 담고 SB3/SB4는 원본의 교대 0101 데이터 비트를 유지한다. CRC/FEC는 기존 네이티브 인코더/디코더를 그대로 호출한다. vendor·패치·ABI는 이 변경으로 수정하지 않는다.
+
+LNIS 목적의 차이는 **달 궤도값 대신 GPS 항법값 사용**, **RAWX와 SB2에 없는 GPS LNAV 필드를 JSON으로 보조**하는 것이다. JSON 항법 words에서는 SB2로 전달한 비트를 0으로 비워 중복하지 않는다. GPS 이심률 단위 2^-33과 원본 AFS 단위 2^-32의 차이 때문에 마지막 1 bit는 JSON에 남긴다. 수신은 SB2를 원위치에 채우고 원본 GRAW SHA-256을 검증한다. 따라서 수신 RAW 표와 지구 PVT는 원래 관측값·항법정보를 사용하며 SB2 양자화로 계산 정밀도를 잃지 않는다. 해당 Java 코드에 배치와 목적을 주석으로 기록했다.
+
+기존 AFS Frame 오류 주입 시험의 `AfsFrameBuilder`/GRAW fragment 경로와 과거 DTN AFS v1 수신은 호환을 위해 유지한다. I/Q는 아래의 별도 추적 경로를 사용한다.
+
+v3는 이 AFS 비트 생성/복원 방식을 바꾸지 않고 JSON만 `satellites[]`의 PRN별 프레임·관측값·보조 항법정보로 묶는다. `recordIndex`/`measurementIndex`로 원본 레코드와 신호 순서를 복원한 뒤 v2 검증 경로를 재사용한다. 관측 시점이나 항법 갱신이 여러 개라도 첫 항목만 남기지 않는다. 수집 정보와 RAWX 공통 헤더는 최상위 `metadata.commonRecords`에 한 번만 보존한다.
+
 ### I/Q 지구 수신 경로
 
 실제 90초 파일 시험에서 발견한 원본 로그 버퍼의 CR/LF/NUL 길이 누락과 RTKLIB 스트림 옵션 배열(5→8항목)도 `04-iq-receiver.patch`로 보정한다. 원본은 그대로 보관하며 수정한 수신 경로는 AddressSanitizer로 전체 파일을 재검증한다.

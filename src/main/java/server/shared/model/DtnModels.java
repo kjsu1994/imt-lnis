@@ -26,12 +26,14 @@ public final class DtnModels {
     @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
     private HdtnConfig hdtnConfig;
     private IqFile file;
-    /** I/Q tracking supplies observations; this metadata supplies GPS LNAV only. */
-    private IqMetadata metadata;
+    /** AFS: observations + residual navigation; I/Q: GPS LNAV assistance only. */
+    private Metadata metadata;
     private String sourceSha256;
     private int recordCount;
     private int prn = 1;
     private List<Frame> frames;
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    private List<AfsSatellite> satellites;
     /** RAW transport preserves canonical GRAW bytes, not UBX serial bytes. */
     private String grawBase64;
     /** Display/comparison only; never used as receiver solver input. */
@@ -71,9 +73,33 @@ public final class DtnModels {
   public record IqFile(String filePath, long sizeBytes, String sha256, int durationSeconds,
       int sampleRateHz, String sampleFormat, int quantizationBits) {}
 
+  @com.fasterxml.jackson.annotation.JsonTypeInfo(use = com.fasterxml.jackson.annotation.JsonTypeInfo.Id.DEDUCTION)
+  @com.fasterxml.jackson.annotation.JsonSubTypes({
+      @com.fasterxml.jackson.annotation.JsonSubTypes.Type(IqMetadata.class),
+      @com.fasterxml.jackson.annotation.JsonSubTypes.Type(AfsMetadata.class),
+      @com.fasterxml.jackson.annotation.JsonSubTypes.Type(AfsGroupedMetadata.class)})
+  public sealed interface Metadata permits IqMetadata, AfsMetadata, AfsGroupedMetadata {}
+
   public record IqNavigation(int prn, List<Integer> words24) {}
   public record IqMetadata(String signal, String pvtMethod, int week, double towSeconds,
-      String trajectory, List<Integer> prns, List<IqNavigation> gpsLnav) {}
+      String trajectory, List<Integer> prns, List<IqNavigation> gpsLnav) implements Metadata {}
+
+  /** Navigation words are residuals: restore SB2 fields before interpreting them as SFRBX. */
+  public record AfsMetadata(List<AfsRecord> records) implements Metadata {}
+  /** v3: shared epoch/envelope data only; measurements and navigation live with their satellite. */
+  public record AfsGroupedMetadata(List<AfsIndexedRecord> commonRecords) implements Metadata {}
+  public record AfsSatellite(int constellationId, int prn, List<Frame> frames,
+      AfsSatelliteMetadata metadata) {}
+  public record AfsSatelliteMetadata(List<AfsMeasurement> observations,
+      List<AfsIndexedRecord> navigationSupplement) {}
+  public record AfsIndexedRecord(int recordIndex, AfsRecord record) {}
+  public record AfsMeasurement(int recordIndex, int measurementIndex, int week, double towSeconds,
+      server.shared.codec.GrawCodec.Observation observation) {}
+  @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+  public record AfsRecord(UUID testId, UUID messageId, long sequence, java.time.Instant capturedAt,
+      server.shared.codec.GrawCodec.ObservationEpoch observation,
+      server.shared.codec.GrawCodec.NavigationUpdate navigation,
+      server.shared.codec.GrawCodec.ReceiverMetadata receiver) {}
 
   /** frameBase64는 반드시 750바이트 AFS 프레임이며 관측 시각은 복원된 GRAW에 있다. */
   @Data @NoArgsConstructor
@@ -83,6 +109,11 @@ public final class DtnModels {
     private int afsItow;
     private int toi;
     private String frameBase64;
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    private Integer prn;
+    /** Zero-based metadata.records indices for GPS LNAV subframes 1, 2, 3. */
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    private List<Integer> navigationRecordIndices;
   }
 
   /** T는 DTN 도착 시각이 아닌 관측 시각 및 수신기 시계 오차다. */

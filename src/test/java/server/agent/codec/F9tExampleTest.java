@@ -52,7 +52,7 @@ class F9tExampleTest {
     try (var afs = NativeAfsCodec.load(nativePath)) {
       var processor = new DtnProcessor(afs, nativePath);
       UUID id = UUID.randomUUID();
-      var tx = processor.prepare(id, candidate);
+      var tx = processor.prepare(id, candidate, true);
       var rx = processor.receive(id, tx.getTransfer());
       assertEquals(tx.getPvt(), rx.getPvt());
       assertEquals(tx.getObservations(), rx.getObservations());
@@ -67,7 +67,7 @@ class F9tExampleTest {
           "Source SHA256: " + Hashing.hex(Hashing.sha256Digest().digest(compressed)) + "\n" +
           "GRAW SHA256: " + Hashing.hex(Hashing.sha256Digest().digest(candidate)) + "\n" +
           "Bytes: " + candidate.length + "\nPVT: " + tx.getPvt() + "\n" +
-          "Exact AFS round trip observations: true\nPVT comparison unavailable: no SFRBX navigation in source\n");
+          "Exact RAW round trip observations: true\nPVT comparison unavailable: no SFRBX navigation in source\n");
     }
   }
 

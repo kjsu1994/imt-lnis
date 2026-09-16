@@ -33,7 +33,8 @@ public class NativePvtIntegrationTest {
       }
       var processor = new DtnProcessor(extended, candidate());
       UUID id = UUID.randomUUID();
-      var prepared = processor.prepare(id, sample());
+      assertThrows(IllegalArgumentException.class, () -> processor.prepare(id, sample()));
+      var prepared = processor.prepare(id, sample(), true);
       assertFalse(prepared.getPvt().getFirst().isPositionValid());
       var received = processor.receive(id, prepared.getTransfer());
       assertEquals(prepared.getPvt(), received.getPvt());
@@ -80,13 +81,45 @@ public class NativePvtIntegrationTest {
       DtnProcessor processor = new DtnProcessor(codec, candidate());
       UUID id = UUID.randomUUID();
       var tx = processor.prepare(id, validSample());
-      var rx = processor.receive(id, tx.getTransfer());
+      var mapper = new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules();
+      var wire = mapper.readValue(mapper.writeValueAsBytes(tx.getTransfer()), DtnModels.Transfer.class);
+      assertEquals(3, wire.getSchemaVersion());
+      assertEquals("LNIS-AFS-GNSS-v3", wire.getFormat());
+      assertInstanceOf(DtnModels.AfsGroupedMetadata.class, wire.getMetadata());
+      assertNull(wire.getFrames());
+      assertEquals(32,wire.getSatellites().size());
+      for (var frame : wire.getSatellites().stream().flatMap(s -> s.frames().stream()).toList()) {
+        var decoded = codec.decode(frame.getToi(), Base64.getDecoder().decode(frame.getFrameBase64()));
+        for (int i = 0; i < 846; i++) {
+          assertEquals(i % 2, decoded.sb3()[i]); assertEquals(i % 2, decoded.sb4()[i]);
+        }
+        if (frame.getPrn() == 1) {
+          // Independent existing SB2 reader + known native/test_pvt.c fixture values.
+          var eph = server.agent.afs.Sb2PayloadCodec.decode(decoded.sb2(),1,2400,83);
+          assertEquals(99984,eph.toeSeconds()); assertEquals(99984,eph.tocSeconds());
+          assertEquals(0.01,eph.eccentricity(),Math.scalb(1.0,-32));
+          assertEquals(Math.sqrt(26560000),eph.sqrtSemiMajorAxis(),Math.scalb(1.0,-19));
+          assertEquals(Math.toRadians(55),eph.inclinationRadians(),2e-9);
+          assertEquals(-Math.PI,eph.ascendingNodeRadians(),2e-9);
+          assertEquals(-Math.PI,eph.meanAnomalyRadians(),2e-9);
+          assertEquals(0,eph.argumentOfPerigeeRadians());
+          assertEquals(0,eph.af0Seconds()); assertEquals(0,eph.af1SecondsPerSecond());
+          assertTrue(eph.headerMatchesPacket() && eph.tailTestPatternValid());
+        }
+      }
+      var misleadingReference = new DtnModels.Pvt(); misleadingReference.setPositionValid(true);
+      misleadingReference.setEcefMeters(new double[]{1,2,3});
+      wire.setReferencePvt(List.of(misleadingReference)); // Comparison fields cannot drive receiver PVT.
+      var rx = processor.receive(id, wire);
+      assertEquals(tx.getObservations(), rx.getObservations());
       var pvt = tx.getPvt().getFirst();
       assertTrue(pvt.isPositionValid(), pvt.getMessage());
       assertTrue(pvt.isVelocityValid());
       assertEquals(tx.getPvt(), rx.getPvt());
       double[] expected = {-3049086.2377217,4046274.10244263,3861624.97495251};
       for (int i = 0; i < 3; i++) assertEquals(expected[i], pvt.getEcefMeters()[i], 0.01);
+      wire.setSourceSha256("0".repeat(64));
+      assertThrows(IllegalArgumentException.class, () -> processor.receive(id, wire));
     }
   }
 

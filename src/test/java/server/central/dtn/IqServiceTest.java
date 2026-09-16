@@ -9,6 +9,15 @@ import org.junit.jupiter.api.io.TempDir;
 import server.shared.model.DtnModels.*;
 
 class IqServiceTest {
+  @Test void iqMetadataWireFormatIsUnchangedByAfsMetadataSupport() throws Exception {
+    var metadata = new IqMetadata("AFSD","AFS_IQ_GPS_LNAV_ASSISTED-v1",2400,100000,
+        "ECEF_CONSTANT_VELOCITY",java.util.List.of(19),java.util.List.of(new IqNavigation(19,java.util.List.of(1,2,3))));
+    Transfer transfer = new Transfer(); transfer.setMetadata(metadata);
+    var mapper = new ObjectMapper();
+    var json = mapper.writeValueAsString(transfer);
+    assertEquals(metadata,mapper.readValue(json,Transfer.class).getMetadata());
+    assertFalse(json.contains("@type")); assertFalse(json.contains("records"));
+  }
   @Test void statusSurvivesPartRemovalDuringCancellation() throws Exception {
     var service = service(); UUID id = UUID.randomUUID();
     var jobs = (java.util.Map<UUID,java.util.Map<String,Object>>) org.springframework.test.util.ReflectionTestUtils.getField(service, "jobs");

@@ -659,9 +659,11 @@ public class DtnService {
                     job.setFileResultJson(verified.toString());
                     var sent = objectMapper.readValue(job.getSentJson(), Transfer.class);
                     if (sent.getMetadata()!=null) {
+                        if (!(sent.getMetadata() instanceof IqMetadata metadata))
+                            throw new IllegalArgumentException("I/Q metadata 형식 오류");
                         if (result.getPvt()==null) throw new IllegalArgumentException("I/Q 수신 PVT 결과 누락");
                         job.setReceiverJson(objectMapper.writeValueAsString(result.getPvt()));
-                        var reference=IqReceiver.references(sent.getMetadata(),sent.getReferencePvt(),result.getPvt());
+                        var reference=IqReceiver.references(metadata,sent.getReferencePvt(),result.getPvt());
                         job.setReferenceJson(objectMapper.writeValueAsString(reference));
                         job.setComparisonJson(objectMapper.writeValueAsString(IqReceiver.comparison(reference,result.getPvt())));
                     }
@@ -693,12 +695,14 @@ public class DtnService {
             List<Pvt> reference=List.of();
             Map<String,Object> comparison=Map.of("verdict","INCONCLUSIVE","message","과거 파일: I/Q PVT 메타데이터 없음");
             if(transfer.getMetadata()!=null) {
+                if (!(transfer.getMetadata() instanceof IqMetadata metadata))
+                    throw new IllegalArgumentException("I/Q metadata 형식 오류");
                 if(iqReceiver==null) throw new IllegalStateException("I/Q 수신기 미설정");
-                decoded=iqReceiver.decode(iq.path(transfer.getFile()),transfer.getMetadata(),
+                decoded=iqReceiver.decode(iq.path(transfer.getFile()),metadata,
                     message->trace(job.getId(),"I/Q 복원",true,message));
                 // File verification and PVT accuracy are different results.
                 iq.verify(transfer.getFile()); // Detect replacement/modification during tracking.
-                reference=IqReceiver.references(transfer.getMetadata(),transfer.getReferencePvt(),decoded.pvt());
+                reference=IqReceiver.references(metadata,transfer.getReferencePvt(),decoded.pvt());
                 comparison=IqReceiver.comparison(reference,decoded.pvt());
             }
             synchronized (this) {

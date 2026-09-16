@@ -811,15 +811,21 @@ Linux 독립 노드 Compose는 `deployment/node`에 있으며 기존 중앙 서�
 }
 ```
 
-접수 후 `receivedAt`(UTC), 계산 완료 후 `pvt`(기존 Pvt 배열)가 추가된다. `state=COMPLETED`는 **수신 계산 완료**이며 비교 판정이 아니다. 송신 PC가 해당 PVT와 자체 기준 PVT를 비교하여 최종 verdict를 저장한다. 원본 JSON 및 AFS 프레임은 응답에 포함하지 않는다.
+접수 후 `receivedAt`(UTC), 계산 완료 후 `pvt`(기존 Pvt 배열)가 추가된다. I/Q는 `fileResult`도 반환하며, 보조 항법정보가 있는 신규 시험은 추적 기반 `pvt`를 포함한다. `state=COMPLETED`는 **수신 처리 완료**이며 PVT 일치 판정이 아니다. 송신 PC가 결과를 받아 비교 판정을 저장한다. 어댑터 부가 로그는 `adapterLogs` 배열(`occurredAt`, `level`, `message`)로 공유하며 LNIS 자체 처리 로그·원본 JSON·AFS 프레임은 포함하지 않는다.
 
 송신 화면의 `dtnReceived=true`는 원격 수신 접수를 뜻하며 송신 DB에 수신 원문이 있다는 뜻이 아니다. `sentPayloadAvailable`/`receivedPayloadAvailable`은 **현재 PC의 DB**를 기준으로 한다. 반대쪽 원문은 Sender/Receiver 버튼으로 해당 PC로 이동해 확인한다.
 
 ### 14.6 재시작 및 연결 실패
 
-관리 요청은 고정된 상대 주소만 사용하며 자동 재송신·리다이렉트를 하지 않는다. 연결 실패 중에는 다음 상태 조회를 기다리고 전체 시험 제한 시간을 유지한다. 재시작으로 사라진 AFS 실행은 취소하고, 메모리에서 진행하던 DTN PREPARING/CALCULATING은 FAILED로 기록한다. 영속 저장된 WAITING_DTN/WAITING_RECEIVER는 기존 접수 대기를 계속한다. 수신 대기 제한은 시험 등록 후 10분이다.
+관리 요청은 설정된 상대 주소를 사용하며 리다이렉트를 따르지 않는다. 시험 데이터는 자동 재송신하지 않고, 연결 실패 중에는 다음 상태 조회를 기다린다. 중지 요청은 예외로 `cancelPending=true`인 동안 재시도한다. 재시작으로 사라진 AFS 실행은 취소하고, 메모리에서 진행하던 DTN PREPARING/CALCULATING은 FAILED로 기록한다. 영속 저장된 WAITING_DTN/WAITING_RECEIVER는 기존 접수 대기를 계속한다. 제한 시간은 각 노드의 시험 생성·등록 시각 기준 RAW/AFS 10분, I/Q 20분이다. 수신 노드는 JSON 접수 전에는 시험 종류가 아직 저장되지 않아 기본 10분 제한을 적용한다.
 
 역할 선택 화면은 상대 노드 URL로 이동한다. 수신 PC에서 수집/업로드/전송 시작 API를 호출하면 `409`로 거부한다. 기존 `server` 모드의 화면 및 API 동작은 유지한다.
+
+### 14.7 DTN 상대 시험 중지
+
+`POST /lnis/api/v1/node/peer/dtn/tests/{testId}/cancel` — 관리 토큰 필수, 수신 노드 전용. 본문은 `{}`, 응답은 HTTP 200과 14.5의 상태 객체다. 등록 전 중지도 같은 ID로 기록해 늦은 등록을 차단한다. 완료된 `COMPLETED`/`INCONCLUSIVE` 결과는 유지한다. 어댑터가 호출할 API가 아니다.
+
+송신 화면의 `POST /lnis/api/v1/dtn/tests/{id}/cancel` 응답은 로컬 시험 요약이다. `cancelPending`은 상대 중지 확인 대기 여부이며 외부 어댑터 번들 취소 여부가 아니다. 시험 요약에는 확정된 `hdtnConfig`와 수신 접수 시각 `receivedAt`도 포함된다.
 
 ---
 
@@ -869,7 +875,7 @@ Authorization: Bearer <LNIS_DTN_SEND_TOKEN>
 
 | 공통 필드 | 타입·값 |
 |---|---|
-| schemaVersion | 정수 `1` |
+| schemaVersion | AFS 신규 전송 `3`, RAW·I/Q `1`; 과거 AFS `1`·`2` 수신 호환 |
 | testId | LNIS가 발급한 시험 UUID. 모든 단계에서 유지 |
 | testType | `GNSS_RAW`, `AFS_METADATA`, `IQ_SAMPLE` |
 | senderMode | `DTN` 또는 `HDTN`: 송신 측 기동 모드 |
@@ -990,28 +996,73 @@ UBX 직렬 바이트 원문과는 다릅니다. 어댑터는 내용을 해석·�
 
 #### B. AFS Frame + Metadata
 
+**신규 v3: `satellites[]`에 PRN별 AFS 프레임과 metadata를 함께 묶습니다.** SB2는 GPS 항법정보, SB3/SB4는 원본 `0101…` 패턴입니다. 아래는 일부 필드·레코드를 생략한 구조 예시입니다.
+
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 3,
   "testId": "438a4035-a13c-4b49-a278-0e5fb7f774bd",
   "testType": "AFS_METADATA",
   "senderMode": "HDTN",
   "receiverMode": "DTN",
   "profile": "POCKETSDR-GPS-L1CA-SPP-v1",
-  "format": "LNIS-GRAW-AFS-v1",
+  "format": "LNIS-AFS-GNSS-v3",
   "sourceSha256": "<복원할 원본 GRAW SHA-256: 대문자 HEX 64자리>",
   "recordCount": 19,
   "prn": 1,
-  "frames": [
-    {"index": 0, "week": 2400, "afsItow": 83, "toi": 33, "frameBase64": "<750바이트 AFS 프레임의 Base64>"}
-  ]
+  "satellites": [{
+    "constellationId": 0,
+    "prn": 19,
+    "frames": [{
+      "index": 0, "prn": 19, "week": 2400, "afsItow": 83, "toi": 33,
+      "navigationRecordIndices": [0, 1, 2], "frameBase64": "<750바이트 AFS 프레임의 Base64>"
+    }],
+    "metadata": {
+      "observations": [{
+        "recordIndex": 18, "measurementIndex": 0, "week": 2400, "towSeconds": 100000.0,
+        "observation": {
+          "constellationId": 0, "satelliteId": 19, "signalId": 0, "frequencyId": 0,
+          "pseudorangeMeters": 20453375.918, "carrierPhaseCycles": 0.0, "dopplerHz": -430.0,
+          "lockTimeMilliseconds": 1000, "carrierToNoiseDbHz": 45,
+          "pseudorangeStdDev": 1, "carrierPhaseStdDev": 1, "dopplerStdDev": 1, "trackingStatus": 1
+        }
+      }],
+      "navigationSupplement": [{"recordIndex": 0, "record": {
+        "testId": "<수집 세션 UUID>", "messageId": "<GRAW 레코드 UUID>",
+        "sequence": 0, "capturedAt": "2026-09-07T00:00:00Z",
+        "navigation": {
+          "constellationId": 0, "satelliteId": 19, "signalId": 0,
+          "frequencyId": 0, "sfrbxVersion": 2,
+          "words": ["<SB2 필드를 비운 unsigned 32-bit 정수 10개>"]
+        }
+      }}]
+    }
+  }],
+  "metadata": {"commonRecords": [{"recordIndex": 18, "record": {
+      "testId": "<수집 세션 UUID>", "messageId": "<GRAW 레코드 UUID>",
+      "sequence": 18, "capturedAt": "2026-09-07T00:00:00Z",
+      "observation": {
+        "receiverTowSeconds": 100000.0, "week": 2400,
+        "leapSeconds": 18, "receiverStatus": 1, "rawxVersion": 1,
+        "observations": []
+      }
+  }}]}
 }
 ```
 
-- 원본 관측·항법 GRAW는 AFS 프레임에 담겨 있습니다. 의사거리나 원본 GRAW를 별도 중복 필드로 전송하지 않습니다.
-- `frames` 배열 순서를 유지합니다. `index`는 0부터 연속, `frameBase64`는 750바이트/1,000문자입니다.
-- `week`, `afsItow`, `toi`는 AFS 시간 메타데이터이며 `afsItow` 단위는 1,200초 구간입니다.
-- `prn=1`은 AFS 시험 PRN으로, 원본 GPS 관측 위성 PRN과 다릅니다.
+- `satellites[]`는 `(constellationId, prn)`별 묶음입니다. `frames`와 해당 위성의 관측값·보조 항법정보가 나란히 있습니다. 여러 시점·신호·항법 갱신을 배열로 보존하며 프레임마다 같은 관측값을 복제하지 않습니다. 관측값 없는 위성은 `observations: []`, GPS 항법 세트가 없는 위성/다른 GNSS는 `frames: []`일 수 있습니다.
+- 최상위 `metadata.commonRecords`에는 공통 관측 시각·상태 및 수집 환경만 둡니다. RAWX의 `observations: []`는 누락이 아니라 위성별 이동을 뜻합니다. 최상위 `frames`는 null/생략입니다.
+- `recordIndex`는 원본 GRAW 전체 배열의 0-based 위치이며 `sequence`와 다를 수 있습니다. 공통 레코드와 위성별 `navigationSupplement`를 합치면 `0..recordCount-1`이 중복·누락 없이 완성됩니다. 각 관측값의 `measurementIndex`는 해당 RAWX 내 원래 순서입니다. 수신은 이 두 인덱스로 원본 순서를 복원합니다.
+- `pseudorangeMeters`는 **수신기가 이미 측정한 의사거리(m)**입니다. LNIS 수신은 이를 다시 신호에서 구하지 않고 SB2+보조 항법정보와 함께 지구 PVT를 계산합니다. 위상(cycle), 도플러(Hz), C/N₀(dB-Hz), 추적시간(ms), 편차 코드·유효성 비트도 그대로 보존합니다. 이 예시 숫자만 읽고 나머지 필드를 삭제하지 않습니다.
+- `frames[].prn`은 실제 GPS PRN(1~32)입니다. `navigationRecordIndices`는 같은 위성의 `navigationSupplement[].recordIndex` 세 개이며 LNAV subframe 1·2·3 순서입니다. 같은 레코드를 여러 프레임이 참조할 수 있습니다.
+- `navigation.words`는 **보조 항법 잔여 워드**입니다. 프레임이 참조하는 레코드에서는 SB2가 담당하는 toe/toc, e(상위 31 bit), sqrtA, i0, Ω0, ω, M0, af0/af1 비트를 0으로 비웁니다. GPS 이심률 최하위 1 bit, 보정항·상태·패리티 등은 남깁니다. 참조하지 않는 항법 레코드는 원문 그대로입니다. 이 배열만으로 완성된 SFRBX라고 해석하면 안 됩니다. LNIS가 AFS 복호화 후 채워 복원합니다.
+- 수집 환경 레코드가 있으면 `receiver`에 `receiverModel`, `firmwareVersion`, `portName`, `baudRate`, `sessionName`을 보존합니다.
+- `index`는 **모든 위성에 걸친 AFS 프레임 번호**(0부터 연속)입니다. `frameBase64`는 750바이트/1,000문자입니다. `week`·`afsItow`·`toi`는 AFS 시간이며 ITOW는 1,200초 구간, TOI는 구간 내 12초 슬롯(0~99)입니다. 최상위 `prn=1`은 이전 공통 모델 호환 필드이며 위성 식별에 쓰지 않습니다.
+- SFRBX 메시지 수와 프레임 수는 다릅니다. 합성 예제는 **96건(수집 순번 0~95) → 32 PRN × subframe 1·2·3 → AFS 32개(index 0~31)**입니다. `recordCount=97`은 RAWX 1건까지 포함한 수입니다. 실제 입력은 항법 중복·갱신·누락 때문에 항상 3:1은 아닙니다.
+- LNIS 수신이 CRC·0101 패턴·항법 참조·원본 GRAW SHA-256을 검사한 뒤 RAW 표와 PVT를 계산합니다. `referencePvt`는 비교용일 뿐 계산 입력이 아닙니다.
+- **어댑터는 satellites·metadata·referencePvt를 포함한 JSON 전체를 보존하여 콜백합니다.** 소수 반올림 금지. GPS LNAV 1·2·3 세트가 필요하며 관측값만 있는 입력은 GNSS RAW 시험을 사용합니다.
+
+과거 `schemaVersion=1` / `LNIS-GRAW-AFS-v1`(SB3/SB4의 GRAW) 및 `schemaVersion=2` / `LNIS-AFS-GNSS-v2`(분리된 frames/metadata.records)는 수신 호환을 유지합니다. 신규 전송은 v3이며 송신·수신 서비스 모두 업데이트해야 합니다. 별도 AFS Frame 오류 주입 시험과 RAW/I/Q 계약은 변경하지 않습니다.
 
 
 #### C. I/Q Sample: 파일 주소 + 보조 항법정보
@@ -1092,7 +1143,7 @@ Content-Type: application/json
 Authorization: Bearer <LNIS_DTN_RECEIVE_TOKEN>
 ```
 
-콜백에는 선택적으로 최상위 `dtnLogsBase64`를 추가할 수 있습니다. UTF-8 텍스트 로그의 표준 Base64이며 인코딩 문자열 최대 131072자, 상세 로그 최대 500줄입니다. 이 필드 하나만 원본 동일성 비교에서 제외하고 나머지 필드·값·배열은 그대로 검증합니다. 최초 수신 원문에는 이 필드도 보관합니다. 잘못된 Base64/UTF-8 로그는 경고로 남기며 시험 데이터 접수를 막지 않습니다.
+콜백에는 선택적으로 최상위 `dtnLogsBase64`를 추가할 수 있습니다. UTF-8 텍스트 로그의 표준 Base64이며 인코딩 문자열 최대 131072자, 상세 로그 최대 500줄입니다. 로그 포함 전체 JSON은 16 MiB 이하여야 합니다. 이 필드 하나만 원본 동일성 비교에서 제외하고 나머지 필드·값·배열은 그대로 검증합니다. 최초 수신 원문에는 이 필드도 보관합니다. 잘못된 Base64/UTF-8 또는 로그 필드 제한 초과는 경고로 남기며 시험 데이터 접수를 막지 않습니다. 500줄을 넘으면 이후 줄은 상세 로그에 저장하지 않고 경고를 추가합니다. 표시·저장용 메시지는 줄당 최대 2000자이며 전체 내용은 최초 수신 JSON 원문에 남습니다.
 
 각 줄은 `[17:12:36.538] [REST API] 메시지` 또는 `[2026-09-16T17:12:36.538+09:00] 메시지` 형식입니다. 날짜 없는 시각은 Asia/Seoul과 수신 날짜를 기준으로 가장 가까운 날짜(±12시간)로 추정하고 다음 줄부터 직전 로그 시각으로 자정 경계를 보정합니다. 장시간 지연·정확한 날짜 식별에는 오프셋 포함 ISO 날짜·시각을 사용하세요. 시각 없는 줄은 직전 로그 시각(첫 줄은 수신 시각)을 사용합니다. 장비 간 시계 오차는 보정하지 않습니다.
 
@@ -1119,12 +1170,12 @@ LNIS는 어댑터 로그를 `[DTN]` 상세 항목으로 저장하고 관리 채�
 |---|---|
 | 400 | 시험 없음, 변경된 JSON, 잘못된 값·JSON |
 | 401 | 수신 Bearer 토큰 누락·불일치 |
-| 409 | 수신 노드가 아님 또는 신규 접수를 받을 상태가 아님 |
+| 409 | 수신 노드가 아님, 중지된 시험 또는 신규 접수를 받을 상태가 아님 |
 | 413 | JSON 본문 16 MiB 초과 |
 
 400/401/409 오류 본문은 LNIS의 ProblemDetail 형식(`status`, `detail` 등)입니다. 413은 현재 `{"message":"JSON은 16 MiB 이하입니다."}`를 반환합니다.
 수신 파일 불일치는 비동기 검증에서 시험 FAILED로 기록될 수 있으므로 202를 최종 성공으로 표시하지 않습니다.
-현재 시험 전체 제한 시간은 10분입니다. 어댑터의 지연 전달 시험이 이보다 길면 LNIS 제한도 함께 조정해야 합니다.
+현재 시험 제한 시간은 각 LNIS 노드의 시험 생성·등록 시각 기준 RAW/AFS 10분, I/Q 20분입니다. 단, 수신 노드는 JSON 접수 전 시험 종류를 알 수 없어 기본 10분을 적용합니다. 접수 후에도 타이머를 다시 시작하지 않습니다. 장시간 지연 전달 시험은 이 제한을 먼저 협의해야 합니다. 중지된 시험의 409 응답에는 같은 ID로 재전송하지 말고 새 시험을 시작하세요.
 
 ### 15.4 환경 설정·인계 체크리스트
 
