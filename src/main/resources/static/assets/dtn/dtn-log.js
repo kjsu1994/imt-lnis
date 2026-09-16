@@ -1,4 +1,4 @@
-// Local processing history only. Never mix receiver-PC events into sender history.
+// Local LNIS history plus shared adapter events, ordered by occurrence time.
 export function logLine(entry) {
   const at = new Date(entry.occurredAt).toLocaleTimeString('ko-KR', {hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
   return `${at} [${entry.level}] [${entry.stage}] ${entry.message}`;

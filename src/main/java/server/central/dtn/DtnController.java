@@ -40,15 +40,16 @@ public class DtnController {
         if (!download) return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(Map.of(
             "entries",entries,"nextSequence",entries.isEmpty()?after:entries.getLast().getSequence(),"hasMore",entries.size()==500));
         var text = new StringBuilder("LNIS local processing log · ").append(scopeId).append("\n");
+        var chronological = new java.util.ArrayList<DtnLogEntry>();
         long cursor=0;
         do {
             entries=logs.read(scopeId,cursor);
-            for(var e:entries) {
-                text.append(e.getOccurredAt()).append(" [").append(e.getLevel()).append("] [")
-                    .append(e.getStage()).append("] ").append(e.getMessage()).append("\n");
-                cursor=e.getSequence();
-            }
+            chronological.addAll(entries);
+            if (!entries.isEmpty()) cursor=entries.getLast().getSequence();
         } while(entries.size()==500);
+        chronological.sort(java.util.Comparator.comparing(DtnLogEntry::getOccurredAt).thenComparing(DtnLogEntry::getSequence));
+        for(var e:chronological) text.append(e.getOccurredAt()).append(" [").append(e.getLevel()).append("] [")
+            .append(e.getStage()).append("] ").append(e.getMessage()).append("\n");
         if(cursor==0) text.append("상세 로그 도입 전 시험 또는 기록된 처리 로그 없음\n");
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
             .header("Content-Disposition","attachment; filename=\"dtn-log-"+scopeId+".txt\"")
@@ -68,6 +69,8 @@ public class DtnController {
         private String testType = "AFS_METADATA";
         private String senderMode;
         private String receiverMode;
+        @Valid
+        private DtnModels.HdtnConfig hdtnConfig;
     }
 
     /* DTN 외부 연동 설정 조회 */
@@ -113,7 +116,12 @@ public class DtnController {
         }
 
         DtnJob dtnJob;
-        if (request.getSenderMode() != null || request.getReceiverMode() != null) {
+        if (request.getHdtnConfig() != null) {
+            String senderMode = request.getSenderMode(), receiverMode = request.getReceiverMode();
+            if (senderMode == null && receiverMode == null) { senderMode = "DTN"; receiverMode = "HDTN"; }
+            dtnJob = dtnService.create(inputId, request.getSenderAgentId(), request.getReceiverAgentId(),
+                    request.getSendUrl(), request.getTestType(), senderMode, receiverMode, request.getHdtnConfig());
+        } else if (request.getSenderMode() != null || request.getReceiverMode() != null) {
             dtnJob = dtnService.create(inputId, request.getSenderAgentId(), request.getReceiverAgentId(),
                     request.getSendUrl(), request.getTestType(), request.getSenderMode(), request.getReceiverMode());
         } else if (!"AFS_METADATA".equals(request.getTestType())) {
@@ -128,6 +136,12 @@ public class DtnController {
 
         Map<String, Object> response = summary(dtnJob);
         return new ResponseEntity<>(response, HttpStatus.ACCEPTED);
+    }
+
+    @PostMapping("/tests/{id}/cancel")
+    public ResponseEntity<Map<String, Object>> cancel(@PathVariable UUID id) throws Exception
+    {
+        return ResponseEntity.ok(summary(dtnService.cancel(id)));
     }
 
     /* DTN 시험 단건 조회 */
@@ -231,11 +245,13 @@ public class DtnController {
         result.put("testType", job.getTestType() == null ? "AFS_METADATA" : job.getTestType());
         result.put("senderMode", job.getSenderMode());
         result.put("receiverMode", job.getReceiverMode());
+        result.put("hdtnConfig", job.getHdtnConfigJson() == null ? null : objectMapper.readTree(job.getHdtnConfigJson()));
         result.put("development", Boolean.TRUE.equals(job.getDevelopment()));
         result.put("inputId", job.getInputId());
         result.put("senderAgentId", job.getSenderAgentId());
         result.put("receiverAgentId", job.getReceiverAgentId());
         result.put("state", job.getState());
+        result.put("cancelPending", Boolean.TRUE.equals(job.getCancelPending()));
         result.put("sendUrl", job.getSendUrl());
         result.put("message", job.getMessage());
         result.put("createdAt", job.getCreatedAt());

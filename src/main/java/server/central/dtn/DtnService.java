@@ -50,6 +50,8 @@ public class DtnService {
     private final InputBufferService inputBufferService;
     private final ObjectMapper objectMapper;
     private final Map<UUID, DtnChunks> chunks = new HashMap<>();
+    private final Map<UUID, Thread> tasks = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Set<UUID> cancelRequests = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private final HttpClient httpClient =
             HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10))
                     .followRedirects(HttpClient.Redirect.NEVER).build();
@@ -139,18 +141,29 @@ public class DtnService {
     public synchronized DtnJob create(UUID inputId, String sender, String receiver, String requestedUrl,
             String testType, String senderMode, String receiverMode)
     {
+        return create(inputId, sender, receiver, requestedUrl, testType, senderMode, receiverMode, null);
+    }
+
+    public synchronized DtnJob create(UUID inputId, String sender, String receiver, String requestedUrl,
+            String testType, String senderMode, String receiverMode, HdtnConfig hdtnConfig)
+    {
+        if (hdtnConfig != null && !"HDTN".equals(senderMode) && !"HDTN".equals(receiverMode))
+            throw new IllegalArgumentException("HDTN 설정은 HDTN이 포함된 전송 경로에서만 사용할 수 있습니다.");
+        String hdtnConfigJson = hdtnConfig == null ? null : objectMapper.valueToTree(hdtnConfig).toString();
         URI destination = validateStart(sender, receiver, requestedUrl, testType, senderMode, receiverMode);
         if ("IQ_SAMPLE".equals(testType)) {
             if (iq == null || inputId == null) throw new IllegalArgumentException("생성된 I/Q 파일을 선택하세요.");
             DtnJob job = newJob(sender, receiver, destination, testType, senderMode, receiverMode);
+            job.setHdtnConfigJson(hdtnConfigJson);
             job.setIqFileId(inputId);
             beginLog(job, inputId);
             update(job, "PREPARING", "I/Q 파일 무결성 확인 중");
-            Thread.ofVirtual().name("iq-prepare").start(() -> prepareIq(job, inputId, senderMode, receiverMode));
+            startTask(job.getId(), "iq-prepare", () -> prepareIq(job, inputId, senderMode, receiverMode));
             return job;
         }
         byte[] data = readInput(inputId);
         DtnJob job = newJob(sender, receiver, destination, testType, senderMode, receiverMode);
+        job.setHdtnConfigJson(hdtnConfigJson);
         job.setInputId(inputId);
         beginLog(job,inputId);
         update(job, "PREPARING", "기준 PVT 계산 및 " + testType + " 준비 중");
@@ -237,6 +250,7 @@ public class DtnService {
             transfer.setTestType(job.getTestType()); transfer.setFormat("LNIS-IQ-FILE-v1");
             transfer.setProfile("LANS-AFS-IQ-v1");
             transfer.setSenderMode(senderMode); transfer.setReceiverMode(receiverMode); transfer.setFile(file);
+            transfer.setHdtnConfig(job.getHdtnConfigJson() == null ? null : objectMapper.readValue(job.getHdtnConfigJson(), HdtnConfig.class));
             var source = iq.source(inputId, file);
             if (source != null) {
                 transfer.setMetadata(source.metadata()); transfer.setReferencePvt(List.of(source.reference()));
@@ -251,6 +265,60 @@ public class DtnService {
             }
             sendExternal(job.getId(), job.getSentJson());
         } catch (Exception error) { synchronized (this) { if (ACTIVE.contains(get(job.getId()).getState())) fail(job, error); } }
+    }
+
+    private void startTask(UUID id, String name, Runnable action)
+    {
+        Thread thread = Thread.ofVirtual().name(name).unstarted(() -> {
+            try { if (isActive(id)) action.run(); }
+            finally { tasks.remove(id, Thread.currentThread()); }
+        });
+        tasks.put(id, thread);
+        thread.start();
+    }
+
+    private synchronized boolean isActive(UUID id)
+    {
+        return !Thread.currentThread().isInterrupted() && ACTIVE.contains(get(id).getState());
+    }
+
+    /** 결과를 보존하고 대기·작업만 중지한다. 같은 ID의 반복 중지는 멱등 처리한다. */
+    public synchronized DtnJob cancel(UUID id)
+    {
+        DtnJob job = get(id);
+        if (List.of("COMPLETED", "INCONCLUSIVE").contains(job.getState())) return job;
+        if (!"CANCELLED".equals(job.getState())) {
+            job.setCancelPending(sendingNode());
+            update(job, "CANCELLED", sendingNode() ? "시험 중지 · 상대 수신 노드 중지 확인 대기" : "시험 중지");
+            chunks.remove(id);
+            Thread running = tasks.get(id);
+            if (running != null) running.interrupt();
+            List<String> agents = nodeLink == null ? List.of(job.getSenderAgentId(), job.getReceiverAgentId())
+                    : List.of(sendingNode() ? job.getSenderAgentId() : job.getReceiverAgentId());
+            for (String agent : agents) {
+                try { agentCommandService.command(agent, id, CommandType.DTN_PROCESS, Map.of("mode", "CANCEL")); }
+                catch (RuntimeException error) { trace(id, "시험 중지", false, "처리기 중지 요청 실패 · " + agent + " · " + error.getMessage()); }
+            }
+        }
+        requestCancellation(job);
+        return job;
+    }
+
+    private void requestCancellation(DtnJob job)
+    {
+        if (!sendingNode() || !Boolean.TRUE.equals(job.getCancelPending()) || !cancelRequests.add(job.getId())) return;
+        Thread.ofVirtual().name("dtn-cancel-peer").start(() -> {
+            try {
+                nodeLink.cancel(job.getId());
+                synchronized (this) {
+                    DtnJob current = get(job.getId());
+                    current.setCancelPending(false);
+                    update(current, current.getState(), "시험 중지 · 상대 수신 노드 정리 완료");
+                }
+            } catch (RuntimeException error) {
+                // 영속 대기 표시를 유지한다. 연결 복구 후 tick에서 같은 ID만 재시도한다.
+            } finally { cancelRequests.remove(job.getId()); }
+        });
     }
 
     /** 브라우저 저장소에 의존하지 않아 별도 수신 PC에서도 최근 시험을 볼 수 있다. */
@@ -287,6 +355,9 @@ public class DtnService {
         JsonNode received = objectMapper.readTree(body);
         UUID id = UUID.fromString(received.path("testId").asText());
         DtnJob job = get(id);
+        if ("CANCELLED".equals(job.getState())) throw new IllegalStateException("중지된 시험에는 수신 데이터를 적용할 수 없습니다.");
+        JsonNode adapterLogs = received.get("dtnLogsBase64");
+        ((com.fasterxml.jackson.databind.node.ObjectNode) received).remove("dtnLogsBase64");
         boolean samePayload = nodeLink == null
                 ? job.getSentJson() != null && received.equals(objectMapper.readTree(job.getSentJson()))
                 : DtnPayloadDigest.sha256(objectMapper, received).equals(job.getExpectedPayloadSha256());
@@ -314,6 +385,7 @@ public class DtnService {
             throw new IllegalArgumentException("수신 전송 경로 오류");
         job.setSenderMode(txMode);
         job.setReceiverMode(rxMode);
+        job.setHdtnConfigJson(received.hasNonNull("hdtnConfig") ? received.get("hdtnConfig").toString() : null);
         String type = received.path("testType").asText("AFS_METADATA");
         if (!List.of("AFS_METADATA", "GNSS_RAW", "IQ_SAMPLE").contains(type)) throw new IllegalArgumentException("시험 유형 오류");
         job.setTestType(type);
@@ -327,6 +399,7 @@ public class DtnService {
         job.setReceivedAt(Instant.now());
         trace(id,"JSON 접수",true,"원본 동일성 확인·저장 완료 · "+body.length+" bytes · "+type+" · "+txMode+" → "+rxMode);
         update(job, "WAITING_RECEIVER", "DTN 수신 완료 / Receiver 연결 대기");
+        if (logs != null && adapterLogs != null) logs.adapter(job.getId(), adapterLogs, job.getReceivedAt());
         return job;
     }
 
@@ -420,12 +493,11 @@ public class DtnService {
                 result.getTransfer().setReferencePvt(result.getPvt());
                 result.getTransfer().setSenderMode(job.getSenderMode());
                 result.getTransfer().setReceiverMode(job.getReceiverMode());
+                result.getTransfer().setHdtnConfig(job.getHdtnConfigJson() == null ? null : objectMapper.readValue(job.getHdtnConfigJson(), HdtnConfig.class));
                 job.setSentJson(objectMapper.writeValueAsString(result.getTransfer()));
                 update(job, "WAITING_DTN", "외부 DTN 전달 및 수신 대기");
                 String packet = job.getSentJson();
-                Thread.ofVirtual()
-                        .name("dtn-http-send")
-                        .start(() -> sendExternal(job.getId(), packet));
+                startTask(job.getId(), "dtn-http-send", () -> sendExternal(job.getId(), packet));
             } else {
                 job.setReceiverJson(objectMapper.writeValueAsString(result.getPvt()));
                 if (nodeLink != null && !nodeLink.sender()) {
@@ -478,6 +550,7 @@ public class DtnService {
     @Scheduled(fixedDelay = 3000)
     public synchronized void tick()
     {
+        for (DtnJob job : dtnRepository.findByCancelPendingTrue()) requestCancellation(job);
         for (DtnJob job : dtnRepository.findByStateIn(ACTIVE)) {
             int timeoutMinutes="IQ_SAMPLE".equals(job.getTestType()) ? 20 : 10;
             if (Instant.now().isAfter(job.getCreatedAt().plus(Duration.ofMinutes(timeoutMinutes)))) {
@@ -497,7 +570,7 @@ public class DtnService {
                 try {
                     if ("IQ_SAMPLE".equals(job.getTestType())) {
                         update(job, "CALCULATING", "수신 공유 I/Q 파일 검증 중");
-                        Thread.ofVirtual().name("iq-verify").start(() -> verifyIq(job));
+                        startTask(job.getId(), "iq-verify", () -> verifyIq(job));
                         continue;
                     }
                     update(job, "CALCULATING", "Receiver 입력 복원 및 PVT 계산 중");
@@ -517,12 +590,14 @@ public class DtnService {
     private void sendExternal(UUID id, String packet)
     {
         try {
+            if (!isActive(id)) return;
             if (sendingNode()) {
                 // 수신 DB 등록이 성공한 뒤에만 실제 본문을 외부 DTN에 전달한다.
                 trace(id,"시험 등록",true,"수신 서비스에 시험 등록 요청");
                 nodeLink.register(get(id));
                 trace(id,"시험 등록",true,"수신 서비스 시험 등록 완료");
             }
+            if (!isActive(id)) return;
             URI destination = DtnDestination.resolve(get(id).getSendUrl(), sendUrl);
             HttpRequest.Builder request =
                     HttpRequest.newBuilder(destination)
@@ -564,6 +639,7 @@ public class DtnService {
         } catch (RuntimeException unavailable) {
             return;
         }
+        if (logs != null) logs.importAdapter(job.getId(), result.getAdapterLogs());
         if (result.getReceivedAt() != null && job.getReceivedAt() == null) {
             job.setReceivedAt(result.getReceivedAt());
             update(job, "WAITING_DTN", "수신 노드 접수 완료 / PVT 계산 결과 대기");

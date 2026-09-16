@@ -11,4 +11,6 @@ public interface DtnNodeLink {
     void register(DtnJob job);
 
     DtnRemoteResult result(UUID testId);
+
+    void cancel(UUID testId);
 }

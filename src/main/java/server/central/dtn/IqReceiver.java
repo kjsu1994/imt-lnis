@@ -145,6 +145,7 @@ public class IqReceiver {
     try (var codec = new NativePvtCodec(nativeDirectory)) {
       for (var n:m.gpsLnav()) codec.navigation(n.prn(),m.week(),n.words24().stream().mapToInt(Integer::intValue).toArray());
       for (var entry:epochs.entrySet()) {
+        if (Thread.currentThread().isInterrupted()) throw new java.io.InterruptedIOException("I/Q PVT 시험 중지");
         double absolute=m.towSeconds()+entry.getKey(); int week=m.week()+(int)(absolute/604800);
         double tow=absolute%604800;
         var input = new double[entry.getValue().size()*4]; int index=0;

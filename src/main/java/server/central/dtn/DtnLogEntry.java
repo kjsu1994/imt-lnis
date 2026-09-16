@@ -31,6 +31,7 @@ public class DtnLogEntry {
 
 interface DtnLogRepository extends JpaRepository<DtnLogEntry, Long> {
     List<DtnLogEntry> findByScopeIdAndSequenceGreaterThanOrderBySequence(UUID scopeId, long sequence, Pageable page);
+    List<DtnLogEntry> findByScopeIdAndStageOrderBySequence(UUID scopeId, String stage);
     boolean existsByScopeId(UUID scopeId);
     boolean existsByScopeIdAndStage(UUID scopeId, String stage);
     long deleteByScopeTypeNotAndOccurredAtBefore(String type, Instant cutoff);

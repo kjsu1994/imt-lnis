@@ -23,6 +23,7 @@ public class NodeDtnController {
     private final NodeDtnService service;
     private final ObjectMapper mapper;
     private final Validator validator;
+    private final server.central.dtn.DtnService dtnService;
 
     @PostMapping
     public ResponseEntity<DtnRemoteResult> register(HttpServletRequest request) throws Exception
@@ -38,6 +39,16 @@ public class NodeDtnController {
             throw new IllegalArgumentException("DTN 사전 등록 필수 항목을 확인하세요.");
         }
         return new ResponseEntity<>(service.accept(registration), HttpStatus.ACCEPTED);
+    }
+
+    @PostMapping("/{testId}/cancel")
+    public ResponseEntity<DtnRemoteResult> cancel(@PathVariable UUID testId,
+            @RequestHeader(value = "Authorization", required = false) String authorization)
+    {
+        authentication.authenticate(authorization);
+        service.prepareCancellation(testId);
+        dtnService.cancel(testId);
+        return ResponseEntity.ok(service.localResult(testId));
     }
 
     @GetMapping("/{testId}")

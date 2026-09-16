@@ -13,6 +13,7 @@ let polling = false, inputMode = 'upload';
 let captureId = null, captureError = '';
 let iqJob = null;
 let iqFiles = [];
+let jobVersion = 0;
 const generatingIq = () => iqJob?.state === 'GENERATING';
 const active = () => ['PREPARING', 'WAITING_DTN', 'WAITING_RECEIVER', 'CALCULATING'].includes(job?.state);
 const locked = () => busy || active() || generatingIq();
@@ -31,6 +32,55 @@ function log(message,level='INFO') {
     $('dtn-settings-feedback').hidden = false;
     $('dtn-settings-feedback').textContent = message;
   }
+}
+const hdtnDefaults = {
+  maxNumberOfBundlesInPipeline: 50, maxSumOfBundleBytesInPipeline: 50000000,
+  enforceBundlePriority: true, neighborDepletedStorageDelaySeconds: 10,
+  maxBundleSizeBytes: 10485760, tcpclMaxSegmentSizeBytes: 200000, storageDeletionPolicy: 'DELETE_AFTER_FORWARDING'
+};
+const hdtnStorageKey = 'lnis.hdtnConfig.v1';
+const usesHdtn = () => senderMode === 'HDTN' || receiverMode === 'HDTN';
+function readHdtnConfig() {
+  const result = {};
+  for (const [key, fallback] of Object.entries(hdtnDefaults)) {
+    const input = $('hdtn-' + key), raw = input.value.trim();
+    if (typeof fallback === 'number') {
+      const value = Number(raw);
+      const min = key === 'tcpclMaxSegmentSizeBytes' ? 1400 : key === 'neighborDepletedStorageDelaySeconds' ? 0 : 1;
+      const max = key === 'tcpclMaxSegmentSizeBytes' ? 1000000 : ['maxNumberOfBundlesInPipeline', 'neighborDepletedStorageDelaySeconds'].includes(key) ? 2147483647 : Number.MAX_SAFE_INTEGER;
+      if (!raw || !Number.isSafeInteger(value) || value < min || value > max) throw new Error(key + ' 값을 확인하세요.');
+      result[key] = value;
+    } else if (typeof fallback === 'boolean') {
+      if (!['true', 'false'].includes(raw)) throw new Error('우선순위 설정을 확인하세요.');
+      result[key] = raw === 'true';
+    } else {
+      if (!/^[A-Z][A-Z0-9_]{0,63}$/.test(raw)) throw new Error('삭제 정책명을 확인하세요.');
+      result[key] = raw;
+    }
+  }
+  return result;
+}
+function initializeHdtnConfig() {
+  let saved = {};
+  try {
+    if (location.pathname?.endsWith('/clear')) localStorage.removeItem(hdtnStorageKey);
+    saved = JSON.parse(localStorage.getItem(hdtnStorageKey) || '{}') || {};
+  } catch { /* Storage may be unavailable. Defaults remain usable. */ }
+  for (const [key, fallback] of Object.entries(hdtnDefaults)) $('hdtn-' + key).value = String(saved[key] ?? fallback);
+  try { readHdtnConfig(); } catch {
+    for (const [key, fallback] of Object.entries(hdtnDefaults)) $('hdtn-' + key).value = String(fallback);
+  }
+  for (const key of Object.keys(hdtnDefaults)) $('hdtn-' + key).onchange = () => {
+    try {
+      const settings = readHdtnConfig();
+      try { localStorage.setItem(hdtnStorageKey, JSON.stringify(settings)); } catch { /* Current values still apply. */ }
+      updateHdtnControls();
+    } catch (error) { $('hdtn-config-state').textContent = error.message; }
+  };
+}
+function updateHdtnControls() {
+  for (const key of Object.keys(hdtnDefaults)) $('hdtn-' + key).disabled = locked() || !usesHdtn();
+  $('hdtn-config-state').textContent = usesHdtn() ? 'HDTN 경로 · 전송 요청에 포함' : 'DTN → DTN 경로에서는 전송하지 않습니다.';
 }
 let mainScrollY = 0;
 function showSettings(open) {
@@ -74,10 +124,13 @@ function renderPvt() {
 function updateControls() {
   updateInputSummary();
   $('dtn-settings-lock').hidden = !locked();
+  updateHdtnControls();
   const tx = agents.find(a => a.agentId === $('dtn-sender').value);
   const rx = agents.find(a => a.agentId === $('dtn-receiver').value);
   $('dtn-start').disabled = locked() || ! $('dtn-port').value || tx?.state !== 'READY';
   $('dtn-port').disabled = $('dtn-baud').disabled = locked();
+  $('dtn-cancel').disabled = busy || !(active() || job?.state === 'FAILED' || job?.cancelPending);
+  $('dtn-cancel').textContent = job?.cancelPending ? '중지 재요청' : '시험 중지';
   $('dtn-send').disabled = locked() || (selectedType === 'IQ_SAMPLE' ? iqJob?.state !== 'READY' : !inputId) || !urlValid() || tx?.state !== 'READY' || rx?.state !== 'READY';
   $('iq-generate').disabled = locked() || !config.iqEnabled || !inputId;
   $('iq-cancel').disabled = !generatingIq();
@@ -229,7 +282,7 @@ for (const button of document.querySelectorAll('.transport-mode-button')) button
     other.classList.toggle('active', other === button); other.setAttribute('aria-pressed', String(other === button));
   }
   $('dtn-transport-mode-state').textContent = senderMode + ' → ' + receiverMode + ' · 전송 요청에 포함';
-  updateInputSummary();
+  updateInputSummary(); updateHdtnControls();
 };
 async function connectPeer(save) {
   if (!$('dtn-receiver-ip').reportValidity() || !$('dtn-receiver-port').reportValidity()) return;
@@ -256,13 +309,28 @@ $('dtn-refresh').onclick = async () => {
 };
 $('dtn-send').onclick = async () => {
   if (locked() || $('dtn-send').disabled) return;
+  let hdtnConfig;
+  try { if (usesHdtn()) hdtnConfig = readHdtnConfig(); }
+  catch (error) { showSettings(true); $('hdtn-config-state').textContent = error.message; log(error.message, 'ERROR'); return; }
+  jobVersion++;
   busy = true; resetResult(); updateControls();
   try {
     job = await post('/dtn/tests', {inputId: selectedType === 'IQ_SAMPLE' ? null : inputId, iqFileId: iqJob?.id, senderAgentId: $('dtn-sender').value,
-      receiverAgentId: $('dtn-receiver').value, sendUrl: $('dtn-send-url').value.trim(), testType: selectedType, senderMode, receiverMode});
+      receiverAgentId: $('dtn-receiver').value, sendUrl: $('dtn-send-url').value.trim(), testType: selectedType, senderMode, receiverMode, ...(hdtnConfig ? {hdtnConfig} : {})});
     log('전송시험 시작 · ' + job.testId);
     renderSummary();
   } catch (e) { log('시험 시작 실패 · ' + e.message, 'ERROR'); pill('dtn-test-status', '시작 실패', 'error'); }
+  finally { busy = false; updateControls(); }
+};
+$('dtn-cancel').onclick = async () => {
+  if ($('dtn-cancel').disabled || !job?.testId) return;
+  const id = job.testId;
+  jobVersion++; busy = true; updateControls();
+  try {
+    job = await post('/dtn/tests/' + encodeURIComponent(id) + '/cancel');
+    log(job.cancelPending ? '시험 중지 · 상대 노드에 중지 요청 재시도 중' : '시험 중지 처리 완료');
+    renderSummary();
+  } catch (error) { log('시험 중지 요청 실패 · ' + error.message, 'ERROR'); }
   finally { busy = false; updateControls(); }
 };
 function renderSummary() {
@@ -307,14 +375,14 @@ async function poll() {
     const agentState = agents.map(a => a.role + ':' + a.state).join(',');
     if (agentState !== lastAgentState) { log('송·수신 처리기 상태 갱신'); lastAgentState = agentState; }
     if (job && !busy) {
-      const id = job.testId;
+      const id = job.testId, version = jobVersion;
       const next = await request('/dtn/tests/' + id);
-      if (job?.testId === id && !busy) {
+      if (job?.testId === id && !busy && version === jobVersion) {
         job = next; renderSummary();
         const key = id + ':' + next.updatedAt;
         if (next.testType !== 'IQ_SAMPLE' && (next.referenceEpochs || next.verdict) && key !== reportKey) {
           const report = await request('/dtn/tests/' + id + '/report');
-          if (job?.testId === id && !busy) {
+          if (job?.testId === id && !busy && version === jobVersion) {
             pvt = report.referencePvt || [];
             if (report.observations) view.setData(report.observations, true);
             renderPvt(); reportKey = key;
@@ -342,6 +410,7 @@ function socket() {
   ws.onclose = () => setTimeout(socket, 3000);
 }
 async function initialize() {
+  initializeHdtnConfig();
   try {
     config = await request('/dtn/config');
     if (config.iqEnabled) await loadIqFiles();

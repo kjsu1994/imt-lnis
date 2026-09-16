@@ -23,6 +23,8 @@ public final class DtnModels {
     private String testType = "AFS_METADATA";
     private String senderMode;
     private String receiverMode;
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    private HdtnConfig hdtnConfig;
     private IqFile file;
     /** I/Q tracking supplies observations; this metadata supplies GPS LNAV only. */
     private IqMetadata metadata;
@@ -34,6 +36,35 @@ public final class DtnModels {
     private String grawBase64;
     /** Display/comparison only; never used as receiver solver input. */
     private List<Pvt> referencePvt;
+  }
+
+  /** 시험별 HDTN 어댑터 설정. 실제 정책 적용은 어댑터가 담당한다. */
+  @Data @NoArgsConstructor
+  public static class HdtnConfig {
+    @jakarta.validation.constraints.NotNull
+    @jakarta.validation.constraints.Min(1)
+    private Integer maxNumberOfBundlesInPipeline;
+    @jakarta.validation.constraints.NotNull
+    @jakarta.validation.constraints.Min(1)
+    @jakarta.validation.constraints.Max(9007199254740991L)
+    private Long maxSumOfBundleBytesInPipeline;
+    @jakarta.validation.constraints.NotNull
+    private Boolean enforceBundlePriority;
+    @jakarta.validation.constraints.NotNull
+    @jakarta.validation.constraints.Min(0)
+    private Integer neighborDepletedStorageDelaySeconds;
+    @jakarta.validation.constraints.NotNull
+    @jakarta.validation.constraints.Min(1)
+    @jakarta.validation.constraints.Max(9007199254740991L)
+    private Long maxBundleSizeBytes;
+    /** 기존 여섯 항목만 보내는 클라이언트는 생략할 수 있다. */
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    @jakarta.validation.constraints.Min(1400)
+    @jakarta.validation.constraints.Max(1000000)
+    private Integer tcpclMaxSegmentSizeBytes;
+    @jakarta.validation.constraints.NotBlank
+    @jakarta.validation.constraints.Pattern(regexp = "[A-Z][A-Z0-9_]{0,63}")
+    private String storageDeletionPolicy;
   }
 
   /** A reference to a completed local shared file, never the I/Q binary body. */

@@ -68,6 +68,7 @@ public class NodeDtnService implements DtnNodeLink {
             registration.setPayloadSha256(DtnPayloadDigest.sha256(mapper, mapper.readTree(job.getSentJson())));
             DtnRemoteResult accepted = peerClient.exchange("/lnis/api/v1/node/peer/dtn/tests",
                     registration, DtnRemoteResult.class, 16 * 1024);
+            if ("CANCELLED".equals(accepted.getState())) throw new IllegalStateException("이미 중지된 수신 시험입니다.");
             if (!job.getId().equals(accepted.getTestId())) {
                 throw new IllegalStateException("수신 노드의 시험 식별자가 다릅니다.");
             }
@@ -87,6 +88,36 @@ public class NodeDtnService implements DtnNodeLink {
         return result;
     }
 
+    @Override
+    public void cancel(UUID testId)
+    {
+        if (!sender()) throw new IllegalStateException("송신 노드 전용 중지 요청입니다.");
+        DtnRemoteResult result = peerClient.exchange("/lnis/api/v1/node/peer/dtn/tests/" + testId + "/cancel",
+                java.util.Map.of(), DtnRemoteResult.class, DtnModels.MAX_JSON_BYTES);
+        if (!testId.equals(result.getTestId()) || !java.util.List.of("CANCELLED", "COMPLETED", "INCONCLUSIVE").contains(result.getState()))
+            throw new IllegalStateException("상대 노드의 중지 결과를 확인할 수 없습니다.");
+    }
+
+    /** 등록보다 먼저 중지가 도착해도 뒤늦은 등록이 시험을 다시 열지 않게 한다. */
+    @Transactional
+    public synchronized void prepareCancellation(UUID testId)
+    {
+        requireReceiver();
+        DtnJob existing = repository.findById(testId).orElse(null);
+        if (existing != null) {
+            validateParticipants(existing.getSenderAgentId(), existing.getReceiverAgentId());
+            return;
+        }
+        DtnJob job = new DtnJob();
+        job.setId(testId);
+        job.setSenderAgentId(properties.getPeerAgentId());
+        job.setReceiverAgentId(properties.getAgentId());
+        job.setState("CANCELLED");
+        job.setMessage("송신 요청으로 시험 중지 · 등록 전 중지");
+        job.setCreatedAt(Instant.now()); job.setUpdatedAt(job.getCreatedAt());
+        repository.saveAndFlush(job);
+    }
+
     /** 같은 ID와 해시의 재등록은 최초 상태를 유지한다. 변경된 내용으로 덮어쓰기는 금지한다. */
     @Transactional
     public synchronized DtnRemoteResult accept(NodeDtnRegistration registration)
@@ -100,6 +131,7 @@ public class NodeDtnService implements DtnNodeLink {
         }
         DtnJob existing = repository.findById(registration.getTestId()).orElse(null);
         if (existing != null) {
+            if ("CANCELLED".equals(existing.getState()) && existing.getExpectedPayloadSha256() == null) return view(existing);
             if (!registration.getPayloadSha256().equals(existing.getExpectedPayloadSha256())
                     || !registration.getSenderAgentId().equals(existing.getSenderAgentId())
                     || !registration.getReceiverAgentId().equals(existing.getReceiverAgentId())) {
@@ -144,6 +176,7 @@ public class NodeDtnService implements DtnNodeLink {
         result.setState(job.getState());
         result.setMessage(job.getMessage());
         result.setReceivedAt(job.getReceivedAt());
+        if (logs != null) result.setAdapterLogs(logs.adapterEntries(job.getId()));
         if (job.getFileResultJson() != null) {
             try { result.setFileResult(mapper.readTree(job.getFileResultJson())); }
             catch (java.io.IOException error) { throw new IllegalStateException("I/Q 결과 조회 실패", error); }

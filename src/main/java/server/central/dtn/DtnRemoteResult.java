@@ -12,6 +12,8 @@ import java.util.UUID;
 @Data
 @NoArgsConstructor
 public class DtnRemoteResult {
+    public record AdapterLog(Instant occurredAt, String level, String message) {}
+    private List<AdapterLog> adapterLogs;
     private UUID testId;
     private String state;
     private String message;

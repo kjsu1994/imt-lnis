@@ -923,3 +923,15 @@ body[data-page="dtn-receiver"] .receiver-adapter .adapter-url-controls { grid-te
 @media(max-width: 600px) {
   .receiver-pvt .pvt-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* Separate DTN/HDTN adapter settings. */
+.adapter-config-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 18px 0; }
+.adapter-config-panel { min-width: 0; padding: 18px; border: 1px solid var(--line); border-radius: 12px; }
+.adapter-config-panel h3 { margin: 0 0 12px; }
+.adapter-config-panel > p { color: var(--muted); font-size: 13px; }
+.adapter-config-panel > small { display: block; margin-top: 14px; line-height: 1.5; }
+.adapter-config-panel label small { font-weight: 400; line-height: 1.5; }
+.adapter-config-pending { padding: 24px 0; text-align: center; }
+@media (max-width: 900px) { .adapter-config-grid { grid-template-columns: 1fr; } }
+
+.adapter-config-help { color: var(--teal); cursor: help; }

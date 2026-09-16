@@ -50,6 +50,11 @@ class IndependentNodeIntegrationTest {
         adapter.createContext("/transfer", exchange -> {
             try (exchange) {
                 byte[] bytes = exchange.getRequestBody().readAllBytes();
+                ObjectMapper adapterMapper = new ObjectMapper();
+                var callbackBody = (com.fasterxml.jackson.databind.node.ObjectNode) adapterMapper.readTree(bytes);
+                callbackBody.put("dtnLogsBase64", java.util.Base64.getEncoder().encodeToString(
+                        "[17:12:36.538] [REST API] accepted\n[17:12:37.001] [HDTN] forwarded".getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+                bytes = adapterMapper.writeValueAsBytes(callbackBody);
                 delivered.set(bytes);
                 HttpRequest callback = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + receiverPort
                                 + "/lnis/api/v1/dtn/receive"))
@@ -93,12 +98,20 @@ class IndependentNodeIntegrationTest {
             assertTrue(preview.getFirst().isVelocityValid());
             DtnService tx = sender.getBean(DtnService.class);
             DtnService rx = receiver.getBean(DtnService.class);
+            var hdtn = mapper.readValue("""
+                    {"maxNumberOfBundlesInPipeline":50,"maxSumOfBundleBytesInPipeline":50000000,
+                    "enforceBundlePriority":true,"neighborDepletedStorageDelaySeconds":10,
+                    "maxBundleSizeBytes":10485760,"storageDeletionPolicy":"DELETE_AFTER_FORWARDING"}
+                    """, server.shared.model.DtnModels.HdtnConfig.class);
             UUID test = tx.create(input, "sender-1", "receiver-1",
-                    "http://127.0.0.1:" + adapter.getAddress().getPort() + "/transfer").getId();
+                    "http://127.0.0.1:" + adapter.getAddress().getPort() + "/transfer",
+                    "AFS_METADATA", "DTN", "HDTN", hdtn).getId();
             await(() -> "COMPLETED".equals(tx.get(test).getState()) || "FAILED".equals(tx.get(test).getState()), 40);
             assertEquals("COMPLETED", tx.get(test).getState(), tx.get(test).getMessage());
             assertEquals("PASS", mapper.readTree(tx.get(test).getComparisonJson()).path("verdict").asText());
+            assertEquals(mapper.readTree(mapper.writeValueAsBytes(hdtn)), mapper.readTree(delivered.get()).get("hdtnConfig"));
             DtnJob received = rx.get(test);
+            assertEquals(tx.get(test).getHdtnConfigJson(), received.getHdtnConfigJson());
             assertEquals("COMPLETED", received.getState(), received.getMessage());
             assertNull(received.getSentJson());
             assertNull(received.getReferenceJson());
@@ -107,11 +120,18 @@ class IndependentNodeIntegrationTest {
             assertNull(tx.get(test).getReceivedJson());
             assertNotNull(tx.get(test).getReceivedAt());
             assertArrayEquals(delivered.get(), rx.payload(test, "received").getBody());
-            assertArrayEquals(delivered.get(), tx.payload(test, "sent").getBody());
+            var transmitted = (com.fasterxml.jackson.databind.node.ObjectNode) mapper.readTree(delivered.get());
+            transmitted.remove("dtnLogsBase64");
+            assertEquals(transmitted, mapper.readTree(tx.payload(test, "sent").getBody()));
+            var senderLogs = sender.getBean(server.central.dtn.DtnLogService.class);
+            var receiverLogs = receiver.getBean(server.central.dtn.DtnLogService.class);
+            assertEquals(2, receiverLogs.adapterEntries(test).size());
+            assertEquals(receiverLogs.adapterEntries(test), senderLogs.adapterEntries(test));
             assertThrows(IllegalArgumentException.class, () -> receiver.getBean(InputBufferService.class).get(input));
             // 최초 원문을 지키고 중복 전달로 계산을 다시 시작하지 않는다.
             rx.receive("Bearer test-dtn-receive", delivered.get());
             assertEquals("COMPLETED", rx.get(test).getState());
+            assertEquals(2, receiverLogs.adapterEntries(test).size());
             com.fasterxml.jackson.databind.node.ObjectNode changed = mapper.readTree(delivered.get()).deepCopy();
             changed.put("prn", 2);
             byte[] modified = mapper.writeValueAsBytes(changed);
@@ -147,6 +167,7 @@ class IndependentNodeIntegrationTest {
             try (ConfigurableApplicationContext restarted = node("receiver", receiverPort, senderPort)) {
                 DtnService restored = restarted.getBean(DtnService.class);
                 assertEquals("COMPLETED", restored.get(test).getState());
+                assertEquals(mapper.readTree(mapper.writeValueAsBytes(hdtn)), mapper.readTree(restored.get(test).getHdtnConfigJson()));
                 assertNull(restored.get(test).getReferenceJson());
                 assertArrayEquals(delivered.get(), restored.payload(test, "received").getBody());
                 assertTrue(restarted.getBean(ActiveSessionLockRepository.class).current().isEmpty());
@@ -159,6 +180,69 @@ class IndependentNodeIntegrationTest {
         } finally {
             adapter.stop(0);
         }
+    }
+
+    @Test
+    @Timeout(120)
+    void cancellingAnUnresponsiveTransferStopsBothNodesAndRejectsLateCallbacks() throws Exception
+    {
+        int receiverPort = tcpPort(), senderPort = tcpPort();
+        var body = new java.util.concurrent.LinkedBlockingQueue<byte[]>();
+        var release = new java.util.concurrent.CountDownLatch(1);
+        HttpServer adapter = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        adapter.createContext("/transfers", exchange -> {
+            try (exchange) {
+                body.add(exchange.getRequestBody().readAllBytes());
+                try { release.await(30, java.util.concurrent.TimeUnit.SECONDS); }
+                catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
+                exchange.sendResponseHeaders(202, -1);
+            }
+        });
+        adapter.start();
+        HttpClient http = HttpClient.newHttpClient();
+        try (ConfigurableApplicationContext receiver = node("receiver", receiverPort, senderPort);
+                ConfigurableApplicationContext sender = node("sender", senderPort, receiverPort)) {
+            await(() -> ready(sender, "sender-1") && ready(sender, "receiver-1"), 20);
+            DtnService tx = sender.getBean(DtnService.class), rx = receiver.getBean(DtnService.class);
+            InputBufferService inputs = sender.getBean(InputBufferService.class);
+            byte[] source = NativePvtIntegrationTest.validSample();
+            UUID input = inputs.create("cancel.graw", source.length, InputKind.GRAW_UPLOAD).inputId();
+            inputs.append(input, 0, source); inputs.complete(input);
+            String url = "http://127.0.0.1:" + adapter.getAddress().getPort();
+            UUID id = tx.create(input, "sender-1", "receiver-1", url).getId();
+            byte[] packet = body.poll(15, java.util.concurrent.TimeUnit.SECONDS);
+            assertNotNull(packet);
+            var cancel = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + senderPort
+                    + "/lnis/api/v1/dtn/tests/" + id + "/cancel")).timeout(Duration.ofSeconds(3))
+                    .POST(HttpRequest.BodyPublishers.noBody()).build();
+            assertEquals(200, http.send(cancel, HttpResponse.BodyHandlers.ofString()).statusCode());
+            assertEquals("CANCELLED", tx.get(id).getState());
+            await(() -> "CANCELLED".equals(rx.get(id).getState()) && !Boolean.TRUE.equals(tx.get(id).getCancelPending()), 10);
+            assertEquals(200, http.send(cancel, HttpResponse.BodyHandlers.ofString()).statusCode());
+            var callback = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + receiverPort + "/lnis/api/v1/dtn/receive"))
+                    .header("Authorization", "Bearer test-dtn-receive").header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofByteArray(packet)).build();
+            assertEquals(409, http.send(callback, HttpResponse.BodyHandlers.ofString()).statusCode());
+            release.countDown();
+            await(() -> ready(sender, "sender-1") && ready(sender, "receiver-1"), 10);
+            UUID next = tx.create(input, "sender-1", "receiver-1", url).getId();
+            assertNotEquals(id, next); assertNotNull(body.poll(15, java.util.concurrent.TimeUnit.SECONDS));
+            assertEquals("CANCELLED", tx.get(id).getState());
+            tx.cancel(next);
+            await(() -> !Boolean.TRUE.equals(tx.get(next).getCancelPending()), 10);
+
+            UUID early = UUID.randomUUID();
+            String peerCancel = "http://127.0.0.1:" + receiverPort + "/lnis/api/v1/node/peer/dtn/tests/" + early + "/cancel";
+            assertEquals(401, http.send(HttpRequest.newBuilder(URI.create(peerCancel))
+                    .POST(HttpRequest.BodyPublishers.noBody()).build(), HttpResponse.BodyHandlers.ofString()).statusCode());
+            assertEquals(200, http.send(HttpRequest.newBuilder(URI.create(peerCancel))
+                    .header("Authorization", "Bearer test-node-management")
+                    .POST(HttpRequest.BodyPublishers.noBody()).build(), HttpResponse.BodyHandlers.ofString()).statusCode());
+            NodeDtnRegistration registration = new NodeDtnRegistration();
+            registration.setTestId(early); registration.setSenderAgentId("sender-1"); registration.setReceiverAgentId("receiver-1");
+            registration.setProfile(server.shared.model.DtnModels.PROFILE); registration.setPayloadSha256("a".repeat(64));
+            assertEquals("CANCELLED", receiver.getBean(NodeDtnService.class).accept(registration).getState());
+        } finally { release.countDown(); adapter.stop(0); }
     }
 
     private ConfigurableApplicationContext node(String role, int port, int peerPort)

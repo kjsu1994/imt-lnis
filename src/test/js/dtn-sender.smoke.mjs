@@ -22,6 +22,10 @@ assert.ok(!html.includes('class="card dtn-comparison-card"'), 'PVT comparison mu
 assert.ok(!html.includes('id="dtn-comparison"') && !html.includes('id="dtn-report"'), 'comparison and report link are receiver-only');
 assert.ok(capturePanel.includes('id="dtn-baud"'), 'serial speed remains available in COM input');
 assert.ok(!capturePanel.includes('<details'), 'serial settings must be visible without expanding');
+for (const key of ['maxNumberOfBundlesInPipeline', 'maxSumOfBundleBytesInPipeline', 'enforceBundlePriority',
+  'neighborDepletedStorageDelaySeconds', 'maxBundleSizeBytes', 'tcpclMaxSegmentSizeBytes', 'storageDeletionPolicy']) {
+  assert.ok(html.includes('id="hdtn-' + key + '" title="' + key + ':'), 'each HDTN control explains its meaning on hover');
+}
 const source = pageSource('dtn.js');
 class Element {
   constructor() { this.value = ''; this.files = []; this.textContent = ''; this.classList = {toggle() {}}; }
@@ -33,7 +37,7 @@ const elements = new Map([...html.matchAll(/id="([^"]+)"/g)].map(([, id]) => [id
 assert.match(html, /id="dtn-development"[^>]*\bhidden\b/);
 elements.get('dtn-development').hidden = true;
 elements.get('dtn-settings-view').hidden = true;
-let loaded = null, currentJob = null, failUpload = false, starts = 0;
+let loaded = null, currentJob = null, failUpload = false, starts = 0, lastStartBody, cancels = 0;
 let healthFetch, healthCalls = 0, healthUrl;
 const intervals = [];
 const tx = {agentId: 'sender-1', role: 'SENDER', state: 'READY'}, rx = {agentId: 'receiver-1', role: 'RECEIVER', state: 'READY'};
@@ -60,7 +64,7 @@ const context = {
       defaultSendUrl: 'http://sender.default:8080', defaultReceiveUrl: 'http://receiver.default:8080'};
     else if (url.endsWith('/agents')) body = [tx, rx];
     else if (url.endsWith('/node/connection')) body = {ip: '127.0.0.1', port: 18091, editable: true};
-    else if (url.endsWith('/tests') && options.method === 'POST') { starts++; currentJob = {testId: 't1', state: 'PREPARING', updatedAt: '1'}; body = currentJob; }
+    else if (url.endsWith('/tests') && options.method === 'POST') { starts++; lastStartBody = JSON.parse(options.body); currentJob = {testId: 't1', state: 'PREPARING', updatedAt: '1'}; body = currentJob; }
     else if (url.endsWith('/tests')) body = [];
     else if (url.endsWith('/inputs?dtn=true')) {
       if (failUpload) return {ok: false, json: async () => ({message: 'bad input'})};
@@ -71,6 +75,7 @@ const context = {
     else if (url.endsWith('/inputs/capture1')) body = {complete: true};
     else if (url.endsWith('/pvt')) body = [{positionValid: true, velocityValid: true, ecefMeters: [1, 2, 3], velocityMetersPerSecond: [0, 0, 0]}];
     else if (url.endsWith('/observations')) body = observations;
+    else if (url.endsWith('/tests/t1/cancel')) { cancels++; currentJob = {...currentJob, state: 'CANCELLED', cancelPending: false}; body = currentJob; }
     else if (url.endsWith('/tests/t1')) body = currentJob;
     else if (url.endsWith('/report')) body = {referencePvt: [{week: 2400, towSeconds: 1,
       positionValid: false, velocityValid: false, ecefMeters: [999, 999, 999], velocityMetersPerSecond: [999, 999, 999]}], observations};
@@ -114,6 +119,10 @@ assert.equal(loaded, observations);
 assert.equal(elements.get('dtn-send').disabled, false);
 await elements.get('dtn-send').onclick();
 assert.equal(starts, 1);
+assert.equal(lastStartBody.hdtnConfig.maxNumberOfBundlesInPipeline, 50);
+assert.equal(lastStartBody.hdtnConfig.enforceBundlePriority, true);
+assert.equal(lastStartBody.hdtnConfig.tcpclMaxSegmentSizeBytes, 200000);
+assert.equal(elements.get('hdtn-maxBundleSizeBytes').disabled, true);
 assert.equal(elements.get('dtn-upload').disabled, true);
 await elements.get('dtn-settings-open').onclick();
 assert.equal(elements.get('dtn-settings-view').hidden, false, 'settings remain readable during transfer');
@@ -231,6 +240,78 @@ await elements.get('dtn-adapter-save').onclick();
 assert.equal(savedAddresses.get('lnis.adapter-url.dtn'), 'http://saved-adapter:8080');
 console.log('PASS: adapter address browser persistence, restore and invalid address rejection');
 
+// Settings validation, persistence and route-specific wire values.
+savedAddresses.set('lnis.hdtnConfig.v1', JSON.stringify({maxNumberOfBundlesInPipeline: 65}));
+context.initializeHdtnConfig();
+assert.equal(elements.get('hdtn-maxNumberOfBundlesInPipeline').value, '65');
+assert.equal(elements.get('hdtn-tcpclMaxSegmentSizeBytes').value, '200000', 'old saved settings gain only the new default');
+elements.get('hdtn-tcpclMaxSegmentSizeBytes').value = '300000';
+elements.get('hdtn-maxNumberOfBundlesInPipeline').value = '75';
+elements.get('hdtn-enforceBundlePriority').value = 'false';
+elements.get('hdtn-neighborDepletedStorageDelaySeconds').value = '0';
+elements.get('hdtn-maxNumberOfBundlesInPipeline').onchange();
+assert.equal(JSON.parse(savedAddresses.get('lnis.hdtnConfig.v1')).maxNumberOfBundlesInPipeline, 75);
+context.initializeHdtnConfig();
+assert.equal(elements.get('hdtn-maxNumberOfBundlesInPipeline').value, '75');
+for (const [txMode, rxMode] of [['DTN', 'HDTN'], ['HDTN', 'DTN'], ['HDTN', 'HDTN'], ['DTN', 'DTN']]) {
+  vm.runInContext(`job=null; busy=false; captureId=null; iqJob=null; inputId='input1'; selectedType='GNSS_RAW'; senderMode='${txMode}'; receiverMode='${rxMode}';`,context);
+  elements.get('dtn-send-url').value = 'http://adapter:8080';
+  context.updateControls();
+  await elements.get('dtn-send').onclick();
+  const usesHdtn = txMode === 'HDTN' || rxMode === 'HDTN';
+  assert.equal(Object.hasOwn(lastStartBody, 'hdtnConfig'), usesHdtn);
+  assert.equal(Object.hasOwn(lastStartBody, 'dtnConfig'), false);
+  if (usesHdtn) {
+    assert.equal(lastStartBody.hdtnConfig.maxNumberOfBundlesInPipeline, 75);
+    assert.equal(lastStartBody.hdtnConfig.tcpclMaxSegmentSizeBytes, 300000);
+    assert.equal(lastStartBody.hdtnConfig.enforceBundlePriority, false);
+    assert.equal(lastStartBody.hdtnConfig.neighborDepletedStorageDelaySeconds, 0);
+  }
+}
+vm.runInContext("job=null; senderMode='DTN'; receiverMode='HDTN'; updateControls();", context);
+for (const invalid of ['', '-1', '0', '1.5', '9007199254740992']) {
+  elements.get('hdtn-maxBundleSizeBytes').value = invalid;
+  const before = starts;
+  await elements.get('dtn-send').onclick();
+  assert.equal(starts, before, 'invalid setting must not start/reset a trial');
+}
+context.initializeHdtnConfig();
+for (const invalid of ['', '1399', '1000001', '1400.5']) {
+  elements.get('hdtn-tcpclMaxSegmentSizeBytes').value = invalid;
+  const before = starts;
+  await elements.get('dtn-send').onclick();
+  assert.equal(starts, before);
+}
+for (const boundary of ['1400', '1000000']) {
+  elements.get('hdtn-tcpclMaxSegmentSizeBytes').value = boundary;
+  assert.equal(context.readHdtnConfig().tcpclMaxSegmentSizeBytes, Number(boundary));
+}
+context.initializeHdtnConfig();
+console.log('PASS: HDTN defaults, custom numeric/boolean values, route omission, validation, persistence and locking');
+
+vm.runInContext("job={testId:'t1',state:'WAITING_DTN'}; busy=false; updateControls();", context);
+assert.equal(elements.get('dtn-cancel').disabled, false);
+const ordinaryFetch = context.fetch;
+let releaseOldJob;
+context.fetch = async (url, options) => {
+  if (url.endsWith('/tests/t1')) return {ok:true,json:async()=>await new Promise(resolve=>{releaseOldJob=resolve;})};
+  return ordinaryFetch(url, options);
+};
+const oldPoll = context.poll();
+while (!releaseOldJob) await new Promise(setImmediate);
+await elements.get('dtn-cancel').onclick();
+assert.equal(cancels, 1);
+releaseOldJob({testId:'t1',state:'WAITING_DTN'});
+await oldPoll;
+assert.equal(vm.runInContext('job.state',context),'CANCELLED', 'late poll cannot revive cancelled trial');
+assert.equal(elements.get('dtn-cancel').disabled,true);
+assert.equal(elements.get('dtn-upload').disabled,false);
+await elements.get('dtn-cancel').onclick(); assert.equal(cancels,1);
+vm.runInContext("job={testId:'t1',state:'FAILED'};updateControls();",context);
+assert.equal(elements.get('dtn-cancel').disabled,false,'failed sender can clean up waiting receiver');
+context.fetch = ordinaryFetch;
+console.log('PASS: trial cancellation, repeat prevention, failed trial cleanup and stale polling guard');
+
 let clearedHistoryRequests = 0;
 const cleared = vm.createContext({...context, location: {...context.location, pathname: '/lnis/dtntest/sender/clear'},
   fetch: async (url, options) => {
@@ -240,6 +321,8 @@ const cleared = vm.createContext({...context, location: {...context.location, pa
 vm.runInContext(source, cleared);
 await cleared.ready;
 assert.equal(clearedHistoryRequests, 0);
+assert.equal(savedAddresses.has('lnis.hdtnConfig.v1'), false);
+assert.equal(elements.get('hdtn-maxNumberOfBundlesInPipeline').value, '50');
 assert.equal(savedAddresses.has('lnis.adapter-url.dtn'), false);
 assert.equal(elements.get('dtn-send-url').value, 'http://sender.default:8080');
 assert.equal(vm.runInContext('job', cleared), null);

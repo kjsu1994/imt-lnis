@@ -14,7 +14,16 @@ public class DtnLogService {
     private final DtnLogRepository repository;
     private final Map<UUID,String> captureStages = new java.util.concurrent.ConcurrentHashMap<>();
     private final Map<UUID,Long> captureTimes = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private static String clean(String message) {
+        String value = String.valueOf(message).replaceAll("[\\r\\n\\t]", " ")
+            .replaceAll("(?i)Bearer\\s+[^\\s]+", "Bearer [숨김]")
+            .replaceAll("(?i)(https?://)[^/\\s]+@", "$1[숨김]@");
+        return value.substring(0,Math.min(value.length(),2000));
+    }
+
     public boolean hasStage(UUID id, String stage) { return repository.existsByScopeIdAndStage(id,stage); }
+
     public void capture(UUID id,String stage,String message) {
         long now=System.nanoTime();
         if(!Objects.equals(captureStages.put(id,stage),stage) || now-captureTimes.getOrDefault(id,0L)>10_000_000_000L) {
@@ -23,25 +32,92 @@ public class DtnLogService {
     }
 
     public boolean exists(UUID id) { return id != null && repository.existsByScopeId(id); }
+
     public List<DtnLogEntry> read(UUID id, long after) {
         if (id == null || after < 0) throw new IllegalArgumentException("로그 식별자·순번을 확인하세요.");
         return repository.findByScopeIdAndSequenceGreaterThanOrderBySequence(id, after, PageRequest.of(0, 500));
     }
+
     @Transactional(propagation=org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     public void add(UUID id, String type, String stage, boolean detail, String message) {
         add(id, type, "INFO", stage, detail, message);
     }
+
     @Transactional(propagation=org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     public void add(UUID id, String type, String level, String stage, boolean detail, String message) {
         if (id == null) return;
         repository.saveAndFlush(new DtnLogEntry(id,type,Instant.now(),level,stage,detail,clean(message)));
     }
-    private static String clean(String message) {
-        String value = String.valueOf(message).replaceAll("[\\r\\n\\t]", " ")
-            .replaceAll("(?i)Bearer\\s+[^\\s]+", "Bearer [숨김]")
-            .replaceAll("(?i)(https?://)[^/\\s]+@", "$1[숨김]@");
-        return value.substring(0,Math.min(value.length(),2000));
+
+    /** 어댑터 부가 로그만 관리 채널로 공유한다. LNIS 자체 처리 로그는 각 PC에 남긴다. */
+    public List<DtnRemoteResult.AdapterLog> adapterEntries(UUID id) {
+        return repository.findByScopeIdAndStageOrderBySequence(id,"DTN").stream()
+            .map(e -> new DtnRemoteResult.AdapterLog(e.getOccurredAt(),e.getLevel(),e.getMessage())).toList();
     }
+
+    @Transactional
+    public void importAdapter(UUID id, List<DtnRemoteResult.AdapterLog> entries) {
+        if (entries == null || entries.isEmpty() || hasStage(id,"DTN")) return;
+        for (var e:entries.stream().limit(501).toList()) {
+            if(e.occurredAt()==null || e.message()==null) continue;
+            String level=List.of("INFO","WARN","ERROR").contains(e.level())?e.level():"INFO";
+            repository.save(new DtnLogEntry(id,"TEST",e.occurredAt(),level,"DTN",true,clean(e.message())));
+        }
+    }
+
+    @Transactional
+    public void adapter(UUID id, com.fasterxml.jackson.databind.JsonNode encoded, Instant receivedAt) {
+        if (hasStage(id,"DTN")) return;
+        List<DtnRemoteResult.AdapterLog> entries;
+        try {
+            if (!encoded.isTextual() || encoded.textValue().length()>131072)
+                throw new IllegalArgumentException();
+            byte[] bytes=Base64.getDecoder().decode(encoded.textValue());
+            String text=java.nio.charset.StandardCharsets.UTF_8.newDecoder()
+                .decode(java.nio.ByteBuffer.wrap(bytes)).toString();
+            entries=parseAdapter(text,receivedAt);
+        } catch (IllegalArgumentException | java.nio.charset.CharacterCodingException error) {
+            entries=List.of(new DtnRemoteResult.AdapterLog(receivedAt,"WARN",
+                "어댑터 로그 해석 실패 · UTF-8/Base64 형식 또는 128 KiB 인코딩 제한 확인 · 시험 데이터는 정상 접수"));
+        }
+        importAdapter(id,entries);
+    }
+
+    static List<DtnRemoteResult.AdapterLog> parseAdapter(String text, Instant receivedAt) {
+        var entries=new ArrayList<DtnRemoteResult.AdapterLog>();
+        ZoneId zone=ZoneId.of("Asia/Seoul");
+        Instant anchor=receivedAt;
+        var pattern=java.util.regex.Pattern.compile("^\\[([^]]+)]\\s*(.*)$");
+        String[] lines=text.split("\\R");
+        for(String line:lines) {
+            if(line.isBlank()) continue;
+            if(entries.size()==500) {
+                entries.add(new DtnRemoteResult.AdapterLog(receivedAt,"WARN","어댑터 로그 500줄 초과 · 이후 내용은 수신 JSON 원문 참조")); break;
+            }
+            Instant at=anchor; String message=line;
+            var match=pattern.matcher(line);
+            if(match.matches()) {
+                try {
+                    String stamp=match.group(1);
+                    if(stamp.contains("T")) at=OffsetDateTime.parse(stamp).toInstant();
+                    else {
+                        LocalTime time=LocalTime.parse(stamp);
+                        at=anchor.atZone(zone).toLocalDate().atTime(time).atZone(zone).toInstant();
+                        if(at.isAfter(anchor.plusSeconds(43200))) at=at.minusSeconds(86400);
+                        if(at.isBefore(anchor.minusSeconds(43200))) at=at.plusSeconds(86400);
+                    }
+                    anchor=at; message=match.group(2);
+                } catch(java.time.DateTimeException ignored) {
+                    message="[시각 해석 불가 · 직전 시각/수신 시각 사용] "+line;
+                }
+            }
+            String level=message.matches("(?i).*\\[(ERROR|FATAL)] .*" )?"ERROR":
+                message.matches("(?i).*\\[WARN(?:ING)?] .*" )?"WARN":"INFO";
+            entries.add(new DtnRemoteResult.AdapterLog(at,level,message));
+        }
+        return entries;
+    }
+
     /** Snapshot preparation history so input expiry and reuse cannot change a past trial. */
     @Transactional
     public void copy(UUID from, UUID to, String type) {

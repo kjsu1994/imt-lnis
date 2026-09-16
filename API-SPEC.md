@@ -586,6 +586,7 @@ POST /sessions
 - `POST /lnis/api/v1/dtn/captures/{id}/stop?senderAgentId=sender-1`: 마지막 청크 전달까지 기다리는 수집 종료 명령.
 - 브라우저는 해당 수집 ID의 GNSS_STATUS/Stopped 이벤트 확인 후 기존 `POST /captures/{id}/complete`로 확정한다.
 - `POST /lnis/api/v1/dtn/tests`: 수집 완료 입력으로 기준 계산, AFS 생성 및 외부 전송을 시작한다.
+- `POST /lnis/api/v1/dtn/tests/{id}/cancel`: 송신 화면에서 시험을 중지한다. 응답은 시험 요약이며 `CANCELLED` 상태와 `cancelPending`(상대 노드 중지 확인 대기 여부)을 포함한다. 진행 중 또는 송신 실패 후 남은 수신 대기를 정리할 수 있다. 완료된 시험 결과는 변경하지 않는다.
 - `GET /lnis/api/v1/dtn/tests/{id}`: 상태 요약.
 - `GET /lnis/api/v1/dtn/tests/{id}/report`: 기준/수신 PVT, 관측 시각별 비교 JSON.
 - `GET /lnis/api/v1/dtn/inputs/{id}/observations`: 완료 GRAW의 `epochs`, `navigationCount`, `receiver`, `navigation`, `records`. 항법 메시지는 수집 순서·중복을 보존합니다. `navigation`의 항목은 `sequence`, `capturedAt`, `message`이며 `records`는 저장된 메시지 종류와 해석 필드 전체를 제공합니다. 외부 전송 JSON에 이 화면용 객체를 추가하지 않습니다.
@@ -873,6 +874,7 @@ Authorization: Bearer <LNIS_DTN_SEND_TOKEN>
 | testType | `GNSS_RAW`, `AFS_METADATA`, `IQ_SAMPLE` |
 | senderMode | `DTN` 또는 `HDTN`: 송신 측 기동 모드 |
 | receiverMode | `DTN` 또는 `HDTN`: 수신 측 기동 모드 |
+| hdtnConfig | 선택 객체. HDTN이 포함된 경로의 시험별 설정. DTN → DTN 및 기존 설정 없는 요청에서는 생략 |
 | profile | RAW/AFS: `POCKETSDR-GPS-L1CA-SPP-v1`, I/Q: `LANS-AFS-IQ-v1` |
 | format | 아래 유형별 데이터 형식 |
 | referencePvt | 송신 기준 PVT 배열. RAW/AFS는 관측 시점별, 신규 IQ_SAMPLE은 생성 시작 시점 1개. 비교용이며 수신 계산 입력이 아님 |
@@ -881,6 +883,64 @@ Authorization: Bearer <LNIS_DTN_SEND_TOKEN>
 선택값은 시험 시작 시 확정되며, 어댑터는 전송 중 UI 변경과 무관하게 이 요청값을 사용합니다.
 다음 예시의 Base64·해시는 설명용 자리표시자입니다.
 프레임 배열도 설명을 위해 한 항목만 표시했습니다. 예시를 그대로 시험 입력으로 사용하지 마세요. 현재 LNIS가 보내는 모든 필드를 보존해야 하며, 표에 없는 필드가 있어도 삭제하거나 기본값을 새로 추가하지 않습니다.
+
+#### 시험 중지와 늦은 응답 처리
+
+- 송신 화면의 **시험 중지**는 LNIS 대기·준비·계산과 상대 수신 시험을 같은 시험 ID로 중지합니다. 중지 후 이력과 기존 원문·결과 파일은 보존됩니다.
+- 상대 노드에 연결되지 않으면 송신 시험을 먼저 중지하고 `cancelPending: true`로 남깁니다. 연결 복구 시 자동 재시도하며 수동 재요청도 가능합니다. 서버 재기동 후에도 이 대기 표시를 유지합니다.
+- 관리 API `POST /lnis/api/v1/node/peer/dtn/tests/{id}/cancel`은 기존 관리 토큰으로 인증합니다. 등록보다 중지가 먼저 도착해도 같은 ID의 늦은 등록으로 시험을 다시 시작하지 않습니다.
+- 중지된 시험의 외부 callback은 HTTP 409로 거절합니다. 지연된 결과·HTTP 실패·화면 갱신은 `CANCELLED`를 진행 상태로 되돌리지 않습니다.
+- HTTP 대기와 I/Q 추적 프로세스는 중지합니다. 실행 중인 네이티브 함수는 메모리를 강제 해제하지 않으며 반환 후 후속 작업·결과 전송을 막습니다. 처리기가 READY가 된 후 다음 시험을 시작할 수 있습니다.
+- 외부 어댑터의 취소 API는 현재 규격에 없습니다. 이미 어댑터에 전달된 번들의 회수나 라우터 자체의 전송 중단은 보장하지 않습니다. I/Q 파일 생성 취소는 기존 **생성 취소** 기능을 사용합니다.
+
+#### HDTN 설정 — `hdtnConfig`
+
+송신 화면의 전송 경로 아래에는 DTN/HDTN 설정 영역이 분리되어 있습니다. 현재는 HDTN 설정만 지원하며, DTN 설정 객체는 전송하지 않습니다. 향후 DTN 설정은 `dtnConfig`, HDTN 설정은 `hdtnConfig`로 구분합니다. DTN의 전체 규격을 받기 전까지 `dtnConfig`의 입력란 및 기본값 전송은 추가하지 않습니다.
+`POST /lnis/api/v1/dtn/tests`의 `hdtnConfig`가 RAW·AFS·I/Q 모두 외부 `/transfers` JSON의 같은 이름으로 포함됩니다. `dtnConfig`는 HDTN 설정의 별칭이 아닙니다.
+설정은 시험 시작 시 확정해 DB에 저장합니다. 수신 콜백은 이 객체까지 그대로 보존해야 합니다.
+기존 클라이언트가 이 객체를 생략하면 자동으로 추가하지 않아 기존 요청 동작을 유지합니다.
+
+```json
+{
+  "hdtnConfig": {
+    "maxNumberOfBundlesInPipeline": 50,
+    "maxSumOfBundleBytesInPipeline": 50000000,
+    "enforceBundlePriority": true,
+    "neighborDepletedStorageDelaySeconds": 10,
+    "maxBundleSizeBytes": 10485760,
+    "tcpclMaxSegmentSizeBytes": 200000,
+    "storageDeletionPolicy": "DELETE_AFTER_FORWARDING"
+  }
+}
+```
+
+| 필드 | 의미 | 화면 기본값·입력 범위 |
+|---|---|---|
+| maxNumberOfBundlesInPipeline | 수신 확인 전 최대 동시 전송 번들 수 | 50 · 1~2147483647 정수 |
+| maxSumOfBundleBytesInPipeline | 동시 전송 번들의 최대 합계 용량(Bytes) | 50000000 · 1~9007199254740991 정수 |
+| enforceBundlePriority | 번들 우선순위 준수 여부 | true · JSON boolean |
+| neighborDepletedStorageDelaySeconds | 상대 저장 공간 부족 시 대기 시간(초) | 10 · 0~2147483647 정수 |
+| maxBundleSizeBytes | 번들 한 개의 최대 크기(Bytes) | 10485760 · 1~9007199254740991 정수 |
+| tcpclMaxSegmentSizeBytes | TCPCL 최대 세그먼트 크기(Bytes), 번들 전체 크기 및 IP MTU와는 별도 | 200000 · 1400~1000000 정수 |
+| storageDeletionPolicy | 어댑터가 적용할 스토리지 삭제 정책명 | DELETE_AFTER_FORWARDING · 영문 대문자로 시작하는 대문자·숫자·밑줄 1~64자 |
+
+화면은 일곱 필드를 전달합니다. 기존 여섯 필드는 필수이며, `tcpclMaxSegmentSizeBytes`는 기존 클라이언트 호환을 위해 API에서 생략할 수 있습니다. 생략하면 외부 전송 JSON에도 임의로 추가하지 않습니다. 브라우저에 저장된 기존 여섯 항목은 유지하고 새 항목만 200000으로 보충합니다. LNIS는 형식과 범위를 검증해 전달하며, 실제 번들 제한·삭제 정책의 지원 여부와 적용은 어댑터가 담당합니다. 이 설정은 LNIS 입력 파일 및 JSON 크기 제한을 변경하지 않습니다.
+HDTN → HDTN에서는 동일한 객체를 양쪽 HDTN 설정에 사용하도록 어댑터와 합의해야 합니다. 송신/수신별로 다른 HDTN 설정을 보내는 규격은 현재 포함하지 않습니다.
+
+추가 전달된 2.7 규격에 따라 TCPCL 설정 범위는 1400~1000000 Bytes입니다. HDTN 기본값은 200000, 향후 DTN(ION) 기본값은 1400입니다. DTN 설정은 계속 추가 규격 대기 상태이며 `dtnConfig`는 아직 전송하지 않습니다.
+
+#### DTN(ION) 매핑 참고 — 추가 규격 대기
+
+다음은 전달받은 어댑터 제안서의 설명이며, LNIS가 ION 엔진 동작을 검증하거나 보장한 내용은 아닙니다. 전체 DTN 규격과 어댑터 구현을 확인한 후 DTN 설정 및 툴팁에 반영합니다.
+
+- 어댑터는 공통 JSON 파라미터를 ION의 메모리·우선순위·보관 정책 등으로 변환합니다. LNIS는 `.rc` 파일을 직접 생성하지 않습니다.
+- 추가 제안서 4.4 기준으로 ION 모드에서는 `maxNumberOfBundlesInPipeline`과 `neighborDepletedStorageDelaySeconds`가 적용되지 않습니다. 4.1의 근사 제어 설명과 구분해, 해당 두 값을 ION의 엄격한 개수·대기 시간 제한으로 안내하지 않습니다.
+- 제안서는 `maxSumOfBundleBytesInPipeline`을 SDR 메모리 설정에, `maxBundleSizeBytes`를 contact 용량·페이로드 산정에, `enforceBundlePriority`를 ION 스케줄러에 매핑한다고 설명합니다. 정확한 변환식과 실제 적용 결과는 어댑터 구현에서 확인합니다.
+- `RETAIN`, `DELETE_AFTER_DELIVERY`를 보관 모드로 매핑할 때 메모리 점유와 확인 트래픽이 증가할 수 있으므로, 어댑터가 지원하는 정책과 메모리 예산을 확인해야 합니다.
+- 제안서상 ION 설정 변경 시 어댑터가 컨테이너를 재기동하며 약 2~5초의 단절·지연이 발생할 수 있습니다. 이는 해당 어댑터의 예상 동작으로, 모든 ION 구성에 대한 보장은 아닙니다. 연속 전송 중 설정 변경을 피하도록 안내합니다.
+- 새 자료에는 `senderMode: "ION"`이 나오지만 현재 LNIS 및 15절의 모드 값은 `DTN`/`HDTN`입니다. `ION` 별칭 지원 또는 모드 이름 변경은 어댑터와 합의 전까지 적용하지 않습니다.
+- 기존 합의는 DTN 설정에 `dtnConfig`, HDTN 설정에 `hdtnConfig`를 사용하는 것입니다. 새 자료의 ION 모드에서도 `hdtnConfig`를 읽는다는 설명과 차이가 있으므로 DTN 구현 전 최종 JSON 규격을 확인합니다.
+- DTN 설정은 추가 규격 대기 상태를 유지합니다. TCPCL의 ION 기본값 1400 외에 아직 확정되지 않은 변환식·기본값을 임의로 정하지 않습니다.
 
 #### 공통 PVT 필드 — GNSS_RAW / AFS_METADATA
 
@@ -1032,7 +1092,13 @@ Content-Type: application/json
 Authorization: Bearer <LNIS_DTN_RECEIVE_TOKEN>
 ```
 
-**본문은 15.2에서 접수한 JSON 전체 그대로입니다.** `testType`, 두 모드, 원본 데이터 또는 파일 메타데이터를 모두 유지합니다.
+콜백에는 선택적으로 최상위 `dtnLogsBase64`를 추가할 수 있습니다. UTF-8 텍스트 로그의 표준 Base64이며 인코딩 문자열 최대 131072자, 상세 로그 최대 500줄입니다. 이 필드 하나만 원본 동일성 비교에서 제외하고 나머지 필드·값·배열은 그대로 검증합니다. 최초 수신 원문에는 이 필드도 보관합니다. 잘못된 Base64/UTF-8 로그는 경고로 남기며 시험 데이터 접수를 막지 않습니다.
+
+각 줄은 `[17:12:36.538] [REST API] 메시지` 또는 `[2026-09-16T17:12:36.538+09:00] 메시지` 형식입니다. 날짜 없는 시각은 Asia/Seoul과 수신 날짜를 기준으로 가장 가까운 날짜(±12시간)로 추정하고 다음 줄부터 직전 로그 시각으로 자정 경계를 보정합니다. 장시간 지연·정확한 날짜 식별에는 오프셋 포함 ISO 날짜·시각을 사용하세요. 시각 없는 줄은 직전 로그 시각(첫 줄은 수신 시각)을 사용합니다. 장비 간 시계 오차는 보정하지 않습니다.
+
+LNIS는 어댑터 로그를 `[DTN]` 상세 항목으로 저장하고 관리 채널로 송신 PC에도 공유합니다. 양쪽 화면의 상세 보기 및 로그 다운로드에서 발생 시각순으로 표시합니다. 중복 콜백은 최초 로그를 유지합니다. 기존에 거절되어 저장되지 않은 콜백 로그는 복구할 수 없습니다.
+
+**위 선택적 로그 필드를 제외한 본문은 15.2에서 접수한 JSON 전체 그대로입니다.** `testType`, 두 모드, 원본 데이터 또는 파일 메타데이터를 모두 유지합니다.
 별도 외피로 감싸거나 전송 시각·결과 필드를 추가하지 않습니다. JSON 객체 키 순서와 공백은 변경 가능하지만 값·배열 순서는 유지해야 합니다.
 바이트 단위 수신 원문은 최초 접수본을 저장합니다. URL·수신 토큰은 어댑터 환경에 설정하고 JSON에 넣지 않습니다.
 

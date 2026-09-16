@@ -23,6 +23,8 @@ public final class DtnWorker {
   private String mode;
   private DtnChunks chunks;
   private long touched;
+  private Thread worker;
+  private final java.util.LinkedHashSet<UUID> cancelled = new java.util.LinkedHashSet<>();
 
   public DtnWorker(DtnProcessor processor, ObjectMapper json, AgentRole role,
       AtomicReference<AgentState> state, BiConsumer<UUID, JsonNode> output) {
@@ -31,6 +33,8 @@ public final class DtnWorker {
 
   public synchronized void accept(UUID id, JsonNode args) {
     String requested = args.path("mode").asText();
+    if ("CANCEL".equals(requested)) { cancel(id); return; }
+    if (cancelled.contains(id)) return;
     if (!(("PREPARE".equals(requested) || "PREPARE_RAW".equals(requested)) && role == AgentRole.SENDER)
         && !("RECEIVE".equals(requested) && role == AgentRole.RECEIVER))
       throw new IllegalArgumentException("DTN 작업과 Agent 역할이 다릅니다.");
@@ -47,7 +51,8 @@ public final class DtnWorker {
           Base64.getDecoder().decode(args.path("dataBase64").asText()));
       if (complete != null) {
         chunks = null;
-        Thread.ofVirtual().name("dtn-pvt").start(() -> process(id, requested, complete));
+        worker = Thread.ofVirtual().name("dtn-pvt").unstarted(() -> process(id, requested, complete));
+        worker.start();
       }
     } catch (Exception e) {
       active = null; chunks = null; state.set(AgentState.READY);
@@ -63,18 +68,38 @@ public final class DtnWorker {
     }
   }
 
+  public synchronized void cancel(UUID id) {
+    cancelled.add(id);
+    if (cancelled.size() > 256) cancelled.removeFirst();
+    if (!id.equals(active)) return;
+    if (worker != null) {
+      // 네이티브 호출의 메모리를 강제로 해제하지 않는다. 반환 후 다음 단계와 결과 전송을 막는다.
+      worker.interrupt();
+    } else {
+      active = null; chunks = null; state.set(AgentState.READY);
+    }
+  }
+
+  private synchronized void checkCancelled(UUID id) {
+    if (cancelled.contains(id) || Thread.currentThread().isInterrupted())
+      throw new java.util.concurrent.CancellationException("DTN 시험 중지");
+  }
+
   public synchronized boolean active() { return active != null; }
 
   private void process(UUID id, String requested, byte[] data) {
     try {
-      java.util.function.BiConsumer<String,String> progress=(stage,message)->output.accept(id,
-          json.createObjectNode().set("progress",json.createObjectNode().put("stage",stage).put("message",message)));
+      checkCancelled(id);
+      java.util.function.BiConsumer<String,String> progress=(stage,message)-> {
+        checkCancelled(id);
+        output.accept(id, json.createObjectNode().set("progress",json.createObjectNode().put("stage",stage).put("message",message)));
+      };
       DtnModels.AgentResult result = requested.startsWith("PREPARE") ? processor.prepare(id, data, "PREPARE_RAW".equals(requested),progress)
           : processor.receive(id, json.readValue(data, DtnModels.Transfer.class),progress);
       send(id, result);
     } catch (Exception | LinkageError e) { sendError(id, new IllegalStateException(e)); }
     finally {
-      synchronized (this) { active = null; chunks = null; state.set(AgentState.READY); }
+      synchronized (this) { if (id.equals(active)) { active = null; chunks = null; worker = null; state.set(AgentState.READY); } }
     }
   }
 
@@ -85,10 +110,12 @@ public final class DtnWorker {
   }
 
   private void send(UUID id, DtnModels.AgentResult result) {
+    synchronized (this) { if (cancelled.contains(id)) return; }
     try {
       byte[] bytes = json.writeValueAsBytes(result);
       if (bytes.length > DtnModels.MAX_JSON_BYTES) throw new IllegalArgumentException("DTN 결과 크기 초과");
       for (int offset = 0, index = 0; offset < bytes.length; offset += DtnChunks.CHUNK_BYTES, index++) {
+        synchronized (this) { if (cancelled.contains(id)) return; }
         int end = Math.min(bytes.length, offset+DtnChunks.CHUNK_BYTES);
         output.accept(id, json.createObjectNode().put("index", index).put("last", end == bytes.length)
             .put("dataBase64", Base64.getEncoder().encodeToString(Arrays.copyOfRange(bytes, offset, end))));
