@@ -158,6 +158,12 @@ class ServerResponseContractTest {
                 """;
         job.setReceivedJson("{\"referencePvt\":" + pvt + "}");
         job.setReceiverJson(pvt);
+        job.setReceivedAt(Instant.parse("2026-09-16T01:02:00Z"));
+        mvc.perform(get("/lnis/api/v1/dtn/tests"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].dtnReceived").value(true))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "\"receivedAt\":" + objectMapper.writeValueAsString(job.getReceivedAt()))));
         mvc.perform(get("/lnis/api/v1/dtn/tests/" + id + "/report"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.comparison.verdict").value("PASS"))
                 .andExpect(jsonPath("$.referencePvt[0].ecefMeters[0]").value(1));

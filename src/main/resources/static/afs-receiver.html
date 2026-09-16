@@ -1,14 +1,179 @@
 <!doctype html>
 <html lang="ko">
 <head>
+  <link rel="icon" type="image/png" href="/lnis/assets/common/logo.png?v=027ac841a3be">
     <meta charset="utf-8">
-    <meta content="width=device-width,initial-scale=1" name="viewport">
+    <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1"
+    >
+
     <title>LNIS AFS Receiver</title>
-    <link href="/lnis/assets/common/app.css?v=20260915-structure" rel="stylesheet">
+
+    <link
+            rel="stylesheet"
+            href="/lnis/assets/common/app.css?v=20260915-structure"
+    >
 </head>
-<body data-page="receiver"><header><div><span class="eyebrow">LNIS AFS VALIDATOR</span><h1>Receiver 모니터</h1><nav class="test-suite-tabs" aria-label="시험 대분류"><a class="active" href="/lnis/afstest/receiver" aria-current="page">AFS Frame 시험</a><a href="/lnis/dtntest/sender">DTN 송수신 시험</a></nav></div><nav class="role-nav" aria-label="AFS 시험 역할"><a href="/lnis/afstest/sender">Sender</a><a class="active" href="/lnis/afstest/receiver" aria-current="page">Receiver</a></nav></header>
-<main><section class="status-strip"><span class="pill warning" id="server-status">서버 연결 중</span><span class="pill" id="receiver-status">Receiver OFFLINE</span><span class="pill" id="listen-status">수신 대기</span></section>
-<div class="grid three"><section class="card stat"><span>현재 시험</span><strong id="current-test">-</strong></section><section class="card stat"><span>시험 조건</span><strong id="test-conditions">SessionStart 대기</strong></section><section class="card stat"><span>판정</span><strong id="receiver-verdict">-</strong></section></div>
-    <section class="card"><div class="card-title"><h2>수신 진행</h2><strong id="progress-label">0%</strong></div><progress id="session-progress" max="100" value="0"></progress><div class="metrics" id="metrics"></div><section class="frame-evidence hidden" id="frame-evidence"></section></section>
-<section class="card"><div class="card-title"><h2>이벤트 로그</h2><button id="clear-log">지우기</button></div><pre aria-live="polite" class="log" id="event-log"></pre><div class="downloads hidden" id="downloads"></div></section>
-</main><script defer src="/lnis/assets/afs/help.js?v=20260915-structure"></script><script src="/lnis/assets/afs/receiver.js?v=20260915-structure" type="module"></script></body></html>
+
+<body data-page="receiver">
+
+<header>
+    <div>
+        <span class="eyebrow">
+            LNIS AFS VALIDATOR
+        </span>
+
+        <h1>Receiver 모니터</h1>
+
+        <nav
+                class="test-suite-tabs"
+                aria-label="시험 대분류"
+        >
+            <a
+                    class="active"
+                    href="/lnis/afstest/receiver"
+                    aria-current="page"
+            >
+                AFS Frame 시험
+            </a>
+
+            <a href="/lnis/dtntest/sender">
+                DTN 송수신 시험
+            </a>
+        </nav>
+    </div>
+
+    <nav
+            class="role-nav"
+            aria-label="AFS 시험 역할"
+    >
+        <a href="/lnis/afstest/sender">
+            Sender
+        </a>
+
+        <a
+                class="active"
+                href="/lnis/afstest/receiver"
+                aria-current="page"
+        >
+            Receiver
+        </a>
+    </nav>
+</header>
+
+<main>
+
+    <!-- 상태 -->
+    <section class="status-strip">
+        <span
+                id="server-status"
+                class="pill warning"
+        >
+            서버 연결 중
+        </span>
+
+        <span
+                id="receiver-status"
+                class="pill"
+        >
+            Receiver OFFLINE
+        </span>
+
+        <span
+                id="listen-status"
+                class="pill"
+        >
+            수신 대기
+        </span>
+    </section>
+
+    <!-- 시험 요약 -->
+    <div class="grid three">
+
+        <section class="card stat">
+            <span>현재 시험</span>
+            <strong id="current-test">-</strong>
+        </section>
+
+        <section class="card stat">
+            <span>시험 조건</span>
+            <strong id="test-conditions">
+                SessionStart 대기
+            </strong>
+        </section>
+
+        <section class="card stat">
+            <span>판정</span>
+            <strong id="receiver-verdict">-</strong>
+        </section>
+
+    </div>
+
+    <!-- 수신 진행 -->
+    <section class="card">
+
+        <div class="card-title">
+            <h2>수신 진행</h2>
+            <strong id="progress-label">0%</strong>
+        </div>
+
+        <progress
+                id="session-progress"
+                max="100"
+                value="0"
+        ></progress>
+
+        <div
+                id="metrics"
+                class="metrics"
+        ></div>
+
+        <section
+                id="frame-evidence"
+                class="frame-evidence hidden"
+        ></section>
+
+    </section>
+
+    <!-- 이벤트 로그 -->
+    <section class="card">
+
+        <div class="card-title">
+            <h2>이벤트 로그</h2>
+
+            <button
+                    id="clear-log"
+                    type="button"
+            >
+                지우기
+            </button>
+        </div>
+
+        <pre
+                id="event-log"
+                class="log"
+                aria-live="polite"
+        ></pre>
+
+        <div
+                id="downloads"
+                class="downloads hidden"
+        ></div>
+
+    </section>
+
+</main>
+
+<script
+        defer
+        src="/lnis/assets/afs/help.js?v=20260915-structure"
+></script>
+
+<script
+        type="module"
+        src="/lnis/assets/afs/receiver.js?v=20260915-structure"
+></script>
+
+</body>
+</html>

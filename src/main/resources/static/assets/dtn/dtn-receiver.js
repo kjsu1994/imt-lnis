@@ -10,6 +10,7 @@ const payloadViewer = createPayloadViewer($('dtn-payload'), {receivedOnly: true}
 const clearScreen = location.pathname?.endsWith('/clear') === true;
 let tests = [], epochs = [], selectedId = '', renderVersion = 0, polling = false;
 let reportKey = '', lastEvent = '';
+let receivedIds = null;
 let referenceEpochs = [], comparisonEpochs = [];
 function setComparison(report = {}) {
   referenceEpochs = Array.isArray(report.referencePvt) ? report.referencePvt : [];
@@ -169,6 +170,10 @@ async function poll(force = false) {
   $('dtn-refresh').disabled = true;
   try {
     const [agents, nextTests] = await Promise.all([get('/agents'), get('/dtn/tests')]);
+    const newlyReceived = nextTests.filter(job => job.dtnReceived &&
+      (receivedIds === null ? !clearScreen : !receivedIds.has(job.testId)))
+      .sort((a, b) => (Date.parse(b.receivedAt) || 0) - (Date.parse(a.receivedAt) || 0))[0];
+    receivedIds = new Set(nextTests.filter(job => job.dtnReceived).map(job => job.testId));
     tests = nextTests;
     const connection = await get('/node/connection').catch(() => ({}));
     $('reverse-state').textContent = connection.peerOnline == null ? '미확인' : connection.peerOnline ? '연결됨' : '연결 끊김';
@@ -179,7 +184,8 @@ async function poll(force = false) {
     $('dtn-tests').replaceChildren(...(clearScreen ? [new Option('시험 선택 · 화면 초기화됨', '')] : []), ...(tests.length ? tests.map(job =>
       new Option(time(job.createdAt) + ' · ' + job.state + ' · ' + job.testId.slice(0, 8), job.testId))
       : [new Option('등록된 시험 없음', '')]));
-    if (tests.some(job => job.testId === selected)) $('dtn-tests').value = selected;
+    if (newlyReceived) $('dtn-tests').value = newlyReceived.testId;
+    else if (tests.some(job => job.testId === selected)) $('dtn-tests').value = selected;
     await renderTest(force);
     $('last-updated').textContent = '최근 확인 ' + new Date().toLocaleTimeString('ko-KR') + ' · 자동 갱신';
   } catch (error) {

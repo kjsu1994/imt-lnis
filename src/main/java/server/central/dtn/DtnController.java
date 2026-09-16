@@ -240,6 +240,7 @@ public class DtnController {
         result.put("message", job.getMessage());
         result.put("createdAt", job.getCreatedAt());
         result.put("updatedAt", job.getUpdatedAt());
+        result.put("receivedAt", job.getReceivedAt());
         result.put("dtnReceived", job.getReceivedJson() != null || job.getReceivedAt() != null);
         result.put("sentPayloadAvailable", job.getSentJson() != null);
         result.put("receivedPayloadAvailable", job.getReceivedJson() != null);

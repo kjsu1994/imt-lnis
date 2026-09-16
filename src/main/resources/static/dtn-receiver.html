@@ -1,17 +1,17 @@
 <!doctype html>
 <html lang="ko">
 <head>
+  <link rel="icon" type="image/png" href="/lnis/assets/common/logo.png?v=027ac841a3be">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>LNIS DTN Receiver</title>
   <link rel="stylesheet" href="/lnis/assets/common/app.css?v=20260915-structure">
-  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20260915-receiver-no-endpoint">
+  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20260916-header-logo">
 </head>
 <body data-page="dtn-receiver">
 <header>
   <div>
-    <span class="eyebrow">LNIS DTN VALIDATOR</span>
-    <h1>DTN 송수신 시험</h1>
+    <h1 class="dtn-brand"><img src="/lnis/assets/common/logo.png?v=027ac841a3be" alt="LNIS DTN Receiver" width="80" height="80"></h1>
     <nav class="test-suite-tabs" aria-label="시험 대분류" hidden>
       <a href="/lnis/afstest/receiver">AFS Frame 시험</a>
       <a class="active" href="/lnis/dtntest/receiver" aria-current="page">DTN 송수신 시험</a>
@@ -140,6 +140,6 @@
   </section>
   </div>
 </main>
-<script type="module" src="/lnis/assets/dtn/dtn-receiver.js?v=20260916-iq-pvt-r3"></script>
+<script type="module" src="/lnis/assets/dtn/dtn-receiver.js?v=20260916-auto-receive"></script>
 </body>
 </html>
