@@ -9,7 +9,17 @@ export function navigationCells(item, iq = false) {
     n.words.map(word => Number(word).toString(16).toUpperCase().padStart(iq ? 6 : 8, '0')).join(' ')];
 }
 
-export function observationCells(o) {
+// Display only: retain the measured pseudorange and epoch used by the PVT pipeline.
+export function transmitTime(o, receiverTowSeconds) {
+  if (!(o.trackingStatus & 1) || !Number.isFinite(receiverTowSeconds) ||
+      receiverTowSeconds < 0 || receiverTowSeconds >= 604800 ||
+      !Number.isFinite(o.pseudorangeMeters) || o.pseudorangeMeters <= 0) return '—';
+  const seconds = receiverTowSeconds - o.pseudorangeMeters / 299792458;
+  const weekOffset = Math.floor(seconds / 604800);
+  return numeric(seconds - weekOffset * 604800, 9) + (weekOffset ? ' (이전 주)' : '');
+}
+
+export function observationCells(o, receiverTowSeconds) {
   const iq = o.source === 'IQ_TRACKING';
   const gnss = constellation(o.constellationId);
   const prValid = (o.trackingStatus & 1) !== 0;
@@ -19,7 +29,8 @@ export function observationCells(o) {
     o.carrierToNoiseDbHz, o.lockTimeMilliseconds,
     iq ? '—' : [o.pseudorangeStdDev, o.carrierPhaseStdDev, o.dopplerStdDev].join(' / '),
     iq ? 'PR 유효 · 위상 상대값' : 'PR ' + (prValid ? '유효' : '무효') + ' · CP ' + (cpValid ? '유효' : '무효'),
-    o.constellationId === 0 && o.signalId === 0 && prValid ? '계산 대상' : '제외'];
+    o.constellationId === 0 && o.signalId === 0 && prValid ? '계산 대상' : '제외',
+    transmitTime(o, receiverTowSeconds)];
 }
 
 export function createObservationView(container, onSelect = () => {}) {
@@ -37,6 +48,7 @@ export function createObservationView(container, onSelect = () => {}) {
         <th>C/N₀ <small>dB-Hz</small></th><th>추적시간 <small>ms</small></th>
         <th title="수신기가 출력한 표준편차 코드. SI 단위의 표준편차가 아닙니다.">편차 코드 <small>PR / CP / DO</small></th>
         <th>측정 유효성</th><th title="GPS L1·의사거리 유효 조건. 최종 계산에서 사용한 위성 수는 PVT 결과에 표시됩니다.">PVT 입력</th>
+        <th title="관측 수신 시각 − 의사거리 / 299,792,458. 위성 시계·시스템 간 시간 보정 전 추정값이며 실제 정확도를 의미하지 않습니다. 주 경계를 넘으면 이전 주로 표시합니다.">위성 송신 시각 추정 <small>TOW(s) · 보정 전</small></th>
       </tr></thead><tbody></tbody></table></div>
     <h3 data-navigation-title>항법정보 · SFRBX</h3>
     <div class="epoch-table-viewport" tabindex="0" aria-label="GNSS 항법정보 표">
@@ -55,12 +67,12 @@ export function createObservationView(container, onSelect = () => {}) {
     body.replaceChildren();
     if (!epoch) {
       const row = document.createElement('tr'), cell = document.createElement('td');
-      row.className = 'epoch-empty-row'; cell.colSpan = 11; cell.textContent = '표시할 GNSS 관측값이 없습니다.';
+      row.className = 'epoch-empty-row'; cell.colSpan = 12; cell.textContent = '표시할 GNSS 관측값이 없습니다.';
       row.append(cell); body.append(row);
     } else {
       for (const observation of epoch.observations) {
         const row = document.createElement('tr');
-        for (const value of observationCells(observation)) {
+        for (const value of observationCells(observation, epoch.receiverTowSeconds)) {
           const cell = document.createElement('td'); cell.textContent = String(value ?? '—'); row.append(cell);
         }
         body.append(row);
