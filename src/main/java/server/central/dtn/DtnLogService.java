@@ -16,14 +16,6 @@ public class DtnLogService {
     private final Map<UUID,String> captureStages = new java.util.concurrent.ConcurrentHashMap<>();
     private final Map<UUID,Long> captureTimes = new java.util.concurrent.ConcurrentHashMap<>();
 
-    /** 콘솔 표시만 정렬한다. 잘못된 JSON은 원문을 출력하고 수신 처리를 방해하지 않는다. */
-    static String prettyBody(com.fasterxml.jackson.databind.ObjectMapper mapper, String body) {
-        try {
-            var tree=mapper.reader().with(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS).readTree(body);
-            return tree==null?body:mapper.writerWithDefaultPrettyPrinter().writeValueAsString(tree);
-        } catch(java.io.IOException error) { return body; }
-    }
-
     private static String clean(String message) {
         String value = String.valueOf(message).replaceAll("[\\r\\n\\t]", " ")
             .replaceAll("(?i)Bearer\\s+[^\\s]+", "Bearer [숨김]")

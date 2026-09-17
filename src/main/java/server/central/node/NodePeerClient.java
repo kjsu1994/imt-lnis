@@ -95,7 +95,7 @@ public class NodePeerClient {
         } catch (java.io.IOException error) {
             throw new IllegalArgumentException("관리 요청을 직렬화할 수 없습니다.", error);
         }
-        CompletableFuture<HttpResponse<byte[]>> pending = httpClient.sendAsync(builder.build(),
+        CompletableFuture<HttpResponse<byte[]>> pending = server.shared.http.LoggedHttpClient.sendAsync(httpClient, builder.build(),
                 information -> new LimitedBodySubscriber(maximumBytes));
         try {
             // 헤더 이후 본문이 멈추는 경우도 포함해 전체 조회 시간에 제한을 둔다.

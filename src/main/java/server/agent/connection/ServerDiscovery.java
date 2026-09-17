@@ -63,7 +63,7 @@ final class ServerDiscovery {
     try {
       URI endpoint = URI.create("http://" + host + ":" + port + "/lnis/api/v1/discovery");
       HttpRequest request = HttpRequest.newBuilder(endpoint).timeout(REQUEST_TIMEOUT).GET().build();
-      HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
+      HttpResponse<String> response = server.shared.http.LoggedHttpClient.send(http, request, HttpResponse.BodyHandlers.ofString());
       if (response.statusCode() != 200) {
         return null;
       }

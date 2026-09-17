@@ -621,12 +621,9 @@ public class DtnService {
                 request.header("Authorization", "Bearer " + sendToken);
             }
             trace(id,"어댑터",true,"JSON 전달 요청 · "+packet.getBytes(StandardCharsets.UTF_8).length+" bytes");
-            log.info(
-                "DTN_SEND_BODY testId={} BEGIN\n{}\nDTN_SEND_BODY END testId={}\n",id,DtnLogService.prettyBody(objectMapper,packet),id);
             long started=System.nanoTime();
             int status =
-                    httpClient
-                            .send(
+                    server.shared.http.LoggedHttpClient.send(httpClient,
                                     request.POST(HttpRequest.BodyPublishers.ofString(packet)).build(),
                                     HttpResponse.BodyHandlers.discarding())
                             .statusCode();
@@ -636,7 +633,6 @@ public class DtnService {
             }
             trace(id,"어댑터",false,"어댑터 접수 완료 · 상대 수신 완료와 구분");
         } catch (Exception e) {
-            log.warn("DTN_SEND_FAILED testId={}",id,e);
             synchronized (this) {
                 DtnJob job = get(id);
                 // callback이 먼저 도착했다면 전달 성공 상태를 뒤늦은 HTTP 오류로 되돌리지 않는다.

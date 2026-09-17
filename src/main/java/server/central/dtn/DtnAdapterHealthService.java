@@ -56,7 +56,7 @@ public class DtnAdapterHealthService {
     try {
       URI uri = URI.create(url);
       var request = HttpRequest.newBuilder(uri).timeout(timeout).GET().build();
-      var pending = client.sendAsync(request, information -> new server.central.common.LimitedBodySubscriber(16 * 1024));
+      var pending = server.shared.http.LoggedHttpClient.sendAsync(client, request, information -> new server.central.common.LimitedBodySubscriber(16 * 1024));
       return pending.copy()
           .orTimeout(timeout.toMillis(), TimeUnit.MILLISECONDS)
           .handle((response, error) -> {

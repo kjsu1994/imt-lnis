@@ -255,8 +255,6 @@ public class DtnController {
         boolean truncated=bytes.length>DtnModels.MAX_JSON_BYTES;
         if(truncated) bytes=Arrays.copyOf(bytes,DtnModels.MAX_JSON_BYTES);
         var receipt=receipts.capture(bytes,request.getContentType(),truncated);
-        log.info("DTN_RECEIVE_BODY receiptId={} testId={} bytes={} truncated={} BEGIN\n{}\nDTN_RECEIVE_BODY END receiptId={}\n",
-            receipt.getId(),receipt.getTestId(),bytes.length,truncated,DtnLogService.prettyBody(objectMapper,new String(bytes,StandardCharsets.UTF_8)),receipt.getId());
         if(truncated) {
             String message="본문 16 MiB 초과 · 앞 16 MiB만 저장됨";
             receipts.finish(receipt,"REJECTED",message);
