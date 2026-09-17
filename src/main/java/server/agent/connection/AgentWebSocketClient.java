@@ -13,8 +13,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import server.agent.config.AgentConfig;
 import server.agent.runtime.AgentRuntime;
 import server.shared.model.AgentProtocol.*;
@@ -25,8 +24,8 @@ import server.shared.model.AgentProtocol.*;
  * <p>HTTP WebSocket client는 Agent ID와 Bearer token을 handshake header에 넣는다. 연결 실패 또는 정상 종료 시 5초 뒤
  * 재접속하고, 연결 중에는 5초마다 현재 AgentState와 증가 sequence를 전송한다.
  */
+@Slf4j
 public final class AgentWebSocketClient implements WebSocket.Listener, AutoCloseable {
-  private static final Logger log = LoggerFactory.getLogger(AgentWebSocketClient.class);
   private final AgentConfig config;
   private final AgentRuntime runtime;
   private final ServerDiscovery discovery = new ServerDiscovery();
