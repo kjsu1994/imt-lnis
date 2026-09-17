@@ -622,7 +622,7 @@ public class DtnService {
             }
             trace(id,"어댑터",true,"JSON 전달 요청 · "+packet.getBytes(StandardCharsets.UTF_8).length+" bytes");
             log.info(
-                "DTN_SEND_BODY testId={} BEGIN\n{}\nDTN_SEND_BODY END testId={}",id,packet,id);
+                "DTN_SEND_BODY testId={} BEGIN\n{}\nDTN_SEND_BODY END testId={}",id,DtnLogService.prettyBody(objectMapper,packet),id);
             long started=System.nanoTime();
             int status =
                     httpClient
