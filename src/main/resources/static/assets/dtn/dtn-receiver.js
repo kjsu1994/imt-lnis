@@ -1,5 +1,5 @@
 import {requestJson} from '../common/http.js?v=20260915-structure';
-import {createDtnLog} from './dtn-log.js?v=20260915-structure';
+import {createDtnLog} from './dtn-log.js?v=20260917-console';
 import {initAdapterHealth} from './dtn-adapter-health.js?v=20260915-structure';
 import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20260917-receipts';
 import {createObservationView, numeric} from './dtn-observations.js?v=20260916-iq-pvt-r3';

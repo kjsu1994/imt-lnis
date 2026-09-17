@@ -1,6 +1,7 @@
 package server.central.dtn;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.transaction.annotation.Transactional;
@@ -9,7 +10,7 @@ import java.time.*;
 import java.util.*;
 import server.shared.model.DtnModels.Pvt;
 
-@Service @RequiredArgsConstructor
+@Service @RequiredArgsConstructor @Slf4j
 public class DtnLogService {
     private final DtnLogRepository repository;
     private final Map<UUID,String> captureStages = new java.util.concurrent.ConcurrentHashMap<>();
@@ -54,7 +55,24 @@ public class DtnLogService {
     @Transactional(propagation=org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     public void add(UUID id, String type, String level, String stage, boolean detail, String message) {
         if (id == null) return;
-        repository.saveAndFlush(new DtnLogEntry(id,type,Instant.now(),level,stage,detail,clean(message)));
+        var entry=new DtnLogEntry(id,type,Instant.now(),level,stage,detail,clean(message));
+        repository.saveAndFlush(entry);
+        console(entry);
+    }
+
+    /** 브라우저 전용 알림도 같은 노드의 콘솔에서 확인한다. DB 이력에는 중복 삽입하지 않는다. */
+    public void screen(UUID id, Instant occurredAt, String level, String message) {
+        console(new DtnLogEntry(id,"SCREEN",occurredAt,level,"화면",false,clean(message)));
+    }
+
+    private void console(DtnLogEntry entry) {
+        String format="DTN_EVENT type={} scopeId={} sequence={} occurredAt={} [{}] detail={} {}\n";
+        Object[] values={entry.getScopeType(),entry.getScopeId(),entry.getSequence(),entry.getOccurredAt(),clean(entry.getStage()),entry.isDetail(),entry.getMessage()};
+        switch(entry.getLevel()) {
+            case "ERROR" -> log.error(format,values);
+            case "WARN" -> log.warn(format,values);
+            default -> log.info(format,values);
+        }
     }
 
     /** 어댑터 부가 로그만 관리 채널로 공유한다. LNIS 자체 처리 로그는 각 PC에 남긴다. */
@@ -69,7 +87,9 @@ public class DtnLogService {
         for (var e:entries.stream().limit(501).toList()) {
             if(e.occurredAt()==null || e.message()==null) continue;
             String level=List.of("INFO","WARN","ERROR").contains(e.level())?e.level():"INFO";
-            repository.save(new DtnLogEntry(id,"TEST",e.occurredAt(),level,"DTN",true,clean(e.message())));
+            var entry=new DtnLogEntry(id,"TEST",e.occurredAt(),level,"DTN",true,clean(e.message()));
+            repository.save(entry);
+            console(entry);
         }
     }
 

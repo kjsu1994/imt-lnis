@@ -55,7 +55,14 @@ export function createDtnLog(target) {
   }
   function write(message,level='INFO') {
     if(local.at(-1)?.message===message) return;
-    local.push({occurredAt:new Date().toISOString(),level,stage:'화면',message});
+    const entry={occurredAt:new Date().toISOString(),level,stage:'화면',message};
+    local.push(entry);
+    // 전송 실패를 다시 로그로 보내면 무한 반복되므로 화면 표시만 유지한다.
+    void fetch('/lnis/api/v1/dtn/logs/screen',{
+      method:'POST',headers:{'Content-Type':'application/json'},signal:AbortSignal.timeout(5000),
+      body:JSON.stringify({scopeId:current||null,occurredAt:entry.occurredAt,
+        level:['INFO','WARN','ERROR'].includes(level)?level:'INFO',message:String(message).slice(0,2000)})
+    }).catch(()=>{});
     local=local.slice(-200);render();
   }
   toggle.onclick=()=>{detailed=!detailed;toggle.setAttribute('aria-pressed',String(detailed));render();};

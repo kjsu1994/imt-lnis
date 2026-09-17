@@ -32,3 +32,15 @@ finish({ok:true,json:async()=>({entries,nextSequence:2,hasMore:false})});await p
 assert.doesNotMatch(target.textContent,/계산 완료/,'old responses cannot replace selected history');
 assert.match(logLine(entries[0]),/\[INFO\] \[PVT\]/);
 console.log('PASS: detail toggle, incremental logs, non-destructive clear, download scope and stale response guard');
+
+let posted=[];
+globalThis.fetch=async(url,options)=>{posted.push({url,options});throw new Error('offline');};
+view.write('adapter state changed','WARN');
+await Promise.resolve();
+assert.equal(posted.length,1);
+assert.equal(posted[0].options.method,'POST');
+assert.equal(JSON.parse(posted[0].options.body).level,'WARN');
+assert.equal(JSON.parse(posted[0].options.body).scopeId,'second');
+view.write('adapter state changed','WARN');
+assert.equal(posted.length,1,'duplicate screen event is not sent twice');
+console.log('PASS: screen events forwarded once; reporting failures do not recurse');

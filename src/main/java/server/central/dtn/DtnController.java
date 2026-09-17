@@ -52,6 +52,16 @@ public class DtnController {
     }
 
 
+    public record ScreenLog(UUID scopeId, @NotNull java.time.Instant occurredAt,
+            @NotNull @jakarta.validation.constraints.Pattern(regexp="INFO|WARN|ERROR") String level,
+            @NotBlank @jakarta.validation.constraints.Size(max=2000) String message) {}
+
+    @PostMapping("/logs/screen")
+    public ResponseEntity<Void> screenLog(@Valid @RequestBody ScreenLog request) {
+        logs.screen(request.scopeId(),request.occurredAt(),request.level(),request.message());
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/logs")
     public ResponseEntity<?> logs(@RequestParam UUID scopeId, @RequestParam(defaultValue="0") long after,
             @RequestParam(defaultValue="false") boolean download) {
@@ -245,7 +255,7 @@ public class DtnController {
         boolean truncated=bytes.length>DtnModels.MAX_JSON_BYTES;
         if(truncated) bytes=Arrays.copyOf(bytes,DtnModels.MAX_JSON_BYTES);
         var receipt=receipts.capture(bytes,request.getContentType(),truncated);
-        log.info("DTN_RECEIVE_BODY receiptId={} testId={} bytes={} truncated={} BEGIN\n{}\nDTN_RECEIVE_BODY END receiptId={}",
+        log.info("DTN_RECEIVE_BODY receiptId={} testId={} bytes={} truncated={} BEGIN\n{}\nDTN_RECEIVE_BODY END receiptId={}\n",
             receipt.getId(),receipt.getTestId(),bytes.length,truncated,DtnLogService.prettyBody(objectMapper,new String(bytes,StandardCharsets.UTF_8)),receipt.getId());
         if(truncated) {
             String message="본문 16 MiB 초과 · 앞 16 MiB만 저장됨";
@@ -260,7 +270,7 @@ public class DtnController {
             String message=error instanceof JsonProcessingException ? "올바른 JSON 형식이 아닙니다." : error.getMessage();
             receipts.finish(receipt,"REJECTED",message);
             dtnService.rejectReceipt(receipt.getTestId(),message);
-            log.warn("DTN_RECEIVE_REJECTED receiptId={} testId={} reason={}",receipt.getId(),receipt.getTestId(),message);
+            log.warn("DTN_RECEIVE_REJECTED receiptId={} testId={} reason={}",receipt.getId(),receipt.getTestId(),message,error);
             if(error instanceof JsonProcessingException) throw new IllegalArgumentException(message);
             throw error;
         }

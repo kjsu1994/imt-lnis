@@ -46,6 +46,7 @@ public class NodeRoleFilter extends OncePerRequestFilter {
                 && path.startsWith("/lnis/api/v1/")
                 && !path.startsWith("/lnis/api/v1/node/peer/")
                 && !path.equals("/lnis/api/v1/dtn/receive")
+                && !("POST".equals(request.getMethod()) && path.equals("/lnis/api/v1/dtn/logs/screen"))
                 && !("DELETE".equals(request.getMethod()) && path.matches("/lnis/api/v1/dtn/iq/[0-9a-fA-F-]+"))
                 && !path.matches("/lnis/api/v1/sessions/[0-9a-fA-F-]+/cancel")) {
             response.sendError(409, "이 기능은 송신 노드 화면에서 실행하세요.");
