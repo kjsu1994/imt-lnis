@@ -1,7 +1,7 @@
 import {requestJson} from '../common/http.js?v=20260915-structure';
 import {createDtnLog} from './dtn-log.js?v=20260915-structure';
 import {initAdapterHealth} from './dtn-adapter-health.js?v=20260915-structure';
-import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20260915-structure';
+import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20260917-receipts';
 import {createObservationView, numeric} from './dtn-observations.js?v=20260916-iq-pvt-r3';
 
 const api = '/lnis/api/v1';
@@ -187,6 +187,7 @@ async function poll(force = false) {
     if (newlyReceived) $('dtn-tests').value = newlyReceived.testId;
     else if (tests.some(job => job.testId === selected)) $('dtn-tests').value = selected;
     await renderTest(force);
+    payloadViewer.setReceipts(await get('/dtn/receipts').catch(() => []));
     $('last-updated').textContent = '최근 확인 ' + new Date().toLocaleTimeString('ko-KR') + ' · 자동 갱신';
   } catch (error) {
     pill('dtn-server-status', '갱신 실패 · 재시도 중', 'error');

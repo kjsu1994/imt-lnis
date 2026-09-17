@@ -103,7 +103,15 @@ export function createPayloadViewer(container, {receivedOnly = false, sentOnly =
   if (!sentOnly && !receivedOnly) container.append(title);
   container.append(controls, status, panel);
   let job = null, original = '', generation = 0, pending = null;
-  let automaticKey = null;
+  let automaticKey = null, receipt = null, receipts = [];
+  const history = create('select');
+  history.setAttribute('aria-label','수신 원문 기록'); history.hidden=true;
+  if(receivedOnly) controls.append(history);
+  history.onchange=()=>{
+    receipt=receipts.find(e=>e.id===history.value)||null;
+    received.disabled=!receipt && !job?.receivedPayloadAvailable;
+    return show('received');
+  };
 
   function reset() {
     generation++;
@@ -121,14 +129,16 @@ export function createPayloadViewer(container, {receivedOnly = false, sentOnly =
   }
 
   async function show(direction) {
-    if (!job) return;
+    if (!job && !receipt) return;
     reset();
-    const selectedId = job.testId;
+    const selectedId = job?.testId || receipt?.testId || '식별 불가';
+    const selectedReceipt = direction==='received'?receipt:null;
+    const url = selectedReceipt ? '/lnis/api/v1/dtn/receipts/'+encodeURIComponent(selectedReceipt.id)+'/body' : payloadUrl(selectedId,direction);
     const requestGeneration = generation;
     pending = new AbortController();
     status.textContent = 'JSON 본문을 불러오는 중입니다.';
     try {
-      const response = await fetch(payloadUrl(selectedId, direction), {cache: 'no-store', signal: pending.signal});
+      const response = await fetch(url, {cache: 'no-store', signal: pending.signal});
       if (!response.ok) {
         const error = await response.json().catch(() => ({}));
         throw new Error(error.detail || error.message || ('HTTP ' + response.status));
@@ -138,8 +148,8 @@ export function createPayloadViewer(container, {receivedOnly = false, sentOnly =
       if (requestGeneration !== generation) return;
       original = body;
       text.value = original;
-      caption.textContent = (direction === 'sent' ? '송신 요청 JSON' : '최초 접수 수신 JSON') + ' · 시험 ' + selectedId;
-      download.href = payloadUrl(selectedId, direction, true);
+      caption.textContent = selectedReceipt ? '수신 기록 · '+new Date(selectedReceipt.arrivedAt).toLocaleString('ko-KR')+' · '+selectedReceipt.status+' · '+(selectedReceipt.testId || '시험 식별 불가') : (direction === 'sent' ? '송신 요청 JSON' : '최초 접수 수신 JSON') + ' · 시험 ' + selectedId;
+      download.href = selectedReceipt ? url+'?download=true' : payloadUrl(selectedId, direction, true);
       download.setAttribute('aria-disabled', 'false');
       panel.hidden = false;
       pretty.disabled = false;
@@ -150,6 +160,8 @@ export function createPayloadViewer(container, {receivedOnly = false, sentOnly =
         : direction === 'sent'
           ? '외부 DTN/HDTN에 전달할 요청 본문입니다.'
           : '접수 당시 원문 · 다운로드는 원문 그대로 저장합니다.';
+      if(selectedReceipt) status.textContent=(selectedReceipt.status==='REJECTED'?'수신 검증 실패 · ':'수신 기록 · ')+selectedReceipt.message+
+        (selectedReceipt.truncated?' · 크기 제한으로 일부만 저장':'')+' · 다운로드는 원문 그대로 저장합니다.';
       pretty.onchange();
     } catch (error) {
       if (requestGeneration === generation && error.name !== 'AbortError') status.textContent = 'JSON 조회 실패: ' + error.message;
@@ -177,9 +189,26 @@ export function createPayloadViewer(container, {receivedOnly = false, sentOnly =
   close.onclick = () => { reset(); status.textContent = 'JSON 보기를 닫았습니다.'; };
 
   return {
+    setReceipts(values) {
+      if(!receivedOnly) return;
+      receipts=Array.isArray(values)?values:[];
+      const available=receipts.filter(e=>!job || e.testId===job.testId || !e.testId);
+      const options=available.map(e=>{
+        const option=create('option',new Date(e.arrivedAt).toLocaleString('ko-KR')+' · '+e.status+' · '+(e.testId||'시험 식별 불가'));
+        option.value=e.id; return option;
+      });
+      const defaultOption=create('option','시험 최초 정상 수신'); defaultOption.value='';
+      history.replaceChildren(defaultOption,...options); history.hidden=!available.length;
+      const previous=receipt;
+      receipt=available.find(e=>e.id===receipt?.id)||null;
+      if(!receipt && !job?.receivedPayloadAvailable) receipt=available.find(e=>e.testId===job?.testId)||(!job?available[0]:null);
+      history.value=receipt?.id||'';
+      received.disabled=!receipt && !job?.receivedPayloadAvailable;
+      if(receipt && (!previous || previous.id!==receipt.id || previous.status!==receipt.status)) return show('received');
+    },
     setJob(nextJob) {
       if (job?.testId !== nextJob?.testId) {
-        automaticKey = null;
+        automaticKey = null; receipt=null; history.hidden=true;
         reset();
         status.textContent = nextJob
           ? (receivedOnly ? '수신 JSON 원문 버튼으로 접수 당시 JSON을 확인하세요.' : sentOnly ? '송신 JSON 원문 버튼으로 확인하세요.' : '준비된 송신 또는 수신 JSON을 선택하세요.')
@@ -187,7 +216,7 @@ export function createPayloadViewer(container, {receivedOnly = false, sentOnly =
       }
       job = nextJob || null;
       sent.disabled = !job?.sentPayloadAvailable;
-      received.disabled = !job?.receivedPayloadAvailable;
+      received.disabled = !receipt && !job?.receivedPayloadAvailable;
       const direction = receivedOnly ? 'received' : sentOnly ? 'sent'
         : job?.sentPayloadAvailable ? 'sent' : 'received';
       const available = direction === 'sent' ? job?.sentPayloadAvailable : job?.receivedPayloadAvailable;

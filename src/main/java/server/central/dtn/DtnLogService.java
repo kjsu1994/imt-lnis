@@ -67,18 +67,30 @@ public class DtnLogService {
 
     @Transactional
     public void adapter(UUID id, com.fasterxml.jackson.databind.JsonNode encoded, Instant receivedAt) {
+        adapter(id,encoded,null,receivedAt);
+    }
+
+    @Transactional
+    public void adapter(UUID id, com.fasterxml.jackson.databind.JsonNode encoded,
+            com.fasterxml.jackson.databind.JsonNode plain, Instant receivedAt) {
         if (hasStage(id,"DTN")) return;
-        List<DtnRemoteResult.AdapterLog> entries;
-        try {
-            if (!encoded.isTextual() || encoded.textValue().length()>131072)
-                throw new IllegalArgumentException();
-            byte[] bytes=Base64.getDecoder().decode(encoded.textValue());
-            String text=java.nio.charset.StandardCharsets.UTF_8.newDecoder()
-                .decode(java.nio.ByteBuffer.wrap(bytes)).toString();
-            entries=parseAdapter(text,receivedAt);
-        } catch (IllegalArgumentException | java.nio.charset.CharacterCodingException error) {
-            entries=List.of(new DtnRemoteResult.AdapterLog(receivedAt,"WARN",
-                "어댑터 로그 해석 실패 · UTF-8/Base64 형식 또는 128 KiB 인코딩 제한 확인 · 시험 데이터는 정상 접수"));
+        var entries=new ArrayList<DtnRemoteResult.AdapterLog>();
+        for(var field:new com.fasterxml.jackson.databind.JsonNode[]{encoded,plain}) {
+            if(field==null) continue;
+            try {
+                if(!field.isTextual() || field.textValue().length()>131072) throw new IllegalArgumentException();
+                String text=field.textValue();
+                if(field==encoded) text=java.nio.charset.StandardCharsets.UTF_8.newDecoder()
+                    .decode(java.nio.ByteBuffer.wrap(Base64.getDecoder().decode(text))).toString();
+                entries.addAll(parseAdapter(text,receivedAt));
+            } catch(IllegalArgumentException | java.nio.charset.CharacterCodingException error) {
+                entries.add(new DtnRemoteResult.AdapterLog(receivedAt,"WARN",
+                    "어댑터 로그 해석 실패 · dtnLogs 문자열/dtnLogsBase64 UTF-8 형식 및 크기 확인 · 시험 데이터는 정상 접수"));
+            }
+        }
+        if(entries.size()>501) {
+            entries=new ArrayList<>(entries.subList(0,500));
+            entries.add(new DtnRemoteResult.AdapterLog(receivedAt,"WARN","어댑터 로그 500줄 초과 · 수신 JSON 원문 참조"));
         }
         importAdapter(id,entries);
     }
@@ -96,7 +108,14 @@ public class DtnLogService {
             }
             Instant at=anchor; String message=line;
             var match=pattern.matcher(line);
-            if(match.matches()) {
+            var hdtn=java.util.regex.Pattern.compile("\\b[0-9]{4}-[A-Za-z]{3}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}\\b").matcher(line);
+            if(hdtn.find()) {
+                try {
+                    at=LocalDateTime.parse(hdtn.group(),java.time.format.DateTimeFormatter.ofPattern("uuuu-MMM-dd HH:mm:ss",Locale.ENGLISH))
+                        .toInstant(ZoneOffset.UTC);
+                    anchor=at;
+                } catch(java.time.DateTimeException ignored) { message="[시각 해석 불가] "+line; }
+            } else if(match.matches()) {
                 try {
                     String stamp=match.group(1);
                     if(stamp.contains("T")) at=OffsetDateTime.parse(stamp).toInstant();
@@ -111,8 +130,8 @@ public class DtnLogService {
                     message="[시각 해석 불가 · 직전 시각/수신 시각 사용] "+line;
                 }
             }
-            String level=message.matches("(?i).*\\[(ERROR|FATAL)] .*" )?"ERROR":
-                message.matches("(?i).*\\[WARN(?:ING)?] .*" )?"WARN":"INFO";
+            String level=message.matches("(?i).*\\[\\s*(ERROR|FATAL)\\s*].*" )?"ERROR":
+                message.matches("(?i).*\\[\\s*WARN(?:ING)?\\s*].*" )?"WARN":"INFO";
             entries.add(new DtnRemoteResult.AdapterLog(at,level,message));
         }
         return entries;

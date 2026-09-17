@@ -54,6 +54,7 @@ class IndependentNodeIntegrationTest {
                 var callbackBody = (com.fasterxml.jackson.databind.node.ObjectNode) adapterMapper.readTree(bytes);
                 callbackBody.put("dtnLogsBase64", java.util.Base64.getEncoder().encodeToString(
                         "[17:12:36.538] [REST API] accepted\n[17:12:37.001] [HDTN] forwarded".getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+                callbackBody.put("dtnLogs", "node2 | [ router ][ info ]: 2026-Sep-17 02:14:10: route ready");
                 bytes = adapterMapper.writeValueAsBytes(callbackBody);
                 delivered.set(bytes);
                 HttpRequest callback = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + receiverPort
@@ -121,17 +122,17 @@ class IndependentNodeIntegrationTest {
             assertNotNull(tx.get(test).getReceivedAt());
             assertArrayEquals(delivered.get(), rx.payload(test, "received").getBody());
             var transmitted = (com.fasterxml.jackson.databind.node.ObjectNode) mapper.readTree(delivered.get());
-            transmitted.remove("dtnLogsBase64");
+            transmitted.remove(java.util.List.of("dtnLogsBase64", "dtnLogs"));
             assertEquals(transmitted, mapper.readTree(tx.payload(test, "sent").getBody()));
             var senderLogs = sender.getBean(server.central.dtn.DtnLogService.class);
             var receiverLogs = receiver.getBean(server.central.dtn.DtnLogService.class);
-            assertEquals(2, receiverLogs.adapterEntries(test).size());
+            assertEquals(3, receiverLogs.adapterEntries(test).size());
             assertEquals(receiverLogs.adapterEntries(test), senderLogs.adapterEntries(test));
             assertThrows(IllegalArgumentException.class, () -> receiver.getBean(InputBufferService.class).get(input));
             // 최초 원문을 지키고 중복 전달로 계산을 다시 시작하지 않는다.
             rx.receive("Bearer test-dtn-receive", delivered.get());
             assertEquals("COMPLETED", rx.get(test).getState());
-            assertEquals(2, receiverLogs.adapterEntries(test).size());
+            assertEquals(3, receiverLogs.adapterEntries(test).size());
             com.fasterxml.jackson.databind.node.ObjectNode changed = mapper.readTree(delivered.get()).deepCopy();
             changed.put("prn", 2);
             byte[] modified = mapper.writeValueAsBytes(changed);
@@ -243,6 +244,49 @@ class IndependentNodeIntegrationTest {
             registration.setProfile(server.shared.model.DtnModels.PROFILE); registration.setPayloadSha256("a".repeat(64));
             assertEquals("CANCELLED", receiver.getBean(NodeDtnService.class).accept(registration).getState());
         } finally { release.countDown(); adapter.stop(0); }
+    }
+
+    @Test @Timeout(90)
+    void rejectedAndUnidentifiedBodiesAreArchivedWithoutAcceptingChangedData() throws Exception {
+        int receiverPort=tcpPort(), senderPort=tcpPort();
+        UUID id=UUID.randomUUID();
+        HttpClient http=HttpClient.newHttpClient();
+        String base="http://127.0.0.1:"+receiverPort+"/lnis/api/v1/dtn";
+        byte[] malformed="not-json <script>alert(1)</script>".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        try(var receiver=node("receiver",receiverPort,senderPort); var sender=node("sender",senderPort,receiverPort)) {
+            for(var context:java.util.List.of(receiver,sender)) {
+                var job=new DtnJob(); job.setId(id); job.setState("WAITING_DTN");
+                job.setSenderAgentId("sender-1"); job.setReceiverAgentId("receiver-1");
+                job.setExpectedPayloadSha256("a".repeat(64));
+                job.setCreatedAt(java.time.Instant.now()); job.setUpdatedAt(job.getCreatedAt());
+                context.getBean(server.central.dtn.DtnRepository.class).saveAndFlush(job);
+            }
+            var request=HttpRequest.newBuilder(URI.create(base+"/receive"))
+                .header("Authorization","Bearer test-dtn-receive").header("Content-Type","application/json")
+                .POST(HttpRequest.BodyPublishers.ofString("{\"testId\":\""+id+"\",\"renamedField\":12}" )).build();
+            assertEquals(400,http.send(request,HttpResponse.BodyHandlers.ofString()).statusCode());
+            assertEquals("FAILED",receiver.getBean(DtnService.class).get(id).getState());
+            await(()->"FAILED".equals(sender.getBean(DtnService.class).get(id).getState()),12);
+            assertTrue(sender.getBean(DtnService.class).get(id).getMessage().contains("수신 검증 실패"));
+            var invalid=HttpRequest.newBuilder(URI.create(base+"/receive")).header("Authorization","Bearer test-dtn-receive")
+                .header("Content-Type","text/plain").POST(HttpRequest.BodyPublishers.ofByteArray(malformed)).build();
+            assertEquals(400,http.send(invalid,HttpResponse.BodyHandlers.ofString()).statusCode());
+            var mapper=receiver.getBean(ObjectMapper.class);
+            var list=mapper.readTree(http.send(HttpRequest.newBuilder(URI.create(base+"/receipts")).GET().build(),HttpResponse.BodyHandlers.ofString()).body());
+            assertEquals(2,list.size()); assertEquals("REJECTED",list.get(0).path("status").asText());
+            assertTrue(list.get(0).path("testId").asText("").isEmpty()); assertFalse(list.get(0).has("body"));
+            String receiptId=list.get(0).path("id").asText();
+            var raw=http.send(HttpRequest.newBuilder(URI.create(base+"/receipts/"+receiptId+"/body?download=true")).GET().build(),HttpResponse.BodyHandlers.ofByteArray());
+            assertArrayEquals(malformed,raw.body());
+            assertTrue(raw.headers().firstValue("Content-Disposition").orElseThrow().contains("attachment"));
+            assertTrue(raw.headers().firstValue("Content-Type").orElseThrow().startsWith("text/plain"));
+            assertEquals(401,http.send(HttpRequest.newBuilder(URI.create(base+"/receive"))
+                .POST(HttpRequest.BodyPublishers.ofByteArray(malformed)).build(),HttpResponse.BodyHandlers.ofString()).statusCode());
+            receiver.close();
+            try(var restarted=node("receiver",receiverPort,senderPort)) {
+                assertArrayEquals(malformed,http.send(HttpRequest.newBuilder(URI.create(base+"/receipts/"+receiptId+"/body")).GET().build(),HttpResponse.BodyHandlers.ofByteArray()).body());
+            }
+        }
     }
 
     private ConfigurableApplicationContext node(String role, int port, int peerPort)

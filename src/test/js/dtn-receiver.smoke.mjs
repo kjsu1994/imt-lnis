@@ -20,7 +20,7 @@ const context = {
   renderIqFile() {},
   createDtnLog: () => ({write() {},setContext() {},refresh() {}}),
   document: {getElementById(id) { assert.ok(elements.has(id), 'DOM missing: ' + id); return elements.get(id); }},
-  createPayloadViewer(container, options) { assert.equal(options.receivedOnly, true); return {setJob() {}}; },
+  createPayloadViewer(container, options) { assert.equal(options.receivedOnly, true); return {setJob() {},setReceipts() {}}; },
   createObservationView() { return {setData() {}, select() {}}; },
   Option: function(text, value) { this.text = text; this.value = value; },
   location: {origin: 'http://localhost:8089'}, navigator: {}, setTimeout() {}, setInterval() {},

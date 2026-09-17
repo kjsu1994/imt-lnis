@@ -1,5 +1,7 @@
 package server.central.dtn;
 
+import lombok.extern.slf4j.Slf4j;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -25,12 +27,30 @@ import java.nio.charset.StandardCharsets;
 /** DTN 담당자에게 공개하는 callback과 화면용 시험 제어 API다. */
 @RequiredArgsConstructor
 @RestController
+@Slf4j
 @RequestMapping("/lnis/api/v1/dtn")
 public class DtnController {
     private final DtnService dtnService;
     private final ObjectMapper objectMapper;
     @org.springframework.beans.factory.annotation.Autowired(required=false)
     private DtnLogService logs;
+    @org.springframework.beans.factory.annotation.Autowired
+    private DtnReceiptService receipts;
+
+    @GetMapping("/receipts")
+    public ResponseEntity<?> receipts() {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(receipts.recent());
+    }
+    @GetMapping("/receipts/{id}/body")
+    public ResponseEntity<byte[]> receiptBody(@PathVariable UUID id,
+            @RequestParam(defaultValue="false") boolean download) {
+        var receipt=receipts.get(id);
+        var headers=new HttpHeaders(); headers.setContentType(new MediaType("text","plain",StandardCharsets.UTF_8));
+        headers.setCacheControl("no-store"); headers.set("X-Content-Type-Options","nosniff");
+        if(download) headers.setContentDisposition(ContentDisposition.attachment().filename("dtn-receipt-"+id+".txt").build());
+        return new ResponseEntity<>(receipt.getBody(),headers,HttpStatus.OK);
+    }
+
 
     @GetMapping("/logs")
     public ResponseEntity<?> logs(@RequestParam UUID scopeId, @RequestParam(defaultValue="0") long after,
@@ -217,25 +237,33 @@ public class DtnController {
     }
 
     /* 외부 DTN 수신 결과 접수: 인증 후 크기와 JSON을 검증한다. */
-    @PostMapping(value = "/receive", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<Map<String, Object>> receive(HttpServletRequest request)
-            throws Exception
-    {
-        String authorization = request.getHeader("Authorization");
+    @PostMapping("/receive")
+    public ResponseEntity<Map<String, Object>> receive(HttpServletRequest request) throws Exception {
+        String authorization=request.getHeader("Authorization");
         dtnService.authenticate(authorization);
-        byte[] bytes = request.getInputStream().readNBytes(DtnModels.MAX_JSON_BYTES + 1);
-        if (bytes.length > DtnModels.MAX_JSON_BYTES) {
-            return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
-                    .body(Map.of("message", "JSON은 16 MiB 이하입니다."));
+        byte[] bytes=request.getInputStream().readNBytes(DtnModels.MAX_JSON_BYTES+1);
+        boolean truncated=bytes.length>DtnModels.MAX_JSON_BYTES;
+        if(truncated) bytes=Arrays.copyOf(bytes,DtnModels.MAX_JSON_BYTES);
+        var receipt=receipts.capture(bytes,request.getContentType(),truncated);
+        log.info("DTN_RECEIVE_BODY receiptId={} testId={} bytes={} truncated={} BEGIN\n{}\nDTN_RECEIVE_BODY END receiptId={}",
+            receipt.getId(),receipt.getTestId(),bytes.length,truncated,new String(bytes,StandardCharsets.UTF_8),receipt.getId());
+        if(truncated) {
+            String message="본문 16 MiB 초과 · 앞 16 MiB만 저장됨";
+            receipts.finish(receipt,"REJECTED",message);
+            return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(Map.of("receiptId",receipt.getId(),"message",message));
         }
-        DtnJob job;
         try {
-            job = dtnService.receive(authorization, bytes);
-        } catch (JsonProcessingException error) {
-            throw new IllegalArgumentException("올바른 DTN JSON을 보내주세요.", error);
+            DtnJob job=dtnService.receive(authorization,bytes);
+            receipts.finish(receipt,"ACCEPTED","검증 통과 · 시험 처리 접수");
+            return ResponseEntity.accepted().body(Map.of("testId",job.getId(),"accepted",true,"state",job.getState(),"receiptId",receipt.getId()));
+        } catch(Exception error) {
+            String message=error instanceof JsonProcessingException ? "올바른 JSON 형식이 아닙니다." : error.getMessage();
+            receipts.finish(receipt,"REJECTED",message);
+            dtnService.rejectReceipt(receipt.getTestId(),message);
+            log.warn("DTN_RECEIVE_REJECTED receiptId={} testId={} reason={}",receipt.getId(),receipt.getTestId(),message);
+            if(error instanceof JsonProcessingException) throw new IllegalArgumentException(message);
+            throw error;
         }
-        return ResponseEntity.accepted()
-                .body(Map.of("testId", job.getId(), "accepted", true, "state", job.getState()));
     }
 
     private Map<String, Object> summary(DtnJob job) throws Exception

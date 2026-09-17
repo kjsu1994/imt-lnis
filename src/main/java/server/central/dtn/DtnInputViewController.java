@@ -2,6 +2,7 @@ package server.central.dtn;
 
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 import server.central.input.InputBufferService;
 import server.shared.codec.GrawCodec;
@@ -9,6 +10,7 @@ import server.shared.model.DtnModels;
 import server.shared.model.DtnObservationView;
 
 /** Read-only display of an existing, validated input. Does not start a trial. */
+@Slf4j
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/lnis/api/v1/dtn/inputs")
@@ -42,7 +44,7 @@ public class DtnInputViewController {
     }
     if (calculator == null) throw new IllegalStateException("PVT 미리보기는 통합 노드 실행에서 지원됩니다.");
     var result=calculator.calculate(records);
-    if(logs!=null) logs.pvt(id,"INPUT",result,started);
+    if(logs!=null)  logs.pvt(id,"INPUT",result,started);
     return result;
     } catch(RuntimeException | java.io.IOException error) {
       if(logs!=null) logs.add(id,"INPUT","WARN","PVT",false,"미리보기 불가 · "+error.getMessage());

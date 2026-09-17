@@ -1,5 +1,7 @@
 package server.central.dtn;
 
+import lombok.extern.slf4j.Slf4j;
+
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.*;
 
@@ -40,6 +42,7 @@ import java.util.Map;
 /** 외부 REST 전달과 별도 Receiver PC의 계산을 조정하는 DTN 전용 서비스다. */
 @RequiredArgsConstructor
 @Service
+@Slf4j
 public class DtnService {
     private static final List<String> ACTIVE =
             List.of("PREPARING", "WAITING_DTN", "WAITING_RECEIVER", "CALCULATING");
@@ -353,11 +356,13 @@ public class DtnService {
             throw new IllegalArgumentException("DTN JSON 크기 초과");
         }
         JsonNode received = objectMapper.readTree(body);
+        if(received==null || !received.isObject()) throw new IllegalArgumentException("수신 본문은 JSON 객체여야 합니다.");
         UUID id = UUID.fromString(received.path("testId").asText());
         DtnJob job = get(id);
         if ("CANCELLED".equals(job.getState())) throw new IllegalStateException("중지된 시험에는 수신 데이터를 적용할 수 없습니다.");
         JsonNode adapterLogs = received.get("dtnLogsBase64");
-        ((com.fasterxml.jackson.databind.node.ObjectNode) received).remove("dtnLogsBase64");
+        JsonNode plainLogs = received.get("dtnLogs");
+        ((com.fasterxml.jackson.databind.node.ObjectNode) received).remove(java.util.List.of("dtnLogsBase64", "dtnLogs"));
         boolean samePayload = nodeLink == null
                 ? job.getSentJson() != null && received.equals(objectMapper.readTree(job.getSentJson()))
                 : DtnPayloadDigest.sha256(objectMapper, received).equals(job.getExpectedPayloadSha256());
@@ -399,8 +404,17 @@ public class DtnService {
         job.setReceivedAt(Instant.now());
         trace(id,"JSON 접수",true,"원본 동일성 확인·저장 완료 · "+body.length+" bytes · "+type+" · "+txMode+" → "+rxMode);
         update(job, "WAITING_RECEIVER", "DTN 수신 완료 / Receiver 연결 대기");
-        if (logs != null && adapterLogs != null) logs.adapter(job.getId(), adapterLogs, job.getReceivedAt());
+        if (logs != null && (adapterLogs != null || plainLogs != null))
+            logs.adapter(job.getId(), adapterLogs, plainLogs, job.getReceivedAt());
         return job;
+    }
+
+    /** 검증 실패를 대기로 남기지 않는다. 완료 결과와 처리 중인 최초 수신은 보호한다. */
+    public synchronized void rejectReceipt(UUID id, String reason) {
+        if(id==null) return;
+        DtnJob job=dtnRepository.findById(id).orElse(null);
+        if(job!=null && "WAITING_DTN".equals(job.getState()) && job.getReceivedAt()==null)
+            fail(job,new IllegalArgumentException("수신 검증 실패 · "+reason+" · 수신 원문 기록 확인 필요"));
     }
 
     /* 외부 DTN의 Bearer 토큰을 일정 시간 비교 방식으로 확인한다. */
@@ -607,6 +621,8 @@ public class DtnService {
                 request.header("Authorization", "Bearer " + sendToken);
             }
             trace(id,"어댑터",true,"JSON 전달 요청 · "+packet.getBytes(StandardCharsets.UTF_8).length+" bytes");
+            log.info(
+                "DTN_SEND_BODY testId={} BEGIN\n{}\nDTN_SEND_BODY END testId={}",id,packet,id);
             long started=System.nanoTime();
             int status =
                     httpClient

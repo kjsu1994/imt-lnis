@@ -28,6 +28,17 @@ class DtnAdapterLogTest {
         logs.adapter(UUID.randomUUID(),new TextNode("not-base64!"),Instant.now());
         verify(repository).save(argThat(e -> "WARN".equals(e.getLevel()) && "DTN".equals(e.getStage())));
     }
+    @Test void plainAdapterLogsRestoreEmbeddedUtcAndRemainDistinctFromPayload() {
+        var entries=DtnLogService.parseAdapter("node2 | [ router ][ info ]: at time 2026-Sep-17 02:14:10\nnode2 | [ egress ][ error ]: failed",
+            Instant.parse("2026-09-17T02:14:11Z"));
+        assertEquals(Instant.parse("2026-09-17T02:14:10Z"),entries.getFirst().occurredAt());
+        assertEquals(entries.getFirst().occurredAt(),entries.getLast().occurredAt());
+        assertEquals("ERROR",entries.getLast().level());
+        var repository=mock(DtnLogRepository.class);
+        var logs=new DtnLogService(repository);
+        logs.adapter(UUID.randomUUID(),null,new TextNode("node1 | sent"),Instant.now());
+        verify(repository).save(argThat(e->e.getMessage().equals("node1 | sent") && "DTN".equals(e.getStage())));
+    }
     @Test void boundsLogCount() {
         var entries=DtnLogService.parseAdapter("line\n".repeat(600),Instant.now());
         assertEquals(501,entries.size());

@@ -102,7 +102,8 @@ public final class DtnModels {
       server.shared.codec.GrawCodec.ReceiverMetadata receiver) {}
 
   /** frameBase64는 반드시 750바이트 AFS 프레임이며 관측 시각은 복원된 GRAW에 있다. */
-  @Data @NoArgsConstructor
+  @Data
+  @NoArgsConstructor
   public static class Frame {
     private int index;
     private int week;
@@ -117,7 +118,8 @@ public final class DtnModels {
   }
 
   /** T는 DTN 도착 시각이 아닌 관측 시각 및 수신기 시계 오차다. */
-  @Data @NoArgsConstructor
+  @Data
+  @NoArgsConstructor
   public static class Pvt {
     private int week;
     private double towSeconds;
@@ -131,7 +133,8 @@ public final class DtnModels {
   }
 
   /** 실행기의 독립 계산 결과와 전송 데이터. */
-  @Data @NoArgsConstructor
+  @Data
+  @NoArgsConstructor
   public static class AgentResult {
     private Transfer transfer;
     private List<Pvt> pvt;

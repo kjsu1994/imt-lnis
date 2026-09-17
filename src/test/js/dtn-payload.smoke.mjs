@@ -143,3 +143,16 @@ assert.equal(senderPanel.hidden,true);
 await senderControls.children[0].onclick();
 assert.equal(senderPanel.hidden,false);
 console.log('PASS: sender title toggle and header download');
+
+// Rejected/unidentified receipts share the existing original/pretty/download panel.
+globalThis.fetch = async () => ({ok:true,text:async()=>original,headers:{get:()=>null}});
+await receiverViewer.setJob({testId:'rejected',receivedPayloadAvailable:false});
+await receiverViewer.setReceipts([{id:'receipt-1',testId:'rejected',status:'REJECTED',message:'mismatch',arrivedAt:'2026-09-17T02:14:10Z'}]);
+assert.equal(receiverControls.children[1].disabled,false);
+assert.equal(receiverPanel.hidden,false);
+assert.match(receiverControls.children.find(e=>e.tag==='a').href,/receipts\/receipt-1\/body\?download=true$/);
+assert.equal(receiverPanel.children.find(e=>e.tag==='textarea').value,displayedJson(original,true));
+await receiverControls.children[1].onclick();
+await receiverViewer.setReceipts([{id:'receipt-1',testId:'rejected',status:'REJECTED',message:'mismatch',arrivedAt:'2026-09-17T02:14:10Z'}]);
+assert.equal(receiverPanel.hidden,true,'receipt polling preserves manual collapse');
+console.log('PASS: rejected receipts integrated into original JSON viewer');
