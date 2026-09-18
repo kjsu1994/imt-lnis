@@ -13,9 +13,29 @@ import java.util.*;
 public final class ApiLog {
     private static final ObjectMapper JSON=new ObjectMapper();
     public static final int LIMIT=16*1024*1024;
-    private static final Map<String,String> STATES=Collections.synchronizedMap(new LinkedHashMap<>(128,.75f,true) {
-        @Override protected boolean removeEldestEntry(Map.Entry<String,String> e) { return size()>2048; }
+    private static final Map<String,PollState> STATES=Collections.synchronizedMap(new LinkedHashMap<>(128,.75f,true) {
+        @Override protected boolean removeEldestEntry(Map.Entry<String,PollState> e) { return size()>2048; }
     });
+    private record PollState(String signature,long reportedAt,int suppressed) {}
+    record PollDecision(boolean changed,boolean report,int suppressed) {}
+    static PollDecision observe(String key,String signature,boolean health,long now) {
+        synchronized(STATES) {
+            var previous=STATES.get(key);
+            boolean changed=previous==null || !signature.equals(previous.signature());
+            boolean report=changed || (health && now-previous.reportedAt()>=60_000_000_000L);
+            int suppressed=previous==null?0:previous.suppressed();
+            STATES.put(key,new PollState(signature,report?now:previous.reportedAt(),report?0:suppressed+1));
+            return new PollDecision(changed,report,suppressed);
+        }
+    }
+    private static String causes(Throwable error) {
+        var names=new ArrayList<String>();
+        var seen=Collections.newSetFromMap(new IdentityHashMap<Throwable,Boolean>());
+        while(error!=null && seen.add(error) && names.size()<16) {
+            names.add(error.getClass().getSimpleName());error=error.getCause();
+        }
+        return String.join(" -> ",names);
+    }
     private ApiLog() {}
 
     public static String id(String value) {
@@ -103,18 +123,25 @@ public final class ApiLog {
                 String testId=requestTree==null?"":safe(requestTree.path("testId").asText(""));
                 if(testId.isEmpty() && responseTree!=null) testId=safe(responseTree.path("testId").asText(""));
                 long elapsed=(System.nanoTime()-started)/1_000_000;
-                String signature=status+":"+state(responseTree);
+                String cause=causes(error);
+                String signature=status+":"+state(responseTree)+":"+cause;
+                String path=address.split("\\?",2)[0];
+                boolean health="GET".equals(method) && (path.endsWith("/sender/health") || path.endsWith("/receiver/health") || path.endsWith("/dtn/adapter-health"));
+                boolean listing="GET".equals(method) && (path.endsWith("/dtn/tests") || path.endsWith("/dtn/receipts"));
                 String key=direction+":"+method+":"+address;
-                boolean changed=!signature.equals(STATES.put(key,signature));
+                var decision=observe(key,signature,health && (error!=null || status>=400),System.nanoTime());
+                boolean changed=decision.changed();
+                boolean quietHealth=health && !decision.report();
                 boolean detailed=!address.contains("/logs/screen") && (!"GET".equals(method) || status>=400 || error!=null || changed);
-                var summary=status>=500?log.atError():status>=400 || error!=null?log.atWarn():
-                    "GET".equals(method) && !changed?log.atDebug():log.atInfo();
-                summary.log("API_END direction={} requestId={} traceId={} testId={} method={} url={} status={} elapsedMs={} requestBytes={} responseBytes={} responseHeaders={}\n",
-                    direction,requestId,traceId,testId,method,address,status,elapsed,request.size(),response.size(),ApiLog.headers(headers));
-                if(detailed) log.info("API_BODY requestId={} traceId={}\nREQUEST\n{}\nRESPONSE\n{}\nAPI_BODY END requestId={}\n",
+                var summary=quietHealth?log.atDebug():status>=500?log.atError():status>=400 || error!=null?log.atWarn():
+                    "GET".equals(method) && !changed && !(health && decision.report())?log.atDebug():log.atInfo();
+                summary.log("API_END direction={} requestId={} traceId={} testId={} method={} url={} status={} elapsedMs={} requestBytes={} responseBytes={} responseHeaders={} cause={} suppressed={} itemCount={}\n",
+                    direction,requestId,traceId,testId,method,address,status,elapsed,request.size(),response.size(),ApiLog.headers(headers),cause,decision.suppressed(),responseTree!=null && responseTree.isArray()?responseTree.size():null);
+                if(detailed && (request.size()>0 || response.size()>0))
+                    (quietHealth || (listing && status<400 && error==null)?log.atDebug():log.atInfo()).log("API_BODY requestId={} traceId={}\nREQUEST\n{}\nRESPONSE\n{}\nAPI_BODY END requestId={}\n",
                     requestId,traceId,body(request),body(response),requestId);
                 // 예외 메시지는 요청 URL/자격증명을 포함할 수 있어 공통 계층에서는 유형과 위치만 남긴다.
-                if(error!=null) log.warn("API_FAILURE requestId={} type={} stack={}\n",requestId,error.getClass().getName(),Arrays.toString(error.getStackTrace()));
+                if(error!=null) log.debug("API_FAILURE requestId={} cause={} stack={}\n",requestId,cause,Arrays.toString(error.getStackTrace()));
             } catch(RuntimeException loggingError) {
                 log.warn("API_LOG_FAILURE requestId={} type={}\n",requestId,loggingError.getClass().getSimpleName());
             }

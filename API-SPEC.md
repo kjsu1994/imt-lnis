@@ -1229,3 +1229,5 @@ Authorization, Cookie, 토큰·비밀번호·secret·API key 이름의 헤더/JS
 X-LNIS-Request-ID / X-LNIS-Trace-ID 헤더로 양쪽 HTTP 호출을 연결합니다. 같은 요청 처리 중 외부로 호출하면 traceId를 이어갑니다. 별도 비동기 시험 작업은 본문의 시험 ID로도 연결해 확인합니다. API_FAILURE는 실패 종류와 호출 위치를 기록하고, 업무 로그와 수신 원문 기록은 유지합니다. 로그 목적의 전체 응답 버퍼링은 하지 않으며 기존 HTTP 취소·제한 시간·다운로드 바이트를 보존합니다.
 
 Docker 콘솔의 레벨 표시는 `[WARN]`만 굵은 노랑(ANSI 1;33), `[ERROR]`만 빨강(ANSI 31)으로 출력하고 즉시 색상을 복원합니다. 다른 레벨과 메시지 본문은 색칠하지 않습니다.
+
+목록 조회(`/dtn/tests`, `/dtn/receipts`)의 정상 응답 본문은 DEBUG에서만 출력하며 INFO에는 itemCount와 상태 변화 요약을 남깁니다. 헬스체크는 같은 상태·원인의 반복을 DEBUG로 내리고 60초마다 suppressed 건수와 함께 요약하며 변화·복구는 즉시 기록합니다. 통신 예외의 원인 유형 체인은 API_END의 cause에 표시하고 스택은 DEBUG로 기록합니다. 요청·응답이 모두 비어 있으면 API_BODY를 생략합니다. 실제 전송·수신 오류는 이 헬스체크 제한의 대상이 아닙니다.

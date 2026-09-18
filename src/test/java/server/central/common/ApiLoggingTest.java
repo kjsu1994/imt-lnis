@@ -86,6 +86,25 @@ class ApiLoggingTest {
             assertEquals(2,logs.appender.list.stream().filter(e->e.getFormattedMessage().startsWith("API_START")).count());
         }
     }
+    @Test void listBodiesStayDebugAndRepeatedHealthErrorsAreSummarized() {
+        try(var logs=new Logs()) {
+            String base="http://"+UUID.randomUUID()+"/";
+            for(String name:List.of("tests","receipts")) {
+                var call=new ApiLog.Exchange("IN","GET",base+"dtn/"+name,Map.of(),null,null);
+                byte[] data="[{\"testId\":\"OLD_HISTORY\",\"state\":\"FAILED\"}]".getBytes(StandardCharsets.UTF_8);
+                call.response.add(data,0,data.length,true);call.finish(200,Map.of(),null);
+            }
+            for(int i=0;i<3;i++) new ApiLog.Exchange("OUT","GET",base+"sender/health",Map.of(),null,null)
+                .finish(0,Map.of(),new CompletionException(new java.net.ConnectException()));
+            new ApiLog.Exchange("OUT","GET",base+"sender/health",Map.of(),null,null).finish(200,Map.of(),null);
+            assertFalse(logs.text().contains("OLD_HISTORY"));
+            assertFalse(logs.text().contains("API_BODY"));
+            assertFalse(logs.text().contains("API_FAILURE"));
+            assertEquals(1,logs.appender.list.stream().filter(e->e.getLevel()==Level.WARN).count());
+            assertTrue(logs.text().contains("ConnectException"));
+            assertTrue(logs.text().contains("suppressed=2"));
+        }
+    }
     @Test void outboundPreservesBodiesAndAuthenticationWhileLoggingSafely() throws Exception {
         var server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);
         byte[] payload="{\"testId\":\"out-trial\",\"sendToken\":\"outgoing-private\"}".getBytes(StandardCharsets.UTF_8);
@@ -122,7 +141,7 @@ class ApiLoggingTest {
             Throwable cancelled=assertThrows(RuntimeException.class,future::join);
             while(!(cancelled instanceof CancellationException) && cancelled.getCause()!=null) cancelled=cancelled.getCause();
             assertInstanceOf(CancellationException.class,cancelled);
-            assertTrue(logs.text().contains("API_FAILURE"));
+            assertTrue(logs.text().contains("CancellationException"));
         } finally {release.countDown();server.stop(0);}
     }
 
