@@ -1,10 +1,9 @@
 import {requestJson} from '../common/http.js?v=20260915-structure';
 import {createDtnLog} from './dtn-log.js?v=20260917-console';
 import {initAdapterHealth} from './dtn-adapter-health.js?v=20260915-structure';
-import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20260917-receipts';
+import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20260918-receiver-original';
 import {createObservationView, numeric} from './dtn-observations.js?v=20260916-iq-pvt-r3';
 
-const api = '/lnis/api/v1';
 const $ = id => document.getElementById(id);
 const payloadViewer = createPayloadViewer($('dtn-payload'), {receivedOnly: true});
 const clearScreen = location.pathname?.endsWith('/clear') === true;
@@ -126,15 +125,11 @@ async function renderTest(force = false) {
     setComparison();
     setEpochs([]);
     observations.setData(null);
-    $('dtn-report').hidden = true;
-    $('dtn-report').removeAttribute('href');
   }
   if (!job) return;
   const event = job.testId + ':' + job.state + ':' + job.updatedAt;
   lastEvent = event;
   if (!job.receivedEpochs) return;
-  $('dtn-report').href = api + '/dtn/tests/' + encodeURIComponent(job.testId) + '/report';
-  $('dtn-report').hidden = false;
   if (!force && reportKey === event) return;
   try {
     const report = await get('/dtn/tests/' + encodeURIComponent(job.testId) + '/report');

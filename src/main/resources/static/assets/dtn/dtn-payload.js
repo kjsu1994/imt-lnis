@@ -106,7 +106,11 @@ export function createPayloadViewer(container, {receivedOnly = false, sentOnly =
   let automaticKey = null, receipt = null, receipts = [];
   const history = create('select');
   history.setAttribute('aria-label','수신 원문 기록'); history.hidden=true;
-  if(receivedOnly) controls.append(history);
+  const historyMenu = create('details');
+  historyMenu.className = 'dtn-payload-history';
+  historyMenu.append(create('summary', '수신 기록'), history);
+  historyMenu.hidden = true;
+  if(receivedOnly) controls.append(historyMenu);
   history.onchange=()=>{
     receipt=receipts.find(e=>e.id===history.value)||null;
     received.disabled=!receipt && !job?.receivedPayloadAvailable;
@@ -159,9 +163,9 @@ export function createPayloadViewer(container, {receivedOnly = false, sentOnly =
         ? '과거 시험의 정규화된 저장본입니다.'
         : direction === 'sent'
           ? '외부 DTN/HDTN에 전달할 요청 본문입니다.'
-          : '접수 당시 원문 · 다운로드는 원문 그대로 저장합니다.';
+          : (receivedOnly ? '' : '접수 당시 원문 · 다운로드는 원문 그대로 저장합니다.');
       if(selectedReceipt) status.textContent=(selectedReceipt.status==='REJECTED'?'수신 검증 실패 · ':'수신 기록 · ')+selectedReceipt.message+
-        (selectedReceipt.truncated?' · 크기 제한으로 일부만 저장':'')+' · 다운로드는 원문 그대로 저장합니다.';
+        (selectedReceipt.truncated?' · 크기 제한으로 일부만 저장':'');
       pretty.onchange();
     } catch (error) {
       if (requestGeneration === generation && error.name !== 'AbortError') status.textContent = 'JSON 조회 실패: ' + error.message;
@@ -197,8 +201,8 @@ export function createPayloadViewer(container, {receivedOnly = false, sentOnly =
         const option=create('option',new Date(e.arrivedAt).toLocaleString('ko-KR')+' · '+e.status+' · '+(e.testId||'시험 식별 불가'));
         option.value=e.id; return option;
       });
-      const defaultOption=create('option','시험 최초 정상 수신'); defaultOption.value='';
-      history.replaceChildren(defaultOption,...options); history.hidden=!available.length;
+      const defaultOption=create('option','시험 원문'); defaultOption.value='';
+      history.replaceChildren(defaultOption,...options); history.hidden=!available.length; historyMenu.hidden=history.hidden;
       const previous=receipt;
       receipt=available.find(e=>e.id===receipt?.id)||null;
       if(!receipt && !job?.receivedPayloadAvailable) receipt=available.find(e=>e.testId===job?.testId)||(!job?available[0]:null);
@@ -208,7 +212,7 @@ export function createPayloadViewer(container, {receivedOnly = false, sentOnly =
     },
     setJob(nextJob) {
       if (job?.testId !== nextJob?.testId) {
-        automaticKey = null; receipt=null; history.hidden=true;
+        automaticKey = null; receipt=null; history.hidden=true; historyMenu.hidden=true;
         reset();
         status.textContent = nextJob
           ? (receivedOnly ? '수신 JSON 원문 버튼으로 접수 당시 JSON을 확인하세요.' : sentOnly ? '송신 JSON 원문 버튼으로 확인하세요.' : '준비된 송신 또는 수신 JSON을 선택하세요.')

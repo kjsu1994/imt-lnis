@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>LNIS DTN Receiver</title>
   <link rel="stylesheet" href="/lnis/assets/common/app.css?v=20260915-structure">
-  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20260916-header-logo">
+  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20260918-receiver-pvt">
 </head>
 <body data-page="dtn-receiver">
 <header>
@@ -18,8 +18,8 @@
     </nav>
   </div>
   <nav class="role-nav" aria-label="시험 역할">
-    <a href="/lnis/dtntest/sender">Sender</a>
-    <a class="active" href="/lnis/dtntest/receiver" aria-current="page">Receiver</a>
+    <a href="/lnis/dtntest/sender" hidden>Sender</a>
+    <a class="active" href="/lnis/dtntest/receiver" aria-current="page" hidden>Receiver</a>
   </nav>
 </header>
 <main>
@@ -93,11 +93,6 @@
   <section class="card receiver-pvt">
     <div class="card-title">
       <h2>송·수신 지구 PVT</h2>
-
-      <div class="receiver-result-links">
-        <a id="dtn-report" hidden target="_blank" rel="noopener">전체 PVT 보고서</a>
-
-      </div>
     </div>
     <div class="receiver-epoch-row">
       <label for="pvt-epoch">관측 시각</label>
@@ -140,6 +135,6 @@
   </section>
   </div>
 </main>
-<script type="module" src="/lnis/assets/dtn/dtn-receiver.js?v=20260917-console"></script>
+<script type="module" src="/lnis/assets/dtn/dtn-receiver.js?v=20260918-receiver-pvt"></script>
 </body>
 </html>

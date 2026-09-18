@@ -43,7 +43,6 @@ assert.equal(requests.filter(url => url.endsWith('/dtn/config')).length, 1, 'ada
 assert.equal(requests.some(url => url.endsWith('/node')), false, 'removed endpoint display does not request a public URL');
 assert.equal(elements.get('receive-state').textContent, '수신 대기');
 assert.match(elements.get('dtn-receiver-status').textContent, /처리 중/);
-assert.equal(elements.get('dtn-report').hidden, true);
 vm.runInContext("renderSummary({testType:'IQ_SAMPLE',state:'COMPLETED'})",context);
 assert.equal(elements.get('receiver-type').textContent,'I/Q Sample');
 assert.ok(!html.includes('class="test-type-selector"') && !html.includes('class="transport-mode-selector"'), 'receiver displays only the received selection, without option buttons');
@@ -102,7 +101,6 @@ await context.renderTest();
 assert.equal(elements.get('pvt-satellites').textContent, '-');
 assert.equal(elements.get('reference-x').textContent, '-');
 assert.equal(elements.get('pvt-match').textContent, 'PVT 비교 불가');
-assert.equal(elements.get('dtn-report').hidden, true);
 assert.equal(elements.get('step-receive').className, 'active');
 
 // 이전 시험의 늦은 보고서가 새로 선택한 시험의 값을 덮어쓰지 않는다.
@@ -132,7 +130,6 @@ await cleared.ready;
 assert.equal(elements.get('dtn-tests').value, '', 'clear must not auto-select stored tests');
 await cleared.poll();
 assert.equal(elements.get('dtn-tests').value, '', 'polling must preserve cleared selection');
-assert.equal(elements.get('dtn-report').hidden, true);
 console.log('PASS: receiver clear preserves empty selection through polling');
 
 // New registrations keep the current selection; actual receipts select automatically.
@@ -145,7 +142,6 @@ await cleared.poll();
 assert.equal(elements.get('dtn-tests').value, 'waiting');
 assert.equal(elements.get('test-id').textContent, 'waiting');
 assert.equal(elements.get('pvt-x').textContent, '-');
-assert.equal(elements.get('dtn-report').hidden, true);
 elements.get('dtn-tests').value = 'completed';
 await cleared.renderTest();
 await cleared.poll();

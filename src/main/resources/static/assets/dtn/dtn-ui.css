@@ -908,7 +908,6 @@ body[data-page="dtn-receiver"] .receiver-adapter .adapter-url-controls { grid-te
   body[data-page="dtn-receiver"] .receiver-adapter .adapter-url-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .receiver-adapter .adapter-url-controls > input { grid-column: 1 / -1; }
 }
-.receiver-result-links { display: flex; flex-wrap: wrap; gap: 12px; font-size: 13px; }
 .receiver-epoch-row { margin: 12px 0; }
 .receiver-epoch-row select { flex: 1 1 280px; min-width: 0; margin: 0; }
 .receiver-pvt .pvt-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 8px; }
@@ -935,3 +934,9 @@ body[data-page="dtn-receiver"] .receiver-adapter .adapter-url-controls { grid-te
 @media (max-width: 900px) { .adapter-config-grid { grid-template-columns: 1fr; } }
 
 .adapter-config-help { color: var(--teal); cursor: help; }
+
+/* Keep the receiver original prominent; receipt history opens only when needed. */
+.receiver-payload .dtn-payload-text { width: 100%; min-height: 420px; height: 55vh; resize: vertical; }
+.dtn-payload-history { position: relative; font-size: 12px; }
+.dtn-payload-history summary { cursor: pointer; white-space: nowrap; }
+.dtn-payload-history select { position: absolute; right: 0; top: 100%; z-index: 2; width: min(520px, 75vw); margin-top: 8px; }
