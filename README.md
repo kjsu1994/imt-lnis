@@ -1,4 +1,5 @@
 # LNIS 송수신 시험
+송수신 서비스 지연을 GNSS의 공통 시간 오차로 간주했을 때 PVT Solver가 그 지연을 어떻게 해석하는가 에 대한 시험
 
 Java 21 · Spring Boot · H2 · HTML/JavaScript. 기존 AFS 코덱과 GPS L1 지구 PVT 계산기를 재사용합니다.
 
