@@ -6,6 +6,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 /** AFS·DTN 화면과 기존 북마크 URL의 HTTP 상태 및 문서를 그대로 유지한다. */
 @Controller
 public class WebPageController {
+    @GetMapping("/lnis/data-management")
+    String dataManagement() { return "forward:/data-management.html"; }
+
     @GetMapping("/")
     String root()
     {

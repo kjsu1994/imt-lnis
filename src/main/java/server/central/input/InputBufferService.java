@@ -21,6 +21,8 @@ import java.util.UUID;
  */
 public class InputBufferService {
     public static final int CHUNK_SIZE = 1024 * 1024;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private server.central.management.DataManagementGuard managementGuard;
     private final Duration incompleteRetention;
     private final Duration completedRetention;
     private final InputBufferRepository inputBufferRepository;
@@ -192,6 +194,7 @@ public class InputBufferService {
     @Transactional
     public void remove(UUID id)
     {
+        if(managementGuard!=null)managementGuard.requireUnpinned("INPUT",id);
         InputBufferEntity input = get(id);
         // 기준 버전과 동일하게 사용자의 명시적 삭제는 허용한다. 자동 보존 정리만 세션 참조를 보호한다.
         inputBufferRepository.delete(id, input.chunkCount());

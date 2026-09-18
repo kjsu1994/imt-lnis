@@ -547,3 +547,12 @@
 
 /* Honor hidden on suite navigation despite the nav flex layout. */
 .test-suite-tabs[hidden] { display: none !important; }
+
+/* Optional admin entry occupies its own left inset without covering the brand. */
+header:has(> .data-management-entry) { position: relative; }
+header:has(> .data-management-entry:not([hidden])) { padding-left: max(50px, clamp(22px, 5vw, 72px)); }
+.data-management-entry { position: absolute; left: 12px; top: 12px; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border: 1px solid #ffffff24; border-radius: 8px; background: #ffffff08; color: #aac3ce; text-decoration: none; transition: background .15s, color .15s, border-color .15s; }
+.data-management-entry:hover { color: #fff; background: #ffffff16; border-color: #ffffff50; }
+.data-management-entry:focus-visible { outline: 2px solid #79d6ce; outline-offset: 3px; }
+.data-management-entry[hidden] { display: none !important; }
+.data-management-entry svg { display: block; }

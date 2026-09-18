@@ -31,6 +31,7 @@ public class IqService {
     this.json = json; this.root = Path.of(root).toAbsolutePath().normalize();
     this.simulator = Path.of(simulator).toAbsolutePath().normalize(); this.enabled = enabled;
   }
+  public synchronized boolean managementBusy(UUID id) { return active!=null && (id==null || active.equals(id)); }
   public boolean enabled() { return enabled && Files.isExecutable(simulator); }
   public synchronized List<Map<String,Object>> recent() throws IOException {
     if (Files.isDirectory(root)) {

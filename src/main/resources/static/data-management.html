@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LNIS 데이터 관리</title><link rel="icon" href="/lnis/assets/common/logo.png">
+<link rel="stylesheet" href="/lnis/assets/common/app.css?v=20260918-management">
+<link rel="stylesheet" href="/lnis/assets/management/data-management.css?v=1"></head>
+<body><header><div><h1>데이터 관리</h1><p id="node">현재 PC 확인 중</p></div><a class="back" id="back" href="/">시험 화면으로</a></header>
+<main><p id="message" role="status" aria-live="polite"></p>
+<section class="card"><h2>저장 현황</h2><div id="summary" class="metrics"></div><small>이 PC의 데이터만 관리합니다. 자료를 삭제해도 DB 파일의 실제 크기는 바로 줄어들지 않을 수 있습니다.</small></section>
+<nav class="management-tabs" aria-label="데이터 관리 메뉴"><button data-tab="records" class="primary">시험 기록</button><button data-tab="files">수신 원문·파일</button><button data-tab="settings">보관 설정</button></nav>
+<section id="records" class="card">
+<form id="search-form" class="filters"><label>자료 종류<select id="kind"><option value="DTN">DTN 시험</option><option value="AFS">AFS 시험</option></select></label>
+<label>시작일<input type="date" id="from"></label><label>종료일<input type="date" id="to"></label>
+<label>상태<select id="state"><option value="">전체</option></select></label><label>시험·자료 ID<input id="search" maxlength="100" placeholder="ID 일부로 검색"></label><button type="submit">조회</button></form>
+<div class="actions"><button id="select-page">이 페이지 선택</button><button id="delete-selected" class="danger">선택 삭제</button><span id="count"></span></div>
+<div class="table-scroll"><table><thead><tr><th>선택</th><th>시험·자료</th><th>상태</th><th>생성 시각</th><th>용량</th><th>관리</th></tr></thead><tbody id="rows"></tbody></table></div>
+<div class="actions"><button id="previous">이전</button><span id="page"></span><button id="next">다음</button></div>
+</section>
+<section id="settings" class="card" hidden><h2>자동 보관 기간</h2><p>자동 삭제는 기본으로 꺼져 있습니다. 시험은 종료 시점, 미연결 수신 원문은 수신 시점, 미사용 파일은 생성 시점을 기준으로 정리합니다. 보관 고정·공유 자료는 제외합니다.</p>
+<form id="settings-form"><div id="policies" class="form-grid"></div><div class="actions"><button type="submit">삭제 예정 확인 후 설정 저장</button><button type="button" id="cleanup-now">현재 설정으로 지금 정리</button></div></form>
+<p><small>10분마다 확인하며 한 번에 최대 500건을 정리합니다. 시험·수집·파일 처리 중에는 정리를 미룹니다.</small></p><h2>최근 정리 내역</h2><div id="history"></div></section>
+<section id="detail" class="card" hidden><div class="card-title"><h2>선택한 자료</h2><button id="close-detail">닫기</button></div><div id="detail-links" class="actions"></div><pre id="detail-content"></pre></section>
+<dialog id="confirm"><h2 id="confirm-title">삭제 대상 확인</h2><p id="confirm-note"></p><div id="preview-items"></div><p>진행 중·보관 고정·공유 자료는 서버에서 다시 확인합니다. 삭제한 자료는 이 화면에서 복원할 수 없습니다.</p><div class="actions"><button id="confirm-cancel">취소</button><button id="confirm-apply" class="danger">확인</button></div></dialog>
+</main><script type="module" src="/lnis/assets/management/data-management.js?v=1"></script></body></html>

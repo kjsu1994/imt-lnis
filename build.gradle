@@ -76,7 +76,8 @@ tasks.register('webTest') {
                 'src/test/js/dtn-observations.smoke.mjs',
                 'src/test/js/dtn-sender.smoke.mjs',
                 'src/test/js/node-connection.smoke.mjs',
-                'src/test/js/dtn-receiver.smoke.mjs'
+                'src/test/js/dtn-receiver.smoke.mjs',
+                'src/test/js/data-management.smoke.mjs'
         ].each { script ->
             providers.exec {
                 commandLine 'node', script

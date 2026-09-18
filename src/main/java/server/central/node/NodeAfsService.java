@@ -27,6 +27,9 @@ import java.util.UUID;
 @Profile("node")
 @RequiredArgsConstructor
 public class NodeAfsService {
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private server.central.management.DataManagementGuard managementGuard;
+
     private final NodeProperties properties;
     private final AgentConnectionRegistry connections;
     private final SessionRepository sessions;
@@ -48,6 +51,7 @@ public class NodeAfsService {
             throw new IllegalArgumentException("관리 채널은 수신 준비와 취소만 지원합니다.");
         }
         UUID id = envelope.sessionId();
+        if(managementGuard!=null) managementGuard.requirePresent("AFS",id);
         TestSessionEntity previous = sessions.find(id).orElse(null);
         if (command.command() == CommandType.CANCEL_SESSION) {
             if (previous == null) {

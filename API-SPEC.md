@@ -1231,3 +1231,24 @@ X-LNIS-Request-ID / X-LNIS-Trace-ID 헤더로 양쪽 HTTP 호출을 연결합니
 Docker 콘솔의 레벨 표시는 `[WARN]`만 굵은 노랑(ANSI 1;33), `[ERROR]`만 빨강(ANSI 31)으로 출력하고 즉시 색상을 복원합니다. 다른 레벨과 메시지 본문은 색칠하지 않습니다.
 
 목록 조회(`/dtn/tests`, `/dtn/receipts`)의 정상 응답 본문은 DEBUG에서만 출력하며 INFO에는 itemCount와 상태 변화 요약을 남깁니다. 헬스체크는 같은 상태·원인의 반복을 DEBUG로 내리고 60초마다 suppressed 건수와 함께 요약하며 변화·복구는 즉시 기록합니다. 통신 예외의 원인 유형 체인은 API_END의 cause에 표시하고 스택은 DEBUG로 기록합니다. 요청·응답이 모두 비어 있으면 API_BODY를 생략합니다. 실제 전송·수신 오류는 이 헬스체크 제한의 대상이 아닙니다.
+
+
+### 관리자용 로컬 데이터 관리
+
+`/lnis/data-management`는 각 PC의 AFS·DTN 시험, 수신 원문, 입력 GRAW, I/Q 파일을 관리한다. AFS/DTN 송신·수신 페이지 좌측 최상단의 `data-management-entry` 링크는 `hidden` 기본값이다. 개발자 도구에서 해제해 사용한다. 별도 인증은 없으며 hidden은 접근 통제가 아니다.
+
+관리 API 기준 경로: `/lnis/api/v1/data-management`.
+- `GET /summary`: 현재 역할, DB 파일과 입력/IQ 파일 용량, 자료 건수. DB 물리 크기는 삭제 직후 줄어들지 않을 수 있다.
+- `GET /items?kind=DTN|AFS|RECEIPT|INPUT|IQ&page=0&search=&state=&from=&to=`: 메타데이터만 50건씩 최신순 조회. from 포함, to 미포함(ISO Instant). IQ는 서버 소유 파일 이름만 조회하며 사용자 경로를 받지 않는다.
+- `GET /items/{kind}/{id}`: 상태·관련 자료·기존 조회/다운로드 API 연결.
+- `POST /pin`: `{item:{kind,id},pinned:true}`. 기존 입력/IQ 삭제 API에도 보관 고정 보호가 적용된다.
+- `POST /preview`: `{items:[{kind,id}]}` 최대 500건. 삭제 예정 원문·로그·프레임·단독 참조 파일과 제외 사유, 10분 유효한 token 반환.
+- `POST /delete`: `{token}`. 실행 직전 재검사하며 진행 중 시험·중지 확인·생성·수집 중에는 409. 다른 시험이 참조하거나 보관 고정된 파일은 보존. 실패는 정리 내역에 남긴다.
+- `GET /history`, `POST /history/{id}/retry`: 최근 50건 정리 결과 및 실패 자료의 새 미리보기.
+- `GET /settings`, `POST /settings/preview`: `{tests:{enabled,days},receipts:{enabled,days},files:{enabled,days}}`. 최초 모두 disabled, 기본 입력 일수 30일, 허용 1~3650일. 설정 미리보기 후 `POST /settings`에 `{token}`으로 저장한다.
+- `POST /cleanup/preview`: 현재 보관 정책의 삭제 예정 목록. 실제 정리는 `/delete`로 확인한다.
+- `GET /files/INPUT|IQ/{id}`: 로컬 완료 파일 다운로드.
+
+시험 보관은 종료 갱신 시각, 미연결 원문은 수신 시각, 미사용 파일은 생성 시각(기존 I/Q는 최초 남아 있는 파일 시각)을 기준으로 한다. 10분마다 최대 500건씩 동일 삭제 로직을 사용한다. 기존 AFS 시험/입력 정리 스케줄은 이 설정으로 통합되어 기존 LNIS_COMPLETED_RETENTION/INCOMPLETE_RETENTION으로 시험을 삭제하지 않는다. 내부 통신 이벤트 24시간 및 준비 로그 7일 정리는 유지한다. 운영 연결 설정·인증 값·Agent 등록은 관리 삭제 대상이 아니다.
+
+삭제는 요청과 경합하지 않게 직렬화하고 파일/DB 실패 시 이력을 보존해 재시도한다. 관리 테이블은 정책·고정·삭제 ID·작업 이력을 저장하며 원문을 복사하지 않는다. 삭제 ID는 늦은 재등록·콜백·Agent 메시지로 시험이 되살아나는 것을 차단하기 위해 유지한다. 운영 DB 초기화·압축·복원은 제공하지 않는다.

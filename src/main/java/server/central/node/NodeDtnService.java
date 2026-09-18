@@ -24,6 +24,9 @@ import java.util.UUID;
 @Profile("node")
 @RequiredArgsConstructor
 public class NodeDtnService implements DtnNodeLink {
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private server.central.management.DataManagementGuard managementGuard;
+
     private final NodeProperties properties;
     private final NodePeerClient peerClient;
     private final DtnRepository repository;
@@ -103,6 +106,7 @@ public class NodeDtnService implements DtnNodeLink {
     public synchronized void prepareCancellation(UUID testId)
     {
         requireReceiver();
+        if(managementGuard!=null) managementGuard.requirePresent("DTN",testId);
         DtnJob existing = repository.findById(testId).orElse(null);
         if (existing != null) {
             validateParticipants(existing.getSenderAgentId(), existing.getReceiverAgentId());
@@ -129,6 +133,7 @@ public class NodeDtnService implements DtnNodeLink {
                 || !registration.getPayloadSha256().matches("[0-9a-f]{64}")) {
             throw new IllegalArgumentException("지원하지 않는 DTN 등록 정보입니다.");
         }
+        if(managementGuard!=null) managementGuard.requirePresent("DTN",registration.getTestId());
         DtnJob existing = repository.findById(registration.getTestId()).orElse(null);
         if (existing != null) {
             if ("CANCELLED".equals(existing.getState()) && existing.getExpectedPayloadSha256() == null) return view(existing);

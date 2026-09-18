@@ -52,6 +52,8 @@ public class DtnService {
     private final AgentConnectionRegistry agentConnectionRegistry;
     private final InputBufferService inputBufferService;
     private final ObjectMapper objectMapper;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private server.central.management.DataManagementGuard managementGuard;
     private final Map<UUID, DtnChunks> chunks = new HashMap<>();
     private final Map<UUID, Thread> tasks = new java.util.concurrent.ConcurrentHashMap<>();
     private final Set<UUID> cancelRequests = java.util.concurrent.ConcurrentHashMap.newKeySet();
@@ -106,6 +108,9 @@ public class DtnService {
     }
 
     /* 외부 연동 준비 여부와 지원 규격 조회 */
+    /** 관리 삭제는 취소된 작업의 실제 종료까지 기다린다. */
+    public synchronized boolean managementBusy() { return !tasks.isEmpty() || !chunks.isEmpty(); }
+
     public Map<String, Object> configuration()
     {
         return Map.ofEntries(
@@ -734,6 +739,7 @@ public class DtnService {
     }
 
     public synchronized void deleteIq(UUID id) throws java.io.IOException {
+        if(managementGuard!=null)managementGuard.requireUnpinned("IQ",id);
         if (dtnRepository.existsByIqFileIdAndStateIn(id, ACTIVE)) throw new IllegalStateException("전송·검증 중인 파일은 삭제할 수 없습니다.");
         iq.delete(id);
     }

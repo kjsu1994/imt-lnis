@@ -50,8 +50,21 @@ public class AgentMessageService {
         this.dtnService = service;
     }
 
+    @Autowired(required=false) private server.central.management.DataManagementGuard managementGuard;
+
     /** envelope 종류에 따라 Agent 상태, 입력 청크, 진행률 또는 역할 결과 처리로 분기한다. */
     public void handle(Envelope envelope) throws Exception
+    {
+        if(managementGuard==null) { handleMessage(envelope);return; }
+        var lock=managementGuard.gate.readLock();lock.lock();
+        try {
+            java.util.UUID id=envelope.sessionId();
+            if(managementGuard.deleted("AFS",id) || managementGuard.deleted("DTN",id) || managementGuard.deleted("INPUT",id)) return;
+            handleMessage(envelope);
+        } finally {lock.unlock();}
+    }
+
+    private void handleMessage(Envelope envelope) throws Exception
     {
         // 연결 정보(HELLO/HEARTBEAT), 입력, 진행 이벤트, 최종 결과를 각 도메인 서비스로 분배한다.
         // WebSocket Handler는 인증과 역직렬화만 담당하고 업무 상태 변경은 이 계층에서 시작된다.

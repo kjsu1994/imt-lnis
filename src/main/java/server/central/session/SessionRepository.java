@@ -20,12 +20,16 @@ import java.util.UUID;
 @Repository
 /** 시험 세션과 역할별 결과를 H2 테이블에 보관한다. */
 public class SessionRepository {
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private server.central.management.DataManagementGuard managementGuard;
+
     private final SessionJpaRepository sessionJpaRepository;
     private final RoleResultJpaRepository roleResultJpaRepository;
     private final ObjectMapper objectMapper;
 
     public void save(TestSessionEntity value)
     {
+        if(managementGuard!=null) managementGuard.requirePresent("AFS",value.sessionId());
         sessionJpaRepository.save(value);
     }
 
@@ -37,6 +41,7 @@ public class SessionRepository {
     public void saveResult(RoleResult result)
     {
         try {
+            if(managementGuard!=null) managementGuard.requirePresent("AFS",result.sessionId());
             roleResultJpaRepository.save(
                     new RoleResultEntity(
                             result.sessionId(),

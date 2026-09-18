@@ -16,6 +16,9 @@ import java.util.*;
 /** 인증된 콜백의 검증 전 본문. 시험 원본/계산 결과와 분리해 보관한다. */
 @Service @RequiredArgsConstructor
 public class DtnReceiptService {
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private server.central.management.DataManagementGuard managementGuard;
+
     private final DtnReceiptRepository repository;
     private final ObjectMapper mapper;
 
@@ -30,6 +33,7 @@ public class DtnReceiptService {
             var node=mapper.readTree(body);
             if(node!=null && node.path("testId").isTextual()) receipt.setTestId(UUID.fromString(node.path("testId").asText()));
         } catch(Exception ignored) { /* 식별 불가능한 원문도 저장한다. */ }
+        if(managementGuard!=null) managementGuard.requirePresent("DTN",receipt.getTestId());
         return repository.saveAndFlush(receipt);
     }
     @Transactional
