@@ -220,7 +220,7 @@ public class NodeDtnService implements DtnNodeLink {
         result.setState(job.getState());
         result.setMessage(job.getMessage());
         result.setReceivedAt(job.getReceivedAt());
-        if (logs != null) result.setAdapterLogs(logs.adapterEntries(job.getId()));
+        // 어댑터 상세는 수신 노드에만 보관한다. 관리 채널은 상태와 계산 결과만 반환한다.
         if (job.getFileResultJson() != null) {
             try { result.setFileResult(mapper.readTree(job.getFileResultJson())); }
             catch (java.io.IOException error) { throw new IllegalStateException("I/Q 결과 조회 실패", error); }

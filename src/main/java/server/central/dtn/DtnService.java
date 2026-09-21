@@ -156,7 +156,7 @@ public class DtnService {
         this.nodeLink = nodeLink;
     }
 
-    private boolean sendingNode()
+    boolean sendingNode()
     {
         return nodeLink != null && nodeLink.sender();
     }
@@ -400,7 +400,7 @@ public class DtnService {
                 synchronized (this) {
                     DtnJob current = get(job.getId());
                     current.setCancelPending(false);
-                    update(current, current.getState(), "시험 중지 · 상대 수신 노드 정리 완료");
+                    update(current, current.getState(), "시험 중지 · 상대 수신 노드 정리 완료", "상대 결과 확인");
                 }
             } catch (RuntimeException error) {
                 // 영속 대기 표시를 유지한다. 연결 복구 후 tick에서 같은 ID만 재시도한다.
@@ -675,7 +675,8 @@ public class DtnService {
         for (DtnJob job : dtnRepository.findByStateIn(ACTIVE)) {
             int timeoutMinutes="IQ_SAMPLE".equals(job.getTestType()) ? 20 : 10;
             if (Instant.now().isAfter(job.getCreatedAt().plus(Duration.ofMinutes(timeoutMinutes)))) {
-                fail(job, new IllegalStateException("DTN 시험 제한 시간 "+timeoutMinutes+"분 초과"));
+                fail(job, new IllegalStateException("DTN 시험 제한 시간 "+timeoutMinutes+"분 초과"),
+                        sendingNode() && "WAITING_DTN".equals(job.getState()) ? "상대 결과 확인" : "시험");
                 continue;
             }
             if (sendingNode() && "WAITING_DTN".equals(job.getState())) {
@@ -762,13 +763,14 @@ public class DtnService {
         } catch (RuntimeException unavailable) {
             return;
         }
-        if (logs != null) logs.importAdapter(job.getId(), result.getAdapterLogs());
         if (result.getReceivedAt() != null && job.getReceivedAt() == null) {
             job.setReceivedAt(result.getReceivedAt());
-            update(job, "WAITING_DTN", "수신 노드 접수 완료 / PVT 계산 결과 대기");
+            update(job, "WAITING_DTN", "상대 수신 완료 · 시험 결과 대기", "상대 결과 확인");
         }
         if ("FAILED".equals(result.getState())) {
-            fail(job, new IllegalStateException("수신 노드 실패: " + result.getMessage()));
+            fail(job, new IllegalStateException("수신 노드 실패: " + result.getMessage()), "상대 결과 확인");
+        } else if ("CANCELLED".equals(result.getState())) {
+            update(job, "CANCELLED", "상대 시험 중지 확인", "상대 결과 확인");
         } else if ("COMPLETED".equals(result.getState()) || ("DELAY".equals(job.getComparisonMode()) && "INCONCLUSIVE".equals(result.getState()))) {
             try {
                 if ("IQ_SAMPLE".equals(job.getTestType())) {
@@ -790,7 +792,7 @@ public class DtnService {
                         job.setReferenceJson(objectMapper.writeValueAsString(reference));
                         job.setComparisonJson(objectMapper.writeValueAsString(IqReceiver.comparison(reference,result.getPvt())));
                     }
-                    update(job, "COMPLETED", "I/Q 파일 일치 · "+result.getMessage()); return;
+                    update(job, "COMPLETED", "상대 시험 완료 · I/Q 결과는 수신 화면에서 확인하세요.", "상대 결과 확인"); return;
                 }
                 if (result.getReceivedAt() == null || result.getPvt() == null || result.getPvt().isEmpty()) {
                     throw new IllegalArgumentException("수신 노드의 완료 결과가 불완전합니다.");
@@ -804,7 +806,7 @@ public class DtnService {
                     compareDelay(job, result.getPvt(), true);
                 } else compare(job, result.getPvt());
             } catch (Exception error) {
-                fail(job, error);
+                fail(job, error, "상대 결과 확인");
             }
         }
     }
@@ -860,9 +862,13 @@ public class DtnService {
         List<Pvt> reference = objectMapper.readValue(job.getReferenceJson(), new TypeReference<>() {});
         Map<String, Object> comparison = DtnComparison.compare(reference, receiverPvt);
         job.setComparisonJson(objectMapper.writeValueAsString(comparison));
-        trace(job.getId(),"PVT 비교",true,objectMapper.writeValueAsString(comparison));
+        if (!sendingNode()) {
+            trace(job.getId(), "PVT 비교", true, objectMapper.writeValueAsString(comparison));
+        }
         update(job, "INCONCLUSIVE".equals(comparison.get("verdict")) ? "INCONCLUSIVE" : "COMPLETED",
-                "PVT 비교 완료: " + comparison.get("verdict"));
+                sendingNode() ? "상대 시험 완료 · 판정 " + comparison.get("verdict")
+                        : "PVT 비교 완료: " + comparison.get("verdict"),
+                sendingNode() ? "상대 결과 확인" : "시험");
     }
 
     private void compareDelay(DtnJob job, List<Pvt> received, boolean sender) throws Exception
@@ -887,6 +893,17 @@ public class DtnService {
                     "차이 = 수신 − Reference · " + objectMapper.writeValueAsString(comparison));
         }
 
+        String state = "INCONCLUSIVE".equals(comparison.get("verdict")) ? "INCONCLUSIVE" : "COMPLETED";
+        if (sender) {
+            String result = switch (comparison.get("verdict").toString()) {
+                case "MEASURED" -> "측정 완료";
+                case "PARTIAL" -> "부분 비교 · 속도 비교 불가";
+                default -> "PVT 비교 불가";
+            };
+            update(job, state, "상대 시험 완료 · " + result + " · 상세 결과는 수신 화면에서 확인하세요.", "상대 결과 확인");
+            return;
+        }
+
         var row = objectMapper.valueToTree(comparison).path("epochs").path(0);
         String summary = comparison.get("message")
                 + " · 시험 시작→수신 " + evidence.delaySeconds() * 1000 + " ms"
@@ -902,9 +919,8 @@ public class DtnService {
                             + " · c×εt = " + measurement(row, "clockResidualMeters", "m")
                             + " (위치 오차가 아닌 시간 차이의 거리 환산값) · 허용오차 미설정");
         }
-        trace(job.getId(), sender ? "송신 최종 요약" : "수신 계산 결과", false, summary);
+        trace(job.getId(), "수신 계산 결과", false, summary);
 
-        String state = "INCONCLUSIVE".equals(comparison.get("verdict")) ? "INCONCLUSIVE" : "COMPLETED";
         update(job, state, comparison.get("message").toString());
     }
 
@@ -954,19 +970,29 @@ public class DtnService {
     /* 시험 상태와 갱신 시각을 함께 저장한다. */
     private void update(DtnJob job, String state, String message)
     {
+        update(job, state, message, "시험");
+    }
+
+    private void update(DtnJob job, String state, String message, String stage)
+    {
         job.setState(state);
         job.setMessage(message);
         job.setUpdatedAt(Instant.now());
         dtnRepository.save(job);
-        if(logs!=null) logs.add(job.getId(),"TEST","FAILED".equals(state)?"ERROR":"INCONCLUSIVE".equals(state)?"WARN":"INFO","시험",false,message);
+        if(logs!=null) logs.add(job.getId(),"TEST","FAILED".equals(state)?"ERROR":"INCONCLUSIVE".equals(state)?"WARN":"INFO",stage,false,message);
     }
 
     /* 미완성 청크를 정리하고 실패 원인을 저장한다. */
     private void fail(DtnJob job, Exception error)
     {
+        fail(job, error, "시험");
+    }
+
+    private void fail(DtnJob job, Exception error, String stage)
+    {
         chunks.remove(job.getId());
         String message =
                 error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage();
-        update(job, "FAILED", message.substring(0, Math.min(2000, message.length())));
+        update(job, "FAILED", message.substring(0, Math.min(2000, message.length())), stage);
     }
 }

@@ -70,13 +70,13 @@ public class DtnController {
         if (after < 0) throw new IllegalArgumentException("로그 순번 오류");
         var entries = logs.read(scopeId, after);
         if (!download) return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(Map.of(
-            "entries",entries,"nextSequence",entries.isEmpty()?after:entries.getLast().getSequence(),"hasMore",entries.size()==500));
+            "entries",visibleLogs(entries),"nextSequence",entries.isEmpty()?after:entries.getLast().getSequence(),"hasMore",entries.size()==500));
         var text = new StringBuilder("LNIS local processing log · ").append(scopeId).append("\n");
         var chronological = new java.util.ArrayList<DtnLogEntry>();
         long cursor=0;
         do {
             entries=logs.read(scopeId,cursor);
-            chronological.addAll(entries);
+            chronological.addAll(visibleLogs(entries));
             if (!entries.isEmpty()) cursor=entries.getLast().getSequence();
         } while(entries.size()==500);
         chronological.sort(java.util.Comparator.comparing(DtnLogEntry::getOccurredAt).thenComparing(DtnLogEntry::getSequence));
@@ -86,6 +86,14 @@ public class DtnController {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
             .header("Content-Disposition","attachment; filename=\"dtn-log-"+scopeId+".txt\"")
             .contentType(new MediaType("text","plain",StandardCharsets.UTF_8)).body(text.toString());
+    }
+
+    /** 과거 송신에 복사된 수신 상세도 조회에서 제외한다. 저장 이력과 페이징 순번은 유지한다. */
+    private List<DtnLogEntry> visibleLogs(List<DtnLogEntry> entries)
+    {
+        if (!dtnService.sendingNode()) return entries;
+        return entries.stream().filter(entry -> !Set.of("DTN", "송신 최종 요약").contains(entry.getStage())
+                && !(entry.isDetail() && "PVT 비교".equals(entry.getStage()))).toList();
     }
 
     @Data

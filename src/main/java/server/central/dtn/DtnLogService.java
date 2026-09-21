@@ -69,7 +69,7 @@ public class DtnLogService {
         }
     }
 
-    /** 어댑터 부가 로그만 관리 채널로 공유한다. LNIS 자체 처리 로그는 각 PC에 남긴다. */
+    /** 수신 노드에 저장된 어댑터 부가 로그를 조회한다. 송신 노드에는 복제하지 않는다. */
     public List<DtnRemoteResult.AdapterLog> adapterEntries(UUID id) {
         return repository.findByScopeIdAndStageOrderBySequence(id,"DTN").stream()
             .map(e -> new DtnRemoteResult.AdapterLog(e.getOccurredAt(),e.getLevel(),e.getMessage())).toList();

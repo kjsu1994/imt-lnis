@@ -127,7 +127,8 @@ class IndependentNodeIntegrationTest {
             var senderLogs = sender.getBean(server.central.dtn.DtnLogService.class);
             var receiverLogs = receiver.getBean(server.central.dtn.DtnLogService.class);
             assertEquals(3, receiverLogs.adapterEntries(test).size());
-            assertEquals(receiverLogs.adapterEntries(test), senderLogs.adapterEntries(test));
+            assertTrue(senderLogs.adapterEntries(test).isEmpty(), "수신 어댑터 상세는 송신에 복제하지 않음");
+            assertFalse(senderLogs.hasStage(test, "PVT 비교"));
             assertThrows(IllegalArgumentException.class, () -> receiver.getBean(InputBufferService.class).get(input));
             // 최초 원문을 지키고 중복 전달로 계산을 다시 시작하지 않는다.
             rx.receive("Bearer test-dtn-receive", delivered.get());
@@ -165,7 +166,10 @@ class IndependentNodeIntegrationTest {
                 assertFalse(senderLogs.hasStage(delayId, "Clock Bias 검증"));
                 assertTrue(mapper.readTree(tx.get(delayId).getComparisonJson()).path("epochs").path(0).path("clockResidualSeconds").isNumber());
                 assertFalse(senderLogs.hasStage(delayId, "의사거리 재계산"), "수신 상세 로그를 송신에 복제하지 않음");
-                assertTrue(senderLogs.hasStage(delayId, "송신 최종 요약"));
+                assertFalse(senderLogs.hasStage(delayId, "송신 최종 요약"));
+                assertTrue(senderLogs.hasStage(delayId, "상대 결과 확인"));
+                assertTrue(senderLogs.adapterEntries(delayId).isEmpty());
+                assertFalse(senderLogs.read(delayId, 0).stream().anyMatch(e -> e.getMessage().contains("Clock Bias 변화")));
                 var at = rx.get(delayId).getReceivedAt();
                 int count = receiverLogs.read(delayId, 0).size();
                 rx.receive("Bearer test-dtn-receive", delivered.get(), at.plusSeconds(5));
