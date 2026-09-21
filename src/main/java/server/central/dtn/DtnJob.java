@@ -27,6 +27,12 @@ public class DtnJob {
     /** 시험 시작 시 확정한 HDTN 설정이다. 기존 시험은 null이다. */
     @Lob
     private String hdtnConfigJson;
+    private String comparisonMode;
+    private Instant testStartedAt;
+    @Lob
+    private String selectedEpochJson;
+    @Lob
+    private String delayEvidenceJson;
     private Boolean development;
     private Instant createdAt;
     private Instant updatedAt;

@@ -1,7 +1,7 @@
 # LNIS 송수신 시험
 송수신 서비스 지연을 GNSS의 공통 시간 오차로 간주했을 때 PVT Solver가 그 지연을 어떻게 해석하는가 에 대한 시험
-> “공통 지연을 넣었을 때 Solver가 이를 시계오차로 얼마나 정확히 추정하며, 위치와 속도는 얼마나
-> 유지하는가?”
+원래 의사거리로 송신시각을 역산하고, 수신측 시각과의 차이로 새 의사거리를 만들어 PVT를 다시 계산하는 구조
+>1 Epoch 기준으로 원본 GNSS PVT를 Reference로 사용한다. 시험 시작 시각과 수신 서비스 수신 시각의 차이를 end-to-end 지연시간으로 계산하고, 해당 지연시간을 추가 전파시간으로 간주해 각 위성의 의사거리만 재계산한다. Doppler, C/N0, Ephemeris 등 나머지 GNSS RAW 값은 그대로 유지한 채 PVT를 다시 계산하고 Reference PVT와 비교한다.
 
 Java 21 · Spring Boot · H2 · HTML/JavaScript. 기존 AFS 코덱과 GPS L1 지구 PVT 계산기를 재사용합니다.
 

@@ -33,7 +33,7 @@ export function observationCells(o, receiverTowSeconds) {
     transmitTime(o, receiverTowSeconds)];
 }
 
-export function createObservationView(container, onSelect = () => {}) {
+export function createObservationView(container, onSelect = () => {}, role = '') {
   if (!container) return {setData() {}, select() {}};
   container.innerHTML = `
     <div class="gnss-data-header"><h2 data-title>GNSS 수집 데이터</h2>
@@ -79,8 +79,8 @@ export function createObservationView(container, onSelect = () => {}) {
       }
     }
     const iq = data?.source === 'IQ_TRACKING';
-    container.querySelector('[data-title]').textContent = iq ? 'I/Q 복원 관측값 · 보조 항법정보' : 'GNSS 수집 데이터';
-    container.querySelector('[data-observation-title]').textContent = iq ? '관측값 · I/Q 추적 (RAWX 원본 아님)' : '관측값 · RAWX';
+    container.querySelector('[data-title]').textContent = iq ? 'I/Q 복원 관측값 · 보조 항법정보' : role ? role+' GNSS 관측값' : 'GNSS 수집 데이터';
+    container.querySelector('[data-observation-title]').textContent = iq ? '관측값 · I/Q 추적 (RAWX 원본 아님)' : role ? role+' 관측값 · RAWX (변환 전)' : '관측값 · RAWX';
     container.querySelector('[data-navigation-title]').textContent = iq ? '보조 항법정보 · GPS LNAV' : '항법정보 · SFRBX';
     container.querySelector('[data-navigation-caption]').textContent = iq ? data.assistance : '항법정보 · SFRBX · 수집된 전체 메시지';
     container.querySelector('[data-word-width]').textContent = iq ? 'HEX · 24 bit (패리티 제외)' : 'HEX · 32 bit';

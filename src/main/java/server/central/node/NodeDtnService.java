@@ -1,5 +1,7 @@
 package server.central.node;
 
+import server.shared.codec.DtnDelay;
+
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -62,15 +64,34 @@ public class NodeDtnService implements DtnNodeLink {
         if (!status.isOnline()) {
             throw new IllegalStateException("수신 노드의 실행기가 준비되지 않았습니다.");
         }
+        if ("DELAY".equals(job.getComparisonMode())) {
+            try {
+                var capabilities = peerClient.exchange("/lnis/api/v1/node/peer/dtn/tests/capabilities",
+                        null, com.fasterxml.jackson.databind.JsonNode.class, 4096);
+                if (!capabilities.path("delaySupported").asBoolean()) {
+                    throw new IllegalStateException("지연 시험 미지원");
+                }
+            } catch (RuntimeException error) {
+                throw new IllegalStateException("수신 LNIS의 지연 시험 지원을 확인할 수 없습니다. 양쪽 서비스 버전과 연결을 확인하세요.", error);
+            }
+        }
         try {
             NodeDtnRegistration registration = new NodeDtnRegistration();
             registration.setTestId(job.getId());
+            registration.setComparisonMode(job.getComparisonMode());
+            registration.setTestStartedAt(job.getTestStartedAt());
+            if (job.getSelectedEpochJson() != null) {
+                registration.setSelectedEpoch(mapper.readValue(job.getSelectedEpochJson(), DtnDelay.Epoch.class));
+            }
             registration.setSenderAgentId(job.getSenderAgentId());
             registration.setReceiverAgentId(job.getReceiverAgentId());
             registration.setProfile(mapper.readTree(job.getSentJson()).path("profile").asText());
             registration.setPayloadSha256(DtnPayloadDigest.sha256(mapper, mapper.readTree(job.getSentJson())));
             DtnRemoteResult accepted = peerClient.exchange("/lnis/api/v1/node/peer/dtn/tests",
                     registration, DtnRemoteResult.class, 16 * 1024);
+            if ("DELAY".equals(job.getComparisonMode()) && !Boolean.TRUE.equals(accepted.getDelaySupported())) {
+                throw new IllegalStateException("수신 LNIS가 지연 시험을 지원하지 않습니다. 양쪽 서비스를 갱신하세요.");
+            }
             if ("CANCELLED".equals(accepted.getState())) throw new IllegalStateException("이미 중지된 수신 시험입니다.");
             if (!job.getId().equals(accepted.getTestId())) {
                 throw new IllegalStateException("수신 노드의 시험 식별자가 다릅니다.");
@@ -133,11 +154,19 @@ public class NodeDtnService implements DtnNodeLink {
                 || !registration.getPayloadSha256().matches("[0-9a-f]{64}")) {
             throw new IllegalArgumentException("지원하지 않는 DTN 등록 정보입니다.");
         }
+        if (registration.getComparisonMode()!=null && !java.util.List.of("DELAY","RESTORE").contains(registration.getComparisonMode()))
+            throw new IllegalArgumentException("지원하지 않는 PVT 비교 방식");
+        if ("DELAY".equals(registration.getComparisonMode())
+                && (registration.getTestStartedAt()==null || registration.getSelectedEpoch()==null))
+            throw new IllegalArgumentException("지연 시험의 시작 시각/Epoch 누락");
         if(managementGuard!=null) managementGuard.requirePresent("DTN",registration.getTestId());
         DtnJob existing = repository.findById(registration.getTestId()).orElse(null);
         if (existing != null) {
             if ("CANCELLED".equals(existing.getState()) && existing.getExpectedPayloadSha256() == null) return view(existing);
-            if (!registration.getPayloadSha256().equals(existing.getExpectedPayloadSha256())
+            if (!java.util.Objects.equals(registration.getComparisonMode(),existing.getComparisonMode())
+                    || !java.util.Objects.equals(registration.getTestStartedAt(),existing.getTestStartedAt())
+                    || !java.util.Objects.equals(registration.getSelectedEpoch()==null?null:mapper.valueToTree(registration.getSelectedEpoch()).toString(),existing.getSelectedEpochJson())
+                    || !registration.getPayloadSha256().equals(existing.getExpectedPayloadSha256())
                     || !registration.getSenderAgentId().equals(existing.getSenderAgentId())
                     || !registration.getReceiverAgentId().equals(existing.getReceiverAgentId())) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 등록된 시험 내용과 다릅니다.");
@@ -149,6 +178,11 @@ public class NodeDtnService implements DtnNodeLink {
         job.setSenderAgentId(registration.getSenderAgentId());
         job.setReceiverAgentId(registration.getReceiverAgentId());
         job.setExpectedPayloadSha256(registration.getPayloadSha256());
+        job.setComparisonMode(registration.getComparisonMode());
+        job.setTestStartedAt(registration.getTestStartedAt());
+        if (registration.getSelectedEpoch() != null) {
+            job.setSelectedEpochJson(mapper.valueToTree(registration.getSelectedEpoch()).toString());
+        }
         job.setState("WAITING_DTN");
         job.setMessage("외부 DTN/HDTN 수신 대기");
         job.setCreatedAt(Instant.now());
@@ -178,6 +212,11 @@ public class NodeDtnService implements DtnNodeLink {
     {
         DtnRemoteResult result = new DtnRemoteResult();
         result.setTestId(job.getId());
+        result.setDelaySupported(true);
+        if(job.getDelayEvidenceJson()!=null) {
+            try { result.setDelayEvidence(mapper.readValue(job.getDelayEvidenceJson(),DtnDelay.Evidence.class)); }
+            catch(java.io.IOException error) { throw new IllegalStateException("지연 계산 근거 조회 실패",error); }
+        }
         result.setState(job.getState());
         result.setMessage(job.getMessage());
         result.setReceivedAt(job.getReceivedAt());

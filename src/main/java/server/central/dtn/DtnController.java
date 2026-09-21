@@ -1,5 +1,7 @@
 package server.central.dtn;
 
+import server.shared.codec.DtnDelay;
+
 import lombok.extern.slf4j.Slf4j;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -97,6 +99,9 @@ public class DtnController {
         @jakarta.validation.constraints.Size(max = 2048)
         private String sendUrl;
         private String testType = "AFS_METADATA";
+        @jakarta.validation.constraints.Pattern(regexp="RESTORE|DELAY")
+        private String comparisonMode;
+        private DtnDelay.Epoch selectedEpoch;
         private String senderMode;
         private String receiverMode;
         @Valid
@@ -140,13 +145,25 @@ public class DtnController {
     public ResponseEntity<Map<String, Object>> create(@Valid @RequestBody CreateRequest request)
             throws Exception
     {
+        java.time.Instant startedAt = java.time.Instant.now();
         UUID inputId = request.getInputId();
         if ("IQ_SAMPLE".equals(request.getTestType())) {
             inputId = request.getIqFileId();
         }
 
         DtnJob dtnJob;
-        if (request.getHdtnConfig() != null) {
+        if ("DELAY".equals(request.getComparisonMode())) {
+            String senderMode = request.getSenderMode();
+            String receiverMode = request.getReceiverMode();
+            if (senderMode == null && receiverMode == null) {
+                senderMode = "DTN";
+                receiverMode = "HDTN";
+            }
+            dtnJob = dtnService.createDelay(
+                    inputId, request.getSenderAgentId(), request.getReceiverAgentId(),
+                    request.getSendUrl(), request.getTestType(), senderMode, receiverMode,
+                    request.getHdtnConfig(), request.getSelectedEpoch(), startedAt);
+        } else if (request.getHdtnConfig() != null) {
             String senderMode = request.getSenderMode(), receiverMode = request.getReceiverMode();
             if (senderMode == null && receiverMode == null) { senderMode = "DTN"; receiverMode = "HDTN"; }
             dtnJob = dtnService.create(inputId, request.getSenderAgentId(), request.getReceiverAgentId(),
@@ -190,6 +207,7 @@ public class DtnController {
     {
         DtnJob job = dtnService.get(id);
         Map<String, Object> report = new LinkedHashMap<>(summary(job));
+        report.put("delayEvidence", job.getDelayEvidenceJson()==null?null:objectMapper.readTree(job.getDelayEvidenceJson()));
         report.put("observations", job.getObservationsJson() == null
                 ? null : objectMapper.readTree(job.getObservationsJson()));
         report.put("fileResult", job.getFileResultJson() == null ? null : objectMapper.readTree(job.getFileResultJson()));
@@ -252,16 +270,17 @@ public class DtnController {
         String authorization=request.getHeader("Authorization");
         dtnService.authenticate(authorization);
         byte[] bytes=request.getInputStream().readNBytes(DtnModels.MAX_JSON_BYTES+1);
+        java.time.Instant receivedAt = java.time.Instant.now();
         boolean truncated=bytes.length>DtnModels.MAX_JSON_BYTES;
         if(truncated) bytes=Arrays.copyOf(bytes,DtnModels.MAX_JSON_BYTES);
-        var receipt=receipts.capture(bytes,request.getContentType(),truncated);
+        var receipt=receipts.capture(bytes,request.getContentType(),truncated,receivedAt);
         if(truncated) {
             String message="본문 16 MiB 초과 · 앞 16 MiB만 저장됨";
             receipts.finish(receipt,"REJECTED",message);
             return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(Map.of("receiptId",receipt.getId(),"message",message));
         }
         try {
-            DtnJob job=dtnService.receive(authorization,bytes);
+            DtnJob job=dtnService.receive(authorization,bytes,receivedAt);
             receipts.finish(receipt,"ACCEPTED","검증 통과 · 시험 처리 접수");
             return ResponseEntity.accepted().body(Map.of("testId",job.getId(),"accepted",true,"state",job.getState(),"receiptId",receipt.getId()));
         } catch(Exception error) {
@@ -283,6 +302,9 @@ public class DtnController {
         result.put("receiverMode", job.getReceiverMode());
         result.put("hdtnConfig", job.getHdtnConfigJson() == null ? null : objectMapper.readTree(job.getHdtnConfigJson()));
         result.put("development", Boolean.TRUE.equals(job.getDevelopment()));
+        result.put("comparisonMode", job.getComparisonMode()==null?"RESTORE":job.getComparisonMode());
+        result.put("testStartedAt",job.getTestStartedAt());
+        result.put("selectedEpoch",job.getSelectedEpochJson()==null?null:objectMapper.readTree(job.getSelectedEpochJson()));
         result.put("inputId", job.getInputId());
         result.put("senderAgentId", job.getSenderAgentId());
         result.put("receiverAgentId", job.getReceiverAgentId());

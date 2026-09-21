@@ -12,6 +12,29 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 class DtnCreateRequestContractTest {
     @Test
+    void delayRequestUsesExplicitModeAndServerStartTime() throws Exception
+    {
+        ObjectMapper json = new ObjectMapper().findAndRegisterModules();
+        DtnService service = mock(DtnService.class);
+        DtnJob job = new DtnJob();
+        job.setId(UUID.randomUUID());
+        when(service.createDelay(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(job);
+        var mvc = MockMvcBuilders.standaloneSetup(new DtnController(service, json)).build();
+        UUID inputId = UUID.randomUUID();
+        var epoch = new server.shared.codec.DtnDelay.Epoch(96, 2400, 100000);
+        var body = Map.of("inputId", inputId, "senderAgentId", "sender-1", "receiverAgentId", "receiver-1",
+                "comparisonMode", "DELAY", "selectedEpoch", epoch);
+        java.time.Instant before = java.time.Instant.now();
+        mvc.perform(post("/lnis/api/v1/dtn/tests").contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsBytes(body))).andExpect(status().isAccepted());
+        var time = org.mockito.ArgumentCaptor.forClass(java.time.Instant.class);
+        verify(service).createDelay(eq(inputId), eq("sender-1"), eq("receiver-1"), isNull(),
+                eq("AFS_METADATA"), eq("DTN"), eq("HDTN"), isNull(), eq(epoch), time.capture());
+        assertFalse(time.getValue().isBefore(before));
+        assertFalse(time.getValue().isAfter(java.time.Instant.now()));
+    }
+
+    @Test
     void preservesMissingBlankNullAndExplicitRequestFields() throws Exception
     {
         UUID inputId = UUID.randomUUID();

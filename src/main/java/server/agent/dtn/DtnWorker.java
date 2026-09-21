@@ -1,5 +1,7 @@
 package server.agent.dtn;
 
+import server.shared.codec.DtnDelay;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Arrays;
@@ -36,7 +38,7 @@ public final class DtnWorker {
     if ("CANCEL".equals(requested)) { cancel(id); return; }
     if (cancelled.contains(id)) return;
     if (!(("PREPARE".equals(requested) || "PREPARE_RAW".equals(requested)) && role == AgentRole.SENDER)
-        && !("RECEIVE".equals(requested) && role == AgentRole.RECEIVER))
+        && !(("RECEIVE".equals(requested) || "RECEIVE_DELAY".equals(requested)) && role == AgentRole.RECEIVER))
       throw new IllegalArgumentException("DTN 작업과 Agent 역할이 다릅니다.");
     if (active == null) {
       if (!state.compareAndSet(AgentState.READY, AgentState.BUSY))
@@ -94,6 +96,12 @@ public final class DtnWorker {
         checkCancelled(id);
         output.accept(id, json.createObjectNode().set("progress",json.createObjectNode().put("stage",stage).put("message",message)));
       };
+      if ("RECEIVE_DELAY".equals(requested)) {
+        var input = json.readValue(data, DtnDelay.Receive.class);
+        if (input.timing() == null) throw new IllegalArgumentException("지연 측정 시각 누락");
+        send(id, processor.receive(id, input.transfer(), progress, input.timing()));
+        return;
+      }
       DtnModels.AgentResult result = requested.startsWith("PREPARE") ? processor.prepare(id, data, "PREPARE_RAW".equals(requested),progress)
           : processor.receive(id, json.readValue(data, DtnModels.Transfer.class),progress);
       send(id, result);

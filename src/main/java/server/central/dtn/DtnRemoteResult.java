@@ -1,5 +1,7 @@
 package server.central.dtn;
 
+import server.shared.codec.DtnDelay;
+
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import server.shared.model.DtnModels.Pvt;
@@ -19,5 +21,7 @@ public class DtnRemoteResult {
     private String message;
     private Instant receivedAt;
     private List<Pvt> pvt;
+    private DtnDelay.Evidence delayEvidence;
+    private Boolean delaySupported;
     private com.fasterxml.jackson.databind.JsonNode fileResult;
 }

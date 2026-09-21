@@ -52,6 +52,14 @@ public class DtnInputViewController {
     }
   }
 
+  @org.springframework.beans.factory.annotation.Autowired
+  private DtnService dtnService;
+
+  @GetMapping("/{id}/delay-epochs")
+  public java.util.List<DtnService.EpochChoice> delayEpochs(@PathVariable UUID id) {
+    return dtnService.delayEpochs(id);
+  }
+
   private java.util.List<byte[]> records(UUID id) {
     var input = inputs.get(id);
     if (!input.complete() || input.receivedSize() <= 0

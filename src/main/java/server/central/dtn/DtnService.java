@@ -1,5 +1,9 @@
 package server.central.dtn;
 
+import server.shared.codec.GrawCodec;
+
+import server.shared.codec.DtnDelay;
+
 import lombok.extern.slf4j.Slf4j;
 
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -86,10 +90,60 @@ public class DtnService {
     }
     private void beginLog(DtnJob job, UUID source) {
         if(logs==null) return;
-        logs.copy(source,job.getId(),"TEST");
+        if (!"DELAY".equals(job.getComparisonMode())) {
+            logs.copy(source, job.getId(), "TEST");
+        }
         trace(job.getId(),"시험",false,"전송시험 시작 · "+job.getTestType()+" · "+job.getSenderMode()+" → "+job.getReceiverMode());
     }
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private DtnPvtCalculator pvtCalculator;
     private DtnNodeLink nodeLink;
+    public record EpochChoice(DtnDelay.Epoch epoch, Pvt reference) {}
+
+    public List<EpochChoice> delayEpochs(UUID inputId)
+    {
+        if (pvtCalculator == null) {
+            throw new IllegalStateException("지연 시험은 통합 노드에서 지원됩니다.");
+        }
+
+        var records = GrawCodec.splitLengthPrefixed(readInput(inputId));
+        var values = pvtCalculator.calculate(records);
+        List<EpochChoice> choices = new ArrayList<>();
+        int pvtIndex = 0;
+
+        for (int recordIndex = 0; recordIndex < records.size(); recordIndex++) {
+            var message = GrawCodec.decode(records.get(recordIndex)).message();
+            if (message instanceof GrawCodec.ObservationEpoch epoch) {
+                var identity = new DtnDelay.Epoch(recordIndex, epoch.week(), epoch.receiverTowSeconds());
+                choices.add(new EpochChoice(identity, values.get(pvtIndex++)));
+            }
+        }
+        return choices;
+    }
+
+    public synchronized DtnJob createDelay(
+            UUID inputId, String sender, String receiver, String url,
+            String testType, String senderMode, String receiverMode, HdtnConfig config,
+            DtnDelay.Epoch epoch, Instant startedAt)
+    {
+        if (pvtCalculator == null || nodeLink == null || !nodeLink.sender()) {
+            throw new IllegalStateException("지연 시험은 송신 통합 노드에서 시작하세요.");
+        }
+        if (!List.of("GNSS_RAW", "AFS_METADATA").contains(testType)) {
+            throw new IllegalArgumentException("지연 시험 유형 오류");
+        }
+        if (epoch == null) {
+            epoch = delayEpochs(inputId).stream()
+                    .filter(choice -> choice.reference().isPositionValid())
+                    .map(EpochChoice::epoch)
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("위치 PVT가 유효한 Epoch가 없습니다."));
+        }
+
+        return createConfigured(inputId, sender, receiver, url, testType,
+                senderMode, receiverMode, config, epoch, startedAt);
+    }
+
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private IqService iq;
     @org.springframework.beans.factory.annotation.Autowired(required = false)
@@ -114,6 +168,7 @@ public class DtnService {
     public Map<String, Object> configuration()
     {
         return Map.ofEntries(
+                Map.entry("delaySupported", pvtCalculator != null && nodeLink != null),
                 Map.entry("exampleEnabled", exampleEnabled),
                 Map.entry("development", development),
                 Map.entry("iqEnabled", iq != null && iq.enabled()),
@@ -155,6 +210,14 @@ public class DtnService {
     public synchronized DtnJob create(UUID inputId, String sender, String receiver, String requestedUrl,
             String testType, String senderMode, String receiverMode, HdtnConfig hdtnConfig)
     {
+        return createConfigured(inputId, sender, receiver, requestedUrl, testType,
+                senderMode, receiverMode, hdtnConfig, null, null);
+    }
+
+    private DtnJob createConfigured(UUID inputId, String sender, String receiver, String requestedUrl,
+            String testType, String senderMode, String receiverMode, HdtnConfig hdtnConfig,
+            DtnDelay.Epoch epoch, Instant startedAt)
+    {
         if (hdtnConfig != null && !"HDTN".equals(senderMode) && !"HDTN".equals(receiverMode))
             throw new IllegalArgumentException("HDTN 설정은 HDTN이 포함된 전송 경로에서만 사용할 수 있습니다.");
         String hdtnConfigJson = hdtnConfig == null ? null : objectMapper.valueToTree(hdtnConfig).toString();
@@ -170,10 +233,26 @@ public class DtnService {
             return job;
         }
         byte[] data = readInput(inputId);
+        if (epoch != null) {
+            data = DtnDelay.select(GrawCodec.splitLengthPrefixed(data), epoch);
+            var reference = pvtCalculator.calculate(GrawCodec.splitLengthPrefixed(data));
+            if (reference.size() != 1 || !reference.getFirst().isPositionValid()) {
+                throw new IllegalArgumentException("선택 Epoch의 Reference 위치 PVT를 계산할 수 없습니다.");
+            }
+        }
         DtnJob job = newJob(sender, receiver, destination, testType, senderMode, receiverMode);
         job.setHdtnConfigJson(hdtnConfigJson);
         job.setInputId(inputId);
+        if (epoch != null) {
+            job.setComparisonMode("DELAY");
+            job.setTestStartedAt(java.util.Objects.requireNonNull(startedAt));
+            job.setSelectedEpochJson(objectMapper.valueToTree(epoch).toString());
+        }
         beginLog(job,inputId);
+        if (epoch != null) {
+            trace(job.getId(),"송신 시험 조건",false,"지연 반영 비교 · 1 Epoch · 선택 " + epoch + " · 시험용 입력 " + data.length + " bytes");
+            trace(job.getId(),"송신 시작",true,"시작 접수 " + startedAt + " · 이후 준비/변환/전송 대기 포함 · 시계 동기화 정확도 미확인");
+        }
         update(job, "PREPARING", "기준 PVT 계산 및 " + testType + " 준비 중");
         try {
             sendChunks(job, sender, "GNSS_RAW".equals(testType) ? "PREPARE_RAW" : "PREPARE", data);
@@ -353,6 +432,11 @@ public class DtnService {
     /** 인증 및 동일성 검증 후 H2 저장이 끝나야 callback 접수를 완료한다. */
     public synchronized DtnJob receive(String authorization, byte[] body) throws Exception
     {
+        return receive(authorization, body, Instant.now());
+    }
+
+    public synchronized DtnJob receive(String authorization, byte[] body, Instant receivedAt) throws Exception
+    {
         authenticate(authorization);
         if (sendingNode()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "DTN callback은 수신 노드로 보내세요.");
@@ -406,7 +490,7 @@ public class DtnService {
         }
         job.setDevelopment(development);
         job.setReceivedJson(objectMapper.writeValueAsString(received));
-        job.setReceivedAt(Instant.now());
+        job.setReceivedAt(receivedAt);
         trace(id,"JSON 접수",true,"원본 동일성 확인·저장 완료 · "+body.length+" bytes · "+type+" · "+txMode+" → "+rxMode);
         update(job, "WAITING_RECEIVER", "DTN 수신 완료 / Receiver 연결 대기");
         if (logs != null && (adapterLogs != null || plainLogs != null))
@@ -500,13 +584,17 @@ public class DtnService {
             if (result.getPvt() == null || result.getPvt().isEmpty()) {
                 throw new IllegalArgumentException("PVT 결과 없음");
             }
-            if(logs!=null) logs.pvt(job.getId(),"TEST",result.getPvt(),0);
+            if(logs!=null && (preparing || !"DELAY".equals(job.getComparisonMode()))) logs.pvt(job.getId(),"TEST",result.getPvt(),0,preparing?"송신 Reference":"수신 PVT");
             if (result.getObservations() != null)
                 job.setObservationsJson(objectMapper.writeValueAsString(result.getObservations()));
             if (preparing) {
                 if (result.getTransfer() == null
                         || !job.getId().equals(result.getTransfer().getTestId())) {
                     throw new IllegalArgumentException("송신 payload 식별 오류");
+                }
+                if ("DELAY".equals(job.getComparisonMode())
+                        && (result.getPvt().size() != 1 || !result.getPvt().getFirst().isPositionValid())) {
+                    throw new IllegalArgumentException("송신 Reference PVT 계산 불가");
                 }
                 job.setReferenceJson(objectMapper.writeValueAsString(result.getPvt()));
                 result.getTransfer().setReferencePvt(result.getPvt());
@@ -519,6 +607,20 @@ public class DtnService {
                 startTask(job.getId(), "dtn-http-send", () -> sendExternal(job.getId(), packet));
             } else {
                 job.setReceiverJson(objectMapper.writeValueAsString(result.getPvt()));
+                if ("DELAY".equals(job.getComparisonMode())) {
+                    if (result.getDelayEvidence() == null) {
+                        throw new IllegalArgumentException("지연 계산 근거 누락");
+                    }
+                    job.setDelayEvidenceJson(objectMapper.writeValueAsString(result.getDelayEvidence()));
+                    var transfer = objectMapper.readValue(job.getReceivedJson(), Transfer.class);
+                    job.setReferenceJson(objectMapper.writeValueAsString(transfer.getReferencePvt()));
+                    if (logs != null) {
+                        logs.delay(job.getId(), result.getDelayEvidence());
+                        logs.pvt(job.getId(), "TEST", result.getPvt(), 0, "수신 지연 반영 PVT");
+                    }
+                    compareDelay(job, result.getPvt(), false);
+                    return;
+                }
                 if (nodeLink != null && !nodeLink.sender()) {
                     var receivedTransfer=objectMapper.readValue(job.getReceivedJson(),Transfer.class);
                     if(receivedTransfer.getReferencePvt()!=null && !receivedTransfer.getReferencePvt().isEmpty()) {
@@ -593,11 +695,14 @@ public class DtnService {
                         continue;
                     }
                     update(job, "CALCULATING", "Receiver 입력 복원 및 PVT 계산 중");
-                    sendChunks(
-                            job,
-                            job.getReceiverAgentId(),
-                            "RECEIVE",
-                            job.getReceivedJson().getBytes(StandardCharsets.UTF_8));
+                    boolean delay = "DELAY".equals(job.getComparisonMode());
+                    byte[] calculationInput = job.getReceivedJson().getBytes(StandardCharsets.UTF_8);
+                    if (delay) {
+                        var transfer = objectMapper.readValue(job.getReceivedJson(), Transfer.class);
+                        var timing = new DtnDelay.Timing(job.getTestStartedAt(), job.getReceivedAt());
+                        calculationInput = objectMapper.writeValueAsBytes(new DtnDelay.Receive(transfer, timing));
+                    }
+                    sendChunks(job, job.getReceiverAgentId(), delay ? "RECEIVE_DELAY" : "RECEIVE", calculationInput);
                 } catch (Exception e) {
                     fail(job, e);
                 }
@@ -664,7 +769,7 @@ public class DtnService {
         }
         if ("FAILED".equals(result.getState())) {
             fail(job, new IllegalStateException("수신 노드 실패: " + result.getMessage()));
-        } else if ("COMPLETED".equals(result.getState())) {
+        } else if ("COMPLETED".equals(result.getState()) || ("DELAY".equals(job.getComparisonMode()) && "INCONCLUSIVE".equals(result.getState()))) {
             try {
                 if ("IQ_SAMPLE".equals(job.getTestType())) {
                     if (result.getReceivedAt() == null || result.getFileResult() == null)
@@ -691,7 +796,13 @@ public class DtnService {
                     throw new IllegalArgumentException("수신 노드의 완료 결과가 불완전합니다.");
                 }
                 job.setReceiverJson(objectMapper.writeValueAsString(result.getPvt()));
-                compare(job, result.getPvt());
+                if ("DELAY".equals(job.getComparisonMode())) {
+                    if (result.getDelayEvidence() == null) {
+                        throw new IllegalArgumentException("수신측 지연 계산 근거 누락");
+                    }
+                    job.setDelayEvidenceJson(objectMapper.writeValueAsString(result.getDelayEvidence()));
+                    compareDelay(job, result.getPvt(), true);
+                } else compare(job, result.getPvt());
             } catch (Exception error) {
                 fail(job, error);
             }
@@ -752,6 +863,45 @@ public class DtnService {
         trace(job.getId(),"PVT 비교",true,objectMapper.writeValueAsString(comparison));
         update(job, "INCONCLUSIVE".equals(comparison.get("verdict")) ? "INCONCLUSIVE" : "COMPLETED",
                 "PVT 비교 완료: " + comparison.get("verdict"));
+    }
+
+    private void compareDelay(DtnJob job, List<Pvt> received, boolean sender) throws Exception
+    {
+        var evidence = objectMapper.readValue(job.getDelayEvidenceJson(), DtnDelay.Evidence.class);
+        if (!Objects.equals(evidence.timing().startedAt(), job.getTestStartedAt())
+                || !Objects.equals(evidence.timing().receivedAt(), job.getReceivedAt())) {
+            throw new IllegalArgumentException("지연 측정 기준 시각 불일치");
+        }
+        var selected = objectMapper.readValue(job.getSelectedEpochJson(), DtnDelay.Epoch.class);
+        if (selected.week() != evidence.originalTime().week()
+                || Double.compare(selected.towSeconds(), evidence.originalTime().towSeconds()) != 0) {
+            throw new IllegalArgumentException("등록된 Epoch와 계산 Epoch 불일치");
+        }
+
+        List<Pvt> reference = objectMapper.readValue(job.getReferenceJson(), new TypeReference<>() {});
+        var comparison = DtnComparison.delay(reference, received, evidence);
+        job.setComparisonJson(objectMapper.writeValueAsString(comparison));
+        if (!sender && logs != null) {
+            logs.pvt(job.getId(), "TEST", reference, 0, "비교 기준 Reference (송신측 제공)");
+            trace(job.getId(), "수신 PVT 비교", true,
+                    "차이 = 수신 − Reference · " + objectMapper.writeValueAsString(comparison));
+        }
+
+        var row = objectMapper.valueToTree(comparison).path("epochs").path(0);
+        String summary = comparison.get("message")
+                + " · 시험 시작→수신 " + evidence.delaySeconds() * 1000 + " ms"
+                + " · 위치 차이 " + measurement(row, "positionDifferenceMeters", "m")
+                + " · 속도 차이 " + measurement(row, "velocityDifferenceMetersPerSecond", "m/s")
+                + " · Clock Bias 차이 " + measurement(row, "clockDifferenceSeconds", "s");
+        trace(job.getId(), sender ? "송신 최종 요약" : "수신 계산 결과", false, summary);
+
+        String state = "INCONCLUSIVE".equals(comparison.get("verdict")) ? "INCONCLUSIVE" : "COMPLETED";
+        update(job, state, comparison.get("message").toString());
+    }
+
+    private static String measurement(JsonNode row, String field, String unit)
+    {
+        return row.path(field).isNumber() ? row.path(field).asText() + " " + unit : "비교 불가";
     }
 
     /* WebSocket 크기 제한에 맞춰 동일한 순서로 청크를 전달한다. */

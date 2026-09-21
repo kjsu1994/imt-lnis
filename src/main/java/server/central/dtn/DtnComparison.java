@@ -1,5 +1,7 @@
 package server.central.dtn;
 
+import server.shared.codec.DtnDelay;
+
 import server.shared.model.DtnModels.Pvt;
 
 import java.util.*;
@@ -75,6 +77,77 @@ public final class DtnComparison {
                 0.001,
                 "clockToleranceSeconds",
                 1e-9);
+    }
+
+    /** 서로 다른 관측 시각을 의도적으로 비교한다. 기존 동일성 판정과 분리한다. */
+    public static Map<String, Object> delay(
+            List<Pvt> reference, List<Pvt> received, DtnDelay.Evidence evidence)
+    {
+        if (reference == null || received == null
+                || reference.size() != 1 || received.size() != 1 || evidence == null) {
+            throw new IllegalArgumentException("1 Epoch 지연 계산 결과 누락");
+        }
+        Pvt source = reference.getFirst();
+        Pvt calculated = received.getFirst();
+        if (source.getWeek() != evidence.originalTime().week()
+                || Double.compare(source.getTowSeconds(), evidence.originalTime().towSeconds()) != 0) {
+            throw new IllegalArgumentException("Reference Epoch 불일치");
+        }
+        if (evidence.error() == null && (evidence.shiftedTime() == null
+                || calculated.getWeek() != evidence.shiftedTime().week()
+                || Double.compare(calculated.getTowSeconds(), evidence.shiftedTime().towSeconds()) != 0)) {
+            throw new IllegalArgumentException("지연 반영 Epoch 불일치");
+        }
+
+        boolean position = evidence.error() == null && source.isPositionValid() && calculated.isPositionValid();
+        boolean velocity = position && source.isVelocityValid() && calculated.isVelocityValid();
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("week", calculated.getWeek());
+        row.put("towSeconds", calculated.getTowSeconds());
+        row.put("referenceWeek", source.getWeek());
+        row.put("referenceTowSeconds", source.getTowSeconds());
+        row.put("referenceValid", source.isPositionValid());
+        row.put("receivedValid", calculated.isPositionValid());
+        if (position) {
+            row.put("positionDifferenceMeters", distance(source.getEcefMeters(), calculated.getEcefMeters()));
+            row.put("positionDeltaMeters", delta(source.getEcefMeters(), calculated.getEcefMeters()));
+            if (source.getReceiverClockBiasSeconds() == null || calculated.getReceiverClockBiasSeconds() == null) {
+                throw new IllegalArgumentException("시계 오차 누락");
+            }
+            double clockDelta = calculated.getReceiverClockBiasSeconds() - source.getReceiverClockBiasSeconds();
+            if (!Double.isFinite(clockDelta)) {
+                throw new IllegalArgumentException("시계 오차 범위 오류");
+            }
+            row.put("clockDifferenceSeconds", clockDelta);
+        }
+        if (velocity) {
+            row.put("velocityDifferenceMetersPerSecond",
+                    distance(source.getVelocityMetersPerSecond(), calculated.getVelocityMetersPerSecond()));
+            row.put("velocityDeltaMetersPerSecond",
+                    delta(source.getVelocityMetersPerSecond(), calculated.getVelocityMetersPerSecond()));
+        }
+
+        String verdict = !position ? "INCONCLUSIVE" : velocity ? "MEASURED" : "PARTIAL";
+        String message = !position ? "수신 완료 · PVT 계산 불가"
+                : velocity ? "지연 반영 PVT 측정 완료" : "위치·시계 오차 측정 완료 · 속도 비교 불가";
+        return Map.of(
+                "mode", "DELAY",
+                "verdict", verdict,
+                "message", message,
+                "comparableEpochs", position ? 1 : 0,
+                "velocityComparableEpochs", velocity ? 1 : 0,
+                "epochs", List.of(row),
+                "delaySeconds", evidence.delaySeconds());
+    }
+
+    private static double[] delta(double[] source, double[] calculated)
+    {
+        distance(source, calculated); // 기존 벡터 유효성 검증 재사용
+        return new double[] {
+                calculated[0] - source[0],
+                calculated[1] - source[1],
+                calculated[2] - source[2]
+        };
     }
 
     private static double distance(double[] a, double[] b)

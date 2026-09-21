@@ -158,3 +158,15 @@ vm.runInContext(source, reopened);
 await reopened.ready;
 assert.equal(elements.get('dtn-tests').value, late.testId, 'normal initial load selects latest received test');
 console.log('PASS: automatic receipt selection, waiting-to-received transition, manual history, clear and arrival ordering');
+
+// Different source/shifted epochs must still compare the selected reference.
+context.setComparison({comparisonMode:'DELAY', referencePvt:[{week:2400,towSeconds:100,positionValid:true,ecefMeters:[1,2,3]}],
+  receivedPvt:[], delayEvidence:{delaySeconds:0.001,addedMeters:299792.458,originalTime:{towSeconds:100},shiftedTime:{towSeconds:100.001}},
+  comparison:{verdict:'MEASURED',epochs:[{week:2400,towSeconds:100.001,positionDifferenceMeters:2,clockDifferenceSeconds:0.001}]}});
+context.setEpochs([{week:2400,towSeconds:100.001,positionValid:true,ecefMeters:[3,2,3]}]);
+assert.equal(elements.get('reference-x').textContent,'1.000');
+assert.match(elements.get('pvt-match').textContent,/지연 반영/);
+assert.match(elements.get('dtn-delay-note').textContent,/수신 원본/);
+assert.match(elements.get('pvt-differences').textContent,/2.000000/);
+context.setComparison();
+assert.equal(elements.get('dtn-delay-note').hidden,true);

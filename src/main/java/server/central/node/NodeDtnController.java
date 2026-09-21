@@ -25,6 +25,14 @@ public class NodeDtnController {
     private final Validator validator;
     private final server.central.dtn.DtnService dtnService;
 
+    @GetMapping("/capabilities")
+    public java.util.Map<String, Boolean> capabilities(
+            @RequestHeader(value = "Authorization", required = false) String authorization)
+    {
+        authentication.authenticate(authorization);
+        return java.util.Map.of("delaySupported", true);
+    }
+
     @PostMapping
     public ResponseEntity<DtnRemoteResult> register(HttpServletRequest request) throws Exception
     {

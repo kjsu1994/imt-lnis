@@ -2,7 +2,7 @@ import {requestJson} from '../common/http.js?v=20260915-structure';
 import {createDtnLog} from './dtn-log.js?v=20260917-console';
 import {initAdapterHealth} from './dtn-adapter-health.js?v=20260915-structure';
 import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20260918-receiver-original';
-import {createObservationView, numeric} from './dtn-observations.js?v=20260916-iq-pvt-r3';
+import {createObservationView, numeric} from './dtn-observations.js?v=20260921-role';
 
 const $ = id => document.getElementById(id);
 const payloadViewer = createPayloadViewer($('dtn-payload'), {receivedOnly: true});
@@ -10,17 +10,26 @@ const clearScreen = location.pathname?.endsWith('/clear') === true;
 let tests = [], epochs = [], selectedId = '', renderVersion = 0, polling = false;
 let reportKey = '', lastEvent = '';
 let receivedIds = null;
-let referenceEpochs = [], comparisonEpochs = [];
+let referenceEpochs = [], comparisonEpochs = [], delayComparison = false;
 function setComparison(report = {}) {
+  delayComparison = report.comparisonMode === 'DELAY';
+  $('receiver-pvt-title').textContent = delayComparison ? '수신 지연 반영 PVT · Reference 비교' : '수신 지구 PVT · 송신 기준 비교';
+  $('received-pvt-label').textContent = delayComparison ? '수신 지연 반영 지구 PVT' : '수신 복원 지구 PVT';
+  const evidence = report.delayEvidence;
+  $('dtn-delay-note').hidden = !delayComparison;
+  $('dtn-delay-note').textContent = !evidence ? '수신 후 지연 반영 계산을 수행합니다.' :
+    '수신 원본 관측값은 아래에 그대로 표시합니다. 계산용 의사거리는 상세 로그에서 확인하세요. 시험 시작→수신 '+numeric(evidence.delaySeconds*1000,3)+
+    ' ms · 추가 거리 '+numeric(evidence.addedMeters,3)+' m · 시계 동기화 정확도 미확인 · 원본 TOW '+numeric(evidence.originalTime?.towSeconds,9)+
+    ' s / Week '+(evidence.originalTime?.week ?? '—')+' → 계산 TOW '+numeric(evidence.shiftedTime?.towSeconds,9)+' s / Week '+(evidence.shiftedTime?.week ?? '—');
   referenceEpochs = Array.isArray(report.referencePvt) ? report.referencePvt : [];
   comparisonEpochs = report.comparison?.epochs || [];
   const verdict = report.comparison?.verdict;
-  pill('pvt-match', verdict === 'MEASURED' ? 'I/Q PVT 오차 측정 · 허용오차 미설정' : verdict === 'PASS' ? '전체 PVT 일치' : verdict === 'FAIL' ? '전체 PVT 불일치' : 'PVT 비교 불가',
+  pill('pvt-match', verdict === 'MEASURED' ? (delayComparison ? '지연 반영 PVT 측정 완료 · 허용오차 미설정' : 'I/Q PVT 오차 측정 · 허용오차 미설정') : verdict === 'PARTIAL' ? '부분 비교 · 속도 비교 불가' : verdict === 'PASS' ? '전체 PVT 일치' : verdict === 'FAIL' ? '전체 PVT 불일치' : 'PVT 비교 불가',
     verdict === 'PASS' ? 'online' : verdict === 'FAIL' ? 'error' : 'warning');
 }
 const observations = createObservationView($('dtn-observations'), index => {
   if (epochs[index]) { $('pvt-epoch').value = String(index); renderEpoch(); }
-});
+}, '수신 원본');
 observations.setData(null);
 
 function get(path) {
@@ -50,7 +59,7 @@ function renderEpoch() {
   const pvt = epochs[Number($('pvt-epoch').value)];
   const delta = pvt && comparisonEpochs.find(e=>e.week===pvt.week && e.towSeconds===pvt.towSeconds);
   $('pvt-differences').textContent = '위치 차이 '+number(delta?.positionDifferenceMeters,6)+' m · 속도 차이 '+number(delta?.velocityDifferenceMetersPerSecond,6)+' m/s · 시계오차 차이 '+number(delta?.clockDifferenceSeconds,12)+' s';
-  const reference = pvt && referenceEpochs.find(value => value.week === pvt.week && value.towSeconds === pvt.towSeconds);
+  const reference = pvt && (delayComparison ? referenceEpochs[0] : referenceEpochs.find(value => value.week === pvt.week && value.towSeconds === pvt.towSeconds));
   ['x', 'y', 'z'].forEach((axis, index) => {
     $('reference-' + axis).textContent = number(reference?.positionValid ? reference.ecefMeters?.[index] : null);
     $('reference-v' + axis).textContent = number(reference?.velocityValid ? reference.velocityMetersPerSecond?.[index] : null);

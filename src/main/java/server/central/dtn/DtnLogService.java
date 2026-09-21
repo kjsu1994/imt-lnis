@@ -1,5 +1,7 @@
 package server.central.dtn;
 
+import server.shared.codec.DtnDelay;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -172,20 +174,78 @@ public class DtnLogService {
         }
     }
     public void pvt(UUID id, String type, List<Pvt> values, long started) {
+        pvt(id,type,values,started,"PVT");
+    }
+    public void pvt(UUID id, String type, List<Pvt> values, long started, String stage) {
         if (values == null || values.isEmpty()) {
-            add(id,type,"WARN","PVT",false,"계산 가능한 관측 시점이 없습니다. 관측값·항법정보를 확인하세요."); return;
+            add(id,type,"WARN",stage,false,"계산 가능한 관측 시점이 없습니다. 관측값·항법정보를 확인하세요.");
+            return;
         }
         for (Pvt p:values) {
             boolean valid=p.isPositionValid() && p.isVelocityValid();
-            add(id,type,valid?"INFO":"WARN","PVT",false,
+            add(id,type,valid?"INFO":"WARN",stage,false,
                 (valid?"지구 PVT 계산 완료":"지구 PVT 계산 결과 · 유효 해 부족") + " · Week " + p.getWeek()
                 + " / TOW " + p.getTowSeconds() + " s · 위치 " + (p.isPositionValid()?"유효":"무효") + " · 속도 " + (p.isVelocityValid()?"유효":"무효")
                 + " · 사용 위성 " + p.getSatellitesUsed() + " · " + (p.getMessage()==null?"":p.getMessage()));
-            if(valid) add(id,type,"PVT",true,"ECEF(m) " + Arrays.toString(p.getEcefMeters())
-                + " · 속도(m/s) " + Arrays.toString(p.getVelocityMetersPerSecond()) + " · 시계오차(s) " + p.getReceiverClockBiasSeconds());
+            if(p.isPositionValid()) add(id,type,stage,true,"ECEF(m) " + Arrays.toString(p.getEcefMeters())
+                + " · 속도(m/s) " + (p.isVelocityValid() ? Arrays.toString(p.getVelocityMetersPerSecond()) : "계산 불가") + " · 시계오차(s) " + p.getReceiverClockBiasSeconds());
         }
-        if(started>0) add(id,type,"PVT",true,"계산 소요 " + ((System.nanoTime()-started)/1_000_000) + " ms");
+        if(started>0) add(id,type,stage,true,"계산 소요 " + ((System.nanoTime()-started)/1_000_000) + " ms");
     }
+    /** 수신 노드에만 위성별 계산 근거를 남긴다. 송신 노드는 최종 요약만 기록한다. */
+    public void delay(UUID id, DtnDelay.Evidence evidence)
+    {
+        if (evidence == null || hasStage(id, "지연 측정")) {
+            return;
+        }
+        add(id, "TEST", "WARN", "지연 측정", false,
+                "수신측 · 시험 시작→수신 지연 " + evidence.delaySeconds() * 1000
+                        + " ms · 양쪽 PC 시계 동기화 정확도 미확인");
+        add(id, "TEST", "지연 측정", true,
+                "시작 " + evidence.timing().startedAt()
+                        + " · 본문 수신 완료 " + evidence.timing().receivedAt()
+                        + " · Δt = 수신 − 시작 = " + evidence.delaySeconds()
+                        + " s · c = 299792458 m/s · c×Δt = " + evidence.addedMeters() + " m");
+        add(id, "TEST", "관측 시각", true,
+                "GPS 원본 t₀ = " + gpsTime(evidence.originalTime())
+                        + " · 계산 t₁ = t₀ + Δt = " + gpsTime(evidence.shiftedTime()));
+
+        for (var satellite : evidence.satellites()) {
+            String identity = "GNSS " + satellite.constellationId()
+                    + " / PRN " + satellite.satelliteId() + " / 신호 " + satellite.signalId();
+            add(id, "TEST", "송신 시각 역산", true,
+                    identity + " · Pᵢ = " + satellite.originalMeters()
+                            + " m · Pᵢ/c = " + satellite.propagationSeconds()
+                            + " s · t_txᵢ = t₀ − Pᵢ/c = " + gpsTime(satellite.transmitTime()));
+
+            String usage = satellite.solverInput()
+                    ? "GPS L1 계산 입력 (최종 채택은 RTKLIB 결정)" : "계산 대상 제외";
+            add(id, "TEST", "의사거리 재계산", true,
+                    identity + " · P′ᵢ = c×(t₁−t_txᵢ) = Pᵢ+c×Δt = " + satellite.recalculatedMeters()
+                            + " m · 변화 " + evidence.addedMeters()
+                            + " m · 원본 Doppler " + satellite.dopplerHz()
+                            + " Hz / C/N0 " + satellite.cn0() + " dB-Hz 유지 · " + usage);
+        }
+
+        add(id, "TEST", "계산 조건", true,
+                "Ephemeris·Doppler·C/N0 등 원본 유지 · 기존 RTKLIB GPS L1 C/A SPP 재사용 · 원본 JSON/RAW 변경 없음");
+        add(id, "TEST", "결과 해석", true,
+                "공통 의사거리 증가분은 수신기 시계 오차로 추정될 수 있습니다. "
+                        + "원본 Doppler를 사용하므로 속도 변화가 작을 수 있으나 동일함을 보장하지 않습니다. "
+                        + "실제 미래 GNSS 관측 재현은 아닙니다.");
+        if (evidence.error() != null) {
+            add(id, "TEST", "WARN", "지연 계산", false, evidence.error());
+        }
+    }
+
+    private static String gpsTime(DtnDelay.Time time)
+    {
+        if (time == null) {
+            return "계산 불가";
+        }
+        return String.format(Locale.ROOT, "Week %d / TOW %.9f s", time.week(), time.towSeconds());
+    }
+
     @Scheduled(fixedDelay = 600000) @Transactional
     public void cleanup() {
         repository.deleteByScopeTypeNotAndOccurredAtBefore("TEST",Instant.now().minus(Duration.ofDays(7)));

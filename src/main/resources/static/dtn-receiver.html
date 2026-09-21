@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>LNIS DTN Receiver</title>
   <link rel="stylesheet" href="/lnis/assets/common/app.css?v=20260918-admin-icon">
-  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20260918-receiver-pvt">
+  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20260921-delay-20260918-receiver-pvt">
 </head>
 <body data-page="dtn-receiver">
 <header>
@@ -91,9 +91,10 @@
 
   <section class="card epoch-observation-card" id="dtn-observations"></section>
 
+  <p id="dtn-delay-note" role="status" hidden></p>
   <section class="card receiver-pvt">
     <div class="card-title">
-      <h2>송·수신 지구 PVT</h2>
+      <h2 id="receiver-pvt-title">수신 지구 PVT · 송신 기준 비교</h2>
     </div>
     <div class="receiver-epoch-row">
       <label for="pvt-epoch">관측 시각</label>
@@ -112,7 +113,7 @@
       <div class="pvt-value"><span>속도 Z</span><strong id="reference-vz">-</strong><small>m/s</small></div>
       <div class="pvt-value"><span>사용 위성</span><strong id="reference-satellites">-</strong><small>개</small></div>
     </div></div>
-    <div><h3>수신 복원 지구 PVT</h3><div class="pvt-grid">
+    <div><h3 id="received-pvt-label">수신 복원 지구 PVT</h3><div class="pvt-grid">
       <div class="pvt-value"><span>ECEF X</span><strong id="pvt-x">-</strong><small>m</small></div>
       <div class="pvt-value"><span>ECEF Y</span><strong id="pvt-y">-</strong><small>m</small></div>
       <div class="pvt-value"><span>ECEF Z</span><strong id="pvt-z">-</strong><small>m</small></div>
@@ -131,11 +132,11 @@
   <div class="dtn-output-grid">
   <section id="dtn-payload" class="card receiver-payload"></section>
   <section class="card receiver-log">
-    <div class="card-title dtn-log-tools"><h2>송수신 로그</h2><select id="dtn-log-history" aria-label="로그 시험 기록"><option value="">현재 작업</option></select><button id="dtn-log-detail" type="button" aria-pressed="false">상세 로그</button><a id="dtn-log-download" aria-disabled="true">다운로드</a><button id="dtn-log-clear" type="button" title="저장 로그는 삭제하지 않습니다">화면 지우기</button></div>
+    <div class="card-title dtn-log-tools"><h2>수신 로그</h2><select id="dtn-log-history" aria-label="로그 시험 기록"><option value="">현재 작업</option></select><button id="dtn-log-detail" type="button" aria-pressed="false">상세 로그</button><a id="dtn-log-download" aria-disabled="true">다운로드</a><button id="dtn-log-clear" type="button" title="저장 로그는 삭제하지 않습니다">화면 지우기</button></div>
     <pre id="dtn-log" class="log"></pre>
   </section>
   </div>
 </main>
-<script type="module" src="/lnis/assets/dtn/dtn-receiver.js?v=20260918-receiver-pvt"></script>
+<script type="module" src="/lnis/assets/dtn/dtn-receiver.js?v=20260921-delay-20260918-receiver-pvt"></script>
 </body>
 </html>

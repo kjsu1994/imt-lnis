@@ -2,7 +2,7 @@ import {requestJson} from '../common/http.js?v=20260915-structure';
 import {createDtnLog} from './dtn-log.js?v=20260917-console';
 import {initAdapterHealth, validAdapterUrl} from './dtn-adapter-health.js?v=20260915-settings';
 import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20260915-structure';
-import {createObservationView, numeric} from './dtn-observations.js?v=20260916-iq-pvt-r3';
+import {createObservationView, numeric} from './dtn-observations.js?v=20260921-role';
 
 const api = '/lnis/api/v1', $ = id => document.getElementById(id);
 const payload = createPayloadViewer($('dtn-payload'), {sentOnly: true});
@@ -10,6 +10,7 @@ let inputId = null, agents = [], busy = false, job = null, config = {}, peerConf
 let selectedType = 'AFS_METADATA', senderMode = 'DTN', receiverMode = 'HDTN';
 let pvt = [], epochIndex = 0, reportKey = '', lastEvent = '', lastAgentState = '';
 let polling = false, inputMode = 'upload';
+let delayChoices = [];
 let captureId = null, captureError = '';
 let iqJob = null;
 let iqFiles = [];
@@ -17,7 +18,7 @@ let jobVersion = 0;
 const generatingIq = () => iqJob?.state === 'GENERATING';
 const active = () => ['PREPARING', 'WAITING_DTN', 'WAITING_RECEIVER', 'CALCULATING'].includes(job?.state);
 const locked = () => busy || active() || generatingIq();
-const view = createObservationView($('dtn-observations'), index => { epochIndex = index; renderPvt(); });
+const view = createObservationView($('dtn-observations'), index => { epochIndex = index; renderPvt(); }, '송신 원본');
 view.setData(null);
 
 function request(path, options = {}) {
@@ -95,7 +96,7 @@ $('dtn-settings-open').onclick = () => showSettings($('dtn-settings-view').hidde
 $('dtn-settings-close').onclick = () => showSettings(false);
 function updateInputSummary() {
   const type = {GNSS_RAW: 'GNSS RAW', AFS_METADATA: 'AFS Frame + Metadata', IQ_SAMPLE: 'I/Q Sample'}[selectedType];
-  $('dtn-condition-summary').textContent = type + ' · ' + senderMode + ' → ' + receiverMode;
+  $('dtn-condition-summary').textContent = type + ' · ' + senderMode + ' → ' + receiverMode + (delayMode() ? ' · 지연 반영 1 Epoch' : '');
   const source = inputMode === 'capture' ? 'COM ' + ($('dtn-port').value || '미선택') : 'capture.graw';
   $('dtn-input-summary').textContent = source + ' · ' + $('dtn-input-state').textContent;
 }
@@ -121,7 +122,35 @@ function renderPvt() {
   $('pvt-message').textContent = value?.message || '지구 ECEF · GPS L1 C/A · 전송시험 시작 시 계산';
 
 }
+function delayMode() { return selectedType !== 'IQ_SAMPLE' && $('dtn-comparison-mode').checked; }
+function selectedDelayEpoch() {
+  return delayChoices.find(choice => choice.reference.positionValid);
+}
+async function loadDelayEpochs() {
+  delayChoices = [];
+  if (!config.delaySupported || !inputId) return;
+  try {
+    delayChoices = await request('/dtn/inputs/' + inputId + '/delay-epochs');
+    const first = delayChoices.findIndex(choice => choice.reference.positionValid);
+    if (first >= 0) {
+      epochIndex = first;
+      view.select(first);
+      renderPvt();
+    } else {
+      log('지연 반영 시험에 사용할 유효한 Epoch가 없습니다. 입력·항법정보를 확인하세요.', 'WARN');
+    }
+  } catch (error) {
+    log('시험 Epoch 확인 실패 · ' + error.message, 'WARN');
+  }
+}
+function updateDelayControls() {
+  $('dtn-comparison-settings').hidden = selectedType === 'IQ_SAMPLE';
+  $('dtn-comparison-mode').disabled = locked() || selectedType === 'IQ_SAMPLE' || !config.delaySupported;
+}
+$('dtn-comparison-mode').onchange = updateControls;
+
 function updateControls() {
+  updateDelayControls();
   updateInputSummary();
   $('dtn-settings-lock').hidden = !locked();
   updateHdtnControls();
@@ -131,7 +160,7 @@ function updateControls() {
   $('dtn-port').disabled = $('dtn-baud').disabled = locked();
   $('dtn-cancel').disabled = busy || !(active() || job?.state === 'FAILED' || job?.cancelPending);
   $('dtn-cancel').textContent = job?.cancelPending ? '중지 재요청' : '시험 중지';
-  $('dtn-send').disabled = locked() || (selectedType === 'IQ_SAMPLE' ? iqJob?.state !== 'READY' : !inputId) || !urlValid() || tx?.state !== 'READY' || rx?.state !== 'READY';
+  $('dtn-send').disabled = locked() || (selectedType === 'IQ_SAMPLE' ? iqJob?.state !== 'READY' : !inputId) || (delayMode() && !selectedDelayEpoch()?.reference?.positionValid) || !urlValid() || tx?.state !== 'READY' || rx?.state !== 'READY';
   $('iq-generate').disabled = locked() || !config.iqEnabled || !inputId;
   $('iq-cancel').disabled = !generatingIq();
   $('iq-saved').disabled = locked();
@@ -203,7 +232,7 @@ async function upload(file) {
     inputId = input.inputId;
     try { pvt = await request('/dtn/inputs/' + inputId + '/pvt'); }
     catch (error) { pvt = []; log('PVT 미리보기 불가 · ' + error.message, 'WARN'); }
-    view.setData(observations); renderPvt();
+    view.setData(observations); renderPvt(); await loadDelayEpochs();
     $('dtn-upload-progress').value = 100; $('dtn-input-state').textContent = file.name + ' · ' + complete.recordCount + '건';
     log('입력 완료 · ' + file.name); void logView.refresh();
   } catch (error) {
@@ -235,7 +264,7 @@ $('dtn-start').onclick = async () => {
     pvt = await request('/dtn/inputs/' + captureId + '/pvt');
     if (observations.epochs?.length !== 1 || !pvt[0]?.positionValid || !pvt[0]?.velocityValid)
       throw new Error('유효한 한 시점 PVT 입력이 아닙니다.');
-    view.setData(observations); renderPvt(); inputId = captureId;
+    inputId = captureId; view.setData(observations); renderPvt(); await loadDelayEpochs();
     $('dtn-input-state').textContent = '한 시점 수집 완료 · 지구 PVT 계산 완료';
     log('수집 완료 · 관측값 1시점 · 지구 PVT 계산 완료');
   } catch (e) {
@@ -252,7 +281,7 @@ if ($('dtn-replay')) $('dtn-replay').onclick = async () => {
     logView.setContext(input.inputId,'INPUT');
     const observations = await request('/dtn/inputs/' + input.inputId + '/observations');
     pvt = await request('/dtn/inputs/' + input.inputId + '/pvt');
-    inputId = input.inputId; view.setData(observations); renderPvt();
+    inputId = input.inputId; view.setData(observations); renderPvt(); await loadDelayEpochs();
     $('dtn-input-state').textContent = '합성 수집 완료 · 지구 PVT 계산 완료 · 실측 아님';
     log('합성 GRAW 수집 재생 완료 · COM/UBX 장치 시험이 아닙니다.', 'WARN');
   } catch (error) { inputId = null; $('dtn-input-state').textContent = '재생 실패'; log(error.message, 'ERROR'); }
@@ -313,10 +342,11 @@ $('dtn-send').onclick = async () => {
   try { if (usesHdtn()) hdtnConfig = readHdtnConfig(); }
   catch (error) { showSettings(true); $('hdtn-config-state').textContent = error.message; log(error.message, 'ERROR'); return; }
   jobVersion++;
+  const delayRequest = delayMode() ? {comparisonMode:'DELAY',selectedEpoch:selectedDelayEpoch()?.epoch} : {};
   busy = true; resetResult(); updateControls();
   try {
     job = await post('/dtn/tests', {inputId: selectedType === 'IQ_SAMPLE' ? null : inputId, iqFileId: iqJob?.id, senderAgentId: $('dtn-sender').value,
-      receiverAgentId: $('dtn-receiver').value, sendUrl: $('dtn-send-url').value.trim(), testType: selectedType, senderMode, receiverMode, ...(hdtnConfig ? {hdtnConfig} : {})});
+      receiverAgentId: $('dtn-receiver').value, sendUrl: $('dtn-send-url').value.trim(), testType: selectedType, senderMode, receiverMode, ...delayRequest, ...(hdtnConfig ? {hdtnConfig} : {})});
     log('전송시험 시작 · ' + job.testId);
     renderSummary();
   } catch (e) { log('시험 시작 실패 · ' + e.message, 'ERROR'); pill('dtn-test-status', '시작 실패', 'error'); }
@@ -413,6 +443,7 @@ async function initialize() {
   initializeHdtnConfig();
   try {
     config = await request('/dtn/config');
+    if (!config.delaySupported) $('dtn-comparison-mode').checked = false;
     if (config.iqEnabled) await loadIqFiles();
     $('dtn-send-url').value = config.defaultSendUrl || '';
     initAdapterHealth(config.adapterUrl || config.defaultSendUrl || '', log, (text, className) => {

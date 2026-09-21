@@ -144,6 +144,43 @@ class IndependentNodeIntegrationTest {
             assertEquals(302, http.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"
                     + receiverPort + "/lnis/dtntest/sender")).GET().build(), HttpResponse.BodyHandlers.discarding()).statusCode());
 
+            byte[] legacyDelivered = delivered.get();
+            Map<UUID, String> delayEvidence = new java.util.LinkedHashMap<>();
+            for (String type : java.util.List.of("GNSS_RAW", "AFS_METADATA")) {
+                await(() -> ready(sender, "sender-1") && ready(sender, "receiver-1"), 15);
+                var epoch = tx.delayEpochs(input).stream().filter(e -> e.reference().isPositionValid()).findFirst().orElseThrow().epoch();
+                UUID delayId = tx.createDelay(input, "sender-1", "receiver-1",
+                        "http://127.0.0.1:" + adapter.getAddress().getPort() + "/transfer",
+                        type, "DTN", "HDTN", hdtn, epoch, java.time.Instant.now()).getId();
+                await(() -> java.util.List.of("COMPLETED", "FAILED", "INCONCLUSIVE").contains(tx.get(delayId).getState()), 40);
+                assertEquals("COMPLETED", tx.get(delayId).getState(), tx.get(delayId).getMessage());
+                assertEquals("MEASURED", mapper.readTree(tx.get(delayId).getComparisonJson()).path("verdict").asText());
+                assertEquals(rx.get(delayId).getDelayEvidenceJson(), tx.get(delayId).getDelayEvidenceJson());
+                assertEquals(1, mapper.readTree(tx.get(delayId).getReferenceJson()).size());
+                assertFalse(mapper.readTree(tx.get(delayId).getSentJson()).has("comparisonMode"), "외부 계약 유지");
+                assertTrue(receiverLogs.hasStage(delayId, "의사거리 재계산"));
+                assertFalse(senderLogs.hasStage(delayId, "의사거리 재계산"), "수신 상세 로그를 송신에 복제하지 않음");
+                assertTrue(senderLogs.hasStage(delayId, "송신 최종 요약"));
+                var at = rx.get(delayId).getReceivedAt();
+                int count = receiverLogs.read(delayId, 0).size();
+                rx.receive("Bearer test-dtn-receive", delivered.get(), at.plusSeconds(5));
+                assertEquals(at, rx.get(delayId).getReceivedAt());
+                assertEquals(count, receiverLogs.read(delayId, 0).size());
+                delayEvidence.put(delayId, rx.get(delayId).getDelayEvidenceJson());
+            }
+            await(() -> ready(sender, "sender-1") && ready(sender, "receiver-1"), 15);
+            UUID negativeDelay = tx.createDelay(input, "sender-1", "receiver-1",
+                    "http://127.0.0.1:" + adapter.getAddress().getPort() + "/transfer",
+                    "GNSS_RAW", "DTN", "HDTN", hdtn, null,
+                    java.time.Instant.now().plusSeconds(60)).getId();
+            await(() -> java.util.List.of("COMPLETED", "FAILED", "INCONCLUSIVE").contains(tx.get(negativeDelay).getState()), 40);
+            assertEquals("INCONCLUSIVE", tx.get(negativeDelay).getState(), tx.get(negativeDelay).getMessage());
+            assertNotNull(rx.get(negativeDelay).getReceivedAt());
+            assertTrue(mapper.readTree(rx.get(negativeDelay).getDelayEvidenceJson()).path("delaySeconds").asDouble() < 0);
+            assertTrue(receiverLogs.hasStage(negativeDelay, "지연 계산"));
+            assertFalse(senderLogs.hasStage(negativeDelay, "지연 계산"));
+            delivered.set(legacyDelivered);
+
             SessionService txSessions = sender.getBean(SessionService.class);
             for (TestType type : TestType.values()) {
                 await(() -> ready(sender, "sender-1") && ready(sender, "receiver-1"), 15);
@@ -168,6 +205,10 @@ class IndependentNodeIntegrationTest {
             try (ConfigurableApplicationContext restarted = node("receiver", receiverPort, senderPort)) {
                 DtnService restored = restarted.getBean(DtnService.class);
                 assertEquals("COMPLETED", restored.get(test).getState());
+                for (var entry : delayEvidence.entrySet()) {
+                    assertEquals(entry.getValue(), restored.get(entry.getKey()).getDelayEvidenceJson());
+                    assertEquals("COMPLETED", restored.get(entry.getKey()).getState());
+                }
                 assertEquals(mapper.readTree(mapper.writeValueAsBytes(hdtn)), mapper.readTree(restored.get(test).getHdtnConfigJson()));
                 assertNull(restored.get(test).getReferenceJson());
                 assertArrayEquals(delivered.get(), restored.payload(test, "received").getBody());

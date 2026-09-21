@@ -1,5 +1,9 @@
 package server.shared.model;
 
+import server.shared.codec.GrawCodec;
+
+import server.shared.codec.DtnDelay;
+
 import java.util.List;
 import java.util.UUID;
 import lombok.Data;
@@ -94,12 +98,12 @@ public final class DtnModels {
       List<AfsIndexedRecord> navigationSupplement) {}
   public record AfsIndexedRecord(int recordIndex, AfsRecord record) {}
   public record AfsMeasurement(int recordIndex, int measurementIndex, int week, double towSeconds,
-      server.shared.codec.GrawCodec.Observation observation) {}
+      GrawCodec.Observation observation) {}
   @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
   public record AfsRecord(UUID testId, UUID messageId, long sequence, java.time.Instant capturedAt,
-      server.shared.codec.GrawCodec.ObservationEpoch observation,
-      server.shared.codec.GrawCodec.NavigationUpdate navigation,
-      server.shared.codec.GrawCodec.ReceiverMetadata receiver) {}
+      GrawCodec.ObservationEpoch observation,
+      GrawCodec.NavigationUpdate navigation,
+      GrawCodec.ReceiverMetadata receiver) {}
 
   /** frameBase64는 반드시 750바이트 AFS 프레임이며 관측 시각은 복원된 GRAW에 있다. */
   @Data
@@ -139,6 +143,7 @@ public final class DtnModels {
     private Transfer transfer;
     private List<Pvt> pvt;
     private DtnObservationView observations;
+    private DtnDelay.Evidence delayEvidence;
     private String error;
   }
 }

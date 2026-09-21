@@ -24,8 +24,13 @@ public class DtnReceiptService {
 
     @Transactional
     public DtnReceipt capture(byte[] body, String contentType, boolean truncated) {
+        return capture(body,contentType,truncated,Instant.now());
+    }
+    @Transactional
+    public DtnReceipt capture(byte[] body, String contentType, boolean truncated, Instant arrivedAt) {
         DtnReceipt receipt=new DtnReceipt();
-        receipt.setId(UUID.randomUUID()); receipt.setArrivedAt(Instant.now());
+        receipt.setId(UUID.randomUUID());
+        receipt.setArrivedAt(arrivedAt);
         receipt.setBody(body); receipt.setSizeBytes(body.length); receipt.setTruncated(truncated);
         receipt.setContentType(contentType==null?null:contentType.substring(0,Math.min(255,contentType.length())));
         receipt.setStatus("RECEIVED"); receipt.setMessage("본문 저장 완료 · 검증 전");

@@ -10,6 +10,7 @@ import server.agent.codec.NativeAfsCodec;
 import server.shared.codec.NativePvtCodec;
 import server.agent.afs.*;
 import server.shared.codec.GrawCodec;
+import server.shared.codec.DtnDelay;
 import server.shared.codec.Hashing;
 import server.shared.model.DtnModels;
 import server.shared.model.DtnModels.*;
@@ -60,16 +61,19 @@ public final class DtnProcessor {
     return receive(id,transfer,(stage,message)->{});
   }
   public AgentResult receive(UUID id, Transfer transfer, java.util.function.BiConsumer<String,String> progress) {
+    return receive(id, transfer, progress, null);
+  }
+  public AgentResult receive(UUID id, Transfer transfer, java.util.function.BiConsumer<String,String> progress, DtnDelay.Timing timing) {
     if (transfer != null && (AfsMetadataCodec.FORMAT.equals(transfer.getFormat())
         || AfsMetadataCodec.GROUPED_FORMAT.equals(transfer.getFormat()))) {
       if (!id.equals(transfer.getTestId())) throw new IllegalArgumentException("시험 ID 불일치");
       progress.accept("AFS 복원","CRC·원본 0101 패턴 검사 → SB2 항법정보와 관측 metadata 결합");
       var records = AfsMetadataCodec.restore(transfer, afs);
       progress.accept("AFS 복원","GRAW 복원·SHA-256 검증 완료 · "+records.size()+" records");
-      return calculate(records, progress);
+      return calculate(records, progress, timing);
     }
     if (transfer != null && "LNIS-GRAW-RAW-v1".equals(transfer.getFormat()))
-      return receiveRaw(id, transfer,progress);
+      return receiveRaw(id, transfer,progress,timing);
     if (transfer == null || !id.equals(transfer.getTestId()) || transfer.getSchemaVersion() != 1
         || !DtnModels.PROFILE.equals(transfer.getProfile()) || !"LNIS-GRAW-AFS-v1".equals(transfer.getFormat())
         || !"AFS_METADATA".equals(transfer.getTestType()) || transfer.getGrawBase64() != null
@@ -103,10 +107,10 @@ public final class DtnProcessor {
     if (!Hashing.hex(Hashing.sha256Digest().digest(source.toByteArray())).equals(transfer.getSourceSha256()))
       throw new IllegalArgumentException("복원 데이터 SHA-256 불일치");
     progress.accept("AFS 복원","GRAW 복원·SHA-256 검증 완료 · "+records.size()+" records · "+source.size()+" bytes");
-    return calculate(records, progress);
+    return calculate(records, progress, timing);
   }
 
-  private AgentResult receiveRaw(UUID id, Transfer transfer, java.util.function.BiConsumer<String,String> progress) {
+  private AgentResult receiveRaw(UUID id, Transfer transfer, java.util.function.BiConsumer<String,String> progress, DtnDelay.Timing timing) {
     progress.accept("RAW 복원","Base64 복원·크기·SHA-256·레코드 수 확인 시작");
     if (!id.equals(transfer.getTestId()) || transfer.getSchemaVersion() != 1
         || !"GNSS_RAW".equals(transfer.getTestType())
@@ -121,15 +125,47 @@ public final class DtnProcessor {
     var records = GrawCodec.splitLengthPrefixed(source);
     if (records.size() != transfer.getRecordCount()) throw new IllegalArgumentException("RAW 레코드 수 불일치");
     progress.accept("RAW 복원","크기·SHA-256·레코드 수 검증 통과 · "+records.size()+" records · "+source.length+" bytes");
-    return calculate(records, progress);
+    return calculate(records, progress, timing);
   }
 
   private AgentResult calculate(List<byte[]> records, java.util.function.BiConsumer<String,String> progress) {
+    return calculate(records, progress, null);
+  }
+  private AgentResult calculate(List<byte[]> records, java.util.function.BiConsumer<String,String> progress, DtnDelay.Timing timing) {
     AgentResult result = new AgentResult();
     result.setObservations(server.shared.model.DtnObservationView.fromRecords(records));
+    if (timing != null) {
+      var converted = DtnDelay.convert(records, timing);
+      result.setDelayEvidence(converted.evidence());
+      if (converted.evidence().error() != null) {
+        Pvt unavailable = new Pvt();
+        unavailable.setWeek(converted.evidence().originalTime().week());
+        unavailable.setTowSeconds(converted.evidence().originalTime().towSeconds());
+        unavailable.setMessage(converted.evidence().error());
+        result.setPvt(List.of(unavailable));
+        return result;
+      }
+      records = converted.records();
+    }
     progress.accept("PVT","지구 PVT 계산 시작 · "+records.size()+" records");
     long started=System.nanoTime();
-    try (var pvt = new NativePvtCodec(nativeDirectory)) { result.setPvt(pvt.calculate(records)); }
+    try (var pvt = new NativePvtCodec(nativeDirectory)) {
+      result.setPvt(pvt.calculate(records));
+    } catch (RuntimeException error) {
+      if (timing == null) {
+        throw error;
+      }
+      var evidence = result.getDelayEvidence();
+      String message = "지연 반영 PVT 계산 불가 · " + error.getMessage();
+      result.setDelayEvidence(new DtnDelay.Evidence(
+          evidence.timing(), evidence.delaySeconds(), evidence.addedMeters(),
+          evidence.originalTime(), evidence.shiftedTime(), evidence.satellites(), message));
+      Pvt unavailable = new Pvt();
+      unavailable.setWeek(evidence.shiftedTime().week());
+      unavailable.setTowSeconds(evidence.shiftedTime().towSeconds());
+      unavailable.setMessage(message);
+      result.setPvt(List.of(unavailable));
+    }
     progress.accept("PVT","계산 요청 처리 종료 · "+((System.nanoTime()-started)/1_000_000)+" ms · 유효성은 결과에서 확인");
     return result;
   }

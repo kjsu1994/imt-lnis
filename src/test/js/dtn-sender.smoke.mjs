@@ -47,7 +47,7 @@ const context = {
   createDtnLog: () => ({write() {},setContext() {},refresh() {}}),
   document: {visibilityState: 'visible', getElementById: id => { assert.ok(elements.has(id), 'missing ' + id); return elements.get(id); }, querySelectorAll: () => []},
   createPayloadViewer: () => ({setJob() {}}),
-  createObservationView: () => ({setData(data) { loaded = data; }}),
+  createObservationView: () => ({setData(data) { loaded = data; }, select() {}}),
   numeric,
   Option: function(text, value) { this.value = value; },
   location: {protocol: 'http:', host: '127.0.0.1:18090'}, WebSocket: class {},
@@ -311,6 +311,21 @@ vm.runInContext("job={testId:'t1',state:'FAILED'};updateControls();",context);
 assert.equal(elements.get('dtn-cancel').disabled,false,'failed sender can clean up waiting receiver');
 context.fetch = ordinaryFetch;
 console.log('PASS: trial cancellation, repeat prevention, failed trial cleanup and stale polling guard');
+
+// New mode selects exactly one source epoch; original API path above stays unchanged.
+vm.runInContext("config.delaySupported=true; selectedType='GNSS_RAW'; job=null; busy=false; inputId='input1';",context);
+elements.get('dtn-comparison-mode').checked=true;
+vm.runInContext("delayChoices=[{epoch:{recordIndex:95},reference:{positionValid:false}},{epoch:{recordIndex:96,week:2400,towSeconds:100000},reference:{positionValid:true,velocityValid:false}}]",context);
+context.updateControls();
+assert.equal(elements.has('dtn-epoch-summary'),false);
+assert.equal(elements.has('dtn-epoch-options'),false);
+assert.equal(elements.get('dtn-send').disabled,false);
+await elements.get('dtn-send').onclick();
+assert.equal(lastStartBody.comparisonMode,'DELAY');
+assert.equal(lastStartBody.selectedEpoch.recordIndex,96);
+vm.runInContext("job=null; delayChoices=[];",context);
+context.updateControls();
+assert.equal(elements.get('dtn-send').disabled,true,'invalid Reference cannot start');
 
 let clearedHistoryRequests = 0;
 const cleared = vm.createContext({...context, location: {...context.location, pathname: '/lnis/dtntest/sender/clear'},

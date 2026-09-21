@@ -940,3 +940,39 @@ body[data-page="dtn-receiver"] .receiver-adapter .adapter-url-controls { grid-te
 .dtn-payload-history { position: relative; font-size: 12px; }
 .dtn-payload-history summary { cursor: pointer; white-space: nowrap; }
 .dtn-payload-history select { position: absolute; right: 0; top: 100%; z-index: 2; width: min(520px, 75vw); margin-top: 8px; }
+
+/* 지연 시험은 설정에서 한 번 선택하고 시험 중에는 변경하지 않는다. */
+.dtn-delay-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+.dtn-delay-toggle input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  accent-color: #79d6ce;
+}
+.dtn-delay-settings {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+.dtn-delay-settings[hidden] { display: none; }
+.dtn-delay-settings .dtn-delay-toggle {
+  margin: 0;
+  gap: 7px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.dtn-delay-settings .dtn-delay-toggle input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  flex-basis: 16px;
+}
+#dtn-delay-note {
+  line-height: 1.7;
+  padding: 0 8px;
+}

@@ -1,5 +1,7 @@
 package server.central.node;
 
+import server.shared.codec.DtnDelay;
+
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -14,6 +16,9 @@ import java.util.UUID;
 public class NodeDtnRegistration {
     @NotNull
     private UUID testId;
+    private String comparisonMode;
+    private java.time.Instant testStartedAt;
+    private DtnDelay.Epoch selectedEpoch;
     @NotBlank
     private String senderAgentId;
     @NotBlank
