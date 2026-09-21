@@ -32,10 +32,25 @@ class DtnDelayIntegrationTest {
                 var reference = prepared.getPvt();
                 assertTrue(reference.getFirst().isPositionValid());
                 String originalHash = prepared.getTransfer().getSourceSha256();
-                for (long nanos : List.of(0L, 1_000_000L, 2_000_000_000L)) {
+                for (long nanos : List.of(0L, 1_000_000L, 2_000_000_000L, 19_222_158_000L)) {
                     var timing = new DtnDelay.Timing(started, started.plusNanos(nanos));
                     var received = processor.receive(id, prepared.getTransfer(), (stage, message) -> {}, timing);
                     var converted = DtnDelay.convert(records, timing);
+                    var laterTiming = new DtnDelay.Timing(started.plusSeconds(86400), timing.receivedAt().plusSeconds(86400));
+                    var later = processor.receive(id, prepared.getTransfer(), (stage, message) -> {}, laterTiming);
+                    assertEquals(received.getPvt(), later.getPvt(), "수집 후 시험 전 대기시간은 PVT에 추가하지 않음");
+                    var comparison = DtnComparison.delay(reference, received.getPvt(), received.getDelayEvidence());
+                    var row = (Map<?, ?>) ((List<?>) comparison.get("epochs")).getFirst();
+                    double biasDelta = received.getPvt().getFirst().getReceiverClockBiasSeconds()
+                            - reference.getFirst().getReceiverClockBiasSeconds();
+                    assertEquals(biasDelta - nanos / 1e9, (double) row.get("clockResidualSeconds"), 1e-15);
+                    assertEquals(biasDelta, nanos / 1e9, 1e-7, "이 고정 시험자료의 공통 지연은 Clock Bias에 반영되어야 함");
+                    var aligned = DtnDelay.alignment(converted.evidence());
+                    var laterAligned = DtnDelay.alignment(later.getDelayEvidence());
+                    for (int i = 0; i < aligned.satellites().size(); i++) {
+                        assertEquals(aligned.satellites().get(i).alignedTransmitAt().plusSeconds(86400),
+                                laterAligned.satellites().get(i).alignedTransmitAt());
+                    }
                     try (var solver = new NativePvtCodec(nativeDirectory)) {
                         assertEquals(solver.calculate(converted.records()), received.getPvt());
                     }

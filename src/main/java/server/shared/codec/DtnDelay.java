@@ -44,6 +44,37 @@ public final class DtnDelay {
 
     public record Converted(List<byte[]> records, Evidence evidence) {}
 
+    public record AlignedSatellite(
+            int constellationId, int satelliteId, int signalId, Instant alignedTransmitAt) {}
+
+    public record TimeAlignment(Timing timing, List<AlignedSatellite> satellites) {}
+
+    /** 시험 시작에 맞춘 가상 송신 시각. GNSS 계산 시간축이나 원본 관측값은 변경하지 않는다. */
+    public static Instant alignedTransmitAt(Timing timing, Satellite satellite)
+    {
+        Double seconds = satellite.propagationSeconds();
+        if (timing == null || timing.startedAt() == null || seconds == null
+                || !Double.isFinite(seconds) || seconds < 0 || seconds >= Long.MAX_VALUE / 1e9) {
+            return null;
+        }
+        return timing.startedAt().minusNanos(Math.round(seconds * 1e9));
+    }
+
+    /** 저장된 근거에서 생성하므로 과거 시험도 DB 수정 없이 조회할 수 있다. */
+    public static TimeAlignment alignment(Evidence evidence)
+    {
+        if (evidence == null || evidence.timing() == null
+                || evidence.timing().startedAt() == null || evidence.timing().receivedAt() == null) {
+            return null;
+        }
+        var satellites = evidence.satellites() == null ? List.<Satellite>of() : evidence.satellites();
+        return new TimeAlignment(evidence.timing(), satellites.stream()
+                .map(satellite -> new AlignedSatellite(
+                        satellite.constellationId(), satellite.satelliteId(), satellite.signalId(),
+                        alignedTransmitAt(evidence.timing(), satellite)))
+                .toList());
+    }
+
     /** GPS 주차 경계를 정규화한다. UTC/윤초와 섞지 않는다. */
     public static Time shift(int week, double tow, double seconds)
     {

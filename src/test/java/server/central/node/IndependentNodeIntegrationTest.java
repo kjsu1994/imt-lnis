@@ -159,6 +159,11 @@ class IndependentNodeIntegrationTest {
                 assertEquals(1, mapper.readTree(tx.get(delayId).getReferenceJson()).size());
                 assertFalse(mapper.readTree(tx.get(delayId).getSentJson()).has("comparisonMode"), "외부 계약 유지");
                 assertTrue(receiverLogs.hasStage(delayId, "의사거리 재계산"));
+                assertTrue(receiverLogs.hasStage(delayId, "송신 시각 보정"));
+                assertTrue(receiverLogs.hasStage(delayId, "Clock Bias 검증"));
+                assertFalse(senderLogs.hasStage(delayId, "송신 시각 보정"));
+                assertFalse(senderLogs.hasStage(delayId, "Clock Bias 검증"));
+                assertTrue(mapper.readTree(tx.get(delayId).getComparisonJson()).path("epochs").path(0).path("clockResidualSeconds").isNumber());
                 assertFalse(senderLogs.hasStage(delayId, "의사거리 재계산"), "수신 상세 로그를 송신에 복제하지 않음");
                 assertTrue(senderLogs.hasStage(delayId, "송신 최종 요약"));
                 var at = rx.get(delayId).getReceivedAt();

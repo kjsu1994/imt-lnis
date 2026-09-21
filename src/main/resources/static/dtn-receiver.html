@@ -125,7 +125,12 @@
     </div>
     </div></div>
     <small id="pvt-message">지구 ECEF · GPS L1 C/A</small>
-    <div class="dtn-comparison-card" role="status"><strong>송·수신 비교</strong><span id="pvt-match" class="pill">PVT 비교 대기</span><small id="pvt-differences">위치 차이 — m · 속도 차이 — m/s · 시계오차 차이 — s</small></div>
+    <div class="dtn-comparison-card" role="status">
+      <strong>송·수신 비교</strong>
+      <span id="pvt-match" class="pill">PVT 비교 대기</span>
+      <small id="pvt-differences" title="원본 Reference 대비 재계산 결과의 차이입니다. 실제 정답 좌표에 대한 위치 정확도를 의미하지 않습니다.">위치 차이 — m · 속도 차이 — m/s · 시계오차 차이 — s</small>
+      <small id="dtn-clock-analysis" hidden></small>
+    </div>
   </section>
 
   <section class="card" id="receiver-iq" hidden><h2>I/Q 수신 파일 검증</h2><div id="receiver-iq-result" class="iq-file-view"></div></section>
@@ -137,6 +142,6 @@
   </section>
   </div>
 </main>
-<script type="module" src="/lnis/assets/dtn/dtn-receiver.js?v=20260921-delay-20260918-receiver-pvt"></script>
+<script type="module" src="/lnis/assets/dtn/dtn-receiver.js?v=20260921-clock-analysis-20260918-receiver-pvt"></script>
 </body>
 </html>

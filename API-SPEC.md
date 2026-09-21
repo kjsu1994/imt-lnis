@@ -1283,3 +1283,25 @@ Docker 콘솔의 레벨 표시는 `[WARN]`만 굵은 노랑(ANSI 1;33), `[ERROR]
   수신 위성별 상세 로그를 송신 로그에 복제하지 않습니다. 기존 TXT 로그 다운로드와 `@Slf4j` 출력에 포함합니다.
 - 최초 정상 수신 시각과 결과를 고정하여 재접수·조회·재기동으로 다시 계산하거나 중복 기록하지 않습니다.
   신규 근거 필드는 기존 시험에서 null이며 시험 삭제/보관 정책을 따릅니다.
+
+
+### 지연 시험 시간 정렬 및 Clock Bias 검증
+
+- 시작 기준 S는 송신 서버의 시험 시작 요청 접수 시각, R은 수신 본문 수신 완료 시각입니다.
+  수집 후 시작 전 대기시간은 제외하며, 준비·어댑터 처리·전송 시간은 포함합니다.
+- 위성별 원본 역산 시각은 `t₀−Pᵢ/c`, 시험 기준 가상 송신 시각은 `S−Pᵢ/c`입니다.
+  후자는 실제 위성 송신 시각을 관측한 값이 아닙니다. GPS와 UTC 절대시각을 직접 빼지 않습니다.
+- `P′ᵢ=Pᵢ+c×(R−S)`로 계산합니다. PVT 계산 시간축은 원본 GNSS 관측 시각에 지연을 더하며,
+  원본 Ephemeris·Doppler·C/N0는 유지합니다. 실제 시험 날짜로 궤도를 재생성하지 않습니다.
+- 보고서의 `delayTimeAlignment`는 기존 `delayEvidence`에서 조회 시 파생합니다.
+  `{timing:{startedAt,receivedAt},satellites:[{constellationId,satelliteId,signalId,alignedTransmitAt}]}` 형식이며
+  `alignedTransmitAt`은 UTC ISO 시각(최대 ns 자릿수), 근거가 없으면 null입니다. 이 시각의 표시 반올림으로
+  의사거리를 다시 계산하지 않습니다. 원문·DB의 기존 시험 기록·외부 어댑터 JSON은 변경하지 않습니다.
+- 지연 비교 `comparison.epochs[]`에 `clockResidualSeconds`와 `clockResidualMeters`를 추가합니다.
+  각각 `(수신 Clock Bias−Reference Clock Bias)−delaySeconds`, 그 값에 c를 곱한 값입니다.
+  부호를 유지하며, 후자는 위치 오차가 아닌 시간 차이의 거리 환산값입니다.
+- 계산 가능한 과거 지연 시험은 보고서 조회 시 같은 수치를 제공합니다. 누락·무효 값은 0으로 대체하지 않습니다.
+  `MEASURED/PARTIAL/INCONCLUSIVE`는 유지하며 합격 기준을 추가하지 않습니다.
+- 수신 RAWX 표에는 원본/변환 후 의사거리·증가량과 원본/변환 후 GNSS 관측 시각을 함께 표시합니다.
+  변환값은 저장된 계산 근거와 Epoch·위성·신호·원본 값이 일치할 때만 표시합니다.
+  원본 Doppler는 유지하지만 실제 속도 계산 결과의 미세한 차이를 강제로 없애지 않습니다.

@@ -207,8 +207,13 @@ public class DtnLogService {
                         + " · Δt = 수신 − 시작 = " + evidence.delaySeconds()
                         + " s · c = 299792458 m/s · c×Δt = " + evidence.addedMeters() + " m");
         add(id, "TEST", "관측 시각", true,
-                "GPS 원본 t₀ = " + gpsTime(evidence.originalTime())
+                "원본 GNSS 시간축 유지 · GPS 원본 t₀ = " + gpsTime(evidence.originalTime())
                         + " · 계산 t₁ = t₀ + Δt = " + gpsTime(evidence.shiftedTime()));
+
+        add(id, "TEST", "시험 시각 기준", true,
+                "S = 송신 서버 시험 시작 접수 · R = 수신 본문 수신 완료 · Δt = R−S"
+                        + " · 수집 후 시험 시작 전 대기시간 제외 · 준비·어댑터 처리·전송 포함"
+                        + " · 보정 송신 시각 S−Pᵢ/c는 시험 기준 가상 시각이며 실제 위성 송신 시각이 아닙니다.");
 
         for (var satellite : evidence.satellites()) {
             String identity = "GNSS " + satellite.constellationId()
@@ -218,11 +223,17 @@ public class DtnLogService {
                             + " m · Pᵢ/c = " + satellite.propagationSeconds()
                             + " s · t_txᵢ = t₀ − Pᵢ/c = " + gpsTime(satellite.transmitTime()));
 
+            var aligned = DtnDelay.alignedTransmitAt(evidence.timing(), satellite);
+            add(id, "TEST", "송신 시각 보정", true,
+                    identity + " · t′_txᵢ = S−Pᵢ/c = " + (aligned == null ? "계산 불가" : aligned)
+                            + " · R = " + evidence.timing().receivedAt()
+                            + " · UTC 시험 기준 가상 시각 · GNSS 계산 시간축과 구분");
+
             String usage = satellite.solverInput()
                     ? "GPS L1 계산 입력 (최종 채택은 RTKLIB 결정)" : "계산 대상 제외";
             add(id, "TEST", "의사거리 재계산", true,
-                    identity + " · P′ᵢ = c×(t₁−t_txᵢ) = Pᵢ+c×Δt = " + satellite.recalculatedMeters()
-                            + " m · 변화 " + evidence.addedMeters()
+                    identity + " · P′ᵢ = c×(R−t′_txᵢ) = Pᵢ+c×Δt = " + satellite.recalculatedMeters()
+                            + " m · 계산은 절대시각 반올림 영향을 피하도록 Pᵢ+c×Δt 사용 · 변화 " + evidence.addedMeters()
                             + " m · 원본 Doppler " + satellite.dopplerHz()
                             + " Hz / C/N0 " + satellite.cn0() + " dB-Hz 유지 · " + usage);
         }

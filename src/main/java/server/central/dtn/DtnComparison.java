@@ -119,6 +119,11 @@ public final class DtnComparison {
                 throw new IllegalArgumentException("시계 오차 범위 오류");
             }
             row.put("clockDifferenceSeconds", clockDelta);
+            var residual = clockResidual(clockDelta, evidence.delaySeconds());
+            if (residual != null) {
+                row.put("clockResidualSeconds", residual.seconds());
+                row.put("clockResidualMeters", residual.meters());
+            }
         }
         if (velocity) {
             row.put("velocityDifferenceMetersPerSecond",
@@ -138,6 +143,17 @@ public final class DtnComparison {
                 "velocityComparableEpochs", velocity ? 1 : 0,
                 "epochs", List.of(row),
                 "delaySeconds", evidence.delaySeconds());
+    }
+
+    public record ClockResidual(double seconds, double meters) {}
+
+    /** Clock Bias가 흡수한 시간과 주입한 지연의 차이. 위치 오차나 합격 판정이 아니다. */
+    public static ClockResidual clockResidual(double clockDelta, double delaySeconds)
+    {
+        double seconds = clockDelta - delaySeconds;
+        double meters = DtnDelay.C * seconds;
+        return Double.isFinite(seconds) && Double.isFinite(meters)
+                ? new ClockResidual(seconds, meters) : null;
     }
 
     private static double[] delta(double[] source, double[] calculated)

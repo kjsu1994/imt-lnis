@@ -73,6 +73,30 @@ assert.equal(nodes.get('[data-navigation]').children[0].children[8].textContent,
 view.setData(null);
 assert.equal(nodes.get('tbody').children[0].children[0].colSpan, 12);
 assert.equal(nodes.get('[data-epoch]').disabled, true);
+const original = {navigationCount:1,navigation,epochs};
+const originalJson = JSON.stringify(original);
+const receiverView = createObservationView(container, () => {}, '수신 원본');
+const evidence = {originalTime:{week:2400,towSeconds:100021},shiftedTime:{week:2400,towSeconds:100040.222158},
+  addedMeters:5762657994.884364,satellites:[{constellationId:0,satelliteId:9,signalId:0,
+    originalMeters:raw.pseudorangeMeters,recalculatedMeters:raw.pseudorangeMeters+5762657994.884364}]};
+receiverView.setData(original, false, evidence);
+assert.equal(nodes.get('[data-range-after]').hidden,false);
+assert.equal(nodes.get('tbody').children[0].children.length,14);
+assert.equal(nodes.get('tbody').children[0].children[3].textContent,numeric(raw.pseudorangeMeters));
+assert.equal(nodes.get('tbody').children[0].children[4].textContent,numeric(evidence.satellites[0].recalculatedMeters));
+assert.equal(nodes.get('tbody').children[0].children[5].textContent,numeric(evidence.addedMeters));
+assert.equal(nodes.get('tbody').children[0].children[7].textContent,numeric(raw.dopplerHz));
+assert.match(nodes.get('[data-delay-summary]').textContent,/100040.222158/);
+receiverView.setData(original, false, {...evidence,error:'음수 지연'});
+assert.equal(nodes.get('tbody').children[0].children[4].textContent,'—');
+receiverView.setData(original, false, {...evidence,satellites:[{...evidence.satellites[0],satelliteId:99}]});
+assert.equal(nodes.get('tbody').children[0].children[4].textContent,'—');
+receiverView.setData(original);
+assert.equal(nodes.get('[data-range-after]').hidden,true);
+assert.equal(nodes.get('tbody').children[0].children.length,12);
+assert.equal(JSON.stringify(original),originalJson);
+console.log('PASS: receiver original/converted ranges, Doppler preservation, evidence mismatch and restore isolation');
+
 delete globalThis.document;
 delete globalThis.Option;
 console.log('PASS: full I/Q and GRAW view updates, navigation HEX widths and empty state');

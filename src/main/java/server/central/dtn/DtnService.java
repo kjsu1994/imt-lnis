@@ -892,7 +892,16 @@ public class DtnService {
                 + " · 시험 시작→수신 " + evidence.delaySeconds() * 1000 + " ms"
                 + " · 위치 차이 " + measurement(row, "positionDifferenceMeters", "m")
                 + " · 속도 차이 " + measurement(row, "velocityDifferenceMetersPerSecond", "m/s")
-                + " · Clock Bias 차이 " + measurement(row, "clockDifferenceSeconds", "s");
+                + " · Clock Bias 변화 " + measurement(row, "clockDifferenceSeconds", "s")
+                + " · 지연과의 차이 " + measurement(row, "clockResidualSeconds", "s");
+        if (!sender) {
+            trace(job.getId(), "Clock Bias 검증", true,
+                    "Δb = 수신 Bias − 원본 Bias = " + measurement(row, "clockDifferenceSeconds", "s")
+                            + " · Δt = " + evidence.delaySeconds() + " s"
+                            + " · εt = Δb − Δt = " + measurement(row, "clockResidualSeconds", "s")
+                            + " · c×εt = " + measurement(row, "clockResidualMeters", "m")
+                            + " (위치 오차가 아닌 시간 차이의 거리 환산값) · 허용오차 미설정");
+        }
         trace(job.getId(), sender ? "송신 최종 요약" : "수신 계산 결과", false, summary);
 
         String state = "INCONCLUSIVE".equals(comparison.get("verdict")) ? "INCONCLUSIVE" : "COMPLETED";

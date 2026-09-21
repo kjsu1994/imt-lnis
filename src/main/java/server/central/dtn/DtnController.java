@@ -207,7 +207,10 @@ public class DtnController {
     {
         DtnJob job = dtnService.get(id);
         Map<String, Object> report = new LinkedHashMap<>(summary(job));
-        report.put("delayEvidence", job.getDelayEvidenceJson()==null?null:objectMapper.readTree(job.getDelayEvidenceJson()));
+        var evidence = job.getDelayEvidenceJson() == null ? null
+                : objectMapper.readValue(job.getDelayEvidenceJson(), DtnDelay.Evidence.class);
+        report.put("delayEvidence", evidence);
+        report.put("delayTimeAlignment", DtnDelay.alignment(evidence));
         report.put("observations", job.getObservationsJson() == null
                 ? null : objectMapper.readTree(job.getObservationsJson()));
         report.put("fileResult", job.getFileResultJson() == null ? null : objectMapper.readTree(job.getFileResultJson()));
@@ -226,6 +229,21 @@ public class DtnController {
                 job.getComparisonJson() == null
                         ? null
                         : objectMapper.readTree(job.getComparisonJson()));
+        // 과거 비교 결과에도 수치를 추가하되 저장된 결과와 로그는 수정하지 않는다.
+        if ("DELAY".equals(job.getComparisonMode()) && evidence != null && evidence.error() == null
+                && report.get("comparison") instanceof JsonNode comparison) {
+            for (var row : comparison.path("epochs")) {
+                if (row instanceof com.fasterxml.jackson.databind.node.ObjectNode object
+                        && row.path("clockDifferenceSeconds").isNumber()) {
+                    var residual = DtnComparison.clockResidual(
+                            row.path("clockDifferenceSeconds").asDouble(), evidence.delaySeconds());
+                    if (residual != null) {
+                        object.put("clockResidualSeconds", residual.seconds());
+                        object.put("clockResidualMeters", residual.meters());
+                    }
+                }
+            }
+        }
         // Legacy transfers lack a reference. Never substitute receiver results for it.
         if (job.getReferenceJson() == null && job.getReceivedJson() != null
                 && !"IQ_SAMPLE".equals(job.getTestType())) {

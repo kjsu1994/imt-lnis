@@ -162,11 +162,17 @@ console.log('PASS: automatic receipt selection, waiting-to-received transition, 
 // Different source/shifted epochs must still compare the selected reference.
 context.setComparison({comparisonMode:'DELAY', referencePvt:[{week:2400,towSeconds:100,positionValid:true,ecefMeters:[1,2,3]}],
   receivedPvt:[], delayEvidence:{delaySeconds:0.001,addedMeters:299792.458,originalTime:{towSeconds:100},shiftedTime:{towSeconds:100.001}},
-  comparison:{verdict:'MEASURED',epochs:[{week:2400,towSeconds:100.001,positionDifferenceMeters:2,clockDifferenceSeconds:0.001}]}});
+  comparison:{verdict:'MEASURED',epochs:[{week:2400,towSeconds:100.001,positionDifferenceMeters:2,clockDifferenceSeconds:0.001,clockResidualSeconds:-0.00000000002,clockResidualMeters:-0.00599584916}]}});
 context.setEpochs([{week:2400,towSeconds:100.001,positionValid:true,ecefMeters:[3,2,3]}]);
 assert.equal(elements.get('reference-x').textContent,'1.000');
 assert.match(elements.get('pvt-match').textContent,/지연 반영/);
 assert.match(elements.get('dtn-delay-note').textContent,/수신 원본/);
 assert.match(elements.get('pvt-differences').textContent,/2.000000/);
+assert.match(elements.get('dtn-clock-analysis').textContent,/측정 지연 0.001000000 s/);
+assert.match(elements.get('dtn-clock-analysis').textContent,/-0.020 ns/);
+assert.equal(elements.get('dtn-clock-analysis').hidden,false);
+context.setEpochs([{week:2400,towSeconds:999,positionValid:false}]);
+assert.match(elements.get('dtn-clock-analysis').textContent,/지연과의 차이 —/);
 context.setComparison();
 assert.equal(elements.get('dtn-delay-note').hidden,true);
+assert.equal(elements.get('dtn-clock-analysis').hidden,true);

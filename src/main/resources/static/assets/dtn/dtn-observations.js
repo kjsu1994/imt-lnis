@@ -41,9 +41,12 @@ export function createObservationView(container, onSelect = () => {}, role = '')
     <div class="observation-summary"><span data-source>데이터 없음</span><span data-nav>항법정보 —</span>
       <span data-count>관측 신호 —</span><span data-status></span></div></div>
     <h3 data-observation-title>관측값 · RAWX</h3>
+    <p data-delay-summary hidden></p>
     <div class="epoch-table-viewport" tabindex="0" aria-label="GNSS 관측값 표">
       <table class="epoch-observation-table"><caption>위성·신호별 관측값</caption><thead><tr>
-        <th>GNSS</th><th>위성</th><th>신호</th><th>의사거리 <small>m</small></th>
+        <th>GNSS</th><th>위성</th><th>신호</th><th data-range-heading>의사거리 <small>m</small></th>
+        <th data-range-after hidden>변환 후 의사거리 <small>m</small></th>
+        <th data-range-added hidden>증가량 <small>m</small></th>
         <th>반송파 위상 <small>cycle</small></th><th>도플러 <small>Hz</small></th>
         <th>C/N₀ <small>dB-Hz</small></th><th>추적시간 <small>ms</small></th>
         <th title="수신기가 출력한 표준편차 코드. SI 단위의 표준편차가 아닙니다.">편차 코드 <small>PR / CP / DO</small></th>
@@ -60,19 +63,43 @@ export function createObservationView(container, onSelect = () => {}, role = '')
     `;
   const select = container.querySelector('[data-epoch]');
   const body = container.querySelector('tbody');
-  let data = null;
+  let data = null, delayEvidence = null;
   function render(notify = true) {
     const item = data?.epochs?.[Number(select.value)];
     const epoch = item?.observation;
+    const comparison = !!delayEvidence && role === '수신 원본' && data?.source !== 'IQ_TRACKING';
+    const epochMatches = !!epoch && !!delayEvidence?.shiftedTime && !delayEvidence?.error && epoch.week === delayEvidence?.originalTime?.week
+      && epoch?.receiverTowSeconds === delayEvidence?.originalTime?.towSeconds;
+    container.querySelector('[data-range-heading]').textContent = comparison ? '원본 의사거리 (m)' : '의사거리 (m)';
+    container.querySelector('[data-range-after]').hidden = !comparison;
+    container.querySelector('[data-range-added]').hidden = !comparison;
+    const summary = container.querySelector('[data-delay-summary]');
+    summary.hidden = !comparison;
+    summary.textContent = comparison ? (epochMatches
+      ? 'GNSS 관측 시각: Week ' + epoch.week + ' / TOW ' + numeric(epoch.receiverTowSeconds, 9)
+        + ' → Week ' + (delayEvidence.shiftedTime?.week ?? '—') + ' / TOW ' + numeric(delayEvidence.shiftedTime?.towSeconds, 9)
+        + ' s · Doppler·C/N₀·반송파·항법정보 원본 유지'
+      : '변환 후 값 표시 불가 · ' + (delayEvidence.error || '원본 Epoch와 계산 근거 불일치')) : '';
+    summary.title = '변환 후 의사거리 = 원본 의사거리 + 299,792,458 × 측정 지연(초). 표시값은 저장된 계산 근거이며 원문과 JSON 다운로드는 실제 수신 원본 그대로 유지됩니다. 최종 채택 위성 수는 PVT 결과에서 확인하세요.';
     body.replaceChildren();
     if (!epoch) {
       const row = document.createElement('tr'), cell = document.createElement('td');
-      row.className = 'epoch-empty-row'; cell.colSpan = 12; cell.textContent = '표시할 GNSS 관측값이 없습니다.';
+      row.className = 'epoch-empty-row'; cell.colSpan = comparison ? 14 : 12; cell.textContent = '표시할 GNSS 관측값이 없습니다.';
       row.append(cell); body.append(row);
     } else {
-      for (const observation of epoch.observations) {
+      for (const [index, observation] of epoch.observations.entries()) {
         const row = document.createElement('tr');
-        for (const value of observationCells(observation, epoch.receiverTowSeconds)) {
+        const values = observationCells(observation, epoch.receiverTowSeconds);
+        if (comparison) {
+          // 순서·위성·신호·원본 값을 대조하여 다른 관측의 변환값을 표시하지 않는다.
+          const satellite = epochMatches ? delayEvidence.satellites?.[index] : null;
+          const matches = satellite && satellite.constellationId === observation.constellationId
+            && satellite.satelliteId === observation.satelliteId && satellite.signalId === observation.signalId
+            && satellite.originalMeters === observation.pseudorangeMeters;
+          const converted = matches ? satellite.recalculatedMeters : null;
+          values.splice(4, 0, numeric(converted), numeric(Number.isFinite(converted) ? delayEvidence.addedMeters : null));
+        }
+        for (const value of values) {
           const cell = document.createElement('td'); cell.textContent = String(value ?? '—'); row.append(cell);
         }
         body.append(row);
@@ -80,7 +107,7 @@ export function createObservationView(container, onSelect = () => {}, role = '')
     }
     const iq = data?.source === 'IQ_TRACKING';
     container.querySelector('[data-title]').textContent = iq ? 'I/Q 복원 관측값 · 보조 항법정보' : role ? role+' GNSS 관측값' : 'GNSS 수집 데이터';
-    container.querySelector('[data-observation-title]').textContent = iq ? '관측값 · I/Q 추적 (RAWX 원본 아님)' : role ? role+' 관측값 · RAWX (변환 전)' : '관측값 · RAWX';
+    container.querySelector('[data-observation-title]').textContent = comparison ? '수신 관측값 · RAWX 원본 / 지연 변환 후' : iq ? '관측값 · I/Q 추적 (RAWX 원본 아님)' : role ? role+' 관측값 · RAWX (변환 전)' : '관측값 · RAWX';
     container.querySelector('[data-navigation-title]').textContent = iq ? '보조 항법정보 · GPS LNAV' : '항법정보 · SFRBX';
     container.querySelector('[data-navigation-caption]').textContent = iq ? data.assistance : '항법정보 · SFRBX · 수집된 전체 메시지';
     container.querySelector('[data-word-width]').textContent = iq ? 'HEX · 24 bit (패리티 제외)' : 'HEX · 32 bit';
@@ -93,9 +120,10 @@ export function createObservationView(container, onSelect = () => {}, role = '')
   }
   select.onchange = () => render();
   return {
-    setData(next, preserve = false) {
+    setData(next, preserve = false, evidence = null) {
       const selected = preserve ? Number(select.value) : 0;
       data = next;
+      delayEvidence = evidence;
       const iq = data?.source === 'IQ_TRACKING';
       const navigationBody = container.querySelector('[data-navigation]');
       navigationBody.replaceChildren();

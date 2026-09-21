@@ -2,7 +2,7 @@ import {requestJson} from '../common/http.js?v=20260915-structure';
 import {createDtnLog} from './dtn-log.js?v=20260917-console';
 import {initAdapterHealth} from './dtn-adapter-health.js?v=20260915-structure';
 import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20260918-receiver-original';
-import {createObservationView, numeric} from './dtn-observations.js?v=20260921-role';
+import {createObservationView, numeric} from './dtn-observations.js?v=20260921-clock-analysis';
 
 const $ = id => document.getElementById(id);
 const payloadViewer = createPayloadViewer($('dtn-payload'), {receivedOnly: true});
@@ -10,17 +10,21 @@ const clearScreen = location.pathname?.endsWith('/clear') === true;
 let tests = [], epochs = [], selectedId = '', renderVersion = 0, polling = false;
 let reportKey = '', lastEvent = '';
 let receivedIds = null;
-let referenceEpochs = [], comparisonEpochs = [], delayComparison = false;
+let referenceEpochs = [], comparisonEpochs = [], delayComparison = false, delayEvidence = null;
 function setComparison(report = {}) {
   delayComparison = report.comparisonMode === 'DELAY';
   $('receiver-pvt-title').textContent = delayComparison ? '수신 지연 반영 PVT · Reference 비교' : '수신 지구 PVT · 송신 기준 비교';
   $('received-pvt-label').textContent = delayComparison ? '수신 지연 반영 지구 PVT' : '수신 복원 지구 PVT';
-  const evidence = report.delayEvidence;
+  delayEvidence = report.delayEvidence ?? null;
   $('dtn-delay-note').hidden = !delayComparison;
-  $('dtn-delay-note').textContent = !evidence ? '수신 후 지연 반영 계산을 수행합니다.' :
-    '수신 원본 관측값은 아래에 그대로 표시합니다. 계산용 의사거리는 상세 로그에서 확인하세요. 시험 시작→수신 '+numeric(evidence.delaySeconds*1000,3)+
-    ' ms · 추가 거리 '+numeric(evidence.addedMeters,3)+' m · 시계 동기화 정확도 미확인 · 원본 TOW '+numeric(evidence.originalTime?.towSeconds,9)+
-    ' s / Week '+(evidence.originalTime?.week ?? '—')+' → 계산 TOW '+numeric(evidence.shiftedTime?.towSeconds,9)+' s / Week '+(evidence.shiftedTime?.week ?? '—');
+  $('dtn-clock-analysis').hidden = !delayComparison;
+  $('dtn-delay-note').textContent = delayEvidence
+    ? '수신 원본 유지 · 원본 Doppler 유지 · 시계 동기화 정확도 미확인'
+    : '수신 후 지연 반영 계산을 수행합니다.';
+  $('dtn-delay-note').title = '시험 시작 접수→본문 수신 완료 시간을 추가합니다. 수집 후 시작 전 대기시간은 제외합니다. '
+    + '시험 기준 보정 송신 시각은 가상 시각이며, PVT는 원본 GNSS 시간축과 궤도정보를 유지합니다. '
+    + 'Doppler가 같아도 재계산 위치·위성 방향에 따라 속도에 작은 차이가 생길 수 있습니다. 상세 로그에서 계산 근거를 확인하세요.';
+  renderClockAnalysis(null);
   referenceEpochs = Array.isArray(report.referencePvt) ? report.referencePvt : [];
   comparisonEpochs = report.comparison?.epochs || [];
   const verdict = report.comparison?.verdict;
@@ -54,11 +58,27 @@ function time(value) {
   return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString('ko-KR');
 }
 
+function renderClockAnalysis(delta) {
+  if (!delayComparison) return;
+  const seconds = delta?.clockResidualSeconds;
+  const residual = Number.isFinite(seconds)
+    ? numeric(seconds, 12) + ' s (' + numeric(seconds * 1e9, 3) + ' ns)'
+    : '—';
+  $('dtn-clock-analysis').textContent = '측정 지연 ' + numeric(delayEvidence?.delaySeconds, 9)
+    + ' s · Clock Bias 변화 ' + numeric(delta?.clockDifferenceSeconds, 12)
+    + ' s · 지연과의 차이 ' + residual;
+  $('dtn-clock-analysis').title = '지연과의 차이 = (수신 Bias − 원본 Bias) − 측정 지연. '
+    + '표시 자릿수는 측정 정확도를 보증하지 않으며 합격 기준은 설정하지 않았습니다. '
+    + '시간 차이의 거리 환산값: ' + numeric(delta?.clockResidualMeters, 6) + ' m (위치 오차가 아님).';
+}
+
 function renderEpoch() {
   observations.select(Number($('pvt-epoch').value));
   const pvt = epochs[Number($('pvt-epoch').value)];
   const delta = pvt && comparisonEpochs.find(e=>e.week===pvt.week && e.towSeconds===pvt.towSeconds);
-  $('pvt-differences').textContent = '위치 차이 '+number(delta?.positionDifferenceMeters,6)+' m · 속도 차이 '+number(delta?.velocityDifferenceMetersPerSecond,6)+' m/s · 시계오차 차이 '+number(delta?.clockDifferenceSeconds,12)+' s';
+  $('pvt-differences').textContent = '위치 차이 '+number(delta?.positionDifferenceMeters,6)+' m · 속도 차이 '+number(delta?.velocityDifferenceMetersPerSecond,6)+' m/s'
+    + (delayComparison ? '' : ' · 시계오차 차이 '+number(delta?.clockDifferenceSeconds,12)+' s');
+  renderClockAnalysis(delta);
   const reference = pvt && (delayComparison ? referenceEpochs[0] : referenceEpochs.find(value => value.week === pvt.week && value.towSeconds === pvt.towSeconds));
   ['x', 'y', 'z'].forEach((axis, index) => {
     $('reference-' + axis).textContent = number(reference?.positionValid ? reference.ecefMeters?.[index] : null);
@@ -146,7 +166,7 @@ async function renderTest(force = false) {
     if (version !== renderVersion || selectedId !== job.testId) return;
     setComparison(report);
     setEpochs(report.receivedPvt, !changed);
-    observations.setData(report.observations, !changed);
+    observations.setData(report.observations, !changed, delayComparison ? report.delayEvidence : null);
     reportKey = event;
   } catch (error) {
     if (version !== renderVersion) return;
