@@ -13,7 +13,7 @@ public final class DtnDestination {
     {
         String value = requestedUrl == null || requestedUrl.isBlank() ? defaultUrl : requestedUrl;
         if (value == null || value.isBlank() || value.length() > 2048) {
-            throw new IllegalArgumentException("DTN/HDTN 어댑터의 서버 주소를 입력하세요. 최대 2048자입니다.");
+            throw new IllegalArgumentException("DTN/HDTN 어댑터의 서버 주소를 입력하세요.");
         }
         URI uri;
         try {
