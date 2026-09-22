@@ -22,7 +22,7 @@ public class ApiLoggingFilter extends OncePerRequestFilter {
             throws ServletException,IOException {
         var headers=new LinkedHashMap<String,List<String>>();
         Collections.list(request.getHeaderNames()).forEach(name->headers.put(name,Collections.list(request.getHeaders(name))));
-        String address=request.getRequestURI()+(request.getQueryString()==null?"":"?"+request.getQueryString());
+        String address=request.getRequestURL().toString()+(request.getQueryString()==null?"":"?"+request.getQueryString());
         var exchange=new ApiLog.Exchange("IN",request.getMethod(),address,headers,
             request.getHeader("X-LNIS-Request-ID"),request.getHeader("X-LNIS-Trace-ID"));
         response.setHeader("X-LNIS-Request-ID",exchange.requestId);
@@ -34,6 +34,10 @@ public class ApiLoggingFilter extends OncePerRequestFilter {
             if(!done.compareAndSet(false,true)) return;
             var resultHeaders=new LinkedHashMap<String,List<String>>();
             response.getHeaderNames().forEach(name->resultHeaders.put(name,new ArrayList<>(response.getHeaders(name))));
+            Object mapping = request.getAttribute(org.springframework.web.servlet.HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE);
+            exchange.inboundRoute(request.getRemoteAddr() + ":" + request.getRemotePort(),
+                    request.getLocalAddr() + ":" + request.getLocalPort(),
+                    mapping == null ? "unresolved" : mapping.toString());
             exchange.finish(error!=null && response.getStatus()<400?500:response.getStatus(),resultHeaders,error);
         };
         String previous=MDC.get("apiTraceId");MDC.put("apiTraceId",exchange.traceId);

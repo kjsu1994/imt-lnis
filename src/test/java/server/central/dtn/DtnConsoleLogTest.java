@@ -25,12 +25,12 @@ class DtnConsoleLogTest {
             service.screen(id,at,"WARN","Bearer secret\nwarning");
             service.importAdapter(id,List.of(new DtnRemoteResult.AdapterLog(at,"INFO","adapter detail")));
             assertEquals(3,appender.list.size());
-            assertTrue(appender.list.get(0).getFormattedMessage().endsWith("\n"));
+            assertFalse(appender.list.get(0).getFormattedMessage().endsWith("\n"));
             assertEquals(Level.ERROR,appender.list.get(0).getLevel());
             assertTrue(appender.list.get(0).getFormattedMessage().contains("detail=true"));
             assertTrue(appender.list.get(1).getFormattedMessage().contains("type=SCREEN"));
             assertFalse(appender.list.get(1).getFormattedMessage().contains("secret"));
-            assertTrue(appender.list.get(2).getFormattedMessage().contains(at.toString()));
+            assertTrue(appender.list.get(2).getFormattedMessage().contains(at.atZone(java.time.ZoneId.of("Asia/Seoul")).toOffsetDateTime().toString()));
             service.read(id,0);
             assertEquals(3,appender.list.size());
             verify(repository,times(1)).saveAndFlush(any());

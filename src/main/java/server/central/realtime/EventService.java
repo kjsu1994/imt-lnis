@@ -11,6 +11,7 @@ import server.shared.model.LnisModels.AgentRole;
 import java.time.Instant;
 import java.util.UUID;
 
+@lombok.extern.slf4j.Slf4j
 @RequiredArgsConstructor
 @Service
 /**
@@ -24,7 +25,12 @@ public class EventService {
 
     /** 이벤트를 현재 연결된 모든 브라우저 구독자에게 전송한다. */
     public BrowserEvent publish(
-            EventType type, String agentId, AgentRole role, UUID sessionId, Object payload)
+            EventType type, String agentId, AgentRole role, UUID sessionId, Object payload) {
+        return publish(type, agentId, role, sessionId, payload, false);
+    }
+
+    public BrowserEvent publish(
+            EventType type, String agentId, AgentRole role, UUID sessionId, Object payload, boolean consoleAlreadyWritten)
     {
         // 모든 세션이 공유하는 sequence라 서로 다른 Agent 이벤트도 발생 순서대로 정렬할 수 있다.
         Instant createdAt = Instant.now();
@@ -40,8 +46,17 @@ public class EventService {
                         createdAt);
         BrowserEvent event =
                 new BrowserEvent(sequence, type, createdAt, agentId, role, sessionId, payload);
+        if (!consoleAlreadyWritten) writeConsole(event);
         browserWebSocketHandler.broadcast(event);
         return event;
+    }
+    /** Called once per new event, not on history reads or WebSocket reconnects. */
+    private void writeConsole(BrowserEvent event) {
+        String message = server.shared.http.ApiLog.eventBody(event.payload());
+        String format = "AFS_EVENT type={} agentId={} role={} sessionId={} sequence={}\n{}\nAFS_EVENT END sequence={}\n";
+        Object[] values = {event.type(), event.agentId(), event.role(), event.sessionId(), event.sequence(), message, event.sequence()};
+        if (event.type() == EventType.ERROR) log.error(format, values);
+        else log.info(format, values);
     }
 }
 

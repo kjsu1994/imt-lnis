@@ -53,10 +53,21 @@ export function statusSocket(onEvent, onState) {
 }
 
 /** 시간 접두어를 붙여 이벤트 로그를 추가하고 항상 최신 행으로 스크롤한다. */
-export function log(target, message) {
+export function log(target, message, options = {}) {
     const time = new Date().toLocaleTimeString('ko-KR', { hour12: false });
     target.textContent += `[${time}] ${message}\n`;
     target.scrollTop = target.scrollHeight;
+    if (options.serverEvent) return;
+
+    const level = options.level || (/실패|오류|ERROR/.test(message) ? 'ERROR' : 'INFO');
+    // Never log this request's failure through the same endpoint.
+    void fetch(API + '/logs/screen', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        signal: AbortSignal.timeout(5000),
+        body: JSON.stringify({scopeId: options.scopeId || null, occurredAt: new Date().toISOString(),
+            level, message: String(message).slice(0, 2000)}),
+    }).catch(() => {});
 }
 
 export function setPill(element, text, state = '') {

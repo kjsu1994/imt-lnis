@@ -81,10 +81,14 @@ public class AgentMessageService {
             case HEARTBEAT -> handleHeartbeat(envelope);
             case STATUS -> {
                 Progress progress = objectMapper.treeToValue(envelope.payload(), Progress.class);
+                boolean consoleAlreadyWritten = false;
                 if(progress.type()==EventType.GNSS_STATUS && logs!=null && logs.exists(envelope.sessionId()))
-                    logs.capture(envelope.sessionId(),progress.stage(),progress.message());
+                    consoleAlreadyWritten = logs.capture(envelope.sessionId(),progress.stage(),progress.message());
                 if(progress.type()==EventType.ERROR && logs!=null && logs.exists(envelope.sessionId()))
+                {
                     logs.add(envelope.sessionId(),"INPUT","ERROR","COM 수집",false,progress.message());
+                    consoleAlreadyWritten = true;
+                }
                 if (progress.type() == EventType.GNSS_STATUS && "SingleEpochComplete".equals(progress.stage())) {
                     Object pvt = progress.counters() == null ? null : progress.counters().get("pvt");
                     if (pvt == null) {
@@ -115,7 +119,8 @@ public class AgentMessageService {
                         envelope.agentId(),
                         envelope.role(),
                         envelope.sessionId(),
-                        progress);
+                        progress,
+                        consoleAlreadyWritten);
             }
             case INPUT_CHUNK -> {
                 // rawSerial은 장치 진단용이며 시험 입력에는 Agent가 변환한 canonical GRAW만 누적한다.
@@ -159,7 +164,8 @@ public class AgentMessageService {
                             envelope.agentId(),
                             envelope.role(),
                             envelope.sessionId(),
-                            envelope.payload());
+                            envelope.payload(),
+                            logs != null && logs.exists(envelope.sessionId()));
             }
             default -> {}
         }

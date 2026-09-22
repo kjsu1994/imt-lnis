@@ -27,11 +27,13 @@ public class DtnLogService {
 
     public boolean hasStage(UUID id, String stage) { return repository.existsByScopeIdAndStage(id,stage); }
 
-    public void capture(UUID id,String stage,String message) {
+    public boolean capture(UUID id,String stage,String message) {
         long now=System.nanoTime();
         if(!Objects.equals(captureStages.put(id,stage),stage) || now-captureTimes.getOrDefault(id,0L)>10_000_000_000L) {
             captureTimes.put(id,now); add(id,"INPUT","COM 수집","Capturing".equals(stage),message);
+            return true;
         }
+        return false;
     }
 
     public boolean exists(UUID id) { return id != null && repository.existsByScopeId(id); }
@@ -60,8 +62,8 @@ public class DtnLogService {
     }
 
     private void console(DtnLogEntry entry) {
-        String format="DTN_EVENT type={} scopeId={} sequence={} occurredAt={} [{}] detail={} {}\n";
-        Object[] values={entry.getScopeType(),entry.getScopeId(),entry.getSequence(),entry.getOccurredAt(),clean(entry.getStage()),entry.isDetail(),entry.getMessage()};
+        String format="DTN_EVENT type={} scopeId={} sequence={} occurredAt={} [{}] detail={} {}";
+        Object[] values={entry.getScopeType(),entry.getScopeId(),entry.getSequence(),entry.getOccurredAt().atZone(ZoneId.of("Asia/Seoul")).toOffsetDateTime(),clean(entry.getStage()),entry.isDetail(),entry.getMessage()};
         switch(entry.getLevel()) {
             case "ERROR" -> log.error(format,values);
             case "WARN" -> log.warn(format,values);

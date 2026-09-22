@@ -6,7 +6,7 @@ import {
     setPill,
     downloads,
     renderMetrics,
-} from '../common/api.js?v=20260915-structure';
+} from '../common/api.js?v=20260922-logging';
 import { formatEventLog } from './event-log.js?v=20260915-structure';
 import { renderFrameEvidence } from './frame-evidence.js?v=20260915-structure';
 
@@ -469,7 +469,7 @@ statusSocket(
             ...resultContext,
             ...progressDetails,
         };
-        log(eventLog, formatEventLog(event));
+        log(eventLog, formatEventLog(event), {serverEvent: true});
         if (event.type === 'SESSION_STATUS') {
             if (TERMINAL_SESSION_STATES.has(payload.state)) {
                 applyActiveSession(null);

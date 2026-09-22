@@ -1226,7 +1226,11 @@ LNIS는 어댑터 로그를 수신 노드의 `[DTN]` 상세 항목으로 저장�
 
 `API_START` / `API_END`는 모든 `/lnis/api/v1/` 호출과 외부 HTTP 호출(DTN 전송, 헬스체크, 노드 관리, 서버 탐색)에 적용됩니다. IN/OUT, requestId, traceId, 메서드, URL, HTTP 상태, 소요 시간, 실제 읽고 쓴 바이트 수, 안전한 헤더를 기록합니다. 본문에서 확인 가능한 testId도 표시합니다. 요청을 읽지 않고 거절한 경우 requestBytes는 0일 수 있으며 Content-Length와 구분합니다. WebSocket 메시지는 기존 연결/시험 이벤트 로그를 유지합니다.
 
-`API_BODY`는 변경 요청과 오류, 조회 상태 변화 시 JSON 본문을 들여써 출력합니다. GET 조회 시작은 DEBUG, 최초 응답과 상태 변경은 INFO로 기록하며 정상 반복 조회의 완료 요약은 DEBUG로 낮춥니다. 반복되는 오류도 생략하지 않고 HTTP 4xx·통신 실패는 WARN, 5xx는 ERROR로 기록합니다. POST 등 변경 요청은 INFO를 유지합니다. 상태 비교는 state/status/online/ready/ok/accepted/peerOnline 필드를 사용하며 변화 감지 캐시는 최근 2048개 호출 경로까지만 유지합니다. `/logs/screen`의 본문은 기존 DTN_EVENT와 중복되므로 별도 출력하지 않습니다. 기존 DTN_SEND_BODY / DTN_RECEIVE_BODY는 API_BODY로 통합되었습니다.
+`API_START`와 헤더는 DEBUG입니다. 정상 GET/HEAD/OPTIONS 조회 및 `/logs/screen` 전달 성공은 DEBUG이며, 연결 상태 변화와 변경 API 결과는 INFO입니다. 반복 연결 실패를 포함하여 HTTP 4xx·통신 실패는 매번 WARN, 5xx는 ERROR로 남깁니다. 정상 목록/보고서/원문 조회는 INFO에서 본문을 재출력하거나 상태 비교용으로 전체 응답을 보관하지 않습니다.
+
+`API_BODY`는 실제 OUT `POST /transfers`, IN `POST /lnis/api/v1/dtn/receive` 원문(검증 거절 포함)을 INFO에 들여써 기록합니다. 다른 API의 본문은 DEBUG입니다. 화면 로그 전달 본문은 이벤트와 중복되므로 출력하지 않습니다. 비어 있는 REQUEST/RESPONSE는 생략하며 요청 ID를 시작·종료에 표시합니다.
+
+IN 로그의 URL은 요청 전체 주소이며 `peer=클라이언트IP:포트`, `local=서버IP:포트`, `mapping=매핑경로`를 추가합니다. 주소는 Servlet 기준으로 Docker/NAT/프록시의 영향을 받을 수 있습니다. 컨트롤러·메서드명은 남기지 않습니다. OUT은 URL에 상대 서버 주소·포트가 포함됩니다.
 
 Authorization, Cookie, 토큰·비밀번호·secret·API key 이름의 헤더/JSON 필드는 가립니다. URL 쿼리는 이름만 남기고 값은 숨깁니다. 나머지 헤더도 허용된 진단용 헤더만 값을 표시합니다. 바이너리·멀티파트·스트리밍 본문은 출력하지 않으며 크기와 Content-Type/Disposition/Range, 제공되는 ETag/Digest 등으로 확인합니다. JSON 로그 캡처는 방향별 16 MiB까지로 제한하고 초과하거나 파싱 불가능한 본문은 콘솔 본문을 생략합니다. 원문 DB 저장과 다운로드는 그대로 유지합니다.
 
@@ -1234,7 +1238,9 @@ X-LNIS-Request-ID / X-LNIS-Trace-ID 헤더로 양쪽 HTTP 호출을 연결합니
 
 Docker 콘솔의 레벨 표시는 `[WARN]`만 굵은 노랑(ANSI 1;33), `[ERROR]`만 빨강(ANSI 31)으로 출력하고 즉시 색상을 복원합니다. 다른 레벨과 메시지 본문은 색칠하지 않습니다.
 
-목록 조회(`/dtn/tests`, `/dtn/receipts`)의 정상 응답 본문은 DEBUG에서만 출력하며 INFO에는 itemCount와 상태 변화 요약을 남깁니다. 헬스체크는 같은 상태·원인의 반복을 DEBUG로 내리고 60초마다 suppressed 건수와 함께 요약하며 변화·복구는 즉시 기록합니다. 통신 예외의 원인 유형 체인은 API_END의 cause에 표시하고 스택은 DEBUG로 기록합니다. 요청·응답이 모두 비어 있으면 API_BODY를 생략합니다. 실제 전송·수신 오류는 이 헬스체크 제한의 대상이 아닙니다.
+헬스체크 실패는 매번 WARN 한 줄로 기록하고 예상되는 연결 예외의 스택은 DEBUG에서 확인합니다. 예기치 않은 서버 내부 예외는 ERROR에 마스킹된 원인 체인과 스택을 남깁니다. HTTP 진단 수준은 `LNIS_HTTP_LOG_LEVEL=INFO`(기본)/`DEBUG`로 변경 후 컨테이너를 재생성합니다. 시간 표시는 Asia/Seoul이며 저장/전송 시각은 기존 UTC 계약을 유지합니다.
+
+AFS 화면 전용 메시지: `POST /lnis/api/v1/logs/screen`, 본문 `{scopeId?, occurredAt, level, message}`, 204 응답. 기존 DTN 화면 로그 계약과 동일하게 INFO/WARN/ERROR, 메시지 1~2000자입니다. 수신 노드에서도 허용하지만 다른 송신 전용 API의 제한은 유지합니다. AFS 서버 이벤트는 서버에서 한 번 기록하고 브라우저에서 재전송하지 않습니다. 기존 `POST /lnis/api/v1/dtn/logs/screen`은 그대로 지원합니다.
 
 
 ### 관리자용 로컬 데이터 관리

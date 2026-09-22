@@ -11,23 +11,21 @@ import java.util.*;
 /** API 양방향 공통 진단. 실제 전송 바이트는 변경하지 않는다. */
 @Slf4j
 public final class ApiLog {
-    private static final ObjectMapper JSON=new ObjectMapper();
+    private static final ObjectMapper JSON=new ObjectMapper().findAndRegisterModules();
     public static final int LIMIT=16*1024*1024;
-    private static final Map<String,PollState> STATES=Collections.synchronizedMap(new LinkedHashMap<>(128,.75f,true) {
-        @Override protected boolean removeEldestEntry(Map.Entry<String,PollState> e) { return size()>2048; }
-    });
-    private record PollState(String signature,long reportedAt,int suppressed) {}
-    record PollDecision(boolean changed,boolean report,int suppressed) {}
-    static PollDecision observe(String key,String signature,boolean health,long now) {
-        synchronized(STATES) {
-            var previous=STATES.get(key);
-            boolean changed=previous==null || !signature.equals(previous.signature());
-            boolean report=changed || (health && now-previous.reportedAt()>=60_000_000_000L);
-            int suppressed=previous==null?0:previous.suppressed();
-            STATES.put(key,new PollState(signature,report?now:previous.reportedAt(),report?0:suppressed+1));
-            return new PollDecision(changed,report,suppressed);
+    // Only connection transitions need state; report/list payloads are never compared.
+    private static final Map<String, String> HEALTH_STATES = new LinkedHashMap<>(128, .75f, true) {
+        @Override protected boolean removeEldestEntry(Map.Entry<String, String> entry) {
+            return size() > 2048;
+        }
+    };
+
+    static boolean connectionChanged(String key, String signature) {
+        synchronized (HEALTH_STATES) {
+            return !Objects.equals(HEALTH_STATES.put(key, signature), signature);
         }
     }
+
     private static String causes(Throwable error) {
         var names=new ArrayList<String>();
         var seen=Collections.newSetFromMap(new IdentityHashMap<Throwable,Boolean>());
@@ -42,10 +40,11 @@ public final class ApiLog {
         return value!=null && value.matches("[A-Za-z0-9-]{1,64}")?value:UUID.randomUUID().toString();
     }
     public static String safe(String value) {
-        if(value==null) return "";
-        return value.replaceAll("[\\r\\n\\t]"," ")
-            .replaceAll("(?i)Bearer\\s+[^\\s\"]+","Bearer [hidden]")
-            .replaceAll("(?i)(https?://)[^/\\s]+@","$1[hidden]@");
+        if (value == null) return "";
+        return value.replaceAll("[\\r\\n\\t]", " ")
+                .replaceAll("(?i)Bearer\\s+[^\\s\"]+", "Bearer [hidden]")
+                .replaceAll("(?i)(https?://)[^/\\s]+@", "$1[hidden]@")
+                .replaceAll("(?i)(?<![a-z0-9_-])([\"']?(?:authorization|cookie|[a-z0-9_-]{0,64}(?:token|password|secret|apikey|credential)[a-z0-9_-]{0,64})[\"']?\\s*[:=]\\s*)(\"[^\"]*\"|'[^']*'|[^\\s,;&}\\]]+)", "$1[hidden]");
     }
     public static String url(String value) {
         // 쿼리 값에는 토큰·사용자 입력이 들어갈 수 있으므로 이름만 기록한다.
@@ -78,8 +77,17 @@ public final class ApiLog {
         if(value.isArray()) { var node=JSON.createArrayNode(); value.forEach(v->node.add(redact(v))); return node; }
         return value.isTextual()?TextNode.valueOf(safe(value.asText())):value;
     }
+    /** Same secret masking for structured application events as for HTTP JSON. */
+    public static String eventBody(Object value) {
+        try {
+            return JSON.writerWithDefaultPrettyPrinter().writeValueAsString(redact(JSON.valueToTree(value)));
+        } catch (Exception ignored) {
+            return "[event details unavailable]";
+        }
+    }
+
     private static JsonNode tree(Capture body) {
-        if(body.truncated()) return null;
+        if (!body.enabled || body.size() == 0 || body.truncated()) return null;
         try { return JSON.reader().with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).readTree(body.bytes()); }
         catch(Exception ignored) { return null; }
     }
@@ -107,57 +115,109 @@ public final class ApiLog {
 
     public static final class Exchange {
         public final String requestId, traceId;
+        public final Capture request, response;
         private final String direction, method, address;
-        private final Map<String,List<String>> requestHeaders;
-        private final long started=System.nanoTime();
-        public final Capture request=new Capture(), response=new Capture();
-        public Exchange(String direction,String method,String address,Map<String,List<String>> headers,String requestId,String traceId) {
-            this.direction=direction;this.method=method;this.address=url(address);this.requestHeaders=headers;
-            this.requestId=id(requestId);this.traceId=id(traceId==null?this.requestId:traceId);
-            ("GET".equals(method)?log.atDebug():log.atInfo()).log("API_START direction={} requestId={} traceId={} method={} url={} headers={}\n",
-                direction,this.requestId,this.traceId,method,this.address,ApiLog.headers(headers));
+        private final boolean diagnostic, connection, screen, transfer;
+        private final long started = System.nanoTime();
+        private String route = "";
+
+        /** Servlet mapping resolution happens after the filter starts; keep it separate from the concrete URL. */
+        public void inboundRoute(String peer, String local, String mapping) {
+            route = " peer=" + safe(peer) + " local=" + safe(local)
+                    + " mapping=" + safe(mapping);
         }
-        public void finish(int status,Map<String,List<String>> headers,Throwable error) {
+
+        public Exchange(String direction, String method, String address,
+                Map<String, List<String>> headers, String requestId, String traceId) {
+            this.direction = direction;
+            this.method = method;
+            this.address = url(address);
+            this.requestId = id(requestId);
+            this.traceId = id(traceId == null ? this.requestId : traceId);
+
+            String path = this.address.split("\\?", 2)[0];
+            diagnostic = "GET".equals(method) || "HEAD".equals(method) || "OPTIONS".equals(method);
+            connection = "GET".equals(method) && (path.endsWith("/sender/health")
+                    || path.endsWith("/receiver/health") || path.endsWith("/dtn/adapter-health")
+                    || path.endsWith("/node/peer/status"));
+            screen = path.endsWith("/logs/screen");
+            transfer = "POST".equals(method) && (("OUT".equals(direction) && path.endsWith("/transfers"))
+                    || ("IN".equals(direction) && path.endsWith("/dtn/receive")));
+            boolean retainBody = log.isDebugEnabled() || transfer || (!diagnostic && !screen);
+            request = new Capture(retainBody);
+            response = new Capture(retainBody || connection);
+
+            if (log.isDebugEnabled()) {
+                log.debug("API_START direction={} requestId={} traceId={} method={} url={} headers={}",
+                        direction, this.requestId, this.traceId, method, this.address, ApiLog.headers(headers));
+            }
+        }
+
+        public void finish(int status, Map<String, List<String>> headers, Throwable error) {
             try {
-                var requestTree=tree(request); var responseTree=tree(response);
-                String testId=requestTree==null?"":safe(requestTree.path("testId").asText(""));
-                if(testId.isEmpty() && responseTree!=null) testId=safe(responseTree.path("testId").asText(""));
-                long elapsed=(System.nanoTime()-started)/1_000_000;
-                String cause=causes(error);
-                String signature=status+":"+state(responseTree)+":"+cause;
-                String path=address.split("\\?",2)[0];
-                boolean health="GET".equals(method) && (path.endsWith("/sender/health") || path.endsWith("/receiver/health") || path.endsWith("/dtn/adapter-health"));
-                boolean listing="GET".equals(method) && (path.endsWith("/dtn/tests") || path.endsWith("/dtn/receipts"));
-                String key=direction+":"+method+":"+address;
-                var decision=observe(key,signature,health && (error!=null || status>=400),System.nanoTime());
-                boolean changed=decision.changed();
-                boolean quietHealth=health && !decision.report();
-                boolean detailed=!address.contains("/logs/screen") && (!"GET".equals(method) || status>=400 || error!=null || changed);
-                var summary=quietHealth?log.atDebug():status>=500?log.atError():status>=400 || error!=null?log.atWarn():
-                    "GET".equals(method) && !changed && !(health && decision.report())?log.atDebug():log.atInfo();
-                summary.log("API_END direction={} requestId={} traceId={} testId={} method={} url={} status={} elapsedMs={} requestBytes={} responseBytes={} responseHeaders={} cause={} suppressed={} itemCount={}\n",
-                    direction,requestId,traceId,testId,method,address,status,elapsed,request.size(),response.size(),ApiLog.headers(headers),cause,decision.suppressed(),responseTree!=null && responseTree.isArray()?responseTree.size():null);
-                if(detailed && (request.size()>0 || response.size()>0))
-                    (quietHealth || (listing && status<400 && error==null)?log.atDebug():log.atInfo()).log("API_BODY requestId={} traceId={}\nREQUEST\n{}\nRESPONSE\n{}\nAPI_BODY END requestId={}\n",
-                    requestId,traceId,body(request),body(response),requestId);
-                // 예외 메시지는 요청 URL/자격증명을 포함할 수 있어 공통 계층에서는 유형과 위치만 남긴다.
-                if(error!=null) log.debug("API_FAILURE requestId={} cause={} stack={}\n",requestId,cause,Arrays.toString(error.getStackTrace()));
-            } catch(RuntimeException loggingError) {
-                log.warn("API_LOG_FAILURE requestId={} type={}\n",requestId,loggingError.getClass().getSimpleName());
+                JsonNode requestTree = tree(request);
+                JsonNode responseTree = tree(response);
+                String testId = requestTree == null ? "" : safe(requestTree.path("testId").asText(""));
+                if (testId.isEmpty() && responseTree != null) {
+                    testId = safe(responseTree.path("testId").asText(""));
+                }
+                String context = testId.isEmpty() ? "" : " testId=" + testId;
+                long elapsed = (System.nanoTime() - started) / 1_000_000;
+                String cause = causes(error);
+                boolean failed = error != null || status >= 400;
+                boolean changed = connection && connectionChanged(direction + ":" + address,
+                        status + ":" + state(responseTree) + ":" + cause);
+                // Never suppress a warning, including repeated background connection failures.
+                var summary = status >= 500 ? log.atError() : failed ? log.atWarn()
+                        : (!diagnostic && !screen) || changed ? log.atInfo() : log.atDebug();
+                summary.log("API_END direction={} requestId={} traceId={}{} method={} url={} status={} elapsedMs={} requestBytes={} responseBytes={}{}{}",
+                        direction, requestId, traceId, context, method, address, status, elapsed,
+                        request.size(), response.size(), cause.isEmpty() ? "" : " cause=" + cause, route);
+
+                if (log.isDebugEnabled()) {
+                    log.debug("API_HEADERS requestId={} responseHeaders={}", requestId, ApiLog.headers(headers));
+                }
+                if (!screen && (transfer || log.isDebugEnabled()) && (request.size() > 0 || response.size() > 0)) {
+                    StringBuilder block = new StringBuilder();
+                    if (request.size() > 0) block.append("REQUEST\n").append(body(request)).append('\n');
+                    if (response.size() > 0) block.append("RESPONSE\n").append(body(response)).append('\n');
+                    (transfer ? log.atInfo() : log.atDebug()).log(
+                            "API_BODY direction={} requestId={} traceId={}{} method={} url={}{}\n{}API_BODY END requestId={}\n",
+                            direction, requestId, traceId, context, method, address, route, block, requestId);
+                }
+                if (error != null) {
+                    // Expected transport errors have a compact WARN summary; internal failures keep a stack.
+                    boolean internal = "IN".equals(direction) && status >= 500
+                            && !(error instanceof java.io.IOException);
+                    if (internal || log.isDebugEnabled()) {
+                        var output = new java.io.StringWriter();
+                        error.printStackTrace(new java.io.PrintWriter(output));
+                        String stack = output.toString().lines().map(ApiLog::safe)
+                                .collect(java.util.stream.Collectors.joining("\n"));
+                        (internal ? log.atError() : log.atDebug()).log(
+                                "API_FAILURE requestId={} cause={}\n{}\nAPI_FAILURE END requestId={}\n",
+                                requestId, cause, stack, requestId);
+                    }
+                }
+            } catch (RuntimeException loggingError) {
+                log.warn("API_LOG_FAILURE requestId={} type={}", requestId, loggingError.getClass().getSimpleName());
             }
         }
     }
 
     public static final class Capture {
         private final ByteArrayOutputStream output=new ByteArrayOutputStream();
+        private final boolean enabled;
+        public Capture() { this(true); }
+        Capture(boolean enabled) { this.enabled = enabled; }
         private long count;
         public synchronized void add(byte[] bytes,int offset,int length,boolean retain) {
             count+=length;
-            if(retain && output.size()<LIMIT) output.write(bytes,offset,Math.min(length,LIMIT-output.size()));
+            if(enabled && retain && output.size()<LIMIT) output.write(bytes,offset,Math.min(length,LIMIT-output.size()));
         }
         public synchronized void add(ByteBuffer bytes,boolean retain) {
             var copy=bytes.duplicate(); int length=copy.remaining(); count+=length;
-            if(retain && output.size()<LIMIT) {
+            if(enabled && retain && output.size()<LIMIT) {
                 byte[] part=new byte[Math.min(length,LIMIT-output.size())]; copy.get(part); output.writeBytes(part);
             }
         }

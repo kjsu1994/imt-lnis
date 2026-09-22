@@ -5,7 +5,7 @@ import {
     setPill,
     downloads,
     renderMetrics,
-} from '../common/api.js?v=20260915-structure';
+} from '../common/api.js?v=20260922-logging';
 import {
     formatEventLog,
     describeTestType,
@@ -113,7 +113,7 @@ statusSocket(
         }
 
         const payload = event.payload || {};
-        log(eventLog, formatEventLog(event));
+        log(eventLog, formatEventLog(event), {serverEvent: true});
 
         const progressDetails = payload.counters || payload;
         // Agent Progress는 세부 조건을 counters 아래에, 세션 이벤트는 최상위에 담으므로 둘을 정규화한다.

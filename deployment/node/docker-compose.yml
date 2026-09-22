@@ -20,7 +20,14 @@ services:
         condition: service_completed_successfully
     ports:
       - "${LNIS_SERVER_PORT:-8088}:${LNIS_SERVER_PORT:-8088}"
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "3"
     environment:
+      TZ: Asia/Seoul
+      LNIS_HTTP_LOG_LEVEL: ${LNIS_HTTP_LOG_LEVEL:-INFO}
       LNIS_NODE_ROLE: ${LNIS_NODE_ROLE:?sender 또는 receiver를 설정하세요}
       SERVER_PORT: ${LNIS_SERVER_PORT:-8088}
       LNIS_NODE_BASE_URL: ${LNIS_NODE_BASE_URL:?현재 PC의 URL을 설정하세요}

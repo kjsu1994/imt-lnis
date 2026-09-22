@@ -314,7 +314,7 @@ public class DtnController {
             String message=error instanceof JsonProcessingException ? "올바른 JSON 형식이 아닙니다." : error.getMessage();
             receipts.finish(receipt,"REJECTED",message);
             dtnService.rejectReceipt(receipt.getTestId(),message);
-            log.warn("DTN_RECEIVE_REJECTED receiptId={} testId={} reason={}",receipt.getId(),receipt.getTestId(),message,error);
+            log.warn("DTN_RECEIVE_REJECTED receiptId={} testId={} reason={}",receipt.getId(),receipt.getTestId(),server.shared.http.ApiLog.safe(message));
             if(error instanceof JsonProcessingException) throw new IllegalArgumentException(message);
             throw error;
         }

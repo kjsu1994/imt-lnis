@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {requestJson} from '../../main/resources/static/assets/common/http.js';
-import {request} from '../../main/resources/static/assets/common/api.js';
+import {request,log} from '../../main/resources/static/assets/common/api.js';
 let call;
 globalThis.fetch = async (url, options) => {call = {url, options}; return new Response('{"ok":true}');};
 assert.deepEqual(await requestJson('/test', {cache:'no-store',method:'POST'}), {ok:true});
@@ -25,3 +25,21 @@ const aborted = new Error('aborted');
 globalThis.fetch = async () => {throw aborted;};
 await assert.rejects(requestJson('/abort'), error => error === aborted);
 console.log('PASS: HTTP JSON, text errors, no-content, binary headers, legacy 404 and abort');
+
+// Browser-only events reach the local server; server events are never echoed back.
+const sent = [];
+globalThis.fetch = async (url, options) => { sent.push({url, options}); return new Response(null, {status:204}); };
+const target = {textContent:'',scrollTop:0,scrollHeight:10};
+log(target, '수집 시작');
+assert.equal(sent.length, 1);
+assert.equal(sent[0].url, '/lnis/api/v1/logs/screen');
+assert.equal(JSON.parse(sent[0].options.body).message, '수집 시작');
+log(target, '서버 이벤트', {serverEvent:true});
+assert.equal(sent.length, 1);
+log(target, '시험 실패');
+assert.equal(JSON.parse(sent[1].options.body).level, 'ERROR');
+globalThis.fetch = async () => { throw new Error('offline'); };
+log(target, '서버 연결 불가');
+await new Promise(resolve => setTimeout(resolve, 0));
+assert.ok(target.textContent.includes('서버 연결 불가'));
+console.log('PASS: AFS screen forwarding, no server-event replay, no logging failure recursion');

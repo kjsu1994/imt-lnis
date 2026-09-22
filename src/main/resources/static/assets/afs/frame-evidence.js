@@ -1,4 +1,4 @@
-import { request } from '../common/api.js?v=20260915-structure';
+import { request } from '../common/api.js?v=20260922-logging';
 
 const FRAME_BITS = 6000;
 const COLUMNS = 100;

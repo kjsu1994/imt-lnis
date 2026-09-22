@@ -59,7 +59,7 @@ class ApiLoggingTest {
             assertEquals("{\"status\":\"ready\"}",writerResponse.getContentAsString());
         }
     }
-    @Test void pollingLogsEverySummaryButBodiesOnlyOnChange() throws Exception {
+    @Test void pollingRemainsDiagnosticEvenWhenResponseStateChanges() throws Exception {
         try(var logs=new Logs()) {
             logs.logger.setLevel(Level.DEBUG);
             String path="/lnis/api/v1/poll/"+UUID.randomUUID();
@@ -69,8 +69,8 @@ class ApiLoggingTest {
                 });
             assertEquals(3,logs.appender.list.stream().filter(e->e.getFormattedMessage().startsWith("API_START") && e.getLevel()==Level.DEBUG).count());
             var ends=logs.appender.list.stream().filter(e->e.getFormattedMessage().startsWith("API_END")).toList();
-            assertEquals(List.of(Level.INFO,Level.DEBUG,Level.INFO),ends.stream().map(ILoggingEvent::getLevel).toList());
-            assertEquals(2,logs.appender.list.stream().filter(e->e.getFormattedMessage().startsWith("API_BODY")).count());
+            assertEquals(List.of(Level.DEBUG,Level.DEBUG,Level.DEBUG),ends.stream().map(ILoggingEvent::getLevel).toList());
+            assertEquals(3,logs.appender.list.stream().filter(e->e.getFormattedMessage().startsWith("API_BODY")).count());
         }
     }
     @Test void repeatedFailuresAndTransfersRemainVisible() {
@@ -81,12 +81,12 @@ class ApiLoggingTest {
             for(int i=0;i<2;i++)
                 new ApiLog.Exchange("OUT","POST",path,Map.of(),null,null).finish(202,Map.of(),null);
             var ends=logs.appender.list.stream().filter(e->e.getFormattedMessage().startsWith("API_END")).toList();
-            assertEquals(List.of(Level.INFO,Level.WARN,Level.WARN,Level.ERROR,Level.INFO,Level.INFO,Level.INFO),
+            assertEquals(List.of(Level.WARN,Level.WARN,Level.ERROR,Level.INFO,Level.INFO),
                 ends.stream().map(ILoggingEvent::getLevel).toList());
-            assertEquals(2,logs.appender.list.stream().filter(e->e.getFormattedMessage().startsWith("API_START")).count());
+            assertEquals(0,logs.appender.list.stream().filter(e->e.getFormattedMessage().startsWith("API_START")).count());
         }
     }
-    @Test void listBodiesStayDebugAndRepeatedHealthErrorsAreSummarized() {
+    @Test void listBodiesStayDebugAndEveryHealthFailureIsVisible() {
         try(var logs=new Logs()) {
             String base="http://"+UUID.randomUUID()+"/";
             for(String name:List.of("tests","receipts")) {
@@ -100,22 +100,22 @@ class ApiLoggingTest {
             assertFalse(logs.text().contains("OLD_HISTORY"));
             assertFalse(logs.text().contains("API_BODY"));
             assertFalse(logs.text().contains("API_FAILURE"));
-            assertEquals(1,logs.appender.list.stream().filter(e->e.getLevel()==Level.WARN).count());
+            assertEquals(3,logs.appender.list.stream().filter(e->e.getLevel()==Level.WARN).count());
             assertTrue(logs.text().contains("ConnectException"));
-            assertTrue(logs.text().contains("suppressed=2"));
+            assertFalse(logs.text().contains("suppressed="));
         }
     }
     @Test void outboundPreservesBodiesAndAuthenticationWhileLoggingSafely() throws Exception {
         var server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);
         byte[] payload="{\"testId\":\"out-trial\",\"sendToken\":\"outgoing-private\"}".getBytes(StandardCharsets.UTF_8);
         var arrived=new CompletableFuture<String>();
-        server.createContext("/transfer",exchange->{try(exchange){
+        server.createContext("/transfers",exchange->{try(exchange){
             arrived.complete(exchange.getRequestHeaders().getFirst("Authorization"));
             byte[] body=exchange.getRequestBody().readAllBytes();exchange.getResponseHeaders().set("Content-Type","application/json");
             exchange.sendResponseHeaders(202,body.length);exchange.getResponseBody().write(body);
         }});server.start();
         try(var logs=new Logs()) {
-            var request=HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+server.getAddress().getPort()+"/transfer"))
+            var request=HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+server.getAddress().getPort()+"/transfers"))
                 .header("Content-Type","application/json").header("Authorization","Bearer original-auth")
                 .POST(HttpRequest.BodyPublishers.ofByteArray(payload)).build();
             var response=LoggedHttpClient.send(HttpClient.newHttpClient(),request,HttpResponse.BodyHandlers.ofByteArray());
@@ -147,6 +147,7 @@ class ApiLoggingTest {
 
     @Test void asynchronousCompletionLogsOnce() throws Exception {
         try(var logs=new Logs()) {
+            logs.logger.setLevel(Level.DEBUG);
             var request=new MockHttpServletRequest("GET","/lnis/api/v1/async");request.setAsyncSupported(true);
             var response=new MockHttpServletResponse();
             new ApiLoggingFilter().doFilter(request,response,(req,res)->{
@@ -155,6 +156,73 @@ class ApiLoggingTest {
             assertFalse(logs.text().contains("API_END"));
             request.getAsyncContext().complete();
             assertEquals(1,logs.appender.list.stream().filter(e->e.getFormattedMessage().startsWith("API_END")).count());
+        }
+    }
+
+    @Test void routeShowsActualEndpointsAndMappingWithoutControllerNames() throws Exception {
+        try (var logs = new Logs()) {
+            var request = new MockHttpServletRequest("POST", "/lnis/api/v1/sessions/123/evidence");
+            request.setServerName("192.168.1.72");
+            request.setServerPort(8089);
+            request.setRemoteAddr("192.168.1.154");
+            request.setRemotePort(50123);
+            request.setLocalAddr("172.20.0.2");
+            request.setLocalPort(8089);
+            var response = new MockHttpServletResponse();
+            new ApiLoggingFilter().doFilter(request, response, (req, res) -> {
+                req.setAttribute(org.springframework.web.servlet.HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE,
+                        "/lnis/api/v1/sessions/{id}/evidence");
+                ((jakarta.servlet.http.HttpServletResponse) res).setStatus(202);
+            });
+            String text = logs.text();
+            assertTrue(text.contains("method=POST"));
+            assertTrue(text.contains("url=http://192.168.1.72:8089/lnis/api/v1/sessions/123/evidence"));
+            assertTrue(text.contains("peer=192.168.1.154:50123"));
+            assertTrue(text.contains("local=172.20.0.2:8089"));
+            assertTrue(text.contains("mapping=/lnis/api/v1/sessions/{id}/evidence"));
+            assertFalse(text.contains("handler="));
+            assertFalse(text.contains("API_START"));
+        }
+    }
+
+    @Test void reportAndScreenTransportDoNotReplayDetailsAtInfo() throws Exception {
+        try (var logs = new Logs()) {
+            for (String path : List.of("/lnis/api/v1/dtn/tests/123/report", "/lnis/api/v1/dtn/logs")) {
+                var request = new MockHttpServletRequest("GET", path);
+                var response = new MockHttpServletResponse();
+                byte[] body = "{\"status\":\"FAILED\",\"message\":\"OLD_REPORT_DETAIL\"}".getBytes(StandardCharsets.UTF_8);
+                new ApiLoggingFilter().doFilter(request, response, (req, res) -> {
+                    res.setContentType("application/json");
+                    res.getOutputStream().write(body);
+                });
+                assertArrayEquals(body, response.getContentAsByteArray());
+            }
+            for (String path : List.of("/lnis/api/v1/logs/screen", "/lnis/api/v1/dtn/logs/screen")) {
+                new ApiLog.Exchange("IN", "POST", path, Map.of(), null, null).finish(204, Map.of(), null);
+            }
+            assertEquals("", logs.text());
+            new ApiLog.Exchange("IN", "POST", "/lnis/api/v1/logs/screen", Map.of(), null, null)
+                    .finish(400, Map.of(), null);
+            assertEquals(1, logs.appender.list.size());
+            assertEquals(Level.WARN, logs.appender.list.getFirst().getLevel());
+        }
+    }
+
+    @Test void rejectedOriginalIsPrettyPrintedOnceWithoutEmptyResponseSection() throws Exception {
+        try (var logs = new Logs()) {
+            var request = new MockHttpServletRequest("POST", "/lnis/api/v1/dtn/receive");
+            request.setContentType("application/json");
+            byte[] body = "{\"testId\":\"rejected\",\"value\":42}".getBytes(StandardCharsets.UTF_8);
+            request.setContent(body);
+            var response = new MockHttpServletResponse();
+            new ApiLoggingFilter().doFilter(request, response, (req, res) -> {
+                assertArrayEquals(body, req.getInputStream().readAllBytes());
+                ((jakarta.servlet.http.HttpServletResponse) res).setStatus(400);
+            });
+            assertEquals(1, logs.appender.list.stream().filter(e -> e.getFormattedMessage().startsWith("API_BODY ")).count());
+            assertTrue(logs.text().contains("\n  \"value\" : 42"));
+            assertFalse(logs.text().contains("RESPONSE\n"));
+            assertTrue(logs.text().contains("API_BODY END requestId="));
         }
     }
 }

@@ -2,7 +2,10 @@
 <configuration>
     <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
     <conversionRule conversionWord="lnisLevel" class="server.shared.logging.ConsoleLevelConverter"/>
-    <property name="CONSOLE_LOG_PATTERN" value="%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %lnisLevel ${PID:- } --- [lnis] [%thread] %logger{40} : %msg%n%wEx"/>
+    <springProperty scope="context" name="nodeRole" source="lnis.node.role" defaultValue="server"/>
+    <springProperty scope="context" name="httpLogLevel" source="LNIS_HTTP_LOG_LEVEL" defaultValue="INFO"/>
+    <logger name="server.shared.http.ApiLog" level="${httpLogLevel}"/>
+    <property name="CONSOLE_LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSSXXX,Asia/Seoul} %lnisLevel [${nodeRole}] [%thread] %logger{40} : %msg%n%wEx"/>
     <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
     <root level="INFO">
         <appender-ref ref="CONSOLE"/>

@@ -63,7 +63,7 @@ public final class AgentWebSocketClient implements WebSocket.Listener, AutoClose
       return;
     }
     URI target = serverUri.get();
-    log.info("Connecting LNIS Agent {} to {}", config.agentId(), target);
+    log.debug("Connecting LNIS Agent {} to {}", config.agentId(), target);
     HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(10))
         .build()
@@ -128,6 +128,7 @@ public final class AgentWebSocketClient implements WebSocket.Listener, AutoClose
   @Override
   public void onOpen(WebSocket webSocket) {
     socket = webSocket;
+    log.info("LNIS Agent connected agentId={} url={}", config.agentId(), serverUri.get());
     Hello hello =
         new Hello(
             "1.0.0",
@@ -148,7 +149,8 @@ public final class AgentWebSocketClient implements WebSocket.Listener, AutoClose
     if (last) {
       try {
         runtime.handle(json.readValue(text.toString(), Envelope.class));
-      } catch (Exception ignored) {
+      } catch (Exception error) {
+        log.warn("AGENT_MESSAGE_REJECTED agentId={} type={}", config.agentId(), error.getClass().getSimpleName());
         // 잘못된 단일 메시지는 버리고 다음 서버 메시지를 계속 수신한다.
       } finally {
         text.setLength(0);
@@ -219,7 +221,8 @@ public final class AgentWebSocketClient implements WebSocket.Listener, AutoClose
         synchronized (sendLock) {
           current.sendText(json.writeValueAsString(envelope), true).join();
         }
-      } catch (Exception ignored) {
+      } catch (Exception error) {
+        log.warn("AGENT_SEND_FAILED agentId={} type={} cause={}", config.agentId(), envelope.type(), error.getClass().getSimpleName());
         // 재연결 스케줄러가 연결을 복구하므로 개별 전송 실패는 무시한다.
       }
     }
