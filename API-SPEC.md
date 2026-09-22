@@ -899,39 +899,45 @@ Authorization: Bearer <LNIS_DTN_SEND_TOKEN>
 
 #### HDTN 설정 — `hdtnConfig`
 
-송신 화면의 전송 경로 아래에는 DTN/HDTN 설정 영역이 분리되어 있습니다. 현재는 HDTN 설정만 지원하며, DTN 설정 객체는 전송하지 않습니다. 향후 DTN 설정은 `dtnConfig`, HDTN 설정은 `hdtnConfig`로 구분합니다. DTN의 전체 규격을 받기 전까지 `dtnConfig`의 입력란 및 기본값 전송은 추가하지 않습니다.
-`POST /lnis/api/v1/dtn/tests`의 `hdtnConfig`가 RAW·AFS·I/Q 모두 외부 `/transfers` JSON의 같은 이름으로 포함됩니다. `dtnConfig`는 HDTN 설정의 별칭이 아닙니다.
-설정은 시험 시작 시 확정해 DB에 저장합니다. 수신 콜백은 이 객체까지 그대로 보존해야 합니다.
-기존 클라이언트가 이 객체를 생략하면 자동으로 추가하지 않아 기존 요청 동작을 유지합니다.
+송신 화면은 HDTN 설정만 제공하며 기본 7개와 접을 수 있는 고급 3개 항목으로 구성됩니다. DTN 준비 영역은 제거했으며 `dtnConfig`는 전송하지 않습니다.
+`POST /lnis/api/v1/dtn/tests`의 `hdtnConfig`는 RAW·AFS·I/Q 외부 `/transfers` JSON에 같은 이름으로 포함됩니다. HDTN이 포함된 경로에서만 전송하고, 시험 시작 시 DB에 확정 저장합니다. 수신 콜백은 이 객체를 그대로 보존해야 합니다.
 
 ```json
 {
   "hdtnConfig": {
     "maxNumberOfBundlesInPipeline": 50,
     "maxSumOfBundleBytesInPipeline": 50000000,
-    "enforceBundlePriority": true,
-    "neighborDepletedStorageDelaySeconds": 10,
     "maxBundleSizeBytes": 10485760,
-    "tcpclMaxSegmentSizeBytes": 200000,
-    "storageDeletionPolicy": "DELETE_AFTER_FORWARDING"
+    "tcpclMaxSegmentSizeBytes": 20000,
+    "neighborDepletedStorageDelaySeconds": 10,
+    "enforceBundlePriority": false,
+    "storageDeletionPolicy": "DELETE_AFTER_FORWARDING",
+    "totalStorageCapacityBytes": 8589934592,
+    "maxLtpReceiveUdpPacketSizeBytes": 65536,
+    "acsSendPeriodMilliseconds": 1000
   }
 }
 ```
 
-| 필드 | 의미 | 화면 기본값·입력 범위 |
+| 필드 | 화면 기본값 | 신규 시험 API 허용 범위 |
 |---|---|---|
-| maxNumberOfBundlesInPipeline | 수신 확인 전 최대 동시 전송 번들 수 | 50 · 1~2147483647 정수 |
-| maxSumOfBundleBytesInPipeline | 동시 전송 번들의 최대 합계 용량(Bytes) | 50000000 · 1~9007199254740991 정수 |
-| enforceBundlePriority | 번들 우선순위 준수 여부 | true · JSON boolean |
-| neighborDepletedStorageDelaySeconds | 상대 저장 공간 부족 시 대기 시간(초) | 10 · 0~2147483647 정수 |
-| maxBundleSizeBytes | 번들 한 개의 최대 크기(Bytes) | 10485760 · 1~9007199254740991 정수 |
-| tcpclMaxSegmentSizeBytes | TCPCL 최대 세그먼트 크기(Bytes), 번들 전체 크기 및 IP MTU와는 별도 | 200000 · 1400~1000000 정수 |
-| storageDeletionPolicy | 어댑터가 적용할 스토리지 삭제 정책명 | DELETE_AFTER_FORWARDING · 영문 대문자로 시작하는 대문자·숫자·밑줄 1~64자 |
+| maxNumberOfBundlesInPipeline | 50 | 10~10,000 정수 (개) |
+| maxSumOfBundleBytesInPipeline | 50000000 | 1,048,576~2,147,483,648 정수 (Bytes) |
+| maxBundleSizeBytes | 10485760 | 1,048,576~104,857,600 정수 (Bytes) |
+| tcpclMaxSegmentSizeBytes | 20000 | 20,000~200,000 정수 (Bytes) |
+| neighborDepletedStorageDelaySeconds | 10 | 0~3,600 정수 (초) |
+| enforceBundlePriority | false | JSON boolean |
+| storageDeletionPolicy | DELETE_AFTER_FORWARDING | `DELETE_AFTER_FORWARDING`, `on_expiration`, `on_storage_full`, `never` |
+| totalStorageCapacityBytes | 8589934592 | 1~9,007,199,254,740,991 정수 (Bytes) |
+| maxLtpReceiveUdpPacketSizeBytes | 65536 | 1~2,147,483,647 정수 (Bytes) |
+| acsSendPeriodMilliseconds | 1000 | 1~2,147,483,647 정수 (ms) |
 
-화면은 일곱 필드를 전달합니다. 기존 여섯 필드는 필수이며, `tcpclMaxSegmentSizeBytes`는 기존 클라이언트 호환을 위해 API에서 생략할 수 있습니다. 생략하면 외부 전송 JSON에도 임의로 추가하지 않습니다. 브라우저에 저장된 기존 여섯 항목은 유지하고 새 항목만 200000으로 보충합니다. LNIS는 형식과 범위를 검증해 전달하며, 실제 번들 제한·삭제 정책의 지원 여부와 적용은 어댑터가 담당합니다. 이 설정은 LNIS 입력 파일 및 JSON 크기 제한을 변경하지 않습니다.
-HDTN → HDTN에서는 동일한 객체를 양쪽 HDTN 설정에 사용하도록 어댑터와 합의해야 합니다. 송신/수신별로 다른 HDTN 설정을 보내는 규격은 현재 포함하지 않습니다.
+용량 범위는 MiB/GiB 기준입니다. 고급 3개 항목의 상한은 자료형 및 JSON 정수 정밀도 제한이며 실제 엔진 허용 범위를 보장하지 않습니다. `DELETE_AFTER_FORWARDING`은 어댑터 문서상 `never`로 매핑되며 LNIS가 즉시 삭제를 보장하지 않습니다. 정책 문자열은 변환하지 않고 전달합니다.
 
-추가 전달된 2.7 규격에 따라 TCPCL 설정 범위는 1400~1000000 Bytes입니다. HDTN 기본값은 200000, 향후 DTN(ION) 기본값은 1400입니다. DTN 설정은 계속 추가 규격 대기 상태이며 `dtnConfig`는 아직 전송하지 않습니다.
+화면은 10개 값을 전달합니다. 기존 여섯 필드는 필수이고 TCPCL 및 고급 3개 필드는 API에서 생략할 수 있습니다. 생략한 값이나 `hdtnConfig` 객체를 임의로 추가하지 않습니다. 숫자 문자열·소수·빈 값·범위 밖 값과 목록 외 정책은 신규 시험 요청에서 거절합니다. 과거 저장된 원문과 설정 조회에는 새 요청 검증을 적용하지 않습니다.
+
+‘전체 기본값’은 고급 설정까지 한 번에 복원하고 브라우저에 저장합니다. 기존 저장값은 유효한 항목을 유지하며, 새 범위를 벗어난 항목만 기본값으로 복구하고 알립니다. 입력 오류는 해당 칸에 남기고 저장·시험 시작을 막습니다. 시험 중에는 설정 변경과 초기화를 잠급니다.
+이번 변경은 `hdtnConfig`에 한정하며 `convergenceLayer`, schemaVersion, testId 규격과 라우터 파일 생성은 변경하지 않습니다. HDTN → HDTN은 기존처럼 하나의 설정 객체를 전달합니다.
 
 #### DTN(ION) 매핑 참고 — 추가 규격 대기
 

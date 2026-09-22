@@ -15,19 +15,23 @@ const elements = new Map([...html.matchAll(/id="([^"]+)"/g)].map(([, id]) => [id
 }]));
 let nextTests = [], report = {}, reportRequest = null;
 const requests = [];
+const removedHealth = new Set(['dtn-adapter-health-results','dtn-adapter-detail','dtn-adapter-health-time','dtn-adapter-health-json']);
+let healthState = 'ready';
+const healthIntervals = [];
 const context = {
-  numeric,
+  numeric, URL, AbortSignal,
   renderIqFile() {},
   createDtnLog: () => ({write() {},setContext() {},refresh() {}}),
-  document: {getElementById(id) { assert.ok(elements.has(id), 'DOM missing: ' + id); return elements.get(id); }},
+  document: {visibilityState:'visible', getElementById(id) { if (removedHealth.has(id)) return null; assert.ok(elements.has(id), 'DOM missing: ' + id); return elements.get(id); }},
   createPayloadViewer(container, options) { assert.equal(options.receivedOnly, true); return {setJob() {},setReceipts() {}}; },
   createObservationView() { return {setData() {}, select() {}}; },
   Option: function(text, value) { this.text = text; this.value = value; },
-  location: {origin: 'http://localhost:8089'}, navigator: {}, setTimeout() {}, setInterval() {},
+  location: {origin: 'http://localhost:8089'}, navigator: {}, setTimeout() {}, setInterval(fn,ms) { healthIntervals.push({fn,ms}); },
   fetch: async (url, options) => {
     assert.ok(!options?.method || options.method === 'GET', 'Receiver screen must not start a test');
     requests.push(url);
-    const body = url.endsWith('/node') ? {baseUrl: 'http://192.168.1.72:8089'}
+    const body = url.includes('/adapter-health?') ? {checkedAt:'2026-09-22T00:00:00Z',adapter:{status:healthState,message:healthState==='ready'?'정상연결':healthState==='busy'?'시험대기':'연결실패',elapsedMillis:5,url:'http://adapter:8080/receiver/health'}}
+      : url.endsWith('/node') ? {baseUrl: 'http://192.168.1.72:8089'}
       : url.endsWith('/agents') ? [{role: 'RECEIVER', state: 'BUSY'}, {role: 'SENDER', state: 'READY'}]
       : url.endsWith('/config') ? {receiveConfigured: true}
       : url.endsWith('/tests') ? nextTests
@@ -166,7 +170,7 @@ context.setComparison({comparisonMode:'DELAY', referencePvt:[{week:2400,towSecon
 context.setEpochs([{week:2400,towSeconds:100.001,positionValid:true,ecefMeters:[3,2,3]}]);
 assert.equal(elements.get('reference-x').textContent,'1.000');
 assert.match(elements.get('pvt-match').textContent,/지연 반영/);
-assert.match(elements.get('dtn-delay-note').textContent,/수신 원본/);
+assert.equal(elements.has('dtn-delay-note'),false);
 assert.match(elements.get('pvt-differences').textContent,/2.000000/);
 assert.match(elements.get('dtn-clock-analysis').textContent,/측정 지연 0.001000000 s/);
 assert.match(elements.get('dtn-clock-analysis').textContent,/-0.020 ns/);
@@ -174,5 +178,17 @@ assert.equal(elements.get('dtn-clock-analysis').hidden,false);
 context.setEpochs([{week:2400,towSeconds:999,positionValid:false}]);
 assert.match(elements.get('dtn-clock-analysis').textContent,/지연과의 차이 —/);
 context.setComparison();
-assert.equal(elements.get('dtn-delay-note').hidden,true);
 assert.equal(elements.get('dtn-clock-analysis').hidden,true);
+
+for (const id of removedHealth) assert.equal(elements.has(id),false,'receiver removes health details');
+elements.get('dtn-send-url').value='http://adapter:8080';
+for (const [state,label] of [['ready','연결됨'],['busy','시험대기'],['failed','연결실패']]) {
+  healthState=state;
+  await elements.get('dtn-adapter-health').onclick();
+  assert.equal(elements.get('dtn-adapter-status').textContent,label);
+  assert.equal(elements.get('dtn-adapter-health').disabled,false);
+}
+elements.get('dtn-send-url').oninput();
+assert.equal(elements.get('dtn-adapter-status').textContent,'확인 대기');
+assert.ok(healthIntervals.some(item=>item.ms===10000),'receiver retains health polling');
+console.log('PASS: receiver compact health status keeps manual checks and polling without details');

@@ -72,7 +72,10 @@ class HdtnConfigTransferTest {
             HdtnConfig settings = new HdtnConfig();
             settings.setMaxNumberOfBundlesInPipeline(75); settings.setMaxSumOfBundleBytesInPipeline(60000000L);
             settings.setEnforceBundlePriority(false); settings.setNeighborDepletedStorageDelaySeconds(0);
-            settings.setTcpclMaxSegmentSizeBytes(300000);
+            settings.setTcpclMaxSegmentSizeBytes(100000);
+            settings.setTotalStorageCapacityBytes(8589934592L);
+            settings.setMaxLtpReceiveUdpPacketSizeBytes(65536);
+            settings.setAcsSendPeriodMilliseconds(1000);
             settings.setMaxBundleSizeBytes(10485760L); settings.setStorageDeletionPolicy("DELETE_AFTER_FORWARDING");
             JsonNode expected = json.readTree(json.writeValueAsBytes(settings));
             DtnJob job = configured

@@ -120,8 +120,8 @@ assert.equal(elements.get('dtn-send').disabled, false);
 await elements.get('dtn-send').onclick();
 assert.equal(starts, 1);
 assert.equal(lastStartBody.hdtnConfig.maxNumberOfBundlesInPipeline, 50);
-assert.equal(lastStartBody.hdtnConfig.enforceBundlePriority, true);
-assert.equal(lastStartBody.hdtnConfig.tcpclMaxSegmentSizeBytes, 200000);
+assert.equal(lastStartBody.hdtnConfig.enforceBundlePriority, false);
+assert.equal(lastStartBody.hdtnConfig.tcpclMaxSegmentSizeBytes, 20000);
 assert.equal(elements.get('hdtn-maxBundleSizeBytes').disabled, true);
 assert.equal(elements.get('dtn-upload').disabled, true);
 await elements.get('dtn-settings-open').onclick();
@@ -244,8 +244,8 @@ console.log('PASS: adapter address browser persistence, restore and invalid addr
 savedAddresses.set('lnis.hdtnConfig.v1', JSON.stringify({maxNumberOfBundlesInPipeline: 65}));
 context.initializeHdtnConfig();
 assert.equal(elements.get('hdtn-maxNumberOfBundlesInPipeline').value, '65');
-assert.equal(elements.get('hdtn-tcpclMaxSegmentSizeBytes').value, '200000', 'old saved settings gain only the new default');
-elements.get('hdtn-tcpclMaxSegmentSizeBytes').value = '300000';
+assert.equal(elements.get('hdtn-tcpclMaxSegmentSizeBytes').value, '20000', 'old saved settings gain only the new default');
+elements.get('hdtn-tcpclMaxSegmentSizeBytes').value = '100000';
 elements.get('hdtn-maxNumberOfBundlesInPipeline').value = '75';
 elements.get('hdtn-enforceBundlePriority').value = 'false';
 elements.get('hdtn-neighborDepletedStorageDelaySeconds').value = '0';
@@ -263,7 +263,7 @@ for (const [txMode, rxMode] of [['DTN', 'HDTN'], ['HDTN', 'DTN'], ['HDTN', 'HDTN
   assert.equal(Object.hasOwn(lastStartBody, 'dtnConfig'), false);
   if (usesHdtn) {
     assert.equal(lastStartBody.hdtnConfig.maxNumberOfBundlesInPipeline, 75);
-    assert.equal(lastStartBody.hdtnConfig.tcpclMaxSegmentSizeBytes, 300000);
+    assert.equal(lastStartBody.hdtnConfig.tcpclMaxSegmentSizeBytes, 100000);
     assert.equal(lastStartBody.hdtnConfig.enforceBundlePriority, false);
     assert.equal(lastStartBody.hdtnConfig.neighborDepletedStorageDelaySeconds, 0);
   }
@@ -282,11 +282,53 @@ for (const invalid of ['', '1399', '1000001', '1400.5']) {
   await elements.get('dtn-send').onclick();
   assert.equal(starts, before);
 }
-for (const boundary of ['1400', '1000000']) {
+for (const boundary of ['20000', '200000']) {
   elements.get('hdtn-tcpclMaxSegmentSizeBytes').value = boundary;
   assert.equal(context.readHdtnConfig().tcpclMaxSegmentSizeBytes, Number(boundary));
 }
 context.initializeHdtnConfig();
+// A single invalid legacy value must not discard valid user settings.
+savedAddresses.set('lnis.hdtnConfig.v1', JSON.stringify({maxNumberOfBundlesInPipeline:75,tcpclMaxSegmentSizeBytes:300000,enforceBundlePriority:true}));
+context.initializeHdtnConfig();
+assert.equal(elements.get('hdtn-maxNumberOfBundlesInPipeline').value,'75');
+assert.equal(elements.get('hdtn-tcpclMaxSegmentSizeBytes').value,'20000');
+assert.equal(elements.get('hdtn-enforceBundlePriority').value,'true');
+assert.equal(elements.get('hdtn-config-notice').hidden,false);
+elements.get('hdtn-acsSendPeriodMilliseconds').value='0';
+elements.get('hdtn-acsSendPeriodMilliseconds').oninput();
+context.updateHdtnControls();
+assert.equal(elements.get('hdtn-acsSendPeriodMilliseconds-error').hidden,false);
+await elements.get('dtn-send').onclick();
+assert.equal(elements.get('hdtn-advanced').open,true);
+assert.equal(elements.get('hdtn-acsSendPeriodMilliseconds').focused,true);
+elements.get('hdtn-reset').onclick();
+assert.equal(elements.get('hdtn-acsSendPeriodMilliseconds').value,'1000');
+assert.equal(elements.get('hdtn-enforceBundlePriority').value,'false');
+assert.equal(elements.get('hdtn-acsSendPeriodMilliseconds-error').hidden,true);
+assert.equal(context.readHdtnConfig().totalStorageCapacityBytes,8589934592);
+for (const policy of ['DELETE_AFTER_FORWARDING','on_expiration','on_storage_full','never']) {
+  elements.get('hdtn-storageDeletionPolicy').value=policy;
+  assert.equal(context.readHdtnConfig().storageDeletionPolicy,policy);
+}
+elements.get('hdtn-reset').onclick();
+for (const [key, rule] of Object.entries(vm.runInContext('hdtnRules',context))) {
+  if (typeof rule.default !== 'number') continue;
+  const control = elements.get('hdtn-' + key);
+  const tag = html.match(new RegExp('<input id="hdtn-' + key + '"[^>]+>'))[0];
+  assert.ok(tag.includes('min="' + rule.min + '"'));
+  assert.ok(tag.includes('max="' + rule.max + '"'));
+  for (const valid of [rule.min,rule.max]) {
+    control.value=String(valid);
+    assert.equal(context.readHdtnConfig()[key],valid);
+  }
+  for (const invalid of ['',String(rule.min-1),String(rule.max+1),'1.5']) {
+    control.value=invalid;
+    assert.throws(()=>context.readHdtnConfig());
+  }
+  control.value=String(rule.default);
+}
+assert.ok(!html.includes('id="dtn-config-title"'),'remove empty DTN settings');
+elements.get('hdtn-reset').onclick();
 console.log('PASS: HDTN defaults, custom numeric/boolean values, route omission, validation, persistence and locking');
 
 vm.runInContext("job={testId:'t1',state:'WAITING_DTN'}; busy=false; updateControls();", context);

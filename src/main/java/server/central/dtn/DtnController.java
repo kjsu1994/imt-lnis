@@ -113,6 +113,7 @@ public class DtnController {
         private String senderMode;
         private String receiverMode;
         @Valid
+        @com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = HdtnConfigRequestDeserializer.class)
         private DtnModels.HdtnConfig hdtnConfig;
     }
 

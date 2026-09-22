@@ -128,10 +128,62 @@ class DtnCreateRequestContractTest {
                     .content(json.writeValueAsBytes(body))).andExpect(status().isBadRequest());
         }
         verifyNoInteractions(service);
-        for (int boundary : List.of(1400, 200000, 1000000)) {
+        for (int boundary : List.of(20000, 200000)) {
             settings.put("tcpclMaxSegmentSizeBytes", boundary);
             mvc.perform(post("/lnis/api/v1/dtn/tests").contentType(MediaType.APPLICATION_JSON)
                     .content(json.writeValueAsBytes(body))).andExpect(status().isAccepted());
         }
     }
+    @Test
+    void rejectsOutOfRangeAndFractionalSettingsButPreservesAllSupportedPolicies() throws Exception {
+        var json = new ObjectMapper();
+        var service = mock(DtnService.class);
+        var job = new DtnJob(); job.setId(UUID.randomUUID());
+        when(service.create(any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(job);
+        var mvc = MockMvcBuilders.standaloneSetup(new DtnController(service, json)).build();
+        var settings = new LinkedHashMap<String, Object>(Map.of(
+                "maxNumberOfBundlesInPipeline", 50, "maxSumOfBundleBytesInPipeline", 50000000L,
+                "maxBundleSizeBytes", 10485760L, "tcpclMaxSegmentSizeBytes", 20000,
+                "neighborDepletedStorageDelaySeconds", 10, "enforceBundlePriority", false,
+                "storageDeletionPolicy", "DELETE_AFTER_FORWARDING"));
+        var body = Map.of("inputId", UUID.randomUUID(), "senderAgentId", "sender-1",
+                "receiverAgentId", "receiver-1", "hdtnConfig", settings);
+        var bounds = Map.of(
+                "maxNumberOfBundlesInPipeline", new long[]{10,10000},
+                "maxSumOfBundleBytesInPipeline", new long[]{1048576,2147483648L},
+                "maxBundleSizeBytes", new long[]{1048576,104857600},
+                "tcpclMaxSegmentSizeBytes", new long[]{20000,200000},
+                "neighborDepletedStorageDelaySeconds", new long[]{0,3600},
+                "totalStorageCapacityBytes", new long[]{1,9007199254740991L},
+                "maxLtpReceiveUdpPacketSizeBytes", new long[]{1,2147483647},
+                "acsSendPeriodMilliseconds", new long[]{1,2147483647});
+        for (var entry : bounds.entrySet()) {
+            String key = entry.getKey(); Object original = settings.get(key);
+            long min = entry.getValue()[0], max = entry.getValue()[1];
+            for (Object invalid : List.of(min-1, max+1, min+0.5, Long.toString(min), "")) {
+                settings.put(key, invalid);
+                mvc.perform(post("/lnis/api/v1/dtn/tests").contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsBytes(body))).andExpect(status().isBadRequest());
+            }
+            for (long valid : new long[]{min,max}) {
+                settings.put(key, valid);
+                mvc.perform(post("/lnis/api/v1/dtn/tests").contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsBytes(body))).andExpect(status().isAccepted());
+            }
+            if (original == null) settings.remove(key); else settings.put(key, original);
+        }
+        for (String policy : List.of("DELETE_AFTER_FORWARDING","on_expiration","on_storage_full","never")) {
+            settings.put("storageDeletionPolicy",policy);
+            mvc.perform(post("/lnis/api/v1/dtn/tests").contentType(MediaType.APPLICATION_JSON)
+                    .content(json.writeValueAsBytes(body))).andExpect(status().isAccepted());
+        }
+        settings.put("storageDeletionPolicy","RETAIN");
+        mvc.perform(post("/lnis/api/v1/dtn/tests").contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsBytes(body))).andExpect(status().isBadRequest());
+        // Reading stored historical settings must not apply new request validation.
+        settings.put("tcpclMaxSegmentSizeBytes",300000);
+        assertEquals(300000,json.readValue(json.writeValueAsBytes(settings),
+                server.shared.model.DtnModels.HdtnConfig.class).getTcpclMaxSegmentSizeBytes());
+    }
+
 }

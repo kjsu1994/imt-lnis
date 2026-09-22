@@ -1,6 +1,6 @@
 import {requestJson} from '../common/http.js?v=20260915-structure';
 import {createDtnLog} from './dtn-log.js?v=20260917-console';
-import {initAdapterHealth} from './dtn-adapter-health.js?v=20260915-structure';
+import {initAdapterHealth} from './dtn-adapter-health.js?v=20260922-compact-structure';
 import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20260918-receiver-original';
 import {createObservationView, numeric} from './dtn-observations.js?v=20260921-clock-analysis';
 
@@ -16,14 +16,7 @@ function setComparison(report = {}) {
   $('receiver-pvt-title').textContent = delayComparison ? '수신 지연 반영 PVT · Reference 비교' : '수신 지구 PVT · 송신 기준 비교';
   $('received-pvt-label').textContent = delayComparison ? '수신 지연 반영 지구 PVT' : '수신 복원 지구 PVT';
   delayEvidence = report.delayEvidence ?? null;
-  $('dtn-delay-note').hidden = !delayComparison;
   $('dtn-clock-analysis').hidden = !delayComparison;
-  $('dtn-delay-note').textContent = delayEvidence
-    ? '수신 원본 유지 · 원본 Doppler 유지 · 시계 동기화 정확도 미확인'
-    : '수신 후 지연 반영 계산을 수행합니다.';
-  $('dtn-delay-note').title = '시험 시작 접수→본문 수신 완료 시간을 추가합니다. 수집 후 시작 전 대기시간은 제외합니다. '
-    + '시험 기준 보정 송신 시각은 가상 시각이며, PVT는 원본 GNSS 시간축과 궤도정보를 유지합니다. '
-    + 'Doppler가 같아도 재계산 위치·위성 방향에 따라 속도에 작은 차이가 생길 수 있습니다. 상세 로그에서 계산 근거를 확인하세요.';
   renderClockAnalysis(null);
   referenceEpochs = Array.isArray(report.referencePvt) ? report.referencePvt : [];
   comparisonEpochs = report.comparison?.epochs || [];

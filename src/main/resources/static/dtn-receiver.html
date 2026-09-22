@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>LNIS DTN Receiver</title>
   <link rel="stylesheet" href="/lnis/assets/common/app.css?v=20260918-admin-icon">
-  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20260921-delay-20260918-receiver-pvt">
+  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20260922-note-20260921-delay-20260918-receiver-pvt">
 </head>
 <body data-page="dtn-receiver">
 <header>
@@ -48,17 +48,9 @@
       <div class="adapter-url-controls">
         <input id="dtn-send-url" type="url" placeholder="http://어댑터-IP:포트" autocomplete="off">
         <button id="dtn-adapter-save" type="button" title="이 브라우저에 주소 저장·적용">저장·적용</button>
-        <button id="dtn-adapter-health" type="button" aria-controls="dtn-adapter-health-results">연결 확인</button>
+        <button id="dtn-adapter-health" type="button">연결 확인</button>
       </div>
-      <details id="dtn-adapter-health-results" class="adapter-health-results" aria-busy="false">
-        <summary><span class="adapter-health-toggle">상세 보기</span></summary>
-        <div class="adapter-health-content">
-          <div class="adapter-health-item"><small id="dtn-adapter-detail">연결 확인을 기다립니다.</small></div>
-          <small id="dtn-adapter-health-time" class="adapter-health-time">10초마다 자동 확인</small>
-          <details class="adapter-health-developer"><summary>개발자 모드 · JSON 원문</summary>
-            <pre id="dtn-adapter-health-json">아직 확인 결과가 없습니다.</pre></details>
-        </div>
-      </details>
+
     </div>
     </div>
 
@@ -91,7 +83,6 @@
 
   <section class="card epoch-observation-card" id="dtn-observations"></section>
 
-  <p id="dtn-delay-note" role="status" hidden></p>
   <section class="card receiver-pvt">
     <div class="card-title">
       <h2 id="receiver-pvt-title">수신 지구 PVT · 송신 기준 비교</h2>
@@ -142,6 +133,6 @@
   </section>
   </div>
 </main>
-<script type="module" src="/lnis/assets/dtn/dtn-receiver.js?v=20260921-clock-analysis-20260918-receiver-pvt"></script>
+<script type="module" src="/lnis/assets/dtn/dtn-receiver.js?v=20260922-compact-20260921-clock-analysis-20260918-receiver-pvt"></script>
 </body>
 </html>

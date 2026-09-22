@@ -924,14 +924,11 @@ body[data-page="dtn-receiver"] .receiver-adapter .adapter-url-controls { grid-te
 }
 
 /* Separate DTN/HDTN adapter settings. */
-.adapter-config-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 18px 0; }
 .adapter-config-panel { min-width: 0; padding: 18px; border: 1px solid var(--line); border-radius: 12px; }
 .adapter-config-panel h3 { margin: 0 0 12px; }
 .adapter-config-panel > p { color: var(--muted); font-size: 13px; }
 .adapter-config-panel > small { display: block; margin-top: 14px; line-height: 1.5; }
 .adapter-config-panel label small { font-weight: 400; line-height: 1.5; }
-.adapter-config-pending { padding: 24px 0; text-align: center; }
-@media (max-width: 900px) { .adapter-config-grid { grid-template-columns: 1fr; } }
 
 .adapter-config-help { color: var(--teal); cursor: help; }
 
@@ -972,7 +969,36 @@ body[data-page="dtn-receiver"] .receiver-adapter .adapter-url-controls { grid-te
   height: 16px;
   flex-basis: 16px;
 }
-#dtn-delay-note {
-  line-height: 1.7;
-  padding: 0 8px;
+
+/* Compact HDTN controls: bounds and explanations are available on focus/hover. */
+.adapter-config-panel { padding:12px 14px; }
+.hdtn-heading { display:flex; align-items:center; flex-wrap:wrap; gap:6px 12px; margin-bottom:10px; }
+.hdtn-heading h3 { margin:0; font-size:14px; }
+#hdtn-config-state { flex:1; color:var(--muted); font-size:11px; }
+.hdtn-heading button { padding:4px 10px; font-size:11px; margin-left:auto; }
+.hdtn-fields { display:flex; flex-wrap:wrap; align-items:flex-start; gap:10px 14px; }
+.hdtn-field { display:flex; flex-direction:column; flex:0 0 auto; width:170px; gap:4px; min-width:0; font-size:12px; position:relative; }
+.hdtn-field > span { min-height:30px; line-height:15px; }
+.hdtn-field:has(#hdtn-maxNumberOfBundlesInPipeline) { width:112px; }
+.hdtn-field:has(#hdtn-enforceBundlePriority) { width:122px; }
+.hdtn-field:has(#hdtn-tcpclMaxSegmentSizeBytes), .hdtn-field:has(#hdtn-storageDeletionPolicy) { width:182px; }
+.hdtn-field input, .hdtn-field select { width:100%; min-width:0; height:32px; padding:5px 8px; box-sizing:border-box; font-size:12px; }
+.hdtn-field small { font-size:11px; font-weight:400; overflow-wrap:anywhere; }
+.hdtn-field .hdtn-error { color:#b73243; }
+.hdtn-field [aria-invalid="true"] { border-color:#b73243; }
+.hdtn-field .adapter-config-help { display:inline-block; }
+.hdtn-tooltip { display:none; position:absolute; left:0; bottom:100%; width:240px; max-width:65vw; padding:9px; background:#14232f; color:#fff; border:1px solid var(--line); border-radius:6px; font-size:12px; font-weight:400; line-height:1.5; z-index:20; overflow-wrap:anywhere; }
+.hdtn-tooltip small { display:block; margin-top:5px; color:#c2e9ef; }
+
+.adapter-config-help:hover .hdtn-tooltip, .hdtn-field:focus-within .hdtn-tooltip { display:block; }
+#hdtn-advanced { margin-top:10px; }
+#hdtn-advanced summary { cursor:pointer; font-size:12px; }
+#hdtn-advanced summary small, .hdtn-advanced-note { color:var(--muted); font-size:11px; }
+#hdtn-advanced .hdtn-field { width:210px; }
+#hdtn-config-notice { margin:0 0 8px; font-size:11px; }
+@media(max-width:600px) {
+  .hdtn-field, .hdtn-field:has(input), .hdtn-field:has(select) { width:calc(50% - 7px); }
+  #hdtn-advanced .hdtn-field { width:100%; }
+  #hdtn-config-state { order:3; flex-basis:100%; }
+  .hdtn-field:nth-child(even) .hdtn-tooltip { left:auto; right:0; }
 }

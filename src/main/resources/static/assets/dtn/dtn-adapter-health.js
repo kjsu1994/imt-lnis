@@ -10,6 +10,11 @@ export function initAdapterHealth(defaultUrl, log = () => {}, onStatus = () => {
   const $ = id => document.getElementById(id);
   const input = $('dtn-send-url'), button = $('dtn-adapter-health');
   const save = $('dtn-adapter-save');
+  // 수신 화면은 상태만 표시하며 상세 요소가 없어도 폴링·수동 확인은 유지한다.
+  const detailText = (id, text) => {
+    const element = $(id);
+    if (element) element.textContent = text;
+  };
   const storageKey = 'lnis.adapter-url.' + (document.body?.dataset?.page || 'dtn');
   input.value = defaultUrl;
   try {
@@ -31,9 +36,9 @@ export function initAdapterHealth(defaultUrl, log = () => {}, onStatus = () => {
     revision++;
     previousInput?.(event);
     status('확인 대기');
-    $('dtn-adapter-detail').textContent = '변경된 주소로 다시 확인합니다.';
-    $('dtn-adapter-health-time').textContent = '주소 변경 · 다음 확인 대기';
-    $('dtn-adapter-health-json').textContent = '아직 변경된 주소의 확인 결과가 없습니다.';
+    detailText('dtn-adapter-detail', '변경된 주소로 다시 확인합니다.');
+    detailText('dtn-adapter-health-time', '주소 변경 · 다음 확인 대기');
+    detailText('dtn-adapter-health-json', '아직 변경된 주소의 확인 결과가 없습니다.');
   };
   async function check(automatic = false) {
     if (checking) return;
@@ -41,7 +46,7 @@ export function initAdapterHealth(defaultUrl, log = () => {}, onStatus = () => {
     const currentRevision = revision, address = input.value.trim();
     const current = () => currentRevision === revision && address === input.value.trim();
     button.disabled = true;
-    $('dtn-adapter-health-results').setAttribute('aria-busy', 'true');
+    $('dtn-adapter-health-results')?.setAttribute('aria-busy', 'true');
     status('확인 중', 'warning');
     try {
       const url = new URL(address);
@@ -56,20 +61,20 @@ export function initAdapterHealth(defaultUrl, log = () => {}, onStatus = () => {
       const value = report.adapter;
       reportState(value.message, automatic);
       status(value.status === 'ready' ? '연결됨' : value.message, value.status === 'ready' ? 'online' : value.status === 'busy' ? 'warning' : 'error');
-      $('dtn-adapter-detail').textContent = (value.httpStatus == null ? '' : 'HTTP ' + value.httpStatus + ' · ')
-        + value.elapsedMillis + ' ms · ' + value.url;
-      $('dtn-adapter-health-time').textContent = '마지막 확인 ' + new Date(report.checkedAt).toLocaleString('ko-KR', {hour12: false}) + ' · LNIS 서버 기준';
-      $('dtn-adapter-health-json').textContent = JSON.stringify(report, null, 2);
+      detailText('dtn-adapter-detail', (value.httpStatus == null ? '' : 'HTTP ' + value.httpStatus + ' · ')
+        + value.elapsedMillis + ' ms · ' + value.url);
+      detailText('dtn-adapter-health-time', '마지막 확인 ' + new Date(report.checkedAt).toLocaleString('ko-KR', {hour12: false}) + ' · LNIS 서버 기준');
+      detailText('dtn-adapter-health-json', JSON.stringify(report, null, 2));
     } catch (error) {
       if (!current()) return;
       reportState('연결실패', automatic);
       status('연결실패', 'error');
-      $('dtn-adapter-detail').textContent = error.message;
-      $('dtn-adapter-health-time').textContent = '마지막 확인 실패 · 다음 자동 확인 또는 수동 재시도';
-      $('dtn-adapter-health-json').textContent = JSON.stringify({error: error.message}, null, 2);
+      detailText('dtn-adapter-detail', error.message);
+      detailText('dtn-adapter-health-time', '마지막 확인 실패 · 다음 자동 확인 또는 수동 재시도');
+      detailText('dtn-adapter-health-json', JSON.stringify({error: error.message}, null, 2));
     } finally {
       checking = false; button.disabled = false;
-      $('dtn-adapter-health-results').setAttribute('aria-busy', 'false');
+      $('dtn-adapter-health-results')?.setAttribute('aria-busy', 'false');
     }
   }
   button.onclick = () => check(false);

@@ -1,6 +1,6 @@
 import {requestJson} from '../common/http.js?v=20260915-structure';
 import {createDtnLog} from './dtn-log.js?v=20260917-console';
-import {initAdapterHealth, validAdapterUrl} from './dtn-adapter-health.js?v=20260915-settings';
+import {initAdapterHealth, validAdapterUrl} from './dtn-adapter-health.js?v=20260922-compact-settings';
 import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20260915-structure';
 import {createObservationView, numeric} from './dtn-observations.js?v=20260921-role';
 
@@ -34,54 +34,159 @@ function log(message,level='INFO') {
     $('dtn-settings-feedback').textContent = message;
   }
 }
-const hdtnDefaults = {
-  maxNumberOfBundlesInPipeline: 50, maxSumOfBundleBytesInPipeline: 50000000,
-  enforceBundlePriority: true, neighborDepletedStorageDelaySeconds: 10,
-  maxBundleSizeBytes: 10485760, tcpclMaxSegmentSizeBytes: 200000, storageDeletionPolicy: 'DELETE_AFTER_FORWARDING'
+const hdtnRules = {
+  "maxNumberOfBundlesInPipeline": {
+    "label": "최대 동시 번들 수",
+    "default": 50,
+    "min": 10,
+    "max": 10000,
+    "advanced": false
+  },
+  "maxSumOfBundleBytesInPipeline": {
+    "label": "최대 동시 번들 용량",
+    "default": 50000000,
+    "min": 1048576,
+    "max": 2147483648,
+    "advanced": false
+  },
+  "maxBundleSizeBytes": {
+    "label": "최대 번들 크기",
+    "default": 10485760,
+    "min": 1048576,
+    "max": 104857600,
+    "advanced": false
+  },
+  "tcpclMaxSegmentSizeBytes": {
+    "label": "TCPCL 세그먼트 크기",
+    "default": 20000,
+    "min": 20000,
+    "max": 200000,
+    "advanced": false
+  },
+  "neighborDepletedStorageDelaySeconds": {
+    "label": "저장 공간 부족 시 대기",
+    "default": 10,
+    "min": 0,
+    "max": 3600,
+    "advanced": false
+  },
+  "enforceBundlePriority": {
+    "label": "번들 우선순위 준수",
+    "default": false,
+    "advanced": false
+  },
+  "storageDeletionPolicy": {
+    "label": "스토리지 삭제 정책",
+    "default": "DELETE_AFTER_FORWARDING",
+    "advanced": false
+  },
+  "totalStorageCapacityBytes": {
+    "label": "전체 저장 용량",
+    "default": 8589934592,
+    "min": 1,
+    "max": 9007199254740991,
+    "advanced": true
+  },
+  "maxLtpReceiveUdpPacketSizeBytes": {
+    "label": "LTP 최대 수신 패킷 크기",
+    "default": 65536,
+    "min": 1,
+    "max": 2147483647,
+    "advanced": true
+  },
+  "acsSendPeriodMilliseconds": {
+    "label": "ACS 전송 주기",
+    "default": 1000,
+    "min": 1,
+    "max": 2147483647,
+    "advanced": true
+  }
 };
+const hdtnDefaults = Object.fromEntries(Object.entries(hdtnRules).map(([key, rule]) => [key, rule.default]));
+const hdtnPolicies = ['DELETE_AFTER_FORWARDING', 'on_expiration', 'on_storage_full', 'never'];
 const hdtnStorageKey = 'lnis.hdtnConfig.v1';
 const usesHdtn = () => senderMode === 'HDTN' || receiverMode === 'HDTN';
+
+function hdtnValue(key, raw) {
+  const rule = hdtnRules[key];
+  if (typeof rule.default === 'number') {
+    const value = Number(raw);
+    if (!raw || !Number.isSafeInteger(value) || value < rule.min || value > rule.max)
+      throw new Error(rule.label + ': ' + rule.min.toLocaleString() + '~' + rule.max.toLocaleString() + ' 사이의 정수를 입력하세요.');
+    return value;
+  }
+  if (typeof rule.default === 'boolean') {
+    if (!['true', 'false'].includes(raw)) throw new Error('우선순위 사용 여부를 선택하세요.');
+    return raw === 'true';
+  }
+  if (!hdtnPolicies.includes(raw)) throw new Error('지원하는 삭제 정책을 선택하세요.');
+  return raw;
+}
+
 function readHdtnConfig() {
   const result = {};
-  for (const [key, fallback] of Object.entries(hdtnDefaults)) {
-    const input = $('hdtn-' + key), raw = input.value.trim();
-    if (typeof fallback === 'number') {
-      const value = Number(raw);
-      const min = key === 'tcpclMaxSegmentSizeBytes' ? 1400 : key === 'neighborDepletedStorageDelaySeconds' ? 0 : 1;
-      const max = key === 'tcpclMaxSegmentSizeBytes' ? 1000000 : ['maxNumberOfBundlesInPipeline', 'neighborDepletedStorageDelaySeconds'].includes(key) ? 2147483647 : Number.MAX_SAFE_INTEGER;
-      if (!raw || !Number.isSafeInteger(value) || value < min || value > max) throw new Error(key + ' 값을 확인하세요.');
-      result[key] = value;
-    } else if (typeof fallback === 'boolean') {
-      if (!['true', 'false'].includes(raw)) throw new Error('우선순위 설정을 확인하세요.');
-      result[key] = raw === 'true';
-    } else {
-      if (!/^[A-Z][A-Z0-9_]{0,63}$/.test(raw)) throw new Error('삭제 정책명을 확인하세요.');
-      result[key] = raw;
+  let firstError = null;
+  for (const key of Object.keys(hdtnRules)) {
+    const input = $('hdtn-' + key), error = $('hdtn-' + key + '-error');
+    try {
+      result[key] = hdtnValue(key, input.value.trim());
+      input.removeAttribute('aria-invalid'); error.hidden = true; error.textContent = '';
+    } catch (failure) {
+      input.setAttribute('aria-invalid', 'true'); error.hidden = false; error.textContent = failure.message;
+      if (!firstError) { failure.field = key; firstError = failure; }
     }
   }
+  if (firstError) throw firstError;
   return result;
 }
+
+function saveHdtnConfig(settings) {
+  try { localStorage.setItem(hdtnStorageKey, JSON.stringify(settings)); }
+  catch { /* Current values still apply when browser storage is unavailable. */ }
+}
+
 function initializeHdtnConfig() {
-  let saved = {};
+  let saved = {}, restored = [];
   try {
     if (location.pathname?.endsWith('/clear')) localStorage.removeItem(hdtnStorageKey);
     saved = JSON.parse(localStorage.getItem(hdtnStorageKey) || '{}') || {};
-  } catch { /* Storage may be unavailable. Defaults remain usable. */ }
-  for (const [key, fallback] of Object.entries(hdtnDefaults)) $('hdtn-' + key).value = String(saved[key] ?? fallback);
-  try { readHdtnConfig(); } catch {
-    for (const [key, fallback] of Object.entries(hdtnDefaults)) $('hdtn-' + key).value = String(fallback);
-  }
-  for (const key of Object.keys(hdtnDefaults)) $('hdtn-' + key).onchange = () => {
-    try {
-      const settings = readHdtnConfig();
-      try { localStorage.setItem(hdtnStorageKey, JSON.stringify(settings)); } catch { /* Current values still apply. */ }
+  } catch { /* Use defaults for unavailable or malformed storage. */ }
+  for (const [key, rule] of Object.entries(hdtnRules)) {
+    let value = rule.default;
+    if (Object.hasOwn(saved, key)) {
+      try { value = hdtnValue(key, String(saved[key])); }
+      catch { restored.push(rule.label); }
+    }
+    const input = $('hdtn-' + key);
+    input.value = String(value);
+    input.oninput = input.onchange = () => {
+      try { saveHdtnConfig(readHdtnConfig()); } catch { /* Keep invalid edits visible, never persist them. */ }
       updateHdtnControls();
-    } catch (error) { $('hdtn-config-state').textContent = error.message; }
+    };
+  }
+  const values = readHdtnConfig();
+  if (restored.length) saveHdtnConfig(values);
+  $('hdtn-config-notice').hidden = !restored.length;
+  $('hdtn-config-notice').textContent = restored.length ? '새 허용 범위에 맞춰 기본값 복구: ' + restored.join(', ') : '';
+  $('hdtn-reset').onclick = () => {
+    if (locked() || !usesHdtn()) return;
+    for (const [key, value] of Object.entries(hdtnDefaults)) $('hdtn-' + key).value = String(value);
+    saveHdtnConfig(readHdtnConfig());
+    $('hdtn-config-notice').hidden = false;
+    $('hdtn-config-notice').textContent = '고급 설정을 포함한 전체 값을 기본값으로 복원했습니다.';
+    updateHdtnControls();
   };
 }
+
 function updateHdtnControls() {
   for (const key of Object.keys(hdtnDefaults)) $('hdtn-' + key).disabled = locked() || !usesHdtn();
-  $('hdtn-config-state').textContent = usesHdtn() ? 'HDTN 경로 · 전송 요청에 포함' : 'DTN → DTN 경로에서는 전송하지 않습니다.';
+  $('hdtn-reset').disabled = locked() || !usesHdtn();
+  let message = 'DTN → DTN 경로에서는 전송하지 않습니다.';
+  if (usesHdtn()) {
+    try { readHdtnConfig(); message = '다음 시험 적용 · 자동 저장'; }
+    catch (error) { message = error.message; }
+  }
+  $('hdtn-config-state').textContent = message;
 }
 let mainScrollY = 0;
 function showSettings(open) {
@@ -340,7 +445,13 @@ $('dtn-send').onclick = async () => {
   if (locked() || $('dtn-send').disabled) return;
   let hdtnConfig;
   try { if (usesHdtn()) hdtnConfig = readHdtnConfig(); }
-  catch (error) { showSettings(true); $('hdtn-config-state').textContent = error.message; log(error.message, 'ERROR'); return; }
+  catch (error) {
+    showSettings(true);
+    if (hdtnRules[error.field]?.advanced) $('hdtn-advanced').open = true;
+    if (error.field) $('hdtn-' + error.field).focus();
+    $('hdtn-config-state').textContent = error.message;
+    log(error.message, 'ERROR'); return;
+  }
   jobVersion++;
   const delayRequest = delayMode() ? {comparisonMode:'DELAY',selectedEpoch:selectedDelayEpoch()?.epoch} : {};
   busy = true; resetResult(); updateControls();

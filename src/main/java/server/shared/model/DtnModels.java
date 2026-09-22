@@ -48,28 +48,50 @@ public final class DtnModels {
   @Data @NoArgsConstructor
   public static class HdtnConfig {
     @jakarta.validation.constraints.NotNull
-    @jakarta.validation.constraints.Min(1)
+    @jakarta.validation.constraints.Min(10L)
+    @jakarta.validation.constraints.Max(10000L)
     private Integer maxNumberOfBundlesInPipeline;
+
     @jakarta.validation.constraints.NotNull
-    @jakarta.validation.constraints.Min(1)
-    @jakarta.validation.constraints.Max(9007199254740991L)
+    @jakarta.validation.constraints.Min(1048576L)
+    @jakarta.validation.constraints.Max(2147483648L)
     private Long maxSumOfBundleBytesInPipeline;
+
+    @jakarta.validation.constraints.NotNull
+    @jakarta.validation.constraints.Min(1048576L)
+    @jakarta.validation.constraints.Max(104857600L)
+    private Long maxBundleSizeBytes;
+
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    @jakarta.validation.constraints.Min(20000L)
+    @jakarta.validation.constraints.Max(200000L)
+    private Integer tcpclMaxSegmentSizeBytes;
+
+    @jakarta.validation.constraints.NotNull
+    @jakarta.validation.constraints.Min(0L)
+    @jakarta.validation.constraints.Max(3600L)
+    private Integer neighborDepletedStorageDelaySeconds;
+
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    @jakarta.validation.constraints.Min(1L)
+    @jakarta.validation.constraints.Max(9007199254740991L)
+    private Long totalStorageCapacityBytes;
+
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    @jakarta.validation.constraints.Min(1L)
+    @jakarta.validation.constraints.Max(2147483647L)
+    private Integer maxLtpReceiveUdpPacketSizeBytes;
+
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    @jakarta.validation.constraints.Min(1L)
+    @jakarta.validation.constraints.Max(2147483647L)
+    private Integer acsSendPeriodMilliseconds;
+
     @jakarta.validation.constraints.NotNull
     private Boolean enforceBundlePriority;
-    @jakarta.validation.constraints.NotNull
-    @jakarta.validation.constraints.Min(0)
-    private Integer neighborDepletedStorageDelaySeconds;
-    @jakarta.validation.constraints.NotNull
-    @jakarta.validation.constraints.Min(1)
-    @jakarta.validation.constraints.Max(9007199254740991L)
-    private Long maxBundleSizeBytes;
-    /** 기존 여섯 항목만 보내는 클라이언트는 생략할 수 있다. */
-    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
-    @jakarta.validation.constraints.Min(1400)
-    @jakarta.validation.constraints.Max(1000000)
-    private Integer tcpclMaxSegmentSizeBytes;
+
     @jakarta.validation.constraints.NotBlank
-    @jakarta.validation.constraints.Pattern(regexp = "[A-Z][A-Z0-9_]{0,63}")
+    @jakarta.validation.constraints.Pattern(regexp = "DELETE_AFTER_FORWARDING|on_expiration|on_storage_full|never")
     private String storageDeletionPolicy;
   }
 
