@@ -9,6 +9,12 @@ public class WebPageController {
     @GetMapping("/lnis/data-management")
     String dataManagement() { return "forward:/data-management.html"; }
 
+    @GetMapping("/dtn-intro")
+    String dtnIntro()
+    {
+        return "forward:/dtn-intro.html";
+    }
+
     @GetMapping("/")
     String root()
     {

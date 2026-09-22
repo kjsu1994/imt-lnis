@@ -61,6 +61,10 @@ class WebPageControllerTest {
     mvc.perform(get("/lnis/test/sender")).andExpect(status().isOk());
     mvc.perform(get("/lnis/afstest/receiver")).andExpect(status().isOk());
     mvc.perform(get("/lnis/test/receiver")).andExpect(status().isOk());
+    mvc.perform(get("/dtn-intro")).andExpect(status().isOk())
+        .andExpect(forwardedUrl("/dtn-intro.html"));
+    mvc.perform(get("/dtn-intro.html")).andExpect(status().isOk())
+        .andExpect(content().string(org.hamcrest.Matchers.containsString("지연·PVT 비교")));
     mvc.perform(get("/lnis/dtntest/sender")).andExpect(status().isOk());
     mvc.perform(get("/lnis/dtntest/receiver")).andExpect(status().isOk())
         .andExpect(forwardedUrl("/dtn-receiver.html"));
