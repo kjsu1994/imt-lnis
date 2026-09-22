@@ -13,11 +13,12 @@ find . -type f \( -name '*.c' -o -name '*.h' \) -exec sed -i 's/\r$//' {} +
 for p in /src/patches/*.patch; do
     # The complete receiver uses upstream's full header, not the codec-only shim.
     if [[ "${1:-}" == receiver && "$p" == */03-decoder-includes.patch ]]; then continue; fi
+    if [[ "${1:-}" != receiver && "$p" == */06-file-replay.patch ]]; then continue; fi
     patch --batch --forward --fuzz=0 -p1 < "$p"
 done
 # Expose exactly the patched files for maintenance; keep originals only in vendor.
 mkdir -p /out/modified-sources
-cp --parents LANS-AFS-SIM/afs_nav.c LANS-AFS-SIM/afs_sim.c /out/modified-sources/
+cp --parents LANS-AFS-SIM/afs_nav.c LANS-AFS-SIM/afs_nav.h LANS-AFS-SIM/afs_sim.c /out/modified-sources/
 if [[ "${1:-}" != receiver ]]; then
     cp --parents PocketSDR-AFS/src/sdr_ldpc_afs.c /out/modified-sources/
 fi
@@ -29,6 +30,8 @@ for f in rtkcmn rcvraw pntpos ephemeris preceph sbas ionex; do rtk_sources+=("$r
 case "${1:-}" in
 receiver)
     mkdir -p /out/iq /work/receiver-objects
+    g++ -O2 -pthread -I/work /src/test_iq_replay.cpp -o /out/verification/test_iq_replay
+    /out/verification/test_iq_replay > /out/verification/file-replay.txt
     cd /work/receiver-objects
     # All SDR originals are compiled together; unused sections are discarded.
     gcc -O2 -ffunction-sections -fdata-sections -DLNIS_IQ_RECEIVER -DSVR_REUSEADDR \
@@ -40,7 +43,10 @@ receiver)
     g++ -Wl,--gc-sections -o /out/iq/pocket_trk *.o -lfftw3f -lusb-1.0 -lfec -lm -lpthread
     cp /work/LDPC-codes/randfile /out/iq/
     cd /work
-    cp --parents PocketSDR-AFS/src/sdr_ch.c PocketSDR-AFS/src/sdr_nav.c \
+    cp iq_file_replay.h /out/modified-sources/
+    cp --parents PocketSDR-AFS/app/pocket_trk/pocket_trk.c \
+        PocketSDR-AFS/src/pocket_sdr.h PocketSDR-AFS/src/sdr_pvt_afs.c \
+        PocketSDR-AFS/src/sdr_ch.c PocketSDR-AFS/src/sdr_nav.c \
         PocketSDR-AFS/src/sdr_rcv.c PocketSDR-AFS/src/sdr_pvt.c PocketSDR-AFS/src/sdr_func.c \
         "$rtk/rtklib.h" /out/modified-sources/
     ;;

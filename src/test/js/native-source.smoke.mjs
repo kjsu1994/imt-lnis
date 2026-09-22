@@ -30,3 +30,14 @@ assert.match(text('deployment/node/.dockerignore'), /!iq\/\*\*/);
 assert.match(text('deployment/node/Dockerfile'), /chmod 755 \/app\/iq\/afs_sim/);
 assert.doesNotMatch(text('native/build.sh'), /libsdr\.a|libldpc\.a/);
 console.log(`PASS: ${listed.length} immutable source files, annotated patches, source-only build, IQ packaging`);
+
+// Diagnostic dumps must not return to the immutable baseline or functional patches.
+const diagnosticSymbols = /\b(?:log_AFS_bits|set_AFS_log_context|log_LDPC_SF2|log_LDPC_SF34|log_AFS_rx_bits|log_AFS_rx_crc|sdr_log_write|AFS_DETAIL_LOG_COUNT)\b/;
+for (const name of files.filter(name => /\.[ch]$/.test(name))) {
+  assert.doesNotMatch(text('native/vendor/' + name), diagnosticSymbols, name);
+}
+assert.ok(readdirSync('native/patches').includes('01-korean-comments.patch'));
+assert.ok(!readdirSync('native/patches').includes('01-logging.patch'));
+assert.match(text('native/patches/04-iq-receiver.patch'), /\$IQOBS,/);
+assert.match(text('native/patches/05-afs-pvt-payload.patch'), /\$IQAFS,/);
+assert.match(text('native/patches/01-korean-comments.patch'), /확인 - SB2 LDPC 부호화/);

@@ -1,0 +1,141 @@
+--- a/PocketSDR-AFS/src/pocket_sdr.h
++++ b/PocketSDR-AFS/src/pocket_sdr.h
+@@ -202,6 +202,9 @@
+     int state;                  // state (0:stop,1:run)
+     sdr_ch_t *ch;               // SDR receiver channel
+     int64_t ix;                 // IF data buffer read pointer (cyc)
++#ifdef LNIS_IQ_RECEIVER
++    int64_t completed_ix;       // LNIS: atomic, next cycle after completed work
++#endif
+     struct sdr_rcv_tag *rcv;    // pointer to SDR receiver
+     pthread_t thread;           // SDR receiver channel thread
+ } sdr_ch_th_t;
+@@ -223,6 +226,10 @@
+ typedef struct sdr_rcv_tag {    // SDR receiver type
+     int state;                  // state (0:stop,1:run)
+     int dev;                    // SDR device type (SDR_DEV_???)
++#ifdef LNIS_IQ_RECEIVER
++    int file_error;             // LNIS: atomic file replay failure
++    int file_stop;              // LNIS: atomic cancellation of file waits
++#endif
+     void *dp;                   // SDR device pointer
+     int fmt;                    // IF data format (SDR_FMT_???)
+     double fs;                  // IF data sampling rate (sps) 
+--- a/PocketSDR-AFS/src/sdr_rcv.c
++++ b/PocketSDR-AFS/src/sdr_rcv.c
+@@ -377,6 +377,10 @@
+                         ch->time, ch->week, ch->prn, ch->tow,
+                         ch->coff, ch->fd, ch->adr, ch->cn0);
+             }
++#ifdef LNIS_IQ_RECEIVER
++            /* LNIS 변경: 처리 중인 샘플을 덮어쓰지 않도록 완료 위치만 공개한다. */
++            __atomic_store_n(&th->completed_ix, th->ix + n, __ATOMIC_RELEASE);
++#endif
+         }
+         sdr_sleep_msec(TH_CYC);
+     }
+@@ -491,9 +495,20 @@
+ static int read_data(sdr_rcv_t *rcv, uint8_t *raw, int N)
+ {
+     if (rcv->dev == SDR_DEV_FILE) { // file input
++#ifdef LNIS_IQ_RECEIVER
++        size_t count = fread(raw, 1, N, (FILE *)rcv->dp);
++        if (count != (size_t)N) {
++            if (count || ferror((FILE *)rcv->dp)) {
++                fprintf(stderr, "I/Q replay read error or incomplete sample block: %zu/%d bytes\n", count, N);
++                __atomic_store_n(&rcv->file_error, 1, __ATOMIC_RELEASE);
++            }
++            return 0;
++        }
++#else
+         if (fread(raw, N, 1, (FILE *)rcv->dp) < 1) {
+             return 0; // end of file
+         }
++#endif
+     }
+     else { // USB device
+         while (!sdr_dev_read((sdr_dev_t *)rcv->dp, raw, N)) {
+@@ -614,7 +629,12 @@
+     rcv->buff_use = 0.0;
+     int64_t ix = get_buff_ix(rcv);
+     for (int i = 0; i < rcv->nch; i++) {
++#ifdef LNIS_IQ_RECEIVER
++        int64_t completed = __atomic_load_n(&rcv->th[i]->completed_ix, __ATOMIC_ACQUIRE);
++        double use = (ix - completed) * 100.0 / MAX_BUFF;
++#else
+         double use = (ix - rcv->th[i]->ix) * 100.0 / MAX_BUFF;
++#endif
+         if (use > rcv->buff_use) rcv->buff_use = use;
+     }
+ }
+@@ -643,6 +663,10 @@
+     }
+ }
+ 
++#ifdef LNIS_IQ_RECEIVER
++#include "../../iq_file_replay.h"
++#endif
++
+ // SDR receiver thread ---------------------------------------------------------
+ static void *rcv_thread(void *arg)
+ {
+@@ -667,8 +691,24 @@
+             sum_size = 0;
+             out_log_time(ix * SDR_CYC);
+         }
++#ifdef LNIS_IQ_RECEIVER
++        if (rcv->dev == SDR_DEV_FILE && !wait_file_channels(rcv, get_buff_ix(rcv), 0)) {
++            rcv->state = 0;
++            break;
++        }
++#endif
+         // read IF data
+         if (!(size = read_data(rcv, raw, ns * rcv->N))) {
++#ifdef LNIS_IQ_RECEIVER
++            if (rcv->dev == SDR_DEV_FILE) {
++                if (!__atomic_load_n(&rcv->file_error, __ATOMIC_ACQUIRE) &&
++                    wait_file_channels(rcv, get_buff_ix(rcv), 1)) {
++                    fprintf(stderr, "I/Q replay complete: cycles=%lld channels=%d pending=0\n",
++                        (long long)ix, rcv->nch);
++                }
++            }
++            else
++#endif
+             sdr_sleep_msec(500);
+             rcv->state = 0;
+             continue;
+@@ -748,6 +788,13 @@
+ //
+ void sdr_rcv_stop(sdr_rcv_t *rcv)
+ {
++#ifdef LNIS_IQ_RECEIVER
++    /* LNIS 변경: 취소 시 생산자 대기도 먼저 풀어 채널 종료와 교착되지 않게 한다. */
++    if (rcv->dev == SDR_DEV_FILE) {
++        __atomic_store_n(&rcv->file_stop, 1, __ATOMIC_RELEASE);
++        rcv->state = 0;
++    }
++#endif
+     for (int i = 0; i < rcv->nch; i++) {
+         ch_th_stop(rcv->th[i]);
+     }
+--- a/PocketSDR-AFS/app/pocket_trk/pocket_trk.c
++++ b/PocketSDR-AFS/app/pocket_trk/pocket_trk.c
+@@ -338,10 +338,18 @@
+         printf("  TIME(s) = %.3f\n", (sdr_get_tick() - tt) * 1e-3);
+         printf("%s", ESC_VCUR);
+     }
++#ifdef LNIS_IQ_RECEIVER
++    /* LNIS 변경: 부분 처리 결과를 Java가 정상 종료로 수용하지 않게 한다. */
++    int replay_error = rcv->dev == SDR_DEV_FILE &&
++        (intr || __atomic_load_n(&rcv->file_error, __ATOMIC_ACQUIRE));
++#endif
+     sdr_rcv_close(rcv);
+     
+     if (*debug_file) {
+         traceclose();
+     }
++#ifdef LNIS_IQ_RECEIVER
++    if (replay_error) return 1;
++#endif
+     return 0;
+ }

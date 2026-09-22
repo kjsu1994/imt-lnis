@@ -1,7 +1,36 @@
-diff --git a/PocketSDR-AFS/src/sdr_ch.c b/PocketSDR-AFS/src/sdr_ch.c
+--- a/LANS-AFS-SIM/afs_sim.c
++++ b/LANS-AFS-SIM/afs_sim.c
+@@ -1354,7 +1354,9 @@
+             rho0[sv] = rho;
+ 
+             // Path loss
+-            path_loss = 5200000.0 / rho.range;
++/* LNIS 변경: 달의 5,200 km 대신 GPS의 20,200 km 기준 신호 세기.
++             * 원본 거리 반비례/잡음/변조 방식은 유지하며 지구 링크의 과도한 감쇠를 방지한다. */
++            path_loss = 20200000.0 / rho.range;
+ 
+             // Gain
+             gain = (int)(path_loss * (double)GAIN_SCALE);
+--- a/PocketSDR-AFS/lib/RTKLIB/src/rtklib.h
++++ b/PocketSDR-AFS/lib/RTKLIB/src/rtklib.h
+@@ -215,7 +215,13 @@
+ #endif
+ #ifdef ENALEO
+ #define MINPRNLEO   1                   /* min satellite sat number of LEO */
++#ifdef LNIS_IQ_RECEIVER
++/* LNIS 변경: AFS 변조 채널에 GPS PRN 1~32를 매핑한다. 기존 코덱 빌드는 유지한다. */
++#define MAXPRNLEO   32
++#else
+ #define MAXPRNLEO   12                  /* max satellite sat number of LEO */ /* TEB: 2025-04-25 Set max PRN to 12 for LANS AFS */
++
++#endif                   
+ #define NSATLEO     (MAXPRNLEO-MINPRNLEO+1) /* number of LEO satellites */
+ #define NSYSLEO     1
+ #else
 --- a/PocketSDR-AFS/src/sdr_ch.c
 +++ b/PocketSDR-AFS/src/sdr_ch.c
-@@ -32,7 +32,9 @@
+@@ -31,9 +31,11 @@
+ #define B_PLL      5.0      // band-width of PLL filter (Hz)
  #define B_FLL_W    5.0      // band-width of FLL filter (Hz) (wide)
  #define B_FLL_N    2.0      // band-width of FLL filter (Hz) (narrow)
 -#define MAX_DOP    5000.0   // max Doppler for acquisition (Hz)
@@ -14,42 +43,90 @@ diff --git a/PocketSDR-AFS/src/sdr_ch.c b/PocketSDR-AFS/src/sdr_ch.c
 +#define THRES_CN0_U 30.0    // C/N0 threshold (dB-Hz) (lost)
  #define THRES_SYNC 0.02     // threshold for sec-code sync
  #define THRES_LOST 0.002    // threshold for sec-code lost
-diff --git a/PocketSDR-AFS/src/sdr_nav.c b/PocketSDR-AFS/src/sdr_nav.c
+ #define N_CODE     10       // number of resampled code bank
+--- a/PocketSDR-AFS/src/sdr_func.c
++++ b/PocketSDR-AFS/src/sdr_func.c
+@@ -748,7 +748,8 @@
+     
+     stream_t *str = (stream_t *)sdr_malloc(sizeof(stream_t));
+     const char *p = strchr(path, ':');
+-    int stat = 0, port = 0, str_opt[] = {30000, 30000, 1000, 1<<20, 0};
++/* LNIS 변경: RTKLIB strsetopt는 예약 필드까지 8개 항목을 읽는다. */
++    int stat = 0, port = 0, str_opt[] = {30000, 30000, 1000, 1<<20, 0, 0, 0, 0};
+     
+     strinit(str);
+     strsetopt(str_opt);
+@@ -833,7 +834,8 @@
+             strwrite(log_str, (uint8_t *)buff, len + 2);
+         }
+         pthread_mutex_lock(&log_buff_mtx);
+-        if (log_buff_p + len + 1 < MAX_LOG_BUFF) {
++/* LNIS 변경: CR/LF와 추가 LF, NUL까지 버퍼 경계에 포함한다. */
++        if (log_buff_p + len + 4 <= MAX_LOG_BUFF) {
+             log_buff_p += sprintf(log_buff + log_buff_p, "%s\n", buff);
+         }
+         pthread_mutex_unlock(&log_buff_mtx);
 --- a/PocketSDR-AFS/src/sdr_nav.c
 +++ b/PocketSDR-AFS/src/sdr_nav.c
-@@ -314,7 +314,7 @@
-     if (ch->tow <= 0)
-     {
+@@ -263,9 +263,9 @@
+ static void update_tow(sdr_ch_t *ch, double tow)
+ {
+     if (ch->tow <= 0) {
 -        ch->tow = (int)(tow / 1e-3);
 -    }
--    else if (ch->tow == (int)(tow / 1e-3))
+-    else if (ch->tow == (int)(tow / 1e-3)) {
 +        ch->tow = (int)llround(tow / 1e-3);
 +    }
-+    else if (ch->tow == (int)llround(tow / 1e-3))
-     {
++    else if (ch->tow == (int)llround(tow / 1e-3)) {
          ch->tow_v = 1; // tow valid
-@@ -2603,5 +2603,8 @@
-         ch->week = getbitu(data, 0, 13);
-         itow = getbitu(data, 13, 9);
--        update_tow(ch, itow * 1200.0 + toi * 12.0 + 0.136); // sync pattern (68 syms) = 68 * 2 ms = 136 ms
-+        /* LNIS 변경: CRC 검증된 전체 주차/TOW를 첫 SB2부터 사용한다.
+     }
+     else { // TOW mismatch
+@@ -2181,7 +2181,11 @@
+         sdr_pack_bits(syms_dec, 1200, 0, data); // decoded SB2 bits
+         ch->week = getbitu(data,0,13);
+         itow = getbitu(data,13,9);
++/* LNIS 변경: CRC 검증된 전체 주차/TOW를 첫 SB2부터 사용한다.
 +         * update_tow의 정수 ms 변환은 절삭 대신 반올림해 부동소수점 1ms 오차를 막는다. */
-+        update_tow(ch, itow * 1200.0 + toi * 12.0 + 0.136); // sync pattern (68 syms) = 68 * 2 ms = 136 ms
+         update_tow(ch, itow * 1200.0 + toi * 12.0 + 0.136); // sync pattern (68 syms) = 68 * 2 ms = 136 ms
++         
 +        if (ch->tow >= 0) ch->tow_v = 1;
          ch->nav->type = 2; // Subframe 2
  
-diff --git a/PocketSDR-AFS/src/sdr_rcv.c b/PocketSDR-AFS/src/sdr_rcv.c
+         memcpy(ch->nav->data, data, 150); // copy SB2 bits
+--- a/PocketSDR-AFS/src/sdr_pvt.c
++++ b/PocketSDR-AFS/src/sdr_pvt.c
+@@ -481,7 +481,8 @@
+         }
+     }
+     else if (!strcmp(ch->sig, "AFSD")) { // TEB: AFSD NAV
+-        if (ch->nav->type == 2 && decode_afs_frame(data, ch->prn)) {
++/* LNIS 변경: 달 항법 배열(12 PRN)에 지구 GPS PRN을 넣지 않는다. */
++        if (false) {
+ 
+             pvt->count[2]++;
+         }
+@@ -626,7 +627,8 @@
+         // update PVT solution
+         if (pvt_afs) {
+             // TEB: Update AFS PVT solutions
+-            update_sol_afs(pvt);
++            
++/* LNIS 변경: 달 측위 비활성. 별도 RTKLIB 지구 PVT 연결부를 사용한다. */
+         }
+         else
+             update_sol(pvt);
 --- a/PocketSDR-AFS/src/sdr_rcv.c
 +++ b/PocketSDR-AFS/src/sdr_rcv.c
-@@ -364,5 +364,6 @@
+@@ -364,11 +364,18 @@
+                 ch->nav->stat = 0;
              }
              // update observation data
 -            sdr_pvt_udobs(th->rcv->pvt, th->ix, ch);
-+            /* LNIS 변경: 달 PVT/실시간 에포 집계 대신 파일 처리 후 샘플 시각으로
-+             * 관측을 합친다. 느린 LDPC 채널을 다른 채널의 집계가 추월하지 않는다. */
-             
+-            
++
              // output channel log
-@@ -369,4 +370,10 @@
++/* LNIS 변경: 달 PVT/실시간 에포 집계 대신 파일 처리 후 샘플 시각으로
++             * 관측을 합친다. 느린 LDPC 채널을 다른 채널의 집계가 추월하지 않는다. */
              if (ch->state == SDR_STATE_LOCK && th->ix % LOG_CYC == 0) {
                  out_log_ch(ch);
 +                /* LNIS 변경: 의사거리 복원에 필요한 추적 실측치만 출력한다.
@@ -60,58 +137,12 @@ diff --git a/PocketSDR-AFS/src/sdr_rcv.c b/PocketSDR-AFS/src/sdr_rcv.c
 +                        ch->coff, ch->fd, ch->adr, ch->cn0);
              }
          }
-diff --git a/PocketSDR-AFS/src/sdr_pvt.c b/PocketSDR-AFS/src/sdr_pvt.c
---- a/PocketSDR-AFS/src/sdr_pvt.c
-+++ b/PocketSDR-AFS/src/sdr_pvt.c
-@@ -482,5 +482,5 @@
-     }
-     else if (!strcmp(ch->sig, "AFSD")) { // TEB: AFSD NAV
--        if (ch->nav->type == 2 && decode_afs_frame(data, ch->prn)) {
-+        if (false /* LNIS 변경: 달 항법 배열(12 PRN)에 지구 GPS PRN을 넣지 않는다. */) {
+         sdr_sleep_msec(TH_CYC);
+@@ -507,7 +514,6 @@
+     sdr_buff_t **buff = rcv->buff;
+     int nbuff = rcv->nbuff;
+     int8_t I[2], Q[2];
+-
  
-             pvt->count[2]++;
-@@ -627,5 +627,5 @@
-         if (pvt_afs) {
-             // TEB: Update AFS PVT solutions
--            update_sol_afs(pvt);
-+            /* LNIS 변경: 달 측위 비활성. 별도 RTKLIB 지구 PVT 연결부를 사용한다. */
-         }
-         else
-diff --git a/PocketSDR-AFS/lib/RTKLIB/src/rtklib.h b/PocketSDR-AFS/lib/RTKLIB/src/rtklib.h
---- a/PocketSDR-AFS/lib/RTKLIB/src/rtklib.h
-+++ b/PocketSDR-AFS/lib/RTKLIB/src/rtklib.h
-@@ -216,5 +216,10 @@
- #ifdef ENALEO
- #define MINPRNLEO   1                   /* min satellite sat number of LEO */
--#define MAXPRNLEO   12                  /* max satellite sat number of LEO */ /* TEB: 2025-04-25 Set max PRN to 12 for LANS AFS */
-+#ifdef LNIS_IQ_RECEIVER
-+/* LNIS 변경: AFS 변조 채널에 GPS PRN 1~32를 매핑한다. 기존 코덱 빌드는 유지한다. */
-+#define MAXPRNLEO   32
-+#else
-+#define MAXPRNLEO   12
-+#endif                  /* max satellite sat number of LEO */ /* TEB: 2025-04-25 Set max PRN to 12 for LANS AFS */
- #define NSATLEO     (MAXPRNLEO-MINPRNLEO+1) /* number of LEO satellites */
- #define NSYSLEO     1
-diff --git a/PocketSDR-AFS/src/sdr_func.c b/PocketSDR-AFS/src/sdr_func.c
---- a/PocketSDR-AFS/src/sdr_func.c
-+++ b/PocketSDR-AFS/src/sdr_func.c
-@@ -748,1 +748,2 @@
--    int stat = 0, port = 0, str_opt[] = {30000, 30000, 1000, 1<<20, 0};
-+    /* LNIS 변경: RTKLIB strsetopt는 예약 필드까지 8개 항목을 읽는다. */
-+    int stat = 0, port = 0, str_opt[] = {30000, 30000, 1000, 1<<20, 0, 0, 0, 0};
-@@ -834,1 +835,2 @@
--        if (log_buff_p + len + 1 < MAX_LOG_BUFF) {
-+        /* LNIS 변경: CR/LF와 추가 LF, NUL까지 버퍼 경계에 포함한다. */
-+        if (log_buff_p + len + 4 <= MAX_LOG_BUFF) {
-diff --git a/LANS-AFS-SIM/afs_sim.c b/LANS-AFS-SIM/afs_sim.c
---- a/LANS-AFS-SIM/afs_sim.c
-+++ b/LANS-AFS-SIM/afs_sim.c
-@@ -1385,5 +1385,7 @@
- 
-             // Path loss
--            path_loss = 5200000.0 / rho.range;
-+            /* LNIS 변경: 달의 5,200 km 대신 GPS의 20,200 km 기준 신호 세기.
-+             * 원본 거리 반비례/잡음/변조 방식은 유지하며 지구 링크의 과도한 감쇠를 방지한다. */
-+            path_loss = 20200000.0 / rho.range;
- 
-             // Gain
+     for (int i = 0; i < 256; i++) {
+         //int8_t I[] = {valI[(i>>0) & 0x3], valI[(i>>4) & 0x3]};

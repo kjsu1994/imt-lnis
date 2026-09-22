@@ -1,27 +1,24 @@
 --- a/LANS-AFS-SIM/afs_sim.c
 +++ b/LANS-AFS-SIM/afs_sim.c
-@@ -10,6 +10,7 @@
+@@ -54,6 +54,8 @@
  #endif
  #include "afs_nav.h"
  #include "afs_rand.h"
++
 +int iq_earth_payload(int prn, int block, unsigned char *bits);
  
  #define DEMO_L1
  
-@@ -1296,6 +1297,9 @@
+@@ -1292,9 +1294,20 @@
          sv = chan[i].prn - 1;
          eph2sbf(eph[sv], syms + 22);
  
-+        /* LNIS 변경 v4: the same source bits as JSON AFS, followed by original CRC/FEC. */
++/* LNIS 변경 v4: the same source bits as JSON AFS, followed by original CRC/FEC. */
 +        iq_earth_payload(chan[i].prn, 2, syms);
 +
-         // 로그처리: 사람이 비교할 PRN 08의 SB02 CRC24 입력만 기록한다.
-         if (chan[i].prn == 8) {
-             snprintf(afs_log_id, sizeof(afs_log_id), "C201-P%02d", chan[i].prn);
-@@ -1315,6 +1319,14 @@
-         set_AFS_log_context(chan[i].prn == 8 ? afs_log_fp : NULL,
-             chan[i].prn, -1, 2);
+         append_CRC24(syms, 1200);
          encode_LDPC_AFS_SF2(syms, AFS_SB234); // Subframe 2
+- 
 +
 +        if (iq_earth_payload(chan[i].prn, 3, syms)) {
 +            append_CRC24(syms, 870);
@@ -30,16 +27,18 @@
 +            append_CRC24(syms, 870);
 +            encode_LDPC_AFS_SF3(syms, AFS_SB234 + 4140);
 +        }
++
+         interleave_AFS_SF234(AFS_SB234, syms); // Interleaving
  
-         // 로그처리: PRN 08의 인터리빙 입력만 기록한다.
-         if (chan[i].prn == 8) {
+         bitncpy(chan[i].I.data[0] + 120, syms, 5880);
 --- a/PocketSDR-AFS/src/sdr_nav.c
 +++ b/PocketSDR-AFS/src/sdr_nav.c
-@@ -2608,6 +2608,15 @@
+@@ -2191,6 +2191,16 @@
          memcpy(ch->nav->data, data, 150); // copy SB2 bits
          ch->nav->stat = 1;
          ch->nav->count[0]++;
-+        /* LNIS 변경: export only CRC-verified payload bits; no sender metadata fallback. */
++
++/* LNIS 변경: export only CRC-verified payload bits; no sender metadata fallback. */
 +        {
 +            uint8_t packed[150] = {0};
 +            char payload[301];
@@ -51,11 +50,12 @@
          char str[512];
          hex_str(data, 1200, str);
          str[80] = 0; // terminalted
-@@ -2666,6 +2675,15 @@
-     // LDPC 복호 함수 반환값 >= 0     AND     복호된 870비트의 CRC24 일치
-     if (nerr >= 0 && crcok)
-     {
-+        /* LNIS 변경: export only CRC-verified payload bits; no sender metadata fallback. */
+@@ -2230,6 +2240,16 @@
+     crcok = test_CRC(syms_dec, 870);
+ 
+     if (nerr >= 0 && crcok) {
++
++/* LNIS 변경: export only CRC-verified payload bits; no sender metadata fallback. */
 +        {
 +            uint8_t packed[150] = {0};
 +            char payload[301];
@@ -66,12 +66,13 @@
 +        }
          sdr_log(3, "$SB3,%.3f,%s,%d,FRAME DECODED", time, ch->sig, ch->prn);
      }
-     else
-@@ -2715,6 +2733,15 @@
+     else {
+@@ -2260,6 +2280,16 @@
+     crcok = test_CRC(syms_dec, 870);
  
-     if (nerr >= 0 && crcok)
-     {
-+        /* LNIS 변경: export only CRC-verified payload bits; no sender metadata fallback. */
+     if (nerr >= 0 && crcok) {
++
++/* LNIS 변경: export only CRC-verified payload bits; no sender metadata fallback. */
 +        {
 +            uint8_t packed[150] = {0};
 +            char payload[301];
@@ -82,4 +83,4 @@
 +        }
          sdr_log(3, "$SB4,%.3f,%s,%d,FRAME DECODED", time, ch->sig, ch->prn);
      }
-     else
+     else {

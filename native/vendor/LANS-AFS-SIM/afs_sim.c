@@ -965,8 +965,6 @@ void printUsage(void)
 int main(int argc, char** argv)
 {
     FILE *fp;
-    // 로그처리: 송신 AFS 단계별 데이터를 수신 log.txt와 별도로 기록한다.
-    FILE *afs_log_fp = NULL;
     const char *fout = "", *feph="";
     double tsec = 300.0;
     double freq = 12.0e6;
@@ -1181,12 +1179,6 @@ int main(int argc, char** argv)
         exit(1);
     }
 
-    // 로그처리: 실행할 때마다 송신 비교 로그를 새로 생성하며 실패해도 신호 생성은 계속한다.
-    afs_log_fp = fopen("afs_sim_log.txt", "w");
-    if (!afs_log_fp) {
-        fprintf(stderr, "WARNING: 송신 AFS 로그 파일을 열 수 없습니다.\n");
-    }
-
     // Initialize signals
 
     grx = g0; // Initial reception time
@@ -1229,16 +1221,13 @@ int main(int argc, char** argv)
             chan[i].azel[0] * R2D, chan[i].azel[1] * R2D, rho0[sv].range, -rho0[sv].rate/LAMBDA);
     }
 
-    //AFS Frame Data 생성
     // Insert synchronization pattern 
-    // SP(Synchronization Pattern) 68비트 고정패턴
+
     const uint8_t sync[9] ={0xCC, 0x63, 0xF7, 0x45, 0x36, 0xF4, 0x9E, 0x04, 0xA0}; // left justified
 
     for (i = 0; i < nsat; i++) {
         sdr_unpack_bits(sync, 68, chan[i].I.data[0]); // synchronization pattern
     }
-    // 로그처리: 모든 PRN에 공통인 68비트 동기 패턴을 C001로 기록한다.
-    log_AFS_bits(afs_log_fp, "C001", 0, -1, 0, "동기 패턴", chan[0].I.data[0], 68);
 
     // Insert subframe 1
 
@@ -1246,11 +1235,6 @@ int main(int argc, char** argv)
     
     // The TOI corresponds to the node time epoch at the leading edge of the "next" 12-second frame.
     generate_BCH_AFS_SF1(AFS_SB1, 0, afst.toi + 1); // subframe 1 for frame ID 0
-    // 로그처리: FID 0과 다음 프레임 TOI로 생성한 SB01을 기록한다.
-    char afs_log_id[32];
-    snprintf(afs_log_id, sizeof(afs_log_id), "C101-T%02d", afst.toi + 1);
-    log_AFS_bits(afs_log_fp, afs_log_id, 0, afst.toi + 1, 1,
-        "FID=0, TOI 기반 SB01", AFS_SB1, 52);
 
     for (i = 0; i < nsat; i++) {
         bitncpy(chan[i].I.data[0] + 68, AFS_SB1, 52);
@@ -1260,28 +1244,13 @@ int main(int argc, char** argv)
 
     uint8_t AFS_SB234[5880];
     uint8_t syms[5880];
-    // SB3·SB4에 넣을 846비트 시험 패턴 생성
+
     for (i = 0; i < 846; i++) {
         syms[i] = i%2; // test pattern 0,1,0,1,...
     }
-    // 로그처리: SB03 CRC24 입력 원본 846비트를 C301로 기록한다.
-    log_AFS_bits(afs_log_fp, "C301", 0, -1, 3, "CRC24 입력 데이터", syms, 846);
-    // SB3 원본 846비트 뒤에 CRC24를 붙여 총 870비트 구성
     append_CRC24(syms, 870);
-    // 로그처리: SB03 CRC24 값과 CRC가 추가된 870비트를 C302로 기록한다.
-    log_AFS_bits(afs_log_fp, "C302-CRC", 0, -1, 3, "CRC24 계산값", syms + 846, 24);
-    log_AFS_bits(afs_log_fp, "C302", 0, -1, 3, "CRC24 추가 후", syms, 870);
-    // SB3 870비트를 LDPC 부호화하고 천공하여
-    // 1740개 전송 심볼을 AFS_SB234[2400...]에 저장
-    // 로그처리: 뒤따르는 LDPC 내부 로그의 대상을 SB03으로 지정한다.
-    set_AFS_log_context(afs_log_fp, 0, -1, 3);
     encode_LDPC_AFS_SF3(syms, AFS_SB234 + 2400); // Subframe 3
 
-    // 로그처리: 동일 원본을 사용하는 SB04 CRC와 LDPC 비교ID를 별도로 기록한다.
-    log_AFS_bits(afs_log_fp, "C401", 0, -1, 4, "CRC24 입력 데이터", syms, 846);
-    log_AFS_bits(afs_log_fp, "C402-CRC", 0, -1, 4, "CRC24 계산값", syms + 846, 24);
-    log_AFS_bits(afs_log_fp, "C402", 0, -1, 4, "CRC24 추가 후", syms, 870);
-    set_AFS_log_context(afs_log_fp, 0, -1, 4);
     encode_LDPC_AFS_SF3(syms, AFS_SB234 + 4140); // Subframe 4
 
     for (i = 0; i < nsat; i++) {
@@ -1296,55 +1265,18 @@ int main(int argc, char** argv)
         sv = chan[i].prn - 1;
         eph2sbf(eph[sv], syms + 22);
 
-        // 로그처리: 사람이 비교할 PRN 08의 SB02 CRC24 입력만 기록한다.
-        if (chan[i].prn == 8) {
-            snprintf(afs_log_id, sizeof(afs_log_id), "C201-P%02d", chan[i].prn);
-            log_AFS_bits(afs_log_fp, afs_log_id, chan[i].prn, -1, 2,
-                "CRC24 입력 데이터", syms, 1176);
-        }
         append_CRC24(syms, 1200);
-        // 로그처리: PRN 08의 CRC24 결과와 LDPC 내부 계산만 기록한다.
-        if (chan[i].prn == 8) {
-            snprintf(afs_log_id, sizeof(afs_log_id), "C202-P%02d-CRC", chan[i].prn);
-            log_AFS_bits(afs_log_fp, afs_log_id, chan[i].prn, -1, 2,
-                "CRC24 계산값", syms + 1176, 24);
-            snprintf(afs_log_id, sizeof(afs_log_id), "C202-P%02d", chan[i].prn);
-            log_AFS_bits(afs_log_fp, afs_log_id, chan[i].prn, -1, 2,
-                "CRC24 추가 후", syms, 1200);
-        }
-        set_AFS_log_context(chan[i].prn == 8 ? afs_log_fp : NULL,
-            chan[i].prn, -1, 2);
         encode_LDPC_AFS_SF2(syms, AFS_SB234); // Subframe 2
-
-        // 로그처리: PRN 08의 인터리빙 입력만 기록한다.
-        if (chan[i].prn == 8) {
-            snprintf(afs_log_id, sizeof(afs_log_id), "C501-P%02d", chan[i].prn);
-            log_AFS_bits(afs_log_fp, afs_log_id, chan[i].prn, -1, 0,
-                "인터리빙 전 SB02~SB04", AFS_SB234, 5880);
-        }
+ 
         interleave_AFS_SF234(AFS_SB234, syms); // Interleaving
 
-        // 로그처리: PRN 08의 인터리빙 결과만 기록한다.
-        if (chan[i].prn == 8) {
-            snprintf(afs_log_id, sizeof(afs_log_id), "C502-P%02d", chan[i].prn);
-            log_AFS_bits(afs_log_fp, afs_log_id, chan[i].prn, -1, 0,
-                "인터리빙 후 SB02~SB04", syms, 5880);
-        }
-
         bitncpy(chan[i].I.data[0] + 120, syms, 5880);
-        // 로그처리: 동기패턴과 SB01을 포함한 PRN 08의 최종 6000심볼을 C601로 기록한다.
-        if (chan[i].prn == 8) {
-            snprintf(afs_log_id, sizeof(afs_log_id), "C601-P%02d-T%02d",
-                chan[i].prn, afst.toi + 1);
-            log_AFS_bits(afs_log_fp, afs_log_id, chan[i].prn, afst.toi + 1, 0,
-                "최종 AFS 프레임", chan[i].I.data[0], 6000);
-        }
     }
 
     // Generate baseband signals
 
     tstart = clock();
-    //./afs_sim -t 1 -b 2 test.bin 파일 생성 시 로그
+
     fprintf(stderr, "Generating baseband signals...\n");
 
     fprintf(stderr, "\rTime = %4.1f", grx.sec - g0.sec);
@@ -1498,20 +1430,8 @@ int main(int argc, char** argv)
 
             generate_BCH_AFS_SF1(AFS_SB1, 0, afst.toi + 1); // subframe 1 for frame ID 0
 
-            // 로그처리: 갱신된 TOI의 SB01을 수신측 C101 비교ID와 맞춰 기록한다.
-            snprintf(afs_log_id, sizeof(afs_log_id), "C101-T%02d", afst.toi + 1);
-            log_AFS_bits(afs_log_fp, afs_log_id, 0, afst.toi + 1, 1,
-                "FID=0, TOI 기반 SB01", AFS_SB1, 52);
-
             for (i = 0; i < nsat; i++) {
                 bitncpy(chan[i].I.data[0] + 68, AFS_SB1, 52);
-                // 로그처리: SB01 갱신 후 PRN 08의 최종 프레임만 기록한다.
-                if (chan[i].prn == 8) {
-                    snprintf(afs_log_id, sizeof(afs_log_id), "C601-P%02d-T%02d",
-                        chan[i].prn, afst.toi + 1);
-                    log_AFS_bits(afs_log_fp, afs_log_id, chan[i].prn, afst.toi + 1, 0,
-                        "최종 AFS 프레임", chan[i].I.data[0], 6000);
-                }
             }
 
             //printf("\nUpdate Data Frames: TOI = %d\n", afst.toi);
@@ -1538,10 +1458,6 @@ int main(int argc, char** argv)
     // Close output file
     if (fp != stdout)
         fclose(fp);
-
-    // 로그처리: 송신 AFS 비교 로그 파일을 정상 종료 시 닫는다.
-    if (afs_log_fp)
-        fclose(afs_log_fp);
 
     // Process time
     fprintf(stderr, "Process time = %.1f[sec]\n", (double)(tend - tstart) / CLOCKS_PER_SEC);

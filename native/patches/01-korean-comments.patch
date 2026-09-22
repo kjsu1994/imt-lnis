@@ -1,0 +1,374 @@
+--- a/LANS-AFS-SIM/afs_nav.c
++++ b/LANS-AFS-SIM/afs_nav.c
+@@ -1,3 +1,19 @@
++/* LNIS 변경: 아래는 제거한 진단 로그의 설명을 보존한 주석입니다. */
++// 로그처리: LDPC 함수 내부 로그에 사용할 송신 프레임 식별정보를 보관한다.
++/* LNIS 변경: 아래는 제거한 진단 로그의 설명을 보존한 주석입니다. */
++// 로그처리: 비트 배열 한 조각을 16진수 문자열로 변환한다.
++/* LNIS 변경: 아래는 제거한 진단 로그의 설명을 보존한 주석입니다. */
++// 로그처리: 사람이 송수신 로그를 같은 비교ID로 찾을 수 있도록 비트와 16진수를 기록한다.
++/* LNIS 변경: 아래는 제거한 진단 로그의 설명을 보존한 주석입니다. */
++// 로그처리: LDPC 함수가 기존 인자 변경 없이 현재 SB의 내부 계산값을 기록하도록 문맥을 지정한다.
++/* LNIS 변경: 아래는 제거한 진단 로그의 설명을 보존한 주석입니다. */
++// 로그처리: SB02 LDPC 내부 배열을 동일 비교ID로 기록한다.
++/* LNIS 변경: 아래는 제거한 진단 로그의 설명을 보존한 주석입니다. */
++// 로그처리: SB03/SB04 LDPC 내부 배열을 공통 비교ID로 기록한다.
++/* LNIS 변경: 아래는 제거한 진단 로그의 설명을 보존한 주석입니다. */
++// 로그처리: 기존 SB02 계산 결과를 신호 배열 변경 없이 기록한다.
++/* LNIS 변경: 아래는 제거한 진단 로그의 설명을 보존한 주석입니다. */
++// 로그처리: 기존 SB03/SB04 계산 결과를 신호 배열 변경 없이 기록한다.
+ #include "afs_nav.h"
+ 
+ // LDPC parity check matrices cache --------------------------------------------
+@@ -3766,6 +3782,18 @@
+ };
+ 
+ 
++/** 확인 - SB2 LDPC 부호화
++ * @brief AFS SB2 1200비트를 LDPC 부호화하여 2400개 전송 심볼을 만든다.
++ *
++ * 입력:
++ *   1176비트 항법 데이터 + CRC24 = 1200비트
++ *
++ * 전체 LDPC 코드워드:
++ *   systematic 1200 + p1 480 + p2 4560 = 6240비트
++ *
++ * 실제 전송:
++ *   systematic 일부 960 + p1 480 + p2 일부 960 = 2400심볼
++ */
+ void encode_LDPC_AFS_SF2(const uint8_t* syms, uint8_t* syms_enc)
+ {
+     if (!SF2_A) {
+@@ -3797,6 +3825,10 @@
+         }
+     }
+ 
++/*syms   = 원본 1200비트
++    p1     = 첫 번째 패리티 480비트
++    p2     = 두 번째 패리티 4560비트
++    A, B⁻¹, C, D = LDPC 패리티 검사 행렬을 구성하는 부분 행렬*/
+     char* p1 = (char*)chk_alloc(480, sizeof * p1);
+     char* p2 = (char*)chk_alloc(4560, sizeof * p2);
+     char* As = (char*)chk_alloc(480, sizeof * As);
+@@ -3804,25 +3836,34 @@
+     char* Dp1 = (char*)chk_alloc(4560, sizeof * Dp1);
+ 
+     // Generate the encoded symbols
++// A × 원본 데이터
+     mod2sparse_mulvec(SF2_A, (char*)syms, As);
++// p1 = B⁻¹ × A × 원본 데이터
+     mod2sparse_mulvec(SF2_B_Inv, As, p1);
+ 
++// C × 원본 데이터
+     mod2sparse_mulvec(SF2_C, (char*)syms, Cs);
+     mod2sparse_mulvec(SF2_D, p1, Dp1);
+ 
++// p2 = C × 원본 데이터 XOR D × p1
+     for (int i = 0; i < 4560; i++) {
+         p2[i] = (Cs[i] + Dp1[i]) % 2;
++// %2는 이진 연산에서는 XOR와 같음  
+     }
+ 
+     // Puncture the first 240 bits of the systematic portion of the codeword
++// 원본 1200비트 중 앞의 240비트를 제외하고
++// 나머지 960비트만 전송
+     for (int i = 0; i < 960; i++) {
+         syms_enc[i] = syms[i + 240];
+     }
+ 
+     // Append the parity bits until the subframe reaches its desired symbol count
++// p1 480비트는 모두 전송
+     for (int i = 0; i < 480; i++) {
+         syms_enc[i + 960] = p1[i];
+     }
++// p2 4560비트 중 앞의 960비트만 전송
+     for (int i = 0; i < 960; i++) {
+         syms_enc[i + 1440] = p2[i];
+     }
+@@ -3836,6 +3877,22 @@
+     return;
+ }
+ 
++/** 확인 - SB3 또는 SB4 LDPC 부호화
++ * @brief AFS SB3 또는 SB4의 870비트를 LDPC 부호화하여
++ *        1740개 전송 심볼을 생성한다.
++ *
++ * 입력:
++ *   데이터 846비트 + CRC24 = 870비트
++ *
++ * LDPC 입력:
++ *   870비트 + filler 10비트 = 880비트
++ *
++ * 전체 코드워드:
++ *   systematic 880 + p1 352 + p2 3344 = 4576비트
++ *
++ * 실제 전송:
++ *   systematic 694 + p1 352 + p2 694 = 1740심볼
++ */
+ void encode_LDPC_AFS_SF3(const uint8_t* syms, uint8_t* syms_enc)
+ {
+     if (!SF3_A) {
+@@ -3916,6 +3973,24 @@
+     return;
+ }
+ 
++//확인 - CRC24 검사값 추가
++/**
++ * @brief 데이터 비트 뒤에 CRC24Q 검사값을 추가한다.
++ *
++ * @param syms
++ *   입력 및 출력 비트 배열.
++ *   함수 호출 전에는 앞부분에 원본 데이터가 들어 있고,
++ *   함수 실행 후에는 마지막 24비트 위치에 CRC24가 저장된다.
++ *
++ * @param len
++ *   CRC24를 포함한 전체 비트 길이.
++ *
++ *   SB2: len = 1200
++ *        원본 데이터 1176비트 + CRC 24비트
++ *
++ *   SB3/SB4: len = 870
++ *            원본 데이터 846비트 + CRC 24비트
++ */
+ void append_CRC24(uint8_t* syms, int len)
+ {
+     uint8_t buff[256];
+@@ -3945,6 +4020,11 @@
+     return;
+ }
+ 
++/* 확인 - 인터리빙
++* AFS_SB234[0 ~ 2399]       SB2 2400심볼
++AFS_SB234[2400 ~ 4139]    SB3 1740심볼
++AFS_SB234[4140 ~ 5879]    SB4 1740심볼 
++*/
+ void interleave_AFS_SF234(uint8_t* syms_in, uint8_t* syms_out)
+ {
+     int i, j, k;
+--- a/LANS-AFS-SIM/afs_nav.h
++++ b/LANS-AFS-SIM/afs_nav.h
+@@ -1,3 +1,7 @@
++/* LNIS 변경: 아래는 제거한 진단 로그의 설명을 보존한 주석입니다. */
++// 로그처리: 송신 AFS 단계별 비교 로그의 현재 LDPC 부호화 대상을 지정한다.
++/* LNIS 변경: 아래는 제거한 진단 로그의 설명을 보존한 주석입니다. */
++// 로그처리: 송신 AFS 비트 배열을 비교ID와 함께 기록한다.
+ #ifndef AFS_LDPC_H
+ #define AFS_LDPC_H
+ 
+--- a/LANS-AFS-SIM/afs_sim.c
++++ b/LANS-AFS-SIM/afs_sim.c
+@@ -1,3 +1,39 @@
++/* LNIS 변경: 아래는 제거한 진단 로그의 설명을 보존한 주석입니다. */
++// 로그처리: 송신 AFS 단계별 데이터를 수신 log.txt와 별도로 기록한다.
++/* LNIS 변경: 아래는 제거한 진단 로그의 설명을 보존한 주석입니다. */
++// 로그처리: 실행할 때마다 송신 비교 로그를 새로 생성하며 실패해도 신호 생성은 계속한다.
++/* LNIS 변경: 아래는 제거한 진단 로그의 설명을 보존한 주석입니다. */
++// 로그처리: 모든 PRN에 공통인 68비트 동기 패턴을 C001로 기록한다.
++/* LNIS 변경: 아래는 제거한 진단 로그의 설명을 보존한 주석입니다. */
++// 로그처리: FID 0과 다음 프레임 TOI로 생성한 SB01을 기록한다.
++/* LNIS 변경: 아래는 제거한 진단 로그의 설명을 보존한 주석입니다. */
++// 로그처리: SB03 CRC24 입력 원본 846비트를 C301로 기록한다.
++/* LNIS 변경: 아래는 제거한 진단 로그의 설명을 보존한 주석입니다. */
++// 로그처리: SB03 CRC24 값과 CRC가 추가된 870비트를 C302로 기록한다.
++/* LNIS 변경: 아래는 제거한 진단 로그의 설명을 보존한 주석입니다. */
++// SB3 870비트를 LDPC 부호화하고 천공하여
++/* LNIS 변경: 아래는 제거한 진단 로그의 설명을 보존한 주석입니다. */
++// 1740개 전송 심볼을 AFS_SB234[2400...]에 저장
++/* LNIS 변경: 아래는 제거한 진단 로그의 설명을 보존한 주석입니다. */
++// 로그처리: 뒤따르는 LDPC 내부 로그의 대상을 SB03으로 지정한다.
++/* LNIS 변경: 아래는 제거한 진단 로그의 설명을 보존한 주석입니다. */
++// 로그처리: 동일 원본을 사용하는 SB04 CRC와 LDPC 비교ID를 별도로 기록한다.
++/* LNIS 변경: 아래는 제거한 진단 로그의 설명을 보존한 주석입니다. */
++// 로그처리: 사람이 비교할 PRN 08의 SB02 CRC24 입력만 기록한다.
++/* LNIS 변경: 아래는 제거한 진단 로그의 설명을 보존한 주석입니다. */
++// 로그처리: PRN 08의 CRC24 결과와 LDPC 내부 계산만 기록한다.
++/* LNIS 변경: 아래는 제거한 진단 로그의 설명을 보존한 주석입니다. */
++// 로그처리: PRN 08의 인터리빙 입력만 기록한다.
++/* LNIS 변경: 아래는 제거한 진단 로그의 설명을 보존한 주석입니다. */
++// 로그처리: PRN 08의 인터리빙 결과만 기록한다.
++/* LNIS 변경: 아래는 제거한 진단 로그의 설명을 보존한 주석입니다. */
++// 로그처리: 동기패턴과 SB01을 포함한 PRN 08의 최종 6000심볼을 C601로 기록한다.
++/* LNIS 변경: 아래는 제거한 진단 로그의 설명을 보존한 주석입니다. */
++// 로그처리: 갱신된 TOI의 SB01을 수신측 C101 비교ID와 맞춰 기록한다.
++/* LNIS 변경: 아래는 제거한 진단 로그의 설명을 보존한 주석입니다. */
++// 로그처리: SB01 갱신 후 PRN 08의 최종 프레임만 기록한다.
++/* LNIS 변경: 아래는 제거한 진단 로그의 설명을 보존한 주석입니다. */
++// 로그처리: 송신 AFS 비교 로그 파일을 정상 종료 시 닫는다.
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <math.h>
+@@ -940,6 +976,29 @@
+     exit(0);
+ }
+ 
++/*
++ * AFS 데이터 프레임 생성 순서
++ *
++ * 1. SB2
++ *    - 위성별 궤도 및 시계정보를 비트 필드로 구성
++ *    - 데이터 1176비트 + CRC24 = 1200비트
++ *    - LDPC 부호화 및 천공
++ *    - 전송 심볼 2400개 생성
++ *
++ * 2. SB3/SB4
++ *    - 현재 구현은 실제 항법정보 대신 0,1 반복 시험 패턴 사용
++ *    - 데이터 846비트 + CRC24 = 870비트
++ *    - filler 10비트 추가 후 LDPC 부호화 및 천공
++ *    - 각 서브프레임당 전송 심볼 1740개 생성
++ *
++ * 3. SB2 + SB3 + SB4
++ *    - 2400 + 1740 + 1740 = 5880심볼
++ *    - 60행 × 98열 블록 인터리빙 수행
++ *
++ * 4. 전체 데이터 프레임
++ *    - 동기 패턴 68 + SB1 52 + SB2~SB4 5880
++ *    - 총 6000심볼, 심볼당 2ms이므로 12초
++ */
+ int main(int argc, char** argv)
+ {
+     FILE *fp;
+@@ -1201,6 +1260,8 @@
+ 
+     // Insert synchronization pattern 
+ 
++//AFS Frame Data 생성
++// SP(Synchronization Pattern) 68비트 고정패턴
+     const uint8_t sync[9] ={0xCC, 0x63, 0xF7, 0x45, 0x36, 0xF4, 0x9E, 0x04, 0xA0}; // left justified
+ 
+     for (i = 0; i < nsat; i++) {
+@@ -1223,9 +1284,11 @@
+     uint8_t AFS_SB234[5880];
+     uint8_t syms[5880];
+ 
++// SB3·SB4에 넣을 846비트 시험 패턴 생성
+     for (i = 0; i < 846; i++) {
+         syms[i] = i%2; // test pattern 0,1,0,1,...
+     }
++// SB3 원본 846비트 뒤에 CRC24를 붙여 총 870비트 구성
+     append_CRC24(syms, 870);
+     encode_LDPC_AFS_SF3(syms, AFS_SB234 + 2400); // Subframe 3
+ 
+@@ -1255,6 +1318,7 @@
+ 
+     tstart = clock();
+ 
++//./afs_sim -t 1 -b 2 test.bin 파일 생성 시 로그
+     fprintf(stderr, "Generating baseband signals...\n");
+ 
+     fprintf(stderr, "\rTime = %4.1f", grx.sec - g0.sec);
+--- a/PocketSDR-AFS/src/pocket_sdr.h
++++ b/PocketSDR-AFS/src/pocket_sdr.h
+@@ -1,3 +1,5 @@
++/* LNIS 변경: 아래는 제거한 진단 로그의 설명을 보존한 주석입니다. */
++// 로그처리: 큰 상세 로그를 기존 로그 스트림에 한 번의 쓰기로 기록한다.
+ //
+ //  Pocket SDR C Library - Header file for GNSS SDR Functions.
+ //
+--- a/PocketSDR-AFS/src/sdr_func.c
++++ b/PocketSDR-AFS/src/sdr_func.c
+@@ -1,3 +1,5 @@
++/* LNIS 변경: 아래는 제거한 진단 로그의 설명을 보존한 주석입니다. */
++// 로그처리: 큰 AFS 상세 로그를 분할 flush 없이 기존 log.txt 스트림에 기록한다.
+ // 
+ //  Pocket SDR C Library - Fundamental GNSS SDR Functions
+ //
+--- a/PocketSDR-AFS/src/sdr_nav.c
++++ b/PocketSDR-AFS/src/sdr_nav.c
+@@ -1,3 +1,25 @@
++/* LNIS 변경: 아래는 제거한 진단 로그의 설명을 보존한 주석입니다. */
++// 로그처리: PRN 08에서 완전 복호된 AFS 프레임의 상세 로그를 최대 2회 기록한다.
++/* LNIS 변경: 아래는 제거한 진단 로그의 설명을 보존한 주석입니다. */
++// 로그처리: 수신 비트 배열을 송신측과 동일한 비교ID, 비트범위, 16진수 형식으로 기록한다.
++/* LNIS 변경: 아래는 제거한 진단 로그의 설명을 보존한 주석입니다. */
++// 로그처리: 한 단계의 모든 조각을 모아 한 번만 파일에 쓰기 위한 버퍼를 할당한다.
++/* LNIS 변경: 아래는 제거한 진단 로그의 설명을 보존한 주석입니다. */
++// 로그처리: 조립된 단계별 로그 전체를 기존 log.txt에 한 번의 쓰기로 기록한다.
++/* LNIS 변경: 아래는 제거한 진단 로그의 설명을 보존한 주석입니다. */
++// 로그처리: 복호 데이터의 수신 CRC24와 재계산 CRC24를 한글 판정과 함께 기록한다.
++/* LNIS 변경: 아래는 제거한 진단 로그의 설명을 보존한 주석입니다. */
++// 로그처리: 완전 복호된 프레임의 단계별 상세 로그 여부와 비교ID를 보관한다.
++/* LNIS 변경: 아래는 제거한 진단 로그의 설명을 보존한 주석입니다. */
++// 로그처리: PRN 08에서 SB02 LDPC와 CRC24가 성공한 프레임부터 최대 2회만 상세 기록한다.
++/* LNIS 변경: 아래는 제거한 진단 로그의 설명을 보존한 주석입니다. */
++// LDPC 복호 함수 반환값 >= 0     AND     복호된 1200비트의 CRC24 일치
++/* LNIS 변경: 아래는 제거한 진단 로그의 설명을 보존한 주석입니다. */
++// 로그처리: 선택된 완전 프레임의 SB03 천공, erasure, LDPC 복호 및 CRC24를 기록한다.
++/* LNIS 변경: 아래는 제거한 진단 로그의 설명을 보존한 주석입니다. */
++// LDPC 복호 함수 반환값 >= 0     AND     복호된 870비트의 CRC24 일치
++/* LNIS 변경: 아래는 제거한 진단 로그의 설명을 보존한 주석입니다. */
++// 로그처리: 선택된 완전 프레임의 SB04 천공, erasure, LDPC 복호 및 CRC24를 기록한다.
+ //
+ //  Pocket SDR C Library - GNSS SDR Nav Data Functions
+ //
+@@ -209,6 +231,7 @@
+ }
+ 
+ // test CRC24Q -----------------------------------------------------------------
++//확인 - CRC검사 확인부
+ int test_CRC(const uint8_t *bits, int len_bits)
+ {
+     uint8_t buff[4096];
+@@ -2141,6 +2164,8 @@
+         syms_rcv[i + 2640] = ERASURE;
+     }
+ 
++// 확인 - SB2는 실제 LDPC + CRC 성공 후에만 기록됨
++//AFSD 프레임 처리 코드는 먼저 수신 심볼을 재배열하고 LDPC 복호 함수를 호출
+     pthread_mutex_lock(&ldpc_afs_mtx); // LDPC-code library is not thread-safe.
+     nerr = sdr_decode_LDPC_AFS_SF2(syms_rcv, syms_dec);
+     pthread_mutex_unlock(&ldpc_afs_mtx);
+@@ -2165,6 +2190,10 @@
+         char str[512];
+         hex_str(data, 1200, str);
+         str[80] = 0; // terminalted
++/*  출력되는 로그값 ----
++        * 디인터리빙 완료 → LDPC 복호 완료 → CRC24 검사 통과
++        → 복원된 SB2 1200비트를 sdr_pack_bits()로 150바이트로 묶은 다음 16진수 문자열로 출력
++         */
+         sdr_log(3, "$SB2,%.3f,%s,%d,%s,%s", time, ch->sig, ch->prn, str, str + 294); 
+     }
+     else {
+@@ -2190,6 +2219,7 @@
+         syms_rcv[i + 1926] = ERASURE;
+     }
+ 
++// 확인 - SB3·SB4 실제 LDPC + CRC 성공 후에만 기록됨
+     pthread_mutex_lock(&ldpc_afs_mtx);
+     nerr = sdr_decode_LDPC_AFS_SF3(syms_rcv, syms_dec);
+     pthread_mutex_unlock(&ldpc_afs_mtx);
+@@ -2219,6 +2249,7 @@
+         syms_rcv[i + 1926] = ERASURE;
+     }
+ 
++// 확인 - SB3·SB4 실제 LDPC + CRC 성공 후에만 기록됨  -sb4
+     pthread_mutex_lock(&ldpc_afs_mtx);
+     nerr = sdr_decode_LDPC_AFS_SF3(syms_rcv, syms_dec);
+     pthread_mutex_unlock(&ldpc_afs_mtx);
+--- a/PocketSDR-AFS/src/sdr_pvt_afs.c
++++ b/PocketSDR-AFS/src/sdr_pvt_afs.c
+@@ -452,6 +452,7 @@
+     out_log_pos(time, pvt->sol, nsat);
+ }
+ 
++// 확인 - 복호된 AFS SB2 데이터에서 위성 궤도정보를 꺼내서 PVT 계산에 사용할 형태로 저장 단, PVT를 계산하진 않음
+ int decode_afs_frame(const uint8_t *buff, int prn)
+ {
+     int sv = prn - 1;
+@@ -460,6 +461,7 @@
+ 
+     if (sv >= MAX_SAT) return 0;
+ 
++//궤도정보로 저장
+     wn = getbitu(buff, i, 13); i += 22;
+ 
+     eph[sv].toe.week = wn;
+--- a/PocketSDR-AFS/src/sdr_rcv.c
++++ b/PocketSDR-AFS/src/sdr_rcv.c
+@@ -85,6 +85,7 @@
+ }
+ 
+ // print SDR receiver status header --------------------------------------------
++// 확인 - 화면 로그 출력부
+ static int print_head(char *buff, sdr_rcv_t *rcv)
+ {
+     char *p = buff, solstr[128] = "", sys[16] = "";

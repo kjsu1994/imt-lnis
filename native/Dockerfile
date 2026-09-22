@@ -31,5 +31,6 @@ COPY --from=receiver /out/iq /iq
 COPY --from=codec /out/native-linux /native-linux
 COPY --from=codec /out/native-pvt /native-pvt
 COPY --from=codec /out/verification /verification
+COPY --from=receiver /out/verification /verification
 COPY --from=codec /out/modified-sources /modified-sources
 COPY --from=receiver /out/modified-sources /modified-sources

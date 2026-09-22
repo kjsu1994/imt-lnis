@@ -7,11 +7,11 @@
 
 | 원본 | 출처·기준 | 사용 기능 |
 |---|---|---|
-| LANS-AFS-SIM | 사용자 제공 `LANS-AFS-SIM-main` 로컬 사본, 2026-09-15 반입 | AFS 부호화·I/Q 변조·PRN 코드 |
-| PocketSDR-AFS | 사용자 제공 `PocketSDR-AFS-main` 로컬 사본, 2026-09-15 반입 | AFS LDPC 복호화·내장 RTKLIB 지구 PVT |
+| LANS-AFS-SIM | 사용자 지정 `오픈소스/LANS-AFS-SIM-main`, 2026-09-22 원본 재반입 | AFS 부호화·I/Q 변조·PRN 코드 |
+| PocketSDR-AFS | 사용자 지정 `오픈소스/PocketSDR-AFS-main`, 2026-09-22 원본 재반입 | AFS LDPC 복호화·내장 RTKLIB 지구 PVT |
 | LDPC-codes | https://github.com/radfordneal/LDPC-codes · `74a8e283be8259dbff7a6bab38ad7e9327825cbf` | PocketSDR 복호기의 희소행렬·확률 복호화 |
 
-LANS/PocketSDR는 로컬 변경이 포함된 제공본이며 공식 저장소와 동일하다고 보증하지 않는다.
+LANS/PocketSDR는 `O:\3.ing\LNIS\오픈소스`의 사용자 지정 기준 원본이며 공식 저장소의 특정 커밋과 동일하다고 보증하지 않는다. 50개 파일을 해당 사본과 바이트 단위로 맞췄다. LDPC-codes 32개는 기존 고정 버전을 유지한다.
 관련 프로젝트: https://github.com/osqzss/LANS-AFS-SIM / https://github.com/osqzss/PocketSDR-AFS
 LDPC는 원래 PocketSDR의 `lib/clone_lib.sh`에서 별도 확보하던 의존성이다. 별도 서비스로 실행하지 않는다.
 LDPC-codes는 Git 원본 바이트로, 제공본은 제공된 파일 바이트로 보존했다. 파일별 기준은 `UPSTREAM-SHA256.txt`다.
@@ -19,13 +19,40 @@ LANS에 포함된 mod2sparse와 LDPC-codes의 버전은 다르므로 임의로 �
 
 ## 변경 패치
 
-- `01-logging`: 제공본의 손상된 문자열이 있는 로그 함수 두 개를 기존 서비스처럼 우회한다. AFS 계산은 변경하지 않는다.
+- `01-korean-comments`: 기존 한글 설명 주석 71개를 실행 코드 변경 없이 보존한다. 제거된 진단 로그의 설명은 파일 앞부분에 이력 주석으로 모으고, 계산 설명은 해당 코드 곁에 둔다. 이전 `01-logging` 우회 패치는 제거했다.
 - `02-earth-iq`: 기존 LNIS의 지구 입력·GPS PRN 1~32·궤도/거리 연결, 심볼 이름 충돌 방지, PRN별 증거 저장, 90초 길이 보정을 재현한다. 변조·FEC·각 PRN 프레임 반복은 원본 경로다.
 - `03-decoder-includes`: 디코더와 관계없는 FFTW/USB/CyAPI 헤더 대신 필요한 선언만 포함한다. Windows DLL도 미리 빌드된 `.a` 없이 동일 소스로 만든다.
 
 각 수정 위치의 `LNIS 변경` 주석에서 목적과 내용을 확인한다. 빌드 사본의 C/H 줄바꿈만 LF로 정규화하며 vendor에는 쓰지 않는다.
 빌드 후 `build/native-output/modified-sources/`에서 주석이 포함된 실제 수정본을 직접 읽을 수 있다.
 이 파일들은 빌드 때 재생성되므로 직접 고치지 말고 대응 패치를 수정한다.
+
+### 진단 로그 정리
+
+비트·16진수·CRC 재계산·LDPC 패리티 비교를 위해 추가했던 진단 덤프는 완전히 제거했다.
+로그 전용 메모리 할당·배열 복사·잠금·카운터와 `afs_sim_log.txt` 생성도 제거한다.
+원본의 부호화/복호화 알고리즘, 계산에 필요한 잠금, 오류·경고·진행률 출력은 유지한다.
+PRN별 `.afsbits` 검증 파일도 그대로 생성한다.
+
+`$IQOBS`와 `$IQAFS`는 Java PVT 계산기가 사용하는 데이터 전달 형식이다. 이름이나 저장 위치가 로그처럼 보여도 삭제하거나 출력 수준을 낮춰 차단하면 안 된다.
+서비스 화면과 Docker의 시험 상세 로그도 유지한다. 현재 원본 출력은 생성·수신 작업별 파일에 보관하며 기존 Java 오류 전달 경로를 사용한다.
+
+송신 비트 출력은 기존에도 우회됐고, 수신 비트 덤프는 PRN 8의 정상 프레임 최초 2개에만 실행됐다.
+따라서 로그 정리만으로 큰 처리속도 향상을 보장하지 않는다. 생성·복조, 파일 복사, SHA-256 검증 시간을 나눠 측정한다.
+I/Q 생성 난수는 현재 시각을 seed로 사용하므로 별도 생성 파일의 SHA가 같아야 한다고 검사하지 않는다.
+수신 반복 시험에서는 복호된 프레임 비트는 정확히 비교하되, 비동기 탐색·추적의 초기 조건에 따른 관측값/PVT 변동은 기존 바이너리의 반복 결과와 함께 기록한다. 상대 누적 반송파 위상은 추적 시작 기준이 달라질 수 있으므로 절대값 일치를 요구하지 않는다.
+
+빠른 Linux 파일시스템에서 확인된 고속 파일 재생의 조기 종료 문제는 `06-file-replay.patch`와 `iq_file_replay.h`로 보완한다. 파일 입력은 가장 느린 채널보다 약 100 ms 이상 앞서 읽지 않으며, EOF에서도 모든 채널의 처리 가능한 상관 구간이 끝날 때까지 기다린다. 상관 계산에 필요한 다음 샘플이 없는 마지막 불완전 구간은 원본처럼 계산하지 않는다.
+
+채널별 완료 위치와 취소 요청은 원자적으로 공유한다. 대기 중 특정 채널이 30초 동안 진행하지 않거나 파일 읽기 오류·불완전 입력 블록이 발견되면 비정상 종료하며, Java의 기존 실행 실패 경로가 부분 결과의 정상 접수를 막는다. 시험 취소는 EOF 대기를 중단한다. `-tscale 20`은 유지하되 실제 처리 속도가 따라오지 못하면 읽기를 늦춘다. USB 입력에는 파일 대기와 파일 오류 정책을 적용하지 않는다.
+
+`20배속`은 저장된 I/Q 파일 재생 옵션이며 신호의 샘플 시각·샘플링 주파수·Doppler를 변경하지 않는다. I/Q 생성 속도나 DTN 전송 속도 설정도 아니며, 실제 처리 시간이 정확히 1/20로 줄어드는 것을 보장하지 않는다.
+
+수신기 빌드에서 `test_iq_replay.cpp`로 속도가 다른 소비자, 버퍼 순환, EOF 잔여 처리, 정지 시간 초과, 취소를 검증한다. `verification/file-replay.txt`에 결과를 내보낸다. 실제 RF 검증은 빠른 디스크의 동일 파일을 1배속/20배속으로 재생하고, 종료 메시지 `I/Q replay complete: cycles=... channels=... pending=0`와 복원 프레임·관측값·PVT를 함께 확인한다. 신호 미획득이나 CRC 실패로 인한 관측 부족까지 없애는 기능은 아니다.
+
+
+회귀 검사는 `gradlew.bat check -PnativeCandidate=build/native-pvt`로 새 DLL을 지정한다. `nativeSourceTest`는 원본 해시와 제거 대상 심볼, 필수 IQ 데이터 출력을 확인한다.
+실제 RF 비교 자료가 있으면 `LNIS_NATIVE_LOG_COMPARISON`에 `source.json`, `source-no8.json`, `tracking-{prn8|no8}-{baseline|candidate}-{1|2|3}.log`가 있는 폴더를 지정한다. `NativeDiagnosticRemovalTest`가 프레임 일치·관측 개수·PVT 반복 차이를 검사하고 `build/reports/native-clean/pvt-repetition.json`에 수치를 기록한다. 자료가 없으면 이 선택적 테스트는 생략한다.
 
 현재 입력 어댑터는 GPS L1 C/A를 지원한다. 다중 GNSS 전체 지원은 포함하지 않는다.
 
@@ -116,3 +143,5 @@ Java 입력 어댑터에서 LNAV preamble 위치까지 확인하여 CNAV가 계�
 `patches/05-afs-pvt-payload.patch` supplies the Java common encoder's SB2/SB3/SB4 input bits to the existing modulator. `iq_earth.c` accepts `LNIS-IQ-EARTH-2` with `F <PRN> <1176 bits> <846 bits> <846 bits>` records; the legacy input remains readable. Original CRC/FEC/interleaving/modulation implementations are retained.
 
 PocketSDR emits `$IQAFS,<sample time>,<PRN>,<block>,<packed hex>` only after LDPC/CRC success. SB2 exports 147 bytes; SB3/SB4 export 106 bytes with the last two padding bits zero. The Java receiver combines blocks from the same decoded frame, validates the LNIS extension, and supplies recovered navigation to RTKLIB. The tracked pseudorange/Doppler remain the RF solver's observations. The local type 63/version 2 payload is not an official message assignment. See README for bit offsets and the 6000-bit layout.
+
+실제 파일 재생 PVT 회귀 검사는 `LNIS_IQ_REPLAY_DIRECTORY`에 90초 검증 자료(`source.json`, `tracking-0-20.log`, `tracking-1-1.log`, `tracking-2-20.log`)가 있는 폴더를 지정하면 실행한다. `NativeFileReplayIntegrationTest`는 JSON 항법 보조 없이 마지막 Epoch까지 위치·속도가 유효한지 검사한다. 자료가 없으면 생략한다.
