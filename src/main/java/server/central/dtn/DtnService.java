@@ -341,6 +341,10 @@ public class DtnService {
             var source = iq.source(inputId, file);
             if (source != null) {
                 transfer.setMetadata(source.metadata()); transfer.setReferencePvt(List.of(source.reference()));
+                if (IqReceiver.FRAME_METHOD.equals(source.metadata().pvtMethod())) {
+                    transfer.setSchemaVersion(2);
+                    transfer.setFormat("LNIS-IQ-FILE-v2");
+                }
                 job.setReferenceJson(objectMapper.writeValueAsString(transfer.getReferencePvt()));
             }
             synchronized (this) {
@@ -814,8 +818,14 @@ public class DtnService {
     private void verifyIq(DtnJob job) {
         try {
             Transfer transfer = objectMapper.readValue(job.getReceivedJson(), Transfer.class);
-            if (!"IQ_SAMPLE".equals(transfer.getTestType()) || !"LNIS-IQ-FILE-v1".equals(transfer.getFormat())
-                    || transfer.getSchemaVersion() != 1 || transfer.getFrames() != null || transfer.getGrawBase64() != null)
+            boolean legacyFormat = transfer.getSchemaVersion() == 1
+                    && "LNIS-IQ-FILE-v1".equals(transfer.getFormat());
+            boolean frameFormat = transfer.getSchemaVersion() == 2
+                    && "LNIS-IQ-FILE-v2".equals(transfer.getFormat())
+                    && transfer.getMetadata() instanceof IqMetadata metadata
+                    && IqReceiver.FRAME_METHOD.equals(metadata.pvtMethod());
+            if (!"IQ_SAMPLE".equals(transfer.getTestType()) || !(legacyFormat || frameFormat)
+                    || transfer.getFrames() != null || transfer.getGrawBase64() != null)
                 throw new IllegalArgumentException("I/Q 전송 형식 오류");
             trace(job.getId(),"I/Q 검증",true,"수신 파일 존재·크기·SHA-256 확인 시작 · "+transfer.getFile().filePath());
             long started=System.nanoTime();
@@ -834,7 +844,8 @@ public class DtnService {
                 // File verification and PVT accuracy are different results.
                 iq.verify(transfer.getFile()); // Detect replacement/modification during tracking.
                 reference=IqReceiver.references(metadata,transfer.getReferencePvt(),decoded.pvt());
-                comparison=IqReceiver.comparison(reference,decoded.pvt());
+                comparison=new java.util.LinkedHashMap<>(IqReceiver.comparison(reference,decoded.pvt()));
+                comparison.put("method", metadata.pvtMethod());
             }
             synchronized (this) {
                 if (!"CALCULATING".equals(get(job.getId()).getState())) return;
@@ -846,7 +857,7 @@ public class DtnService {
                     job.setReferenceJson(objectMapper.writeValueAsString(reference));
                 }
                 update(job, "COMPLETED", decoded==null ? "파일 검증 완료 · 과거 파일은 PVT 메타데이터 없음"
-                    : "파일 검증 완료 · 항법정보 보조 I/Q PVT: "+comparison.get("verdict"));
+                    : "파일 검증 완료 · I/Q 추적 PVT: "+comparison.get("verdict"));
             }
         } catch (Exception error) { synchronized (this) { if ("CALCULATING".equals(get(job.getId()).getState())) fail(job, error); } }
     }

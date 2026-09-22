@@ -180,7 +180,8 @@ final class AfsMetadataCodec {
 
   /** Restore original record/measurement ordering, not PRN order, before the existing hash/PVT path. */
   static Transfer ungroup(Transfer transfer) {
-    if (transfer.getSchemaVersion() != 3 || transfer.getFrames() != null
+    boolean embedded = server.shared.codec.AfsPvtFrameCodec.FORMAT.equals(transfer.getFormat());
+    if (transfer.getSchemaVersion() != (embedded ? 4 : 3) || transfer.getFrames() != null
         || !(transfer.getMetadata() instanceof AfsGroupedMetadata metadata) || metadata.commonRecords() == null
         || transfer.getRecordCount() < 1 || transfer.getRecordCount() > 15000
         || transfer.getSatellites() == null || transfer.getSatellites().isEmpty()
@@ -205,7 +206,7 @@ final class AfsMetadataCodec {
         if (frame == null || sat.constellationId() != 0 || !Objects.equals(frame.getPrn(),sat.prn()))
           throw invalid("위성 묶음과 AFS PRN 불일치");
         frames.add(frame);
-        if (frames.size() > records.length) throw invalid("프레임 수 초과");
+        if (frames.size() > (embedded ? 20000 : records.length)) throw invalid("프레임 수 초과");
       }
       for (var item : sat.metadata().navigationSupplement()) {
         assign(records,item);
@@ -263,13 +264,13 @@ final class AfsMetadataCodec {
         e.receiverTowSeconds(),e.week(),e.leapSeconds(),e.receiverStatus(),e.rawxVersion(),observations),null,null);
   }
 
-  private static AfsRecord record(Envelope e) {
+  static AfsRecord record(Envelope e) {
     return new AfsRecord(e.testId(),e.messageId(),e.sequence(),e.capturedAt(),
         e.message() instanceof ObservationEpoch o ? o : null,
         e.message() instanceof NavigationUpdate n ? n : null,
         e.message() instanceof ReceiverMetadata r ? r : null);
   }
-  private static Envelope envelope(AfsRecord r) {
+  static Envelope envelope(AfsRecord r) {
     return new Envelope(r.testId(),r.messageId(),r.sequence(),r.capturedAt(),
         r.observation() != null ? r.observation() : r.navigation() != null ? r.navigation() : r.receiver());
   }

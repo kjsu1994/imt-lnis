@@ -83,25 +83,27 @@ public class NativePvtIntegrationTest {
       var tx = processor.prepare(id, validSample());
       var mapper = new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules();
       var wire = mapper.readValue(mapper.writeValueAsBytes(tx.getTransfer()), DtnModels.Transfer.class);
-      assertEquals(3, wire.getSchemaVersion());
-      assertEquals("LNIS-AFS-GNSS-v3", wire.getFormat());
+      assertEquals(4, wire.getSchemaVersion());
+      assertEquals("LNIS-AFS-GNSS-v4", wire.getFormat());
       assertInstanceOf(DtnModels.AfsGroupedMetadata.class, wire.getMetadata());
       assertNull(wire.getFrames());
       assertEquals(32,wire.getSatellites().size());
       for (var frame : wire.getSatellites().stream().flatMap(s -> s.frames().stream()).toList()) {
         var decoded = codec.decode(frame.getToi(), Base64.getDecoder().decode(frame.getFrameBase64()));
-        for (int i = 0; i < 846; i++) {
-          assertEquals(i % 2, decoded.sb3()[i]); assertEquals(i % 2, decoded.sb4()[i]);
-        }
-        if (frame.getPrn() == 1) {
+        var payload = AfsPvtFrameCodec.decode(decoded.sb2(), decoded.sb3(), decoded.sb4());
+        assertEquals(frame.getPrn(), payload.prn());
+        assertEquals(100000.0, payload.tow());
+        if (frame.getPrn() == 19) {
           // Independent existing SB2 reader + known native/test_pvt.c fixture values.
+          // This reader's PRN selects a comparison almanac only; SB2 itself carries no PRN.
+          // Use supported profile 1 to independently inspect the PRN 19 frame's actual bit values.
           var eph = server.agent.afs.Sb2PayloadCodec.decode(decoded.sb2(),1,2400,83);
           assertEquals(99984,eph.toeSeconds()); assertEquals(99984,eph.tocSeconds());
           assertEquals(0.01,eph.eccentricity(),Math.scalb(1.0,-32));
           assertEquals(Math.sqrt(26560000),eph.sqrtSemiMajorAxis(),Math.scalb(1.0,-19));
           assertEquals(Math.toRadians(55),eph.inclinationRadians(),2e-9);
           assertEquals(-Math.PI,eph.ascendingNodeRadians(),2e-9);
-          assertEquals(-Math.PI,eph.meanAnomalyRadians(),2e-9);
+          assertEquals(-Math.PI + 18 * 2 * Math.PI / 32,eph.meanAnomalyRadians(),2e-9);
           assertEquals(0,eph.argumentOfPerigeeRadians());
           assertEquals(0,eph.af0Seconds()); assertEquals(0,eph.af1SecondsPerSecond());
           assertTrue(eph.headerMatchesPacket() && eph.tailTestPatternValid());
@@ -111,7 +113,11 @@ public class NativePvtIntegrationTest {
       misleadingReference.setEcefMeters(new double[]{1,2,3});
       wire.setReferencePvt(List.of(misleadingReference)); // Comparison fields cannot drive receiver PVT.
       var rx = processor.receive(id, wire);
-      assertEquals(tx.getObservations(), rx.getObservations());
+      assertEquals(tx.getObservations().records(), rx.getObservations().records());
+      assertEquals(tx.getObservations().epochs(), rx.getObservations().epochs());
+      assertEquals(tx.getObservations().navigation(), rx.getObservations().navigation());
+      assertEquals(tx.getObservations().receiver(), rx.getObservations().receiver());
+      assertEquals("AFS_V4", rx.getObservations().frameInput().source());
       var pvt = tx.getPvt().getFirst();
       assertTrue(pvt.isPositionValid(), pvt.getMessage());
       assertTrue(pvt.isVelocityValid());

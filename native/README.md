@@ -109,3 +109,10 @@ Java 입력 어댑터에서 LNAV preamble 위치까지 확인하여 CNAV가 계�
 기존 GRAW 저장 형식과 원본 RTKLIB는 변경하지 않는다.
 메시지 배열 참고: https://content.u-blox.com/sites/default/files/ZED-F9T-10B_IntegrationManual_UBX-20033630.pdf (3.12.1.2)
 검토한 원본 파일의 고정 해시 목록은 UPSTREAM-SHA256.txt에 보관한다.
+
+
+## AFS v4 / I/Q frame payload extension
+
+`patches/05-afs-pvt-payload.patch` supplies the Java common encoder's SB2/SB3/SB4 input bits to the existing modulator. `iq_earth.c` accepts `LNIS-IQ-EARTH-2` with `F <PRN> <1176 bits> <846 bits> <846 bits>` records; the legacy input remains readable. Original CRC/FEC/interleaving/modulation implementations are retained.
+
+PocketSDR emits `$IQAFS,<sample time>,<PRN>,<block>,<packed hex>` only after LDPC/CRC success. SB2 exports 147 bytes; SB3/SB4 export 106 bytes with the last two padding bits zero. The Java receiver combines blocks from the same decoded frame, validates the LNIS extension, and supplies recovered navigation to RTKLIB. The tracked pseudorange/Doppler remain the RF solver's observations. The local type 63/version 2 payload is not an official message assignment. See README for bit offsets and the 6000-bit layout.

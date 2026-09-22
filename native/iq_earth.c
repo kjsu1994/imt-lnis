@@ -4,7 +4,17 @@
 #include <omp.h>
 static lnis_pvt_context *earth;
 static double origin[3], motion[3], start_tow, bias;
-static int start_week, selected[32];
+static int start_week, selected[32], embedded, payload_present[32];
+static uint8_t payload_bits[32][2868];
+
+/* Shared Java encoder supplies unencoded SB2/SB3/SB4; upstream still applies CRC/FEC. */
+int iq_earth_payload(int prn, int block, uint8_t *bits) {
+    if (prn < 1 || prn > 32 || !payload_present[prn-1]) return 0;
+    int offset = block == 2 ? 0 : block == 3 ? 1176 : 2022;
+    int length = block == 2 ? 1176 : 846;
+    memcpy(bits, payload_bits[prn-1] + offset, length);
+    return 1;
+}
 
 int iq_earth_load(const char *path, int *week, double *tow, double *xyz, double *llh) {
     /* Upstream modulation uses shared ph and RNG state. Preserve its algorithms
@@ -14,10 +24,11 @@ int iq_earth_load(const char *path, int *week, double *tow, double *xyz, double 
     if (!f) return -1;
     if (fscanf(f,"%31s %d %lf %lf %lf %lf %lf %lf %lf %lf",magic,&start_week,&start_tow,
         &origin[0],&origin[1],&origin[2],&motion[0],&motion[1],&motion[2],&bias)!=10 ||
-        strcmp(magic,"LNIS-IQ-EARTH-1") || start_week<0 || start_week>8191 ||
+        (strcmp(magic,"LNIS-IQ-EARTH-1") && strcmp(magic,"LNIS-IQ-EARTH-2")) || start_week<0 || start_week>8191 ||
         !isfinite(start_tow) || start_tow<0 || start_tow>=604800) { fclose(f); return -1; }
     for(int i=0;i<3;i++) if(!isfinite(origin[i]) || !isfinite(motion[i])) { fclose(f); return -1; }
     if(!isfinite(bias) || norm(origin,3)<6e6 || norm(origin,3)>7e6) { fclose(f); return -1; }
+    embedded = !strcmp(magic,"LNIS-IQ-EARTH-2");
     earth=lnis_pvt_create(); if(!earth) { fclose(f); return -1; }
     while(fscanf(f," %c %d",&kind,&prn)==2) {
         if(prn<1 || prn>32) { fclose(f); return -1; }
@@ -26,6 +37,16 @@ int iq_earth_load(const char *path, int *week, double *tow, double *xyz, double 
             uint32_t words[10];
             for(int j=0;j<10;j++) if(fscanf(f,"%u",&words[j])!=1) { fclose(f); return -1; }
             if(lnis_pvt_gps_navigation(earth,prn,start_week,words,10)<0) { fclose(f); return -1; }
+        } else if(kind=='F' && embedded && !payload_present[prn-1]) {
+            char b2[1177], b3[847], b4[847];
+            if(fscanf(f,"%1176s %846s %846s",b2,b3,b4)!=3 || strlen(b2)!=1176
+                || strlen(b3)!=846 || strlen(b4)!=846) { fclose(f); return -1; }
+            const char *blocks[3]={b2,b3,b4}; int offset=0;
+            for(int b=0;b<3;b++) for(int j=0;j<(b==0?1176:846);j++) {
+                if(blocks[b][j]!='0' && blocks[b][j]!='1') { fclose(f); return -1; }
+                payload_bits[prn-1][offset++]=(uint8_t)(blocks[b][j]-'0');
+            }
+            payload_present[prn-1]=1;
         } else { fclose(f); return -1; }
     }
     fclose(f);
@@ -33,6 +54,7 @@ int iq_earth_load(const char *path, int *week, double *tow, double *xyz, double 
     for(int i=0;i<32;i++) {
         eph_t *e=&earth->nav.eph[satno(SYS_GPS,i+1)-1];
         if(selected[i] && (e->A<=0 || e->svh || fabs(timediff(gpst2time(start_week,start_tow),e->toe))>7200)) return -1;
+        if(selected[i] && embedded && !payload_present[i]) return -1;
         if(selected[i]) count++;
     }
     return count>=4 ? count : -1;

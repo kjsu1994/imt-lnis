@@ -873,7 +873,7 @@ Authorization: Bearer <LNIS_DTN_SEND_TOKEN>
 
 | 공통 필드 | 타입·값 |
 |---|---|
-| schemaVersion | AFS 신규 전송 `3`, RAW·I/Q `1`; 과거 AFS `1`·`2` 수신 호환 |
+| schemaVersion | AFS 신규 `4`, RAW `1`, I/Q 신규 `2`; 과거 AFS `1`·`2`·`3` 및 I/Q `1` 수신 호환 |
 | testId | LNIS가 발급한 시험 UUID. 모든 단계에서 유지 |
 | testType | `GNSS_RAW`, `AFS_METADATA`, `IQ_SAMPLE` |
 | senderMode | `DTN` 또는 `HDTN`: 송신 측 기동 모드 |
@@ -1000,7 +1000,22 @@ UBX 직렬 바이트 원문과는 다릅니다. 어댑터는 내용을 해석·�
 
 #### B. AFS Frame + Metadata
 
-**신규 v3: `satellites[]`에 PRN별 AFS 프레임과 metadata를 함께 묶습니다.** SB2는 GPS 항법정보, SB3/SB4는 원본 `0101…` 패턴입니다. 아래는 일부 필드·레코드를 생략한 구조 예시입니다.
+**신규 v4: 계산은 AFS 프레임, 원본 보존은 metadata.**
+
+- `schemaVersion=4`, `format=LNIS-AFS-GNSS-v4`; `testType=AFS_METADATA`와 `profile`은 유지합니다.
+- `satellites[]`/`metadata.commonRecords`/관측·항법 레코드 JSON 구조는 기존과 같습니다. v4의 `navigationSupplement` word는 SB2 비트를 지우지 않은 **원본 전체**입니다.
+- 각 Epoch의 계산 대상 GPS L1 관측마다 프레임 하나를 생성합니다. SB3·SB4에 epochIndex·PRN이 있고 SB4에 원본 관측 순서·GNSS 시각이 있어 다중 Epoch를 구분합니다.
+- `frames[].index`는 전체 프레임 순번, `week/afsItow/toi`는 해당 관측 Epoch 기준, `prn`은 위성 식별자입니다. v4는 `navigationRecordIndices`를 보내지 않습니다.
+- 프레임당 750 bytes(6000 bits), Base64 길이 1000을 유지합니다. SB2는 기존 항법 배치, SB3는 항법 보충정보, SB4는 원본 의사거리·Doppler·C/N0·시각·상태와 전리층 정보를 담습니다. 상세 비트 배치는 README의 LNIS SB3·SB4 배치를 참조합니다.
+- LNIS는 원본 metadata 복원 해시와 프레임 내용의 대응을 확인한 뒤 **프레임에서 복원한 값으로만 PVT를 계산**합니다. Reference는 비교용입니다. 지연 시험의 시각 기록·변환·판정은 변경하지 않습니다.
+- 원본에 계산 가능한 GPS 관측이 없는 Epoch는 PRN=0의 빈 Epoch 표식을 사용합니다. 이를 어댑터가 필터링하면 안 됩니다.
+- v4 보고서 `observations.frameInput`은 `{source:"AFS_V4", frameCount, epochs, navigation}` 형태의 계산 입력 근거입니다. 외부 전송 JSON에 추가되는 필드는 아닙니다.
+- 어댑터는 버전별 DTO 재생성·필드 제거·숫자 반올림 없이 원문 전체를 중계해야 합니다. 새 버전 거절/누락 여부를 송수신 서비스 갱신 후 확인해야 합니다.
+
+아래는 **과거 v3 호환 규격**입니다. v4의 항법 word 의미와 혼용하지 마세요.
+
+
+**과거 v3: `satellites[]`에 PRN별 AFS 프레임과 metadata를 함께 묶습니다.** SB2는 GPS 항법정보, SB3/SB4는 원본 `0101…` 패턴입니다. 아래는 일부 필드·레코드를 생략한 구조 예시입니다.
 
 ```json
 {
@@ -1066,10 +1081,16 @@ UBX 직렬 바이트 원문과는 다릅니다. 어댑터는 내용을 해석·�
 - LNIS 수신이 CRC·0101 패턴·항법 참조·원본 GRAW SHA-256을 검사한 뒤 RAW 표와 PVT를 계산합니다. `referencePvt`는 비교용일 뿐 계산 입력이 아닙니다.
 - **어댑터는 satellites·metadata·referencePvt를 포함한 JSON 전체를 보존하여 콜백합니다.** 소수 반올림 금지. GPS LNAV 1·2·3 세트가 필요하며 관측값만 있는 입력은 GNSS RAW 시험을 사용합니다.
 
-과거 `schemaVersion=1` / `LNIS-GRAW-AFS-v1`(SB3/SB4의 GRAW) 및 `schemaVersion=2` / `LNIS-AFS-GNSS-v2`(분리된 frames/metadata.records)는 수신 호환을 유지합니다. 신규 전송은 v3이며 송신·수신 서비스 모두 업데이트해야 합니다. 별도 AFS Frame 오류 주입 시험과 RAW/I/Q 계약은 변경하지 않습니다.
+과거 `schemaVersion=1` / `LNIS-GRAW-AFS-v1`(SB3/SB4의 GRAW) 및 `schemaVersion=2` / `LNIS-AFS-GNSS-v2`(분리된 frames/metadata.records)는 수신 호환을 유지합니다. 신규 전송은 v4이며 송신·수신 서비스 모두 업데이트해야 합니다. 별도 AFS Frame 오류 주입 시험과 RAW 계약은 유지합니다.
 
 
-#### C. I/Q Sample: 파일 주소 + 보조 항법정보
+#### C. I/Q Sample: 파일 주소 + 프레임 항법정보
+
+신규 파일은 `schemaVersion=2`, `format=LNIS-IQ-FILE-v2`, `metadata.pvtMethod=AFS_IQ_FRAME_PVT-v2`입니다. 파일 크기·90초·12 MHz·경로 규칙과 JSON 필드 구조는 유지합니다. JSON AFS v4와 동일한 SB3·SB4 내용이 I/Q 변조에 사용됩니다.
+
+수신은 CRC 검증된 SB2·SB3·SB4의 항법정보와 실제 I/Q 추적 관측값으로 PVT를 계산합니다. 새 방식의 `metadata.gpsLnav`는 기존 구조의 부가자료이며 계산에 사용하지 않습니다(빈 배열도 허용). 필요한 프레임을 복원하지 못하면 JSON으로 대체하지 않습니다. Reference·SB4 원본 관측값을 I/Q 추적 측정값으로 대신하지 않습니다. `metadata.week/towSeconds/prns`는 샘플 시각과 탐색 채널 설정에 계속 사용합니다.
+
+아래는 과거 `LNIS-IQ-FILE-v1`/`AFS_IQ_GPS_LNAV_ASSISTED-v1` 파일의 호환 규격과 예시입니다.
 
 아래는 구조 예시입니다. `gpsLnav`, `referencePvt` 배열 내용은 지면상 생략했으며 실제 요청에는 아래 표의 값이 채워집니다.
 
@@ -1167,7 +1188,7 @@ LNIS는 어댑터 로그를 수신 노드의 `[DTN]` 상세 항목으로 저장�
 {"testId":"438a4035-a13c-4b49-a278-0e5fb7f774bd","accepted":true,"state":"WAITING_RECEIVER"}
 ```
 
-202는 JSON 접수·저장 완료입니다. 이후 수신 LNIS가 RAW/AFS 복원·PVT 계산 또는 I/Q 파일 검증·추적·보조 항법 기반 PVT 계산을 수행합니다.
+202는 JSON 접수·저장 완료입니다. 이후 수신 LNIS가 RAW/AFS 복원·PVT 계산 또는 I/Q 파일 검증·추적·프레임 항법 기반 PVT 계산을 수행합니다(과거 I/Q는 JSON 항법 보조).
 같은 JSON 재접수는 재계산하지 않고 현재 상태를 반환합니다. 완료 후 재접수하면 state가 COMPLETED일 수도 있습니다.
 
 | 응답 | 의미 |

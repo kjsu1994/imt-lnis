@@ -116,16 +116,86 @@ ns 표시 자릿수는 실제 측정 정확도를 의미하지 않습니다. 증
 
 
 
-AFS + Metadata 신규 전송은 `schemaVersion=3`, `format=LNIS-AFS-GNSS-v3`입니다. **`satellites[]`에 PRN별 `frames`와 `metadata`를 함께 묶습니다.** 의사거리는 `satellites[].metadata.observations[].observation.pseudorangeMeters`에 수신기 측정값 그대로 들어가며, 도플러·위상·관측 시각도 보존합니다. SB2는 원본 `eph2sbf`의 배치·단위로 GPS 항법값을 담고 SB3/SB4는 `0101…` 패턴을 유지합니다. SB2에 없는 항법정보는 같은 위성의 `metadata.navigationSupplement`에, 공통 수집 정보는 최상위 `metadata.commonRecords`에 둡니다. 여러 시점·신호의 순서를 복원하고 GRAW 해시를 검사한 뒤 기존 지구 PVT 계산기를 사용합니다. GPS LNAV subframe 1·2·3이 필요합니다. 과거 AFS v1/v2 수신, 별도 AFS Frame 시험, GNSS RAW·I/Q 경로는 유지합니다. 상세 계약은 [API-SPEC.md](API-SPEC.md)의 15절을 참고하세요.
+## AFS 프레임 안에서 PVT 입력 전달
 
-합성 예제의 SFRBX는 96건(수집 순번 0~95)이며, 32개 PRN의 subframe 1·2·3을 묶으면 AFS 프레임은 32개(index 0~31)입니다. 마지막 순번은 총 건수가 아닙니다.
+신규 전송은 `schemaVersion=4`, `format=LNIS-AFS-GNSS-v4`입니다. 각 Epoch의 **GPS L1 관측 위성마다 한 프레임**을 만듭니다. 여러 Epoch는 각각 독립된 위성별 프레임 묶음으로 전송합니다. 지연 시험은 기존처럼 선택한 1 Epoch만 사용합니다.
+
+```mermaid
+flowchart LR
+    RAW[원본 GNSS RAW] --> REF[기존 RTKLIB Reference PVT]
+    RAW --> PACK[Epoch별 계산 입력 추출]
+    PACK --> FRAME[SB2 항법 · SB3 항법 보충 · SB4 원본 관측]
+    RAW --> META[JSON metadata 원본 보존]
+    FRAME --> DECODE[수신 CRC/FEC 검증 · 계산 입력 복원]
+    META --> CHECK[원본 SHA-256 · 프레임과 대조]
+    DECODE --> CHECK
+    DECODE --> DELAY[선택 시 기존 지연 재계산]
+    CHECK --> VIEW[원본 표 · 다운로드]
+    DELAY --> PVT[기존 RTKLIB 수신 PVT]
+    REF --> COMPARE[위치 · 속도 · Clock Bias 비교]
+    PVT --> COMPARE
+```
+
+프레임에서 복원한 계산 입력과 원본 metadata가 다르면 거절합니다. 수신 계산은 metadata나 Reference PVT로 누락된 프레임을 대신하지 않습니다. `sourceSha256`은 여전히 원본 GRAW 전체의 해시입니다. `satellites[].metadata.navigationSupplement`는 v4에서 **원본 항법 word 전체**를 보존하며, v2/v3의 SB2 제거 잔여 word와 의미가 다릅니다. JSON 필드 구조는 유지하고 버전으로 구분합니다.
+
+### 6,000비트 구조와 부호화
+
+| 구간 | 부호화 전 | 오류 검출·정정 | 전송 비트 |
+|---|---:|---|---:|
+| 동기 패턴 | 68 | 고정 패턴 | 68 |
+| SB1 | FID·TOI 입력 | 기존 BCH | 52 |
+| SB2 | 데이터 1,176 + CRC 24 = 1,200 | 기존 LDPC·천공 | 2,400 |
+| SB3 | 데이터 846 + CRC 24 = 870 | 기존 LDPC·천공 | 1,740 |
+| SB4 | 데이터 846 + CRC 24 = 870 | 기존 LDPC·천공 | 1,740 |
+| 합계 | | | **6,000 = 750 bytes** |
+
+```text
+부호화 전: SB2 [1176 + CRC24]  SB3 [846 + CRC24]  SB4 [846 + CRC24]
+                  ↓ LDPC             ↓ LDPC            ↓ LDPC
+부호화 후:       2400                1740               1740
+                  └──────────────────┬──────────────────┘
+                           5880비트 인터리빙 (98×60)
+최종:      [동기 68][SB1 BCH 52][인터리빙된 SB2·SB3·SB4 5880] = 6000
+```
+
+최종 비트열에서 SB2·SB3·SB4가 그대로 연속 배치되는 것은 아닙니다. 각 크기·CRC·BCH·LDPC·인터리빙은 기존 SIM/PocketSDR를 사용합니다. 공식 근거는 [NASA LSIS AFS Volume A v1.0](https://www.nasa.gov/wp-content/uploads/2025/02/lunanet-signal-in-space-recommended-standard-augmented-forward-signal-vol-a.pdf)입니다. SB3·SB4는 **LNIS 시험용 확장**이며, type=63은 공식 할당을 주장하지 않는 로컬 식별값입니다. 지구 GPS 정보를 사용하는 이 시험은 LunaNet 운용 메시지 전체의 적합성 인증이 아닙니다.
+
+### LNIS SB3·SB4 배치 (CRC 제외)
+
+모든 다중 비트 값은 상위 비트부터 저장합니다. 관측 시각·의사거리는 IEEE 754 binary64, Doppler는 binary32로 원본 정밀도를 유지합니다.
+
+```text
+공통 헤더 57비트:
+  messageType 6 | version 8 (=2) | block 3 (=3/4) | epochIndex 32 | PRN 8
+
+SB3 846비트:
+  공통 헤더 57 | 항법 존재 1 | SB2에 없는 LNAV 비트 459 | 예약 329
+  사용 517비트. LNAV 1·2·3의 720비트 중 SB2에 실린 261비트를 제외.
+  수신 시 SB2와 결합해 기존 RTKLIB 항법 해석기에 전달.
+
+SB4 846비트:
+  공통 헤더 57 | 원본 관측 순서 8 | GPS week 16 | 원본 TOW 64
+  원본 의사거리 64 | Doppler 32 | C/N0 8 | 추적 상태 8
+  전리층 정보 존재 1 | 해당 항법 PRN 8 | GPS 전리층 항법 페이지 240 | 예약 240
+  사용 606비트. 전리층 정보가 없으면 존재=0, PRN·페이지=0.
+```
+
+SB4 의사거리는 **송신 원본**입니다. 수신부에서 `Δt=본문 수신 완료−시험 시작 접수`를 구하고, `P′=P+cΔt`, 계산용 GNSS 시각 `t₁=t₀+Δt`를 적용합니다. 시험 기준 가상 송신 시각 `S−P/c`도 기존 상세 로그에 표시합니다. 수집 후 시험 전 대기시간은 포함하지 않습니다.
+
+원본 UUID·수집 이력·비GPS 신호·반송파 등은 JSON metadata에 그대로 남습니다. GPS 계산 대상이 없는 Epoch는 PRN=0, 관측 순서=255의 빈 Epoch 표식으로 보존하며 가상 위성을 만들지 않습니다. 항법정보가 없는 위성은 항법 존재=0으로 표시해 기존 계산기의 유효성 판단을 유지합니다.
+
+수신 화면의 **AFS 프레임에서 복원한 PVT 계산 입력**을 펼치면 원본 보존 RAWX와 구분해 복원한 의사거리·Doppler·시각을 확인할 수 있습니다. 과거 v1/v2/v3 수신·결과 조회, 별도 AFS 오류 주입 시험, GNSS RAW 시험은 유지합니다. 어댑터는 새 버전의 전체 JSON을 그대로 중계해야 합니다.
+
+합성 예제는 SFRBX 96건(32 PRN×3개 항법 메시지)을 보존하지만, v4 계산 프레임은 실제 관측 GPS 5개에 대해 **5개** 생성합니다. 과거 v3는 항법 세트 기준으로 32개를 생성했습니다.
 
 I/Q는 송신에서 `LNIS_IQ_ENABLED=true`로 활성화합니다. 양쪽 LNIS와 **각자의 로컬 어댑터**가 공유 폴더를 `/exchange`에 마운트해야 합니다.
-COM/GRAW 입력 적용 → 지구 PVT 계산 → 90초 I/Q 생성 → 전송 → 수신 추적·지구 PVT 계산 순서입니다. GPS PRN별 LNAV를 원본 SB2에 넣고 각 프레임을 반복·합산합니다. AFS 변조·부호화는 원본을 사용하며, 원본의 공유 위상/난수 상태 충돌 방지를 위해 생성은 단일 스레드로 실행합니다. 초기 PVT의 등속 운동을 가정한 시험 신호이며 실측 RF가 아닙니다.
+COM/GRAW 입력 적용 → 지구 PVT 계산 → 90초 I/Q 생성 → 전송 → 수신 추적·지구 PVT 계산 순서입니다. 위 공통 구성기로 만든 SB2·SB3·SB4를 PRN별로 반복·합산하며 SB1의 프레임 시각을 갱신합니다. 90초 동안 다른 Epoch 데이터를 새로 수집하지 않습니다. AFS 변조·부호화는 원본을 사용하며, 원본의 공유 위상/난수 상태 충돌 방지를 위해 생성은 단일 스레드로 실행합니다. 초기 PVT의 등속 운동을 가정한 시험 신호이며 실측 RF가 아닙니다.
 기존 LANS AFS 시뮬레이터의 90초·12 MHz 출력은 2.16 GB입니다. REST로 파일 본문을 보내지 않습니다.
 빌드 사본에서 원본의 0.1초 부족한 출력 루프를 보정하며, 실제 바이트 수로 90초를 검증합니다. 원본 파일은 수정하지 않습니다.
-수신 어댑터는 수신 PC 폴더에 BIN을 완성한 다음 원래 JSON으로 콜백합니다. LNIS가 PocketSDR의 AFS 탐색·추적·CRC 검증 후 의사거리·도플러·상대 누적 위상을 얻고, JSON의 GPS LNAV를 보조 항법정보로 사용하여 기존 RTKLIB 지구 PVT를 계산합니다. 송신 RAWX나 기준 좌표를 수신 계산에 넣지 않습니다.
-수신 화면에는 **I/Q 복원 관측값(수신기 RAWX 원본 아님)**, 보조 LNAV, 동일 샘플 시각의 기준/수신 PVT와 오차가 표시됩니다. 파일 `PASS`와 PVT `MEASURED`(오차 측정)는 별개이며, I/Q 정확도 합격 허용오차는 아직 설정하지 않았습니다. 추적 초기에는 PVT가 없을 수 있습니다. 메타데이터가 없는 과거 파일은 파일 검증만 가능하므로 PVT 시험에는 새로 생성하세요.
+수신 어댑터는 수신 PC 폴더에 BIN을 완성한 다음 원래 JSON으로 콜백합니다. LNIS가 PocketSDR의 AFS 탐색·추적·CRC 검증 후 의사거리·도플러·상대 누적 위상을 얻고, 신규 파일은 실제 복호한 SB2·SB3·SB4의 항법정보로 기존 RTKLIB 지구 PVT를 계산합니다. SB4 원본 의사거리로 신호 추적값을 대체하지 않습니다. 과거 v1 파일은 JSON 항법정보 보조 방식을 유지합니다. 송신 RAWX나 기준 좌표를 수신 계산에 넣지 않습니다.
+수신 화면에는 **I/Q 복원 관측값(수신기 RAWX 원본 아님)**, 프레임 복원 항법정보(과거 파일은 보조 LNAV), 동일 샘플 시각의 기준/수신 PVT와 오차가 표시됩니다. 파일 `PASS`와 PVT `MEASURED`(오차 측정)는 별개이며, I/Q 정확도 합격 허용오차는 아직 설정하지 않았습니다. 추적 초기에는 PVT가 없을 수 있습니다. 메타데이터가 없는 과거 파일은 파일 검증만 가능하므로 PVT 시험에는 새로 생성하세요.
+
+새 I/Q는 `LNIS-IQ-FILE-v2`, `pvtMethod=AFS_IQ_FRAME_PVT-v2`로 구분합니다. JSON의 PRN·첫 샘플 시각·Reference는 탐색/비교용이며 항법정보는 CRC 검증된 프레임에서 확보합니다. 4개 미만 PRN의 계산 프레임만 복원되면 메타데이터로 우회하지 않고 오류를 표시합니다. I/Q에는 기존처럼 통신 지연 재계산을 적용하지 않습니다.
 
 ## 개발용 눈으로 확인
 

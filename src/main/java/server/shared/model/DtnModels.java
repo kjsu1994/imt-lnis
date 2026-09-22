@@ -30,7 +30,7 @@ public final class DtnModels {
     @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
     private HdtnConfig hdtnConfig;
     private IqFile file;
-    /** AFS: observations + residual navigation; I/Q: GPS LNAV assistance only. */
+    /** AFS v4: original evidence, independent of frame PVT input. Older AFS/IQ formats retain their contracts. */
     private Metadata metadata;
     private String sourceSha256;
     private int recordCount;
@@ -110,7 +110,7 @@ public final class DtnModels {
   public record IqMetadata(String signal, String pvtMethod, int week, double towSeconds,
       String trajectory, List<Integer> prns, List<IqNavigation> gpsLnav) implements Metadata {}
 
-  /** Navigation words are residuals: restore SB2 fields before interpreting them as SFRBX. */
+  /** v2/v3 navigation words are SB2 residuals; v4 preserves full original navigation words. */
   public record AfsMetadata(List<AfsRecord> records) implements Metadata {}
   /** v3: shared epoch/envelope data only; measurements and navigation live with their satellite. */
   public record AfsGroupedMetadata(List<AfsIndexedRecord> commonRecords) implements Metadata {}

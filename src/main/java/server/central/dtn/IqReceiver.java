@@ -18,6 +18,7 @@ import java.util.function.Consumer;
 @Slf4j
 public class IqReceiver {
   public static final String METHOD = "AFS_IQ_GPS_LNAV_ASSISTED-v1";
+  public static final String FRAME_METHOD = "AFS_IQ_FRAME_PVT-v2";
   public record Source(String sha256, IqMetadata metadata, Pvt reference) {}
   public record Result(List<Pvt> pvt, Map<String,Object> observations) {}
   private final Path executable, nativeDirectory;
@@ -35,21 +36,31 @@ public class IqReceiver {
     var lines = input.lines().toList();
     if (lines.isEmpty()) throw new IllegalArgumentException("I/Q 생성 입력 누락");
     String[] header = lines.getFirst().trim().split("\\s+");
-    if (header.length != 10 || !header[0].equals("LNIS-IQ-EARTH-1"))
+    if (header.length != 10 || !(header[0].equals("LNIS-IQ-EARTH-1") || header[0].equals("LNIS-IQ-EARTH-2")))
       throw new IllegalArgumentException("I/Q 생성 입력 형식 오류");
     Pvt ref = new Pvt(); ref.setWeek(Integer.parseInt(header[1])); ref.setTowSeconds(Double.parseDouble(header[2]));
     ref.setEcefMeters(new double[]{Double.parseDouble(header[3]),Double.parseDouble(header[4]),Double.parseDouble(header[5])});
     ref.setVelocityMetersPerSecond(new double[]{Double.parseDouble(header[6]),Double.parseDouble(header[7]),Double.parseDouble(header[8])});
     ref.setReceiverClockBiasSeconds(Double.parseDouble(header[9])); ref.setPositionValid(true); ref.setVelocityValid(true);
+    boolean embedded = header[0].equals("LNIS-IQ-EARTH-2");
+    var framePrns = new HashSet<Integer>();
     var prns = new ArrayList<Integer>(); var nav = new ArrayList<IqNavigation>();
     for (String line : lines.subList(1, lines.size())) {
       String[] row = line.trim().split("\\s+");
       if (row.length == 2 && row[0].equals("P")) prns.add(Integer.parseInt(row[1]));
       else if (row.length == 12 && row[0].equals("N"))
         nav.add(new IqNavigation(Integer.parseInt(row[1]), Arrays.stream(row).skip(2).map(Integer::valueOf).toList()));
-      else throw new IllegalArgumentException("I/Q 생성 입력 레코드 오류");
+      else if (embedded && row.length == 5 && row[0].equals("F")) {
+        var payload = server.shared.codec.AfsPvtFrameCodec.decode(IqFrameRecovery.inputBits(row[2], 1176),
+            IqFrameRecovery.inputBits(row[3], 846), IqFrameRecovery.inputBits(row[4], 846));
+        if (payload.prn() != Integer.parseInt(row[1]) || payload.epoch() != 0
+            || payload.week() != ref.getWeek() || Double.compare(payload.tow(), ref.getTowSeconds()) != 0
+            || payload.navigation() == null || !framePrns.add(payload.prn()))
+          throw new IllegalArgumentException("I/Q 생성 프레임 식별 오류");
+      } else throw new IllegalArgumentException("I/Q 생성 입력 레코드 오류");
     }
-    var meta = new IqMetadata("AFSD", METHOD, ref.getWeek(), ref.getTowSeconds(), "ECEF_CONSTANT_VELOCITY",
+    if (embedded && !framePrns.equals(new HashSet<>(prns))) throw new IllegalArgumentException("I/Q 생성 프레임 누락");
+    var meta = new IqMetadata("AFSD", embedded ? FRAME_METHOD : METHOD, ref.getWeek(), ref.getTowSeconds(), "ECEF_CONSTANT_VELOCITY",
         List.copyOf(prns), nav.stream().filter(n->prns.contains(n.prn())).toList());
     validate(meta); validateReference(ref, meta);
     ref.setSatellitesUsed(prns.size());
@@ -57,7 +68,7 @@ public class IqReceiver {
   }
 
   public static void validate(IqMetadata m) {
-    if (m == null || !"AFSD".equals(m.signal()) || !METHOD.equals(m.pvtMethod())
+    if (m == null || !"AFSD".equals(m.signal()) || !(METHOD.equals(m.pvtMethod()) || FRAME_METHOD.equals(m.pvtMethod()))
         || !"ECEF_CONSTANT_VELOCITY".equals(m.trajectory()) || m.week()<0 || m.week()>8190
         || !Double.isFinite(m.towSeconds()) || m.towSeconds()<0 || m.towSeconds()>=604800
         || m.prns()==null || m.prns().size()<4 || m.prns().size()>32
@@ -75,7 +86,7 @@ public class IqReceiver {
       if(id<1 || id>5) throw new IllegalArgumentException("I/Q GPS LNAV 서브프레임 오류");
       subframes.computeIfAbsent(n.prn(), k->new HashSet<>()).add(id);
     }
-    if (m.prns().stream().anyMatch(p->!subframes.getOrDefault(p,Set.of()).containsAll(Set.of(1,2,3))))
+    if (!FRAME_METHOD.equals(m.pvtMethod()) && m.prns().stream().anyMatch(p->!subframes.getOrDefault(p,Set.of()).containsAll(Set.of(1,2,3))))
       throw new IllegalArgumentException("I/Q PVT에 필요한 LNAV 1·2·3 누락");
   }
 
@@ -124,7 +135,10 @@ public class IqReceiver {
       }
       progress.accept("탐색·추적 종료 · CRC 통과 채널 관측값 집계·지구 PVT 계산 시작");
       var result = calculate(tracking,metadata);
-      progress.accept("지구 PVT 계산 완료 · 유효 "+result.pvt().stream().filter(Pvt::isPositionValid).count()+" / "+result.pvt().size()+" 시점 · 항법정보 보조 방식");
+      String navigationSource = FRAME_METHOD.equals(metadata.pvtMethod())
+          ? "AFS 프레임 복원 항법정보" : "JSON 항법정보 보조 방식";
+      progress.accept("지구 PVT 계산 완료 · 유효 " + result.pvt().stream().filter(Pvt::isPositionValid).count()
+          + " / " + result.pvt().size() + " 시점 · " + navigationSource);
       return result;
     } finally {
       Process running=process;
@@ -142,9 +156,13 @@ public class IqReceiver {
 
   Result calculate(Path tracking, IqMetadata m) throws IOException {
     var epochs = parse(tracking,m);
+    boolean embedded = FRAME_METHOD.equals(m.pvtMethod());
+    var recovered = embedded ? IqFrameRecovery.read(tracking, m) : null;
+    var navigation = embedded ? recovered.navigation() : m.gpsLnav();
+    if (embedded) epochs.values().forEach(channels -> channels.keySet().retainAll(recovered.prns()));
     var values = new ArrayList<Pvt>(); var view = new ArrayList<Object>();
     try (var codec = new NativePvtCodec(nativeDirectory)) {
-      for (var n:m.gpsLnav()) codec.navigation(n.prn(),m.week(),n.words24().stream().mapToInt(Integer::intValue).toArray());
+      for (var n:navigation) codec.navigation(n.prn(),m.week(),n.words24().stream().mapToInt(Integer::intValue).toArray());
       for (var entry:epochs.entrySet()) {
         if (Thread.currentThread().isInterrupted()) throw new java.io.InterruptedIOException("I/Q PVT 시험 중지");
         double absolute=m.towSeconds()+entry.getKey(); int week=m.week()+(int)(absolute/604800);
@@ -158,16 +176,16 @@ public class IqReceiver {
               "carrierPhaseCycles",-measurement[4],"trackingStatus",1,"source","IQ_TRACKING"));
         }
         Pvt p=codec.solve(week,tow,input);
-        p.setMessage("AFS I/Q 추적 · GPS LNAV 보조 · "+(p.isPositionValid()?"지구 ECEF":"측위 불가 · "+p.getMessage()));
+        p.setMessage("AFS I/Q 추적 · " + (embedded ? "프레임 항법정보" : "GPS LNAV 보조") + " · "+(p.isPositionValid()?"지구 ECEF":"측위 불가 · "+p.getMessage()));
         values.add(p);
         view.add(Map.of("observation",Map.of("week",week,"receiverTowSeconds",tow,"observations",observations)));
       }
     }
-    return new Result(values,Map.of("source","IQ_TRACKING","epochs",view,"navigationCount",m.gpsLnav().size(),
-        "navigation",java.util.stream.IntStream.range(0,m.gpsLnav().size()).mapToObj(i->Map.of(
-            "sequence",i+1,"message",Map.of("constellationId",0,"satelliteId",m.gpsLnav().get(i).prn(),
-            "words",m.gpsLnav().get(i).words24()))).toList(),
-        "records",m.gpsLnav(),"assistance","GPS LNAV 메타데이터 · I/Q에서 복원한 SFRBX가 아님"));
+    return new Result(values,Map.of("source","IQ_TRACKING","epochs",view,"navigationCount",navigation.size(),
+        "navigation",java.util.stream.IntStream.range(0,navigation.size()).mapToObj(i->Map.of(
+            "sequence",i+1,"message",Map.of("constellationId",0,"satelliteId",navigation.get(i).prn(),
+            "words",navigation.get(i).words24()))).toList(),
+        "records",navigation,"assistance", embedded ? "AFS SB2·SB3·SB4 복원 · JSON 항법정보 계산 대체 없음" : "GPS LNAV 메타데이터 · I/Q에서 복원한 SFRBX가 아님"));
   }
 
   static SortedMap<Integer,SortedMap<Integer,double[]>> parse(Path tracking,IqMetadata m) throws IOException {

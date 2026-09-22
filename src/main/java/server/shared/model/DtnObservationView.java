@@ -9,7 +9,22 @@ import server.shared.codec.GrawCodec;
 public record DtnObservationView(List<Epoch> epochs, int navigationCount,
                                  GrawCodec.ReceiverMetadata receiver,
                                  List<Navigation> navigation,
-                                 List<StoredRecord> records) {
+                                 List<StoredRecord> records,
+                                 @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+                                 FrameInput frameInput) {
+  public record FrameInput(String source, int frameCount, List<Epoch> epochs, List<Navigation> navigation) {}
+
+  public DtnObservationView(List<Epoch> epochs, int navigationCount, GrawCodec.ReceiverMetadata receiver,
+      List<Navigation> navigation, List<StoredRecord> records) {
+    this(epochs, navigationCount, receiver, navigation, records, null);
+  }
+
+  public DtnObservationView withFrameInput(List<byte[]> input, int count) {
+    var decoded = fromRecords(input);
+    return new DtnObservationView(epochs, navigationCount, receiver, navigation, records,
+        new FrameInput("AFS_V4", count, decoded.epochs(), decoded.navigation()));
+  }
+
   public record Epoch(Instant capturedAt, GrawCodec.ObservationEpoch observation) {}
   public record Navigation(long sequence, Instant capturedAt, GrawCodec.NavigationUpdate message) {}
   public record StoredRecord(long sequence, Instant capturedAt, String type, Object message) {}

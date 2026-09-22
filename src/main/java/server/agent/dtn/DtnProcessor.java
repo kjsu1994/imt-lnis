@@ -48,11 +48,12 @@ public final class DtnProcessor {
       result.setTransfer(transfer);
       return result;
     }
-    progress.accept("AFS 변환","GPS 항법정보 → 원본 형식 SB2 · SB3/SB4 0101 패턴 → 기존 인코더 실행");
-    AfsMetadataCodec.prepare(transfer, records, afs);
-    progress.accept("AFS 변환","인코딩 완료 · "+transfer.getFrames().size()+" frames · 프레임당 750 bytes");
-    AfsMetadataCodec.group(transfer);
-    progress.accept("JSON 준비","의사거리·도플러 관측값 및 SB2 외 항법정보 metadata 구성 완료");
+    progress.accept("AFS 변환", "Epoch별 GPS 관측 → SB2 항법정보 · SB3 보충정보 · SB4 원본 관측값");
+    AfsPvtTransferCodec.prepare(transfer, records, afs);
+    int count = transfer.getSatellites().stream().mapToInt(s -> s.frames().size()).sum();
+    progress.accept("AFS 변환", "인코딩 완료 · " + count + " frames · 각 6000 bits/750 bytes"
+        + " · SB3 517/846 bits · SB4 606/846 bits · 원본 메타데이터 별도 보존");
+    progress.accept("JSON 준비", "AFS v4 · PVT 계산 입력은 프레임, 원본 RAW는 metadata로 보존");
     result.setTransfer(transfer);
     return result;
   }
@@ -64,6 +65,25 @@ public final class DtnProcessor {
     return receive(id, transfer, progress, null);
   }
   public AgentResult receive(UUID id, Transfer transfer, java.util.function.BiConsumer<String,String> progress, DtnDelay.Timing timing) {
+    if (transfer != null && server.shared.codec.AfsPvtFrameCodec.FORMAT.equals(transfer.getFormat())) {
+      if (!id.equals(transfer.getTestId())) throw new IllegalArgumentException("시험 ID 불일치");
+      progress.accept("AFS 복원", "SB2·SB3·SB4 복호화 → 프레임 계산 입력 복원 · 원본 metadata 별도 대조");
+      var restored = AfsPvtTransferCodec.restore(transfer, afs);
+      progress.accept("AFS 복원", "프레임/원본 검증 완료 · " + restored.frameCount()
+          + " frames · PVT 입력 출처: AFS 프레임 · metadata 계산 대체 없음");
+      AgentResult result = calculate(restored.calculation(), progress, timing);
+      result.setObservations(server.shared.model.DtnObservationView.fromRecords(restored.source())
+          .withFrameInput(restored.calculation(), restored.frameCount()));
+      if (timing != null) {
+        // Display all original signals in their original order, independently of the GPS-only solver input.
+        var originalEvidence = DtnDelay.convert(restored.source(), timing).evidence();
+        String error = result.getDelayEvidence().error();
+        result.setDelayEvidence(new DtnDelay.Evidence(originalEvidence.timing(), originalEvidence.delaySeconds(),
+            originalEvidence.addedMeters(), originalEvidence.originalTime(), originalEvidence.shiftedTime(),
+            originalEvidence.satellites(), error));
+      }
+      return result;
+    }
     if (transfer != null && (AfsMetadataCodec.FORMAT.equals(transfer.getFormat())
         || AfsMetadataCodec.GROUPED_FORMAT.equals(transfer.getFormat()))) {
       if (!id.equals(transfer.getTestId())) throw new IllegalArgumentException("시험 ID 불일치");

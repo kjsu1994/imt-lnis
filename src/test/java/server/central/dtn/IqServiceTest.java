@@ -60,7 +60,7 @@ class IqServiceTest {
     try (var calculator = new server.shared.codec.NativePvtCodec(Path.of("native/bin/win-x64"))) {
       var pvt = calculator.calculate(records).getFirst();
       String input = IqService.earthInput(records, pvt);
-      assertTrue(input.startsWith("LNIS-IQ-EARTH-1 2400 100000.0 "));
+      assertTrue(input.startsWith("LNIS-IQ-EARTH-2 2400 100000.0 "));
       assertEquals(java.util.List.of("P 19", "P 23", "P 24", "P 28", "P 29"),
           input.lines().filter(line -> line.startsWith("P ")).toList());
       assertEquals(96, input.lines().filter(line -> line.startsWith("N ")).count());

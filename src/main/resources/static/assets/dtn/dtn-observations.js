@@ -53,6 +53,16 @@ export function createObservationView(container, onSelect = () => {}, role = '')
         <th>측정 유효성</th><th title="GPS L1·의사거리 유효 조건. 최종 계산에서 사용한 위성 수는 PVT 결과에 표시됩니다.">PVT 입력</th>
         <th title="관측 수신 시각 − 의사거리 / 299,792,458. 위성 시계·시스템 간 시간 보정 전 추정값이며 실제 정확도를 의미하지 않습니다. 주 경계를 넘으면 이전 주로 표시합니다.">위성 송신 시각 추정 <small>TOW(s) · 보정 전</small></th>
       </tr></thead><tbody></tbody></table></div>
+    <details data-frame-input hidden>
+      <summary>AFS 프레임에서 복원한 PVT 계산 입력 · 지연 적용 전</summary>
+      <p data-frame-summary></p>
+      <div class="epoch-table-viewport" tabindex="0" aria-label="AFS 계산 입력 표">
+        <table class="epoch-observation-table"><thead><tr>
+          <th>위성</th><th>GNSS Week</th><th>원본 TOW (s)</th><th>원본 의사거리 (m)</th>
+          <th>Doppler (Hz)</th><th>C/N₀ (dB-Hz)</th>
+        </tr></thead><tbody data-frame-values></tbody></table>
+      </div>
+    </details>
     <h3 data-navigation-title>항법정보 · SFRBX</h3>
     <div class="epoch-table-viewport" tabindex="0" aria-label="GNSS 항법정보 표">
       <table class="epoch-observation-table"><caption data-navigation-caption>항법정보 · SFRBX · 수집된 전체 메시지</caption><thead><tr>
@@ -105,10 +115,28 @@ export function createObservationView(container, onSelect = () => {}, role = '')
         body.append(row);
       }
     }
+    const frameInput = data?.frameInput;
+    container.querySelector('[data-frame-input]').hidden = !frameInput;
+    const frameBody = container.querySelector('[data-frame-values]');
+    frameBody.replaceChildren();
+    if (frameInput) {
+      container.querySelector('[data-frame-summary]').textContent = frameInput.frameCount
+        + ' frames · SB2·SB3 항법정보 + SB4 관측값 · 원본 메타데이터 대조 통과 · 위 RAWX 표는 원본 보존값';
+      const frameEpoch = frameInput.epochs?.[Number(select.value)]?.observation;
+      for (const observation of frameEpoch?.observations || []) {
+        const row = document.createElement('tr');
+        for (const value of [observation.satelliteId, frameEpoch.week, numeric(frameEpoch.receiverTowSeconds, 9),
+          numeric(observation.pseudorangeMeters, 6), numeric(observation.dopplerHz, 6), observation.carrierToNoiseDbHz]) {
+          const cell = document.createElement('td'); cell.textContent = String(value); row.append(cell);
+        }
+        frameBody.append(row);
+      }
+    }
     const iq = data?.source === 'IQ_TRACKING';
-    container.querySelector('[data-title]').textContent = iq ? 'I/Q 복원 관측값 · 보조 항법정보' : role ? role+' GNSS 관측값' : 'GNSS 수집 데이터';
+    const frameNavigation = iq && data?.assistance?.startsWith('AFS SB2');
+    container.querySelector('[data-title]').textContent = iq ? (frameNavigation ? 'I/Q 복원 관측값 · 프레임 항법정보' : 'I/Q 복원 관측값 · 보조 항법정보') : role ? role+' GNSS 관측값' : 'GNSS 수집 데이터';
     container.querySelector('[data-observation-title]').textContent = comparison ? '수신 관측값 · RAWX 원본 / 지연 변환 후' : iq ? '관측값 · I/Q 추적 (RAWX 원본 아님)' : role ? role+' 관측값 · RAWX (변환 전)' : '관측값 · RAWX';
-    container.querySelector('[data-navigation-title]').textContent = iq ? '보조 항법정보 · GPS LNAV' : '항법정보 · SFRBX';
+    container.querySelector('[data-navigation-title]').textContent = iq ? (frameNavigation ? '프레임 복원 항법정보 · GPS LNAV' : '보조 항법정보 · GPS LNAV') : '항법정보 · SFRBX';
     container.querySelector('[data-navigation-caption]').textContent = iq ? data.assistance : '항법정보 · SFRBX · 수집된 전체 메시지';
     container.querySelector('[data-word-width]').textContent = iq ? 'HEX · 24 bit (패리티 제외)' : 'HEX · 32 bit';
     container.querySelector('[data-source]').textContent = iq ? 'PocketSDR AFS 추적' : data?.receiver?.receiverModel || (epoch ? 'GRAW 관측값' : '데이터 없음');

@@ -97,6 +97,18 @@ assert.equal(nodes.get('tbody').children[0].children.length,12);
 assert.equal(JSON.stringify(original),originalJson);
 console.log('PASS: receiver original/converted ranges, Doppler preservation, evidence mismatch and restore isolation');
 
+// Frame-derived solver input is a separate view; never overwrite the original RAWX table.
+const frameView = {...original, frameInput: {source: 'AFS_V4', frameCount: 1, epochs, navigation}};
+receiverView.setData(frameView);
+assert.equal(nodes.get('[data-frame-input]').hidden, false);
+assert.equal(nodes.get('[data-frame-values]').children[0].children[3].textContent, numeric(raw.pseudorangeMeters, 6));
+assert.equal(nodes.get('tbody').children[0].children[3].textContent, numeric(raw.pseudorangeMeters));
+receiverView.setData(original);
+assert.equal(nodes.get('[data-frame-input]').hidden, true);
+assert.equal(nodes.get('[data-frame-values]').children.length, 0);
+assert.equal(JSON.stringify(original), originalJson);
+console.log('PASS: separate AFS frame calculation inputs and legacy view reset');
+
 delete globalThis.document;
 delete globalThis.Option;
 console.log('PASS: full I/Q and GRAW view updates, navigation HEX widths and empty state');

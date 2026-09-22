@@ -63,7 +63,7 @@ public class IqService {
   }
   public static String earthInput(List<byte[]> records, server.shared.model.DtnModels.Pvt pvt) {
     if(pvt==null || !pvt.isPositionValid() || !pvt.isVelocityValid()) throw new IllegalArgumentException("유효 PVT 필요");
-    var text=new StringBuilder("LNIS-IQ-EARTH-1 ").append(pvt.getWeek()).append(' ').append(pvt.getTowSeconds());
+    var text=new StringBuilder("LNIS-IQ-EARTH-2 ").append(pvt.getWeek()).append(' ').append(pvt.getTowSeconds());
     for(double value:pvt.getEcefMeters()) text.append(' ').append(value);
     for(double value:pvt.getVelocityMetersPerSecond()) text.append(' ').append(value);
     text.append(' ').append(pvt.getReceiverClockBiasSeconds()).append('\n');
@@ -83,11 +83,28 @@ public class IqService {
       }
     }
     if(!found) throw new IllegalArgumentException("PVT 관측 시각 불일치");
+    var selectedEpoch = new server.shared.codec.DtnDelay.Epoch(
+        java.util.stream.IntStream.range(0, records.size()).filter(i -> {
+          var m = server.shared.codec.GrawCodec.decode(records.get(i)).message();
+          return m instanceof server.shared.codec.GrawCodec.ObservationEpoch e
+              && e.week() == pvt.getWeek() && Double.compare(e.receiverTowSeconds(), pvt.getTowSeconds()) == 0;
+        }).findFirst().orElseThrow(), pvt.getWeek(), pvt.getTowSeconds());
+    var selected = server.shared.codec.GrawCodec.splitLengthPrefixed(server.shared.codec.DtnDelay.select(records, selectedEpoch));
+    for (var payload : server.shared.codec.AfsPvtFrameCodec.select(selected)) {
+      if (payload.prn() == 0) continue;
+      var blocks = server.shared.codec.AfsPvtFrameCodec.encode(payload);
+      text.append("F ").append(payload.prn());
+      for (byte[] bits : List.of(blocks.sb2(), blocks.sb3(), blocks.sb4())) {
+        text.append(' ');
+        for (byte bit : bits) text.append((char)('0' + bit));
+      }
+      text.append('\n');
+    }
     return text.toString();
   }
   public synchronized Map<String,Object> start(String earthInput) throws IOException { return start(earthInput,null); }
   public synchronized Map<String,Object> start(String earthInput,UUID inputId) throws IOException {
-    if(earthInput==null || !earthInput.startsWith("LNIS-IQ-EARTH-1 ")) throw new IllegalArgumentException("GNSS 입력 필요");
+    if(earthInput==null || !(earthInput.startsWith("LNIS-IQ-EARTH-1 ") || earthInput.startsWith("LNIS-IQ-EARTH-2 "))) throw new IllegalArgumentException("GNSS 입력 필요");
     if (!enabled()) throw new IllegalStateException("I/Q 생성기를 설정하세요.");
     if (active != null) throw new IllegalStateException("I/Q 생성 작업 진행 중");
     Files.createDirectories(root);
@@ -97,7 +114,7 @@ public class IqService {
     if(logs!=null) logs.copy(inputId,id,"IQ");
     trace(id,"I/Q 입력",true,"대상 PRN "+earthInput.lines().filter(s->s.startsWith("P ")).toList()+" · 항법 레코드 "+earthInput.lines().filter(s->s.startsWith("N ")).count()+"건");
     active = id;
-    set(id, "GENERATING", "GNSS 기반 90초 AFS I/Q 생성 중 · PRN별 SB2 반복", null);
+    set(id, "GENERATING", "GNSS 기반 90초 AFS I/Q 생성 중 · PRN별 SB2·SB3·SB4 반복", null);
     Thread.ofVirtual().name("iq-generate").start(() -> generate(id,earthInput));
     return status(id);
   }
