@@ -32,9 +32,7 @@
     .masthead { display: flex; justify-content: space-between; align-items: center; gap: 20px; margin-bottom: 14px; }
     .brand { font-size: 13px; font-weight: 800; letter-spacing: .17em; }
     .badge { display: inline-block; color: #526579; background: #e7edf4; border-radius: 20px; padding: 4px 12px; font-size: 12px; letter-spacing: 0; font-weight: 500; }
-    .hero { display: flex; justify-content: space-between; gap: 28px; align-items: end; margin-bottom: 18px; }
-    .hero p { color: var(--muted); margin-top: 10px; }
-    .hero-note { max-width: 250px; font-size: 13px; border-left: 2px solid #bccdde; padding-left: 14px; }
+    .hero { margin-bottom: 18px; }
     .plain, .primary { border: 1px solid var(--line); border-radius: 9px; background: white; padding: 8px 14px; font-weight: 600; }
     .plain:hover:not(:disabled) { background: #eaf0f7; }
     .primary { background: var(--ink); color: white; border-color: var(--ink); }
@@ -101,17 +99,22 @@
     .wire.active { stroke: #276fc0; stroke-width: 3; stroke-dasharray: 7 5; }
     .running .wire.active { animation: flow var(--flow-period, .65s) linear infinite; }
     @keyframes flow { to { stroke-dashoffset: -24; } }
-    .controls { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 13px 20px; border-top: 1px solid var(--line); }
+    .playback-panel { margin-bottom: 18px; }
+    .controls { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 13px 20px; }
     .playback-speed { display: inline-flex; gap: 7px; align-items: center; margin-left: 6px; font-size: 13px; }
     .playback-speed select { border: 1px solid var(--line); border-radius: 8px; background: white; color: var(--ink); padding: 8px; }
-    .controls .step-count { margin-left: auto; font-variant-numeric: tabular-nums; font-size: 13px; color: var(--muted); }
+    .diagram-head .step-count { margin-left: auto; padding: 4px 10px; border-radius: 20px; background: #edf3fc; color: var(--blue); font-variant-numeric: tabular-nums; font-size: 13px; white-space: nowrap; }
     .progress { height: 3px; background: #e9eef4; }
     .progress div { height: 100%; background: var(--blue); transition: width .2s; }
-    .detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-top: 18px; align-items: start; }
-    .explanation, .outcome { padding: 23px; }
-    .eyebrow { font-size: 11px; font-weight: 800; letter-spacing: .1em; color: var(--blue); margin-bottom: 7px; }
-    #step-copy { margin-top: 10px; color: #41576a; }
-    .takeaway { margin-top: 16px; padding: 10px 13px; border-left: 3px solid #76a5d6; background: #f2f6fb; font-size: 13px; }
+    .detail-grid { margin-top: 14px; }
+    .explanation { padding: 12px 20px; border-top: 1px solid var(--line); background: #f7f9fc; }
+    .explanation .eyebrow { display: inline; margin-right: 12px; }
+    .explanation h2 { display: inline; font-size: 15px; }
+    .eyebrow { font-size: 11px; font-weight: 800; letter-spacing: .1em; color: var(--blue); }
+    #step-copy, .takeaway { display: inline; color: #41576a; font-size: 13px; }
+    .explanation-body { margin-top: 4px; }
+    .takeaway::before { content: " "; }
+    .outcome { padding: 14px 20px; }
     .outcome h2 { font-size: 17px; margin-bottom: 12px; }
     .delay-control { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 12px 0; }
     .delay-control input { width: 100px; padding: 5px 8px; border-radius: 6px; border: 1px solid #b9c8d5; }
@@ -119,13 +122,15 @@
     .presets button { background: #f2f6fb; border: 1px solid var(--line); border-radius: 6px; font-size: 12px; padding: 4px 8px; }
     .fine { margin-top: 12px; font-size: 12px; color: var(--muted); }
     #delay-context { white-space: pre-line; font-size: 13px; }
-    .outcome { min-width: 0; min-height: 520px; }
-    .outcome > .badge { margin-bottom: 9px; }
+    .outcome { min-width: 0; }
+    .outcome > .badge { margin: 0 10px 0 0; }
+    .outcome > h2 { display: inline; }
     .evidence-flow { display: flex; list-style: none; gap: 15px; padding: 0; margin: 14px 0; }
     .evidence-flow li { flex: 1; position: relative; text-align: center; padding: 10px 7px; background: #edf5fa; border-radius: 8px; font-size: 12px; }
     .evidence-flow li + li::before { content: "→"; position: absolute; left: -14px; color: var(--blue); }
     .evidence-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 14px 0; }
     .evidence-facts div { padding: 12px; border: 1px solid var(--line); border-radius: 9px; }
+    .evidence-facts > div:only-child { grid-column: 1 / -1; }
     .evidence-facts dt { color: var(--blue); font-size: 13px; margin-bottom: 5px; }
     .evidence-facts dd { font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
     .evidence-note { font-size: 13px; padding: 11px 13px; margin: 16px 0 4px; background: #eef7f3; border-left: 3px solid #388773; }
@@ -136,6 +141,7 @@
     .frame-selector { display: flex; gap: 5px; margin-top: 12px; }
     .frame-selector button { flex: 1; padding: 8px 3px; border: 1px solid var(--line); background: #f4f7fa; border-radius: 7px; font-weight: 700; }
     .frame-selector [aria-pressed="true"] { border-color: var(--blue); background: #e1edff; color: var(--blue); }
+    #frame-description { margin: 8px 0 0; padding: 10px 12px; border-radius: 8px; background: #f3f6fa; }
     .frame-selector small { display: block; font-weight: 400; font-size: 11px; }
     #satellite-comparison table { white-space: nowrap; font-size: 12px; font-variant-numeric: tabular-nums; }
     #satellite-comparison th, #satellite-comparison td { padding: 8px 6px; }
@@ -143,7 +149,6 @@
     caption { text-align: left; font-size: 12px; color: var(--muted); padding: 4px 0; }
     .advance-control { display: inline-flex; gap: 7px; align-items: center; font-size: 13px; }
     .advance-control select { border: 1px solid var(--line); border-radius: 8px; background: white; color: var(--ink); padding: 8px; }
-    .advance-hint { font-size: 12px; color: var(--muted); padding: 0 20px 10px; }
     .learn { margin-top: 18px; }
     details { border-bottom: 1px solid var(--line); }
     details:last-child { border-bottom: 0; }
@@ -164,14 +169,30 @@
     footer { display: flex; justify-content: space-between; gap: 16px; margin-top: 20px; color: var(--muted); font-size: 12px; }
     .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
     @media (min-width: 1600px) { .wrap { max-width: 1460px; } }
+    @media (min-width: 1000px) {
+      #delay-example:has(#satellite-comparison:not([hidden])) {
+        display: grid;
+        grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr);
+        grid-template-rows: auto auto 1fr;
+        column-gap: 24px;
+        align-items: start;
+      }
+      #delay-example:has(#satellite-comparison:not([hidden])) .delay-control { grid-column: 1; grid-row: 1; }
+      #delay-example:has(#satellite-comparison:not([hidden])) #delay-context { grid-column: 1; grid-row: 2; margin: 0; }
+      #delay-example:has(#satellite-comparison:not([hidden])) #delay-help { grid-column: 1; grid-row: 3; }
+      #satellite-comparison { grid-column: 2; grid-row: 1 / 4; min-width: 0; }
+      #satellite-comparison table { margin-top: 0; }
+      #satellite-comparison th, #satellite-comparison td { padding: 5px 8px; }
+      .outcome:has(#satellite-comparison:not([hidden])) .evidence-flow { margin: 10px 0; }
+      .outcome:has(#satellite-comparison:not([hidden])) .evidence-flow li { padding: 5px 7px; }
+      .outcome .evidence-note { margin-top: 10px; padding: 7px 12px; }
+      #evidence-details summary { padding: 8px 0 0; }
+    }
     @media (max-width: 760px) {
       .wrap { padding: 20px 14px; }
       .scroll-hint { display: block; width: 100%; }
-      .hero-note { display: none; }
       .tabs { width: 100%; }
       .tabs button { flex: 1; padding: 10px 8px; }
-      .detail-grid { grid-template-columns: 1fr; }
-      .outcome { min-height: 0; }
       .evidence-facts dd { margin-bottom: 0; }
       .scene { height: 390px; aspect-ratio: auto; }
       .controls { padding: 12px; }
@@ -189,7 +210,7 @@
     :fullscreen .scene { height: 360px; }
     @media print {
       .wrap { max-width: none; padding: 0; }
-      .controls, #fullscreen, .progress { display: none; }
+      .playback-panel, #fullscreen { display: none; }
       .scroll-hint { display: none; }
     .diagram-scroll { overflow: visible; }
       .scene { min-width: 0; height: 360px; }
@@ -215,17 +236,43 @@
       <button class="plain" id="fullscreen" type="button">전체화면</button>
     </header>
     <div class="hero">
-      <div><h1>GNSS 데이터는 어떻게 전달되고 비교될까요?</h1><p>GNSS 관측부터 DTN/HDTN 전송, 수신 결과 비교까지 한 단계씩 살펴보세요.</p></div>
-      <p class="hero-note">설명용 시뮬레이션<br>실제 장비 연결·전송·DB 변경 없이 자유롭게 조작할 수 있습니다.</p>
+      <h1>GNSS 데이터는 어떻게 전달되고 비교될까요?</h1>
     </div>
     <nav class="tabs" role="tablist" aria-label="시험 목적">
       <button id="tab-delay" role="tab" aria-selected="true" aria-controls="guide" type="button" data-mode="delay">01 · 지연·PVT 비교</button>
       <button id="tab-transfer" role="tab" aria-selected="false" aria-controls="guide" tabindex="-1" type="button" data-mode="transfer">02 · 전송·무결성 검증</button>
     </nav>
     <section id="guide" role="tabpanel" aria-labelledby="tab-delay">
+      <section class="panel playback-panel" aria-label="설명 재생 제어">
+        <div class="controls">
+          <button class="primary" id="play" type="button">▶ 흐름 재생</button>
+          <button class="plain" id="previous" type="button" aria-label="이전 단계">← 이전</button>
+          <button class="plain" id="next" type="button" aria-label="다음 단계">다음 →</button>
+          <button class="plain" id="reset" type="button">처음으로</button>
+          <label class="advance-control" for="advance-mode">진행 방식
+            <select id="advance-mode">
+              <option value="manual" selected>수동 · 다음 버튼</option>
+              <option value="auto">자동 · 시간 간격</option>
+            </select>
+          </label>
+          <label class="playback-speed" for="playback-speed">재생속도
+            <select id="playback-speed">
+              <option value="0.5">0.5배</option>
+              <option value="1" selected>1배 · 기본</option>
+              <option value="1.5">1.5배</option>
+              <option value="2">2배</option>
+            </select>
+          </label>
+        </div>
+      </section>
       <div class="purpose"><h2 id="purpose-title"></h2><p id="purpose-copy"></p></div>
       <section class="panel" aria-label="송수신 구성도">
-        <div class="diagram-head"><strong id="selection-summary"></strong><span id="route-summary"></span><small class="scroll-hint">↔ 구성도를 좌우로 밀어 전체 경로를 확인하세요.</small></div>
+        <div class="diagram-head">
+          <strong id="selection-summary"></strong>
+          <span class="step-count" id="step-count"></span>
+          <small class="scroll-hint">↔ 구성도를 좌우로 밀어 전체 경로를 확인하세요.</small>
+        </div>
+        <div class="progress" aria-hidden="true"><div id="progress"></div></div>
         <div class="diagram-scroll" tabindex="0" role="region" aria-label="송수신 흐름도. 좁은 화면에서는 좌우로 스크롤할 수 있습니다.">
           <div class="scene" id="scene">
             <svg viewBox="0 0 1100 446" preserveAspectRatio="none" aria-hidden="true">
@@ -251,35 +298,16 @@
             <button class="node receiver rx-node" data-node="compare" style="left:12%" type="button"><svg fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><use href="#icon-data"/></svg><strong>결과 비교</strong><small>원본 기준 ↔ 수신 결과</small></button>
           </div>
         </div>
-        <div class="controls">
-          <button class="primary" id="play" type="button">▶ 흐름 재생</button>
-          <button class="plain" id="previous" type="button" aria-label="이전 단계">← 이전</button>
-          <button class="plain" id="next" type="button" aria-label="다음 단계">다음 →</button>
-          <button class="plain" id="reset" type="button">처음으로</button>
-          <label class="advance-control" for="advance-mode">진행 방식
-            <select id="advance-mode">
-              <option value="manual" selected>수동 · 다음 버튼</option>
-              <option value="auto">자동 · 시간 간격</option>
-            </select>
-          </label>
-          <label class="playback-speed" for="playback-speed">재생속도
-            <select id="playback-speed">
-              <option value="0.5">0.5배</option>
-              <option value="1" selected>1배 · 기본</option>
-              <option value="1.5">1.5배</option>
-              <option value="2">2배</option>
-            </select>
-          </label>
-          <span class="step-count" id="step-count"></span>
-        </div>
-        <p class="advance-hint" id="advance-hint"></p>
-        <div class="progress" aria-hidden="true"><div id="progress"></div></div>
+        <section class="explanation" aria-labelledby="step-title">
+          <p class="eyebrow" id="step-owner"></p>
+          <h2 id="step-title"></h2>
+          <div class="explanation-body">
+            <p id="step-copy"></p>
+            <p class="takeaway" id="step-takeaway"></p>
+          </div>
+        </section>
       </section>
       <div class="detail-grid">
-        <section class="panel explanation" aria-labelledby="step-title">
-          <p class="eyebrow" id="step-owner"></p><h2 id="step-title"></h2>
-          <p id="step-copy"></p><p class="takeaway" id="step-takeaway"></p>
-        </section>
         <section class="panel outcome" aria-labelledby="outcome-title">
           <span class="badge" id="evidence-kind">서비스 구조</span>
           <h2 id="outcome-title"></h2>
@@ -411,10 +439,8 @@
       if (state.data !== 'raw') result.push('frame');
       if (state.data === 'iq') result.push('encode');
       result.push('send', 'network', 'receive');
-      if (state.mode === 'delay') {
-        if (state.data === 'iq') result.push('decode');
-        result.push('restore');
-      }
+      if (state.data === 'iq') result.push('decode');
+      result.push('restore');
       result.push('calculate', 'compare');
       return result;
     }
@@ -463,27 +489,27 @@
         receive: [
           '수신측 · 본문 수신',
           '수신 서비스에 데이터가 도착합니다.',
-          '수신 어댑터가 LNIS 수신 서비스로 데이터를 전달합니다. testId로 시험을 식별하고 원문과 처리 결과를 확인합니다. 본문 수신 완료가 지연 측정의 끝점입니다.',
+          '수신 어댑터가 LNIS 수신 서비스로 전달하면 testId로 시험을 찾고 송신 원본과 JSON 동일성을 검증합니다. 어댑터 부가 로그는 분리합니다. 본문 수신 완료가 지연 측정의 끝점입니다.',
           '측정 지연에는 PC 시계 차이가 섞일 수 있습니다. 동기화 상태를 별도로 확인해야 합니다.'
         ],
         decode: [
           '수신측 · 신호 추적 / 복호',
           'I/Q 신호에서 관측값을 얻습니다.',
-          'I/Q 파일을 읽어 신호를 추적하고 프레임을 복호합니다. 신호에서 얻은 관측값과 AFS 항법정보가 PVT 계산에 사용됩니다.',
+          'LNIS에서 파일 존재·크기·SHA-256을 먼저 검증한 뒤 PocketSDR로 신호를 추적하고 AFS 프레임을 복호합니다. 관측값과 복원 항법정보가 PVT 계산에 사용됩니다.',
           'SB4의 원본 관측값이나 Reference PVT를 RF 추적 결과 대신 사용하지 않습니다.'
         ],
         restore: [
           '수신측 · 정보 복원',
           raw ? '원본 관측·항법 데이터를 읽습니다.' : 'AFS에서 계산에 필요한 정보를 복원합니다.',
-          raw ? '전달된 RAW를 해석해 관측값과 선행 항법정보를 준비합니다.' : iq ? '복호한 AFS에서 항법정보를 복원합니다. PVT의 관측값은 I/Q 신호 추적으로 확보한 값을 사용합니다.' : 'AFS 프레임의 관측·항법정보를 복원합니다. Metadata는 보존과 원문 확인을 위한 추가 정보를 제공합니다.',
+          raw ? 'Base64를 복원하고 크기·SHA-256·레코드 수를 검증한 뒤 관측·항법정보를 읽습니다.' : iq ? '복호한 AFS에서 항법정보를 복원합니다. PVT 관측값은 I/Q 신호 추적 결과를 사용합니다.' : 'AFS 프레임을 복호하고 CRC·원본 Metadata 대조 등을 거쳐 SB2·SB3·SB4에서 관측·항법정보를 복원합니다.',
           '원문 수신, 내용 검증, PVT 계산은 구분되는 처리 단계입니다.'
         ],
         calculate: transfer
           ? [
-            '수신측 · 무결성 검증',
-            '도착한 데이터가 온전한지 확인합니다.',
-            iq ? '송수신 I/Q 파일의 크기와 SHA-256을 비교합니다. 이후 신호 복호나 PVT 계산의 성공 여부는 별도로 확인합니다.' : '송신 원본과 수신 JSON의 시험 데이터를 비교합니다. 어댑터 부가 로그와 원본 시험 데이터의 차이를 구분합니다.',
-            '전달 성공과 내용 검증 성공을 따로 확인합니다.'
+            '수신측 · PVT 계산',
+            '검증·복원한 입력으로 PVT를 계산합니다.',
+            iq ? '신호 추적 관측값과 복원한 AFS 항법정보로 PVT를 계산합니다. 추적 후 파일을 다시 검증해 처리 중 변경 여부도 확인합니다.' : 'RAW 또는 AFS에서 검증·복원한 관측·항법정보로 PVT를 계산합니다. 실제 시험의 지연 반영 옵션에 따라 원본 또는 지연 반영 값을 사용합니다.',
+            '전송·무결성 탭은 설명 관점입니다. 실제 서비스의 복원·PVT 계산을 생략하는 실행 모드가 아닙니다.'
           ]
           : iq
             ? [
@@ -576,11 +602,8 @@
         case 'frame':
           return make(
             '6,000 bits 안의 역할 분담', '현재 서비스 규격',
-            ['관측·항법정보', 'SB1 ~ SB4', '프레임 750 bytes'],
-            [
-              ['물리 프레임', '동기 68 + SB1 52 + SB2 2,400 + SB3 1,740 + SB4 1,740 bits'],
-              ['내용 선택', '아래 SB 버튼을 눌러 저장 정보와 용도를 확인하세요.']
-            ],
+            [],
+            [['전체 프레임 · 750 bytes', '동기 68 + SB1 52 + SB2 2,400 + SB3 1,740 + SB4 1,740 bits']],
             'SB3·SB4는 LNIS 확장 내용입니다. 공식 표준 메시지 할당을 의미하지 않습니다.',
             'SB2: 정보 1,176 + CRC 24 bits → 부호화 후 2,400 bits.\nSB3·SB4: 각각 정보 846 + CRC 24 bits → 부호화 후 1,740 bits.\n현재 LNIS 확장 사용량은 SB3 517/846 bits, SB4 606/846 bits입니다. SB4에는 지연 반영 전 원본 관측값을 넣습니다. 프레임 식별과 기존 물리 부호화 구조를 유지합니다.',
             '부호화 전후 크기 보기');
@@ -654,10 +677,18 @@
               ['항법정보 출처', raw ? '선행 항법 레코드' : 'AFS SB2·SB3의 항법정보'],
               ['원본 증거', raw ? 'GRAW 바이트·해시' : 'Metadata를 원본 증거로 보존·대조']
             ],
-            iq ? 'I/Q PVT는 프레임 원본 관측값이 아닌 추적 관측값을 사용합니다.' : '이 단계의 의사거리는 원본 값입니다. 지연 변환은 다음 계산 단계에서 수행합니다.',
+            iq ? 'I/Q PVT는 프레임 원본 관측값이 아닌 추적 관측값을 사용합니다.' : '이 단계의 의사거리는 원본 값입니다. 지연 반영 옵션이 켜져 있으면 다음 계산 단계에서 변환합니다.',
             raw ? 'GNSS RAW는 LNIS 내부 GRAW 바이트를 Base64로 전달합니다. 바이트 복원과 원본 검증 후 관측·항법 레코드를 계산에 사용합니다.' : iq ? 'I/Q v2는 복호한 AFS에서 항법정보를 복원하고, 관측값은 신호 추적에서 얻습니다. SB4 원본 관측값이나 Metadata로 RF 추적 관측값을 대체하지 않습니다.' : 'AFS v4는 프레임 복호 결과와 원본 Metadata를 대조합니다. SB2·SB3·SB4에서 계산 입력을 복원하며 Metadata를 계산 결과의 대체 입력으로 사용하지 않습니다.');
         case 'calculate':
-          if (transport) return integrityContent(iq, false);
+          if (transport) return make(
+            '검증·복원 이후 PVT 계산', 'LNIS 수신 처리',
+            [iq ? '추적 관측 + AFS 항법' : '복원 관측·항법정보', 'PVT 계산', 'Reference와 비교'],
+            [
+              ['계산 입력', iq ? 'RF 추적 관측값과 복호한 항법정보' : '검증을 통과한 RAW / AFS 복원 정보'],
+              ['계산 결과', '위치·속도·시각 및 해의 유효성']
+            ],
+            '데이터 무결성이 정상이어도 유효한 PVT 해가 보장되지는 않습니다.',
+            iq ? '현재 I/Q v2는 파일 검증 후 추적·복호·PVT 계산을 수행합니다. 과거 PVT 메타데이터가 없는 파일은 파일 검증만 가능할 수 있습니다.' : '지연 반영 옵션을 끄면 원본 복원 비교, 켜면 선택한 1 Epoch에 공통 지연을 반영합니다. 이 설명 탭은 실제 시험 옵션을 변경하지 않습니다.');
           if (iq) return make(
             '신호 기반 PVT 계산', '계산 입력과 출력',
             ['추적 관측 + 복원 항법', 'PVT 계산기', '수신측 PVT'],
@@ -706,7 +737,7 @@
         facts: [
           ['최종 수신', '같은 testId의 데이터가 목적지 서비스에 도착했는지'],
           [iq ? '파일 무결성' : '내용 무결성', iq ? '파일 크기와 SHA-256이 원본과 같은지' : '원본 시험 데이터가 유지됐는지'],
-          ['계산 결과', '필요한 경우 신호 복호·PVT 유효성을 별도로 확인'],
+          ['계산 결과', '복원·PVT 계산 결과를 무결성 결과와 구분해 확인'],
           ['라우터 동작 근거', '어댑터·라우터 설정과 로그로 보완']
         ],
         note: '어댑터 접수 응답 하나로 이 확인 항목들을 모두 성공 처리하지 않습니다.',
@@ -891,9 +922,7 @@
         ['restore', state.data === 'iq'
           ? line(point(node('decode'), 'left'), point(node('restore'), 'right'))
           : leaveReceiver(point(node('restore'), 'top'))],
-        ['calculate', transfer
-          ? leaveReceiver(point(node('calculate'), 'top'))
-          : line(point(node('restore'), 'left'), point(node('calculate'), 'right'))],
+        ['calculate', line(point(node('restore'), 'left'), point(node('calculate'), 'right'))],
         ['compare', line(point(node('calculate'), 'left'), point(node('compare'), 'right'))]
       ];
       const available = steps();
@@ -941,9 +970,9 @@
       $('tx-switch').setAttribute('aria-label', '송신 엔진: ' + state.tx + '. 클릭하여 변경');
       $('rx-switch').setAttribute('aria-label', '수신 엔진: ' + state.rx + '. 클릭하여 변경');
       $('restore-label').textContent = state.data === 'raw' ? 'RAW 읽기' : 'AFS Frame 해석';
-      $('restore-subtitle').textContent = iq ? '항법정보 복원' : '관측·항법정보 복원';
-      $('calculate-label').textContent = transfer ? '무결성 검증' : 'PVT 재계산';
-      $('calculate-subtitle').textContent = transfer ? (iq ? '파일 크기 · SHA-256' : '원본 시험 데이터 비교') : '위치 · 속도 · 시계오차';
+      $('restore-subtitle').textContent = iq ? '항법정보 복원' : '원본 검증 · 정보 복원';
+      $('calculate-label').textContent = transfer ? 'PVT 계산' : 'PVT 재계산';
+      $('calculate-subtitle').textContent = '위치 · 속도 · 시계오차';
       for (const el of document.querySelectorAll('[data-node], .node.switch')) {
         const key = el.dataset.node || ({ 'data-switch': 'data', 'tx-switch': 'send', 'rx-switch': 'receive' })[el.id];
         el.classList.toggle('active', key === active);
@@ -957,8 +986,6 @@
         tab.tabIndex = selected ? 0 : -1;
       });
       $('guide').setAttribute('aria-labelledby', 'tab-' + state.mode);
-      $('route-summary').textContent = iq ? '경로: GNSS → AFS → I/Q 생성 → 전송 → 신호 추적·복호 → 항법정보 복원 → 결과 확인' : state.data === 'raw' ? '경로: GNSS RAW → 전송 → RAW 읽기 → 결과 확인 · AFS와 I/Q 단계는 생략합니다.' : '경로: GNSS → AFS + Metadata → 전송 → AFS 해석 → 결과 확인 · I/Q 단계는 생략합니다.';
-      if (transfer) $('route-summary').textContent = '경로: ' + labels[state.data] + ' 준비 → ' + state.tx + ' → ' + state.rx + ' → 최종 수신 → 내용 검증 · 신호 복호와 PVT 계산은 별도 결과입니다.';
       const [owner, title, copy, takeaway] = explanation(active);
       $('step-owner').textContent = owner;
       $('step-title').textContent = title;
@@ -970,7 +997,6 @@
       $('previous').disabled = state.step === 0;
       $('next').disabled = state.step === flow.length - 1;
       $('play').textContent = state.running ? 'Ⅱ 일시정지' : state.advance === 'manual' ? '▶ 애니메이션 재생' : state.step === flow.length - 1 ? '↻ 다시 재생' : '▶ 흐름 재생';
-      $('advance-hint').textContent = state.advance === 'manual' ? '수동 진행 · 애니메이션만 재생합니다. 다음 버튼 또는 ← → 방향키로 단계를 넘기세요.' : '자동 진행 · 재생속도에 따라 단계가 넘어갑니다. ← → 방향키로도 이동할 수 있습니다.';
       $('scene').classList.toggle('running', state.running);
       $('scene').style.setProperty('--flow-period', (0.65 / state.speed) + 's');
       $('progress').style.width = ((state.step + 1) / flow.length * 100) + '%';
@@ -994,6 +1020,18 @@
     function goToStep(index) {
       state.step = Math.max(0, Math.min(steps().length - 1, index));
       if (state.running) schedulePlayback();
+      render();
+    }
+
+    // Keep the current stage when switching routes; skip removed processing stages.
+    function toggleData() {
+      const previousFlow = steps();
+      const remainingStages = previousFlow.slice(state.step);
+      state.data = types[(types.indexOf(state.data) + 1) % types.length];
+
+      const nextFlow = steps();
+      const stage = remainingStages.find(key => nextFlow.includes(key));
+      state.step = stage ? nextFlow.indexOf(stage) : nextFlow.length - 1;
       render();
     }
 
@@ -1042,7 +1080,7 @@
     $('previous').addEventListener('click', () => goToStep(state.step - 1));
     $('next').addEventListener('click', () => goToStep(state.step + 1));
     $('reset').addEventListener('click', () => goToStep(0));
-    $('data-switch').addEventListener('click', () => select({ data: types[(types.indexOf(state.data) + 1) % types.length] }));
+    $('data-switch').addEventListener('click', toggleData);
     $('tx-switch').addEventListener('click', () => toggleEngine('tx'));
     $('rx-switch').addEventListener('click', () => toggleEngine('rx'));
     document.querySelectorAll('[data-mode]').forEach(tab => tab.addEventListener('click', () => select({ mode: tab.dataset.mode })));
@@ -1060,7 +1098,7 @@
         render();
         $('step-title').textContent = '선택한 데이터 경로에서는 생략하는 단계입니다.';
         $('step-owner').textContent = '경로 안내 · 생략되는 처리';
-        $('step-copy').textContent = state.mode === 'transfer' && ['decode', 'restore'].includes(node.dataset.node) ? '전송·무결성 설명에서는 내용 검증에 집중합니다. 복원과 PVT 계산 흐름은 지연·PVT 비교 탭에서 볼 수 있습니다.' : node.dataset.node === 'frame' ? 'AFS 프레임 구성은 AFS Frame + Metadata 또는 I/Q Sample을 선택하면 사용합니다.' : 'I/Q 생성·추적·복호는 I/Q Sample을 선택하면 사용합니다.';
+        $('step-copy').textContent = node.dataset.node === 'frame' ? 'AFS 프레임 구성은 AFS Frame + Metadata 또는 I/Q Sample을 선택하면 사용합니다.' : 'I/Q 생성·추적·복호는 I/Q Sample을 선택하면 사용합니다.';
         $('step-takeaway').textContent = '점선 데이터 아이콘을 눌러 유형을 바꿔보세요.';
         renderEvidence('skipped', $('step-copy').textContent);
         $('announcement').textContent = $('step-title').textContent;
