@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>LNIS DTN Receiver</title>
   <link rel="stylesheet" href="/lnis/assets/common/app.css?v=20260918-admin-icon">
-  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20260922-note-20260921-delay-20260918-receiver-pvt">
+  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20260923-presets-log">
 </head>
 <body data-page="dtn-receiver">
 <header>
@@ -39,6 +39,7 @@
       <strong id="receiver-type">시험 선택 대기</strong>
       <span class="receiver-route"><span>전송 경로</span><strong id="receiver-mode">경로 정보 없음</strong></span>
     </div>
+    <section id="trial-settings" class="trial-config" aria-label="시험 요청 설정"></section>
     <div class="receiver-connections">
       <div>
         <div class="receiver-connection-heading"><label for="sender-address">상대 송신 서비스</label>
@@ -131,11 +132,11 @@
   <div class="dtn-output-grid">
   <section id="dtn-payload" class="card receiver-payload"></section>
   <section class="card receiver-log">
-    <div class="card-title dtn-log-tools"><h2>수신 로그</h2><select id="dtn-log-history" aria-label="로그 시험 기록"><option value="">현재 작업</option></select><button id="dtn-log-detail" type="button" aria-pressed="false">상세 로그</button><a id="dtn-log-download" aria-disabled="true">다운로드</a><button id="dtn-log-clear" type="button" title="저장 로그는 삭제하지 않습니다">화면 지우기</button></div>
+    <div class="card-title dtn-log-tools"><h2>수신 로그</h2><select id="dtn-log-history" aria-label="로그 시험 기록"><option value="">현재 작업</option></select><button id="dtn-log-detail" type="button" aria-pressed="false">상세 로그</button><a id="dtn-log-download" aria-disabled="true">다운로드</a><button id="dtn-log-clear" type="button" title="저장 로그는 삭제하지 않습니다">화면 지우기</button><button id="dtn-log-fullscreen" type="button" title="로그 전체화면" aria-label="로그 전체화면" aria-pressed="false"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M9 3H3v6M15 3h6v6M3 15v6h6M21 15v6h-6"/></svg></button></div>
     <pre id="dtn-log" class="log"></pre>
   </section>
   </div>
 </main>
-<script type="module" src="/lnis/assets/dtn/dtn-receiver.js?v=20260922-compact-20260921-clock-analysis-20260918-receiver-pvt"></script>
+<script type="module" src="/lnis/assets/dtn/dtn-receiver.js?v=20260923-presets-log"></script>
 </body>
 </html>

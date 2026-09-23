@@ -189,7 +189,7 @@
       .scroll-hint { display: block; width: 100%; }
       .outcome[data-stage="compare"] .evidence-facts { grid-template-columns: 1fr; }
       .evidence-facts dd { margin-bottom: 0; }
-      .scene { height: 390px; aspect-ratio: auto; }
+      .scene { aspect-ratio: auto; }
       dl { grid-template-columns: 1fr; gap: 4px; }
       dd { margin-bottom: 10px; }
       footer { flex-direction: column; gap: 4px; }
@@ -209,6 +209,51 @@
       .scene { min-width: 0; height: 360px; }
       .panel { break-inside: avoid; }
     }
+
+    .scene { min-width: 1100px; height: 610px; }
+    .scene > svg { z-index: 1; pointer-events: none; }
+    .node { z-index: 2; height: 112px; }
+    .tx-node { top: 17%; }
+    .rx-node { top: 74%; }
+    #tx-switch { top: 29%; min-height: 80px; padding: 8px; }
+    #rx-switch { top: 67%; min-height: 80px; padding: 8px; }
+    #tx-switch svg, #rx-switch svg { width: 20px; height: 20px; }
+    .pc-boundary { position: absolute; border: 1px solid #b6cbdf; border-radius: 14px; background: #eef4fc; }
+    .pc-boundary strong { display: flex; align-items: center; gap: 7px; padding: 9px 14px; font-size: 14px; }
+    .pc-boundary svg, .shared-folder svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.6; }
+    .tx-pc { left: 21%; right: 1%; top: 1%; height: 45%; }
+    .rx-pc { left: 2%; right: 1%; top: 55%; height: 44%; background: #edf7f3; border-color: #b5d7cb; }
+    .scope-boundary { position: absolute; border: 1px dashed #aabed0; border-radius: 9px; background: #ffffff85; }
+    .scope-boundary strong { position: absolute; top: 7px; left: 10px; font-size: 12px; color: #41627c; }
+    .tx-service { left: 22%; width: 53%; top: 9%; height: 35%; }
+    .rx-service { left: 3%; width: 72%; top: 63%; height: 34%; }
+    .tx-routing { left: 76%; width: 22%; top: 9%; height: 35%; }
+    .rx-routing { left: 76%; width: 22%; top: 63%; height: 34%; }
+    .adapter-node, .shared-folder, .management-link { position: absolute; z-index: 3; border: 1px solid #b7cbdc; border-radius: 7px; background: white; color: #245cbb; padding: 5px 8px; font-size: 11px; }
+    .adapter-node { left: 77.5%; width: 19%; }
+    #tx-switch, #rx-switch { left: 87% !important; height: 84px; }
+    #tx-adapter { top: 17%; }
+    #rx-adapter { top: 86%; }
+    .adapter-node.active { border: 2px solid #b46a08; background: #fffaf0; }
+    .shared-folder { display: flex; align-items: center; justify-content: center; gap: 5px; left: 77.5%; width: 19%; background: #fffaf0; border-color: #d8c49c; }
+    .scene.iq { height: 740px; }
+    .scene.iq .tx-pc { height: 48%; }
+    .scene.iq .tx-service { top: 6%; height: 34%; }
+    .scene.iq .tx-routing { top: 6%; height: 34%; }
+    .scene.iq #tx-switch { top: 27%; }
+    .scene.iq .tx-folder { top: 10%; }
+    .scene.iq .rx-service, .scene.iq .rx-routing { height: 27%; }
+    .scene.iq #rx-adapter { top: 82%; }
+    .scene.iq .rx-folder { top: 92%; }
+    :fullscreen .scene.iq { height: 740px; }
+    .management-link { top: 48%; left: 30%; transform: translateX(-50%); font-size: 10px; color: #65758a; border-style: dashed; }
+    .scene.iq .management-link { top: 50%; }
+    .clock-note { top: 48%; left: 40%; max-width: 35%; font-size: 11px; }
+    .reference-label { top: 48%; left: 12%; }
+    .network { top: 48%; left: 87%; z-index: 2; }
+    .wire.file { stroke: #977226; stroke-dasharray: 6 4; }
+    .wire.management { stroke: #8c9caa; stroke-dasharray: 2 5; stroke-width: 1; }
+    :fullscreen .scene { height: 610px; }
   </style>
 </head>
 <body>
@@ -247,11 +292,21 @@
           <div class="scene" id="scene">
             <svg viewBox="0 0 1100 446" preserveAspectRatio="none" aria-hidden="true">
               <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0 0 7 3 0 6" fill="none" stroke="#5286c0"/></marker></defs>
-              <rect x="18" y="12" width="1064" height="176" rx="14" fill="#f0f5fd"/>
-              <rect x="18" y="259" width="1064" height="176" rx="14" fill="#eff8f5"/>
+
+
               <g id="wires"></g>
             </svg>
-            <div class="lane-label tx">송신측 <small>입력 준비 → 외부 어댑터에 전달</small></div>
+            <div class="pc-boundary tx-pc"><strong><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14v13H5zM2 20h20l-3-4H5z"/></svg>송신부 PC</strong></div>
+            <div class="pc-boundary rx-pc"><strong><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14v13H5zM2 20h20l-3-4H5z"/></svg>수신부 PC</strong></div>
+            <div class="scope-boundary tx-service"><strong>LNIS 송신 서비스</strong></div>
+            <div class="scope-boundary rx-service"><strong>LNIS 수신 서비스</strong></div>
+            <div class="scope-boundary tx-routing"><strong>어댑터 · 라우터</strong></div>
+            <div class="scope-boundary rx-routing"><strong>어댑터 · 라우터</strong></div>
+            <button type="button" id="tx-adapter" class="adapter-node" data-link="send" title="POST /transfers">송신 어댑터 · REST JSON</button>
+            <button type="button" id="rx-adapter" class="adapter-node" data-link="receive" title="POST /lnis/api/v1/dtn/receive">수신 어댑터 · REST JSON</button>
+            <button type="button" class="shared-folder tx-folder" data-link="tx-file" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 5h8l2 3h10v12H2z"/></svg>송신 공유 폴더 · BIN</button>
+            <button type="button" class="shared-folder rx-folder" data-link="rx-file" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 5h8l2 3h10v12H2z"/></svg>수신 공유 폴더 · BIN</button>
+            <button type="button" class="management-link" data-link="management">서비스 간 REST · 시험 등록 / 결과 확인 ↕</button>
             <button class="node tx-node" data-node="source" style="left:12%" type="button"><svg fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><use href="#icon-satellite"/></svg><strong>GNSS 수신기</strong><small>관측값 + 원본 PVT</small></button>
             <button class="node tx-node switch" id="data-switch" style="left:30%" type="button" title="클릭하여 RAW, AFS, I/Q 순서로 전환"><svg fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><use id="data-icon" href="#icon-frame"/></svg><strong id="data-label"></strong><small>클릭하여 데이터 변경 ↻</small></button>
             <button class="node tx-node" data-node="frame" style="left:48%" type="button"><svg fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><use href="#icon-frame"/></svg><strong>AFS Frame 구성</strong><small>고정 6,000 bits</small></button>
@@ -259,9 +314,9 @@
             <button class="node tx-node switch" id="tx-switch" style="left:86%" type="button"><svg fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><use href="#icon-router"/></svg><strong id="tx-label">HDTN</strong><small>송신 엔진 변경 ↻</small></button>
             <span class="reference-label" id="reference-label">원본 PVT · 비교 기준</span>
             <p class="clock-note" id="clock-note">시계 동기화는 시험 전제입니다.<br>지연 = 수신 본문 수신 완료 − 시험 시작 접수 · 수집 후 시작 전 대기시간 제외</p>
-            <button class="network" data-node="network" type="button">전송망 · 저장 / 대기 / 전달 ↓</button>
-            <div class="lane-label rx">수신측 <small>수신 확인 → 복원·검증 → 결과 비교</small></div>
-            <button class="node receiver rx-node switch" id="rx-switch" style="left:86%" type="button"><svg fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><use href="#icon-router"/></svg><strong id="rx-label">HDTN</strong><small>수신 엔진 변경 ↻</small><span class="check-tag" title="어댑터가 전달한 JSON은 LNIS 수신 서비스에서 검증합니다.">LNIS 접수 · JSON 검증</span></button>
+            <button class="network" data-node="network" type="button">번들 전송 · 저장 / 대기 ↓</button>
+
+            <button class="node receiver rx-node switch" id="rx-switch" style="left:86%" type="button"><svg fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><use href="#icon-router"/></svg><strong id="rx-label">HDTN</strong><small>수신 엔진 변경 ↻</small></button>
             <button class="node receiver rx-node" data-node="decode" style="left:66%" type="button"><svg fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><use href="#icon-wave"/></svg><strong>I/Q 추적·복호</strong><small>신호에서 관측값 추출</small><span class="check-tag">파일 검증 → 신호 복원</span></button>
             <button class="node receiver rx-node" data-node="restore" style="left:48%" type="button"><svg fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><use href="#icon-frame"/></svg><strong id="restore-label">AFS Frame 해석</strong><small id="restore-subtitle">관측·항법정보 복원</small><span class="check-tag" id="restore-check">복호 · 원본 대조</span></button>
             <button class="node receiver rx-node" data-node="calculate" style="left:30%" type="button"><svg fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><use href="#icon-location"/></svg><strong id="calculate-label">PVT 재계산</strong><small id="calculate-subtitle">위치 · 속도 · 시계오차</small></button>
@@ -857,37 +912,62 @@
       const line = (from, to) => `M${from.join(' ')}L${to.join(' ')}`;
       const node = name => `[data-node="${name}"]`;
       const sendFrom = state.data === 'raw' ? '#data-switch' : node('frame');
-      const txLeft = point('#tx-switch', 'left');
-      const rxLeft = point('#rx-switch', 'left');
-      const enterSender = from => `M${from.join(' ')}V196H${txLeft[0] - 14}V${txLeft[1]}H${txLeft[0]}`;
-      const leaveReceiver = to => `M${rxLeft.join(' ')}H${rxLeft[0] - 14}V293H${to[0]}V${to[1]}`;
+      const txLeft = point('#tx-adapter', 'left');
+      const rxLeft = point('#rx-adapter', 'left');
+      // Keep JSON and local BIN access in separate horizontal lanes.
+      const iq = state.data === 'iq';
+      const senderOrigin = point(iq ? node('encode') : sendFrom, 'bottom');
+      const receiverTarget = point(iq ? node('decode') : node('restore'), 'top');
+      const txLane = point('.tx-service', 'bottom')[1] - (iq ? 34 : 12);
+      const rxLane = receiverTarget[1] - 10;
+      const senderRight = point(node('encode'), 'right');
+      const enterSender = iq
+        ? `M${senderRight.join(' ')}H830V${txLeft[1]}H${txLeft[0]}`
+        : `M${senderOrigin.join(' ')}V${txLane}H830V${txLeft[1]}H${txLeft[0]}`;
+      const leaveReceiver = `M${rxLeft.join(' ')}H830V${rxLane}H${receiverTarget[0]}V${receiverTarget[1]}`;
+      const txRouter = point('#tx-switch', 'bottom');
+      const rxRouter = point('#rx-switch', 'top');
+      const managementX = point('.management-link', 'top')[0];
+      const managementTop = point('.tx-service', 'bottom')[1];
+      const managementBottom = point('.rx-service', 'top')[1];
       const routes = [
         ['reference', line(point(node('source'), 'bottom'), point(node('compare'), 'top'))],
+        ['management', `M${managementX} ${managementTop}V${managementBottom}`],
         ['data', line(point(node('source'), 'right'), point('#data-switch', 'left'))],
         ['frame', line(point('#data-switch', 'right'), point(node('frame'), 'left'))],
         ['encode', line(point(node('frame'), 'right'), point(node('encode'), 'left'))],
-        ['send', state.data === 'iq'
-          ? line(point(node('encode'), 'right'), point('#tx-switch', 'left'))
-          : enterSender(point(sendFrom, 'bottom'))],
-        ['network', line(point('#tx-switch', 'bottom'), point('#rx-switch', 'top'))],
-        ['decode', line(point('#rx-switch', 'left'), point(node('decode'), 'right'))],
-        ['restore', state.data === 'iq'
-          ? line(point(node('decode'), 'left'), point(node('restore'), 'right'))
-          : leaveReceiver(point(node('restore'), 'top'))],
+        ['send', enterSender],
+        ['send', line(point('#tx-adapter', 'bottom'), point('#tx-switch', 'top'))],
+        ['network', line(txRouter, rxRouter)],
+        ['receive', line(point('#rx-switch', 'bottom'), point('#rx-adapter', 'top'))],
+        ['receive', leaveReceiver],
         ['calculate', line(point(node('restore'), 'left'), point(node('calculate'), 'right'))],
         ['compare', line(point(node('calculate'), 'left'), point(node('compare'), 'right'))]
       ];
+      if (iq) {
+        const txFolder = point('.tx-folder', 'left');
+        const rxFolder = point('.rx-folder', 'left');
+        const decode = point(node('decode'), 'bottom');
+        const encodeTop = point(node('encode'), 'top');
+        routes.push(
+          ['restore', line(point(node('decode'), 'left'), point(node('restore'), 'right'))],
+          ['file', `M${encodeTop.join(' ')}V${txFolder[1]}H${txFolder[0]}`],
+          ['file', line(point('.tx-folder', 'bottom'), point('#tx-adapter', 'top'))],
+          ['file', line(point('#rx-adapter', 'bottom'), point('.rx-folder', 'top'))],
+          ['file', `M${rxFolder.join(' ')}H${decode[0]}V${decode[1]}`]
+        );
+      }
       const available = steps();
       const group = $('wires');
       group.replaceChildren();
       const ns = 'http://www.w3.org/2000/svg';
       for (const [key, d] of routes) {
-        if (key !== 'reference' && !available.includes(key)) continue;
-        const current = key === active || key === 'network' && active === 'receive';
+        if (!['reference', 'management', 'file'].includes(key) && !available.includes(key)) continue;
+        const current = key === active || key === 'file' && ['send', 'decode', 'receive'].includes(active);
         const path = document.createElementNS(ns, 'path');
         path.setAttribute('d', d);
-        path.setAttribute('class', 'wire' + (key === 'reference' ? ' reference' : '') + (current ? ' active' : ''));
-        path.setAttribute('marker-end', 'url(#arrow)');
+        path.setAttribute('class', 'wire' + (['reference', 'management', 'file'].includes(key) ? ' ' + key : '') + (current ? ' active' : ''));
+        if (key !== 'management') path.setAttribute('marker-end', 'url(#arrow)');
         group.append(path);
         if (current) {
           const dot = document.createElementNS(ns, 'circle');
@@ -908,10 +988,15 @@
       const flow = steps();
       const active = flow[state.step];
       const iq = state.data === 'iq';
+      $('scene').classList.toggle('iq', iq);
+      document.querySelectorAll('.shared-folder').forEach(folder => { folder.hidden = !iq; });
+      $('tx-adapter').classList.toggle('active', active === 'send');
+      $('rx-adapter').classList.toggle('active', active === 'receive');
       $('purpose-title').textContent = '전달부터 무결성 검증, PVT 비교까지';
       $('purpose-copy').textContent = '그림의 검증 항목은 해당 단계에서 확인할 내용입니다. 성공 여부를 뜻하지 않습니다.';
       $('reference-label').textContent = '원본 데이터 · PVT 기준';
-      $('clock-note').textContent = iq ? '파일 검증 → 신호 추적·복호 → PVT 계산 · Reference는 비교에만 사용합니다.' : state.delayEnabled ? '지연 = 본문 수신 완료 − 시험 시작 접수 · 수집 후 시작 전 대기 제외 · PC 시계 동기화 필요' : '원본 관측값을 복원해 비교합니다. 통신 지연을 의사거리에 추가하지 않습니다.';
+      $('clock-note').hidden = iq;
+      $('clock-note').textContent = iq ? '' : state.delayEnabled ? '지연 = 본문 수신 완료 − 시험 시작 접수 · 수집 후 시작 전 대기 제외 · PC 시계 동기화 필요' : '원본 관측값을 복원해 비교합니다. 통신 지연을 의사거리에 추가하지 않습니다.';
       $('delay-toggle-label').hidden = iq;
       $('delay-toggle').checked = state.delayEnabled;
       $('selection-summary').textContent = labels[state.data] + ' · ' + state.tx + ' → ' + state.rx;
@@ -992,6 +1077,25 @@
       }
       state.step = index;
       render();
+    }));
+
+    document.querySelectorAll('[data-link]').forEach(button => button.addEventListener('click', () => {
+      const key = button.dataset.link;
+      const iq = state.data === 'iq';
+      const content = {
+        send: ['송신 서비스 → 송신 어댑터', 'POST /transfers · REST JSON', iq ? 'JSON으로 파일 경로·크기·SHA-256·신호 정보·Reference를 전달합니다. BIN은 어댑터가 송신 PC의 공유 폴더에서 읽습니다.' : 'GNSS RAW는 Base64 GRAW, AFS는 프레임과 Metadata를 JSON 본문에 담아 전송합니다.'],
+        receive: ['수신 어댑터 → 수신 서비스', 'POST /lnis/api/v1/dtn/receive · REST JSON', iq ? '어댑터가 수신 PC의 공유 폴더에 BIN을 복원한 뒤 JSON으로 접수를 요청합니다. LNIS가 파일을 읽어 검증·추적합니다.' : '어댑터가 원본 시험 JSON을 전달하면 LNIS가 testId·동일성을 검증하고 RAW / AFS를 복원합니다.'],
+        'tx-file': ['송신부 PC · 로컬 공유 폴더', 'LNIS 쓰기 → 어댑터 읽기', '같은 PC의 LNIS와 어댑터가 /exchange/<UUID>.bin을 참조합니다. JSON의 파일 경로는 HTTP 다운로드 주소가 아닙니다.'],
+        'rx-file': ['수신부 PC · 별도 로컬 공유 폴더', '어댑터 쓰기 → LNIS 읽기', '송신 PC의 디스크와 별개입니다. 수신 어댑터가 같은 파일 경로로 복원하고 LNIS는 파일 크기·SHA-256을 검증한 뒤 처리합니다.'],
+        management: ['LNIS 송신 서비스 ↔ LNIS 수신 서비스', '시험 등록 · 결과 확인', '시험 ID·시작 시각·선택 Epoch·검증용 해시를 등록하고 결과를 조회하는 서비스 간 REST 통신입니다. 실제 시험 데이터는 어댑터·라우터 경로로 전달합니다.']
+      }[key];
+      $('step-owner').textContent = content[0]; $('step-title').textContent = content[1];
+      $('step-copy').textContent = content[2]; $('step-takeaway').textContent = '';
+      renderEvidence('skipped', content[2]);
+      $('outcome-title').textContent = content[1]; $('evidence-kind').textContent = '통신 경로';
+      $('evidence-summary').textContent = '통신 구분';
+      $('evidence-detail-copy').textContent = 'REST JSON은 서비스와 어댑터 사이의 요청입니다. PC 사이의 번들 전달은 DTN/HDTN 라우터가 담당합니다. 선의 움직임은 설명용이며 실제 전송 속도나 상태를 나타내지 않습니다.';
+      $('announcement').textContent = content[0] + '. ' + content[1];
     }));
 
     $('delay').addEventListener('input', updateExample);

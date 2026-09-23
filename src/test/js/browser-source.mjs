@@ -8,5 +8,5 @@ export function pageSource(name) {
   const page = readFileSync(new URL('dtn/' + name, assets), 'utf8')
     .replace(/^import .*;\r?\n/gm, '')
     .replace(/initialize\(\);\s*$/, 'globalThis.ready = initialize();');
-  return shared + '\n' + page;
+  return shared + '\nconst initPresetControls = () => ({update() {}, refresh() {}}); const renderTrialSettings = () => {};\n' + page;
 }

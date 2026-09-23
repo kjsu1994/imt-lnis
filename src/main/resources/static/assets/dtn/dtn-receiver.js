@@ -1,5 +1,6 @@
+import {renderTrialSettings} from './dtn-settings.js?v=20260923-presets';
 import {requestJson} from '../common/http.js?v=20260915-structure';
-import {createDtnLog} from './dtn-log.js?v=20260917-console';
+import {createDtnLog} from './dtn-log.js?v=20260923-fullscreen';
 import {initAdapterHealth} from './dtn-adapter-health.js?v=20260922-compact-structure';
 import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20260918-receiver-original';
 import {createObservationView, numeric} from './dtn-observations.js?v=20260921-clock-analysis';
@@ -105,6 +106,7 @@ function setEpochs(values, preserve = false) {
 }
 
 function renderSummary(job) {
+  renderTrialSettings($('trial-settings'), job);
   $('dtn-observations').hidden = job?.testType === 'IQ_SAMPLE' && !job?.receivedEpochs;
   const types = {GNSS_RAW: 'GNSS RAW', AFS_METADATA: 'AFS Frame + Metadata', IQ_SAMPLE: 'I/Q Sample'};
   $('receiver-type').textContent = types[job?.testType] || '시험 선택 대기';

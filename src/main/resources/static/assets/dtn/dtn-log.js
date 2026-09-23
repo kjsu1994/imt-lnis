@@ -5,6 +5,7 @@ export function logLine(entry) {
 }
 export function createDtnLog(target) {
   const $ = id => document.getElementById(id);
+  const fullscreen = initLogFullscreen(target);
   const toggle=$('dtn-log-detail'), select=$('dtn-log-history'), download=$('dtn-log-download');
   let current='', currentType='TEST', scope='', version=0, cursor=0, cleared=0, entries=[], local=[], detailed=false, running=false, lastError='';
   let historyAt=0;
@@ -21,6 +22,7 @@ export function createDtnLog(target) {
     if(next!==scope) {scope=next;version++;cursor=cleared=0;entries=[];lastError='';}
     if(scope) {download.href='/lnis/api/v1/dtn/logs?scopeId='+encodeURIComponent(scope)+'&download=true';download.setAttribute('aria-disabled','false');}
     else {download.removeAttribute('href');download.setAttribute('aria-disabled','true');}
+    fullscreen?.setScope(scope);
     render();
   };
   async function poll() {
@@ -74,4 +76,70 @@ export function createDtnLog(target) {
     if(current!==next) {current=next;currentType=type;local=[];select.value='';}
     change();void poll();
   }};
+}
+
+// Enlarge the existing log; retain its poller, selection and scroll position.
+function initLogFullscreen(target) {
+  const button = document.getElementById('dtn-log-fullscreen');
+  const card = target.closest?.('section');
+  if (!button || !card) return null;
+  const identity = document.createElement('small');
+  identity.className = 'log-scope';
+  card.querySelector('h2').append(identity);
+  const original = {role: card.getAttribute('role'), tabindex: card.getAttribute('tabindex'), ariaModal: card.getAttribute('aria-modal'), label: card.getAttribute('aria-label')};
+  let fallback = false, savedOverflow = '', opening = false;
+  const active = () => fallback || document.fullscreenElement === card;
+  function sync() {
+    const expanded = active();
+    button.setAttribute('aria-pressed', String(expanded));
+    button.title = expanded ? '전체화면 종료' : '로그 전체화면';
+    button.setAttribute('aria-label', button.title);
+    card.classList.toggle('log-expanded', expanded);
+  }
+  function scrollSnapshot() {
+    const follow = target.scrollHeight - target.scrollTop - target.clientHeight < 36;
+    const top = target.scrollTop;
+    return () => requestAnimationFrame(() => { target.scrollTop = follow ? target.scrollHeight : top; });
+  }
+  function restoreAttributes() {
+    for (const [key, value] of Object.entries({role: original.role, tabindex: original.tabindex, 'aria-modal': original.ariaModal, 'aria-label': original.label})) {
+      if (value == null) card.removeAttribute(key); else card.setAttribute(key, value);
+    }
+  }
+  async function exit() {
+    const restoreScroll = scrollSnapshot();
+    if (fallback) {
+      fallback = false; card.classList.remove('log-maximized');
+      document.body.style.overflow = savedOverflow; restoreAttributes();
+    } else if (document.fullscreenElement === card) await document.exitFullscreen();
+    sync(); restoreScroll(); button.focus({preventScroll: true});
+  }
+  button.onclick = async () => {
+    if (opening) return;
+    if (active()) { await exit(); return; }
+    opening = true;
+    const restoreScroll = scrollSnapshot();
+    try {
+      if (!card.requestFullscreen || !document.fullscreenEnabled) throw new Error('fallback');
+      await card.requestFullscreen();
+    } catch {
+      fallback = true; savedOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden'; card.classList.add('log-maximized');
+      card.setAttribute('role', 'dialog'); card.setAttribute('aria-modal', 'true');
+      card.setAttribute('aria-label', card.querySelector('h2').textContent);
+      card.setAttribute('tabindex', '-1');
+    } finally { opening = false; sync(); restoreScroll(); button.focus({preventScroll: true}); }
+  };
+  document.addEventListener('fullscreenchange', () => { sync(); if (!active()) button.focus({preventScroll: true}); });
+  document.addEventListener('keydown', event => {
+    if (!fallback) return;
+    if (event.key === 'Escape') { event.preventDefault(); void exit(); }
+    if (event.key === 'Tab') {
+      const items = [...card.querySelectorAll('button:not(:disabled), select:not(:disabled), a[href], [tabindex="0"]')];
+      const first = items[0], last = items.at(-1);
+      if (event.shiftKey && (document.activeElement === first || !card.contains(document.activeElement))) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && (document.activeElement === last || !card.contains(document.activeElement))) { event.preventDefault(); first?.focus(); }
+    }
+  });
+  return {setScope(id) { identity.textContent = id ? ' · ' + id.slice(0, 8) : ' · 현재 작업'; }};
 }

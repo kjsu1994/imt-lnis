@@ -1,5 +1,6 @@
+import {initPresetControls, renderTrialSettings} from './dtn-settings.js?v=20260923-presets';
 import {requestJson} from '../common/http.js?v=20260915-structure';
-import {createDtnLog} from './dtn-log.js?v=20260917-console';
+import {createDtnLog} from './dtn-log.js?v=20260923-fullscreen';
 import {initAdapterHealth, validAdapterUrl} from './dtn-adapter-health.js?v=20260922-compact-settings';
 import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20260915-structure';
 import {createObservationView, numeric} from './dtn-observations.js?v=20260921-role';
@@ -188,9 +189,32 @@ function updateHdtnControls() {
   }
   $('hdtn-config-state').textContent = message;
 }
+const presets = initPresetControls({read: () => ({
+  testType: selectedType, senderMode, receiverMode,
+  delayEnabled: $('dtn-comparison-mode').checked, hdtnConfig: readHdtnConfig()
+}), isLocked: locked, apply: settings => {
+  if (locked()) throw new Error('처리 중에는 불러올 수 없습니다.');
+  if (!['GNSS_RAW', 'AFS_METADATA', 'IQ_SAMPLE'].includes(settings.testType)
+      || !['DTN', 'HDTN'].includes(settings.senderMode) || !['DTN', 'HDTN'].includes(settings.receiverMode)
+      || typeof settings.delayEnabled !== 'boolean') throw new Error('프리셋 설정을 확인하세요.');
+  const configValues = Object.fromEntries(Object.keys(hdtnRules).map(key => [key, hdtnValue(key, String(settings.hdtnConfig?.[key] ?? ''))]));
+  selectedType = settings.testType; senderMode = settings.senderMode; receiverMode = settings.receiverMode;
+  $('dtn-comparison-mode').checked = settings.delayEnabled;
+  for (const [key, value] of Object.entries(configValues)) $('hdtn-' + key).value = String(value);
+  for (const button of document.querySelectorAll('.test-type-button')) {
+    const selected = button.dataset.testType === selectedType;
+    button.classList.toggle('active', selected); button.setAttribute('aria-pressed', String(selected));
+  }
+  for (const button of document.querySelectorAll('.transport-mode-button')) {
+    const selected = button.dataset.senderMode === senderMode && button.dataset.receiverMode === receiverMode;
+    button.classList.toggle('active', selected); button.setAttribute('aria-pressed', String(selected));
+  }
+  $('dtn-transport-mode-state').textContent = senderMode + ' → ' + receiverMode + ' · 전송 요청에 포함';
+  saveHdtnConfig(configValues); updateInputPanels(); updateControls();
+}});
 let mainScrollY = 0;
 function showSettings(open) {
-  if (open && $('dtn-settings-view').hidden) mainScrollY = window.scrollY;
+  if (open && $('dtn-settings-view').hidden) { mainScrollY = window.scrollY; void presets.refresh(); }
   $('dtn-settings-view').hidden = !open;
   $('dtn-main-view').hidden = open;
   $('dtn-settings-open').setAttribute('aria-expanded', String(open));
@@ -255,6 +279,7 @@ function updateDelayControls() {
 $('dtn-comparison-mode').onchange = updateControls;
 
 function updateControls() {
+  presets.update();
   updateDelayControls();
   updateInputSummary();
   $('dtn-settings-lock').hidden = !locked();
@@ -475,6 +500,7 @@ $('dtn-cancel').onclick = async () => {
   finally { busy = false; updateControls(); }
 };
 function renderSummary() {
+  renderTrialSettings($('trial-settings'), job);
   $('dtn-iq-result').hidden = job?.testType !== 'IQ_SAMPLE';
   renderIqFile($('dtn-iq-result'), job?.testType === 'IQ_SAMPLE' ? job.fileResult : null,
     job?.state === 'FAILED' ? '수신 파일 검증 실패 · 로그를 확인하세요.' : '수신 파일 검증 대기');

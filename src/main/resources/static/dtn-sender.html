@@ -5,7 +5,7 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>LNIS DTN Sender</title>
   <link rel="stylesheet" href="/lnis/assets/common/app.css?v=20260918-admin-icon">
-  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=compact-20260922-hdtn-20260921-checkbox-header-20260916-hdtn-config">
+  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20260923-presets-log">
 </head>
 <body data-page="dtn-sender">
 <header>
@@ -31,6 +31,23 @@
   </section>
   <div id="dtn-settings-view" hidden>
     <div class="card-title settings-heading"><h2 id="dtn-settings-title" tabindex="-1">송신 설정</h2><button id="dtn-settings-close" type="button">시험 화면으로</button></div>
+    <div class="preset-bar" aria-label="설정 프리셋">
+      <select id="preset-select" aria-label="저장된 프리셋"><option value="">프리셋 선택</option></select>
+      <button id="preset-load" type="button" disabled>불러오기</button>
+      <button id="preset-save" type="button">설정 저장하기</button>
+      <button id="preset-update" type="button" disabled>변경 저장</button>
+      <button id="preset-manage" type="button" disabled>관리</button>
+      <button id="preset-refresh" type="button" title="프리셋 새로고침" aria-label="프리셋 새로고침">↻</button>
+      <small id="preset-count">0 / 5</small><span id="preset-status" role="status"></span>
+    </div>
+    <dialog id="preset-dialog" aria-labelledby="preset-dialog-title">
+      <form id="preset-form">
+        <h2 id="preset-dialog-title">설정 저장하기</h2>
+        <label>프리셋 이름<input id="preset-name" maxlength="40" required autocomplete="off"></label>
+        <p id="preset-dialog-note"></p><p id="preset-dialog-error" role="alert"></p>
+        <div class="actions"><button id="preset-confirm" type="submit">저장</button><button id="preset-delete" type="button" hidden>삭제</button><button id="preset-cancel" type="button">닫기</button></div>
+      </form>
+    </dialog>
     <p id="dtn-settings-lock" role="status" hidden>처리 중에는 설정을 변경할 수 없습니다.</p>
     <p id="dtn-settings-feedback" role="status" hidden></p>
   <section class="card">
@@ -166,6 +183,7 @@
   </section>
   </div>
   <div id="dtn-main-view">
+    <section id="trial-settings" class="trial-config" aria-label="시험 요청 설정"></section>
   <section class="sender-actions" aria-label="시험 실행">
     <div class="sender-summary">
       <strong id="dtn-condition-summary">AFS Frame + Metadata · DTN → HDTN</strong>
@@ -204,9 +222,9 @@
   </section>
   <div class="dtn-output-grid">
   <section id="dtn-payload" class="card"></section>
-  <section class="card"><div class="card-title dtn-log-tools"><h2>송신 로그</h2><select id="dtn-log-history" aria-label="로그 시험 기록"><option value="">현재 작업</option></select><button id="dtn-log-detail" type="button" aria-pressed="false">상세 로그</button><a id="dtn-log-download" aria-disabled="true">다운로드</a><button id="dtn-log-clear" type="button" title="저장 로그는 삭제하지 않습니다">화면 지우기</button></div><pre id="dtn-log" class="log" aria-label="PC 시간 기준 로그"></pre></section>
+  <section class="card"><div class="card-title dtn-log-tools"><h2>송신 로그</h2><select id="dtn-log-history" aria-label="로그 시험 기록"><option value="">현재 작업</option></select><button id="dtn-log-detail" type="button" aria-pressed="false">상세 로그</button><a id="dtn-log-download" aria-disabled="true">다운로드</a><button id="dtn-log-clear" type="button" title="저장 로그는 삭제하지 않습니다">화면 지우기</button><button id="dtn-log-fullscreen" type="button" title="로그 전체화면" aria-label="로그 전체화면" aria-pressed="false"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M9 3H3v6M15 3h6v6M3 15v6h6M21 15v6h-6"/></svg></button></div><pre id="dtn-log" class="log" aria-label="PC 시간 기준 로그"></pre></section>
   </div>
   </div>
 </main>
-<script type="module" src="/lnis/assets/dtn/dtn.js?v=compact-20260922-hdtn-final-20260921-checkbox-header-20260917-console"></script>
+<script type="module" src="/lnis/assets/dtn/dtn.js?v=20260923-presets-log"></script>
 </body></html>
