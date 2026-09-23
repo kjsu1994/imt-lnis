@@ -53,7 +53,7 @@ public class EventService {
     /** Called once per new event, not on history reads or WebSocket reconnects. */
     private void writeConsole(BrowserEvent event) {
         String message = server.shared.http.ApiLog.eventBody(event.payload());
-        String format = "AFS_EVENT type={} agentId={} role={} sessionId={} sequence={}\n{}\nAFS_EVENT END sequence={}\n";
+        String format = "AGENT_EVENT type={} agentId={} role={} sessionId={} sequence={}\n{}\nAGENT_EVENT END sequence={}\n";
         Object[] values = {event.type(), event.agentId(), event.role(), event.sessionId(), event.sequence(), message, event.sequence()};
         if (event.type() == EventType.ERROR) log.error(format, values);
         else log.info(format, values);

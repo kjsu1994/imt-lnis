@@ -17,7 +17,6 @@ import java.time.*;
 import java.util.*;
 import server.central.dtn.*;
 import server.central.input.*;
-import server.central.session.*;
 import server.central.config.StorageCleanupService;
 import server.shared.model.LnisModels.*;
 import static server.central.management.DataManagementService.*;
@@ -39,7 +38,7 @@ class DataManagementIntegrationTest {
     @Autowired DtnReceiptService receipts;
     @Autowired DtnLogService logs;
     @Autowired InputBufferService inputs;
-    @Autowired SessionRepository sessions;
+    @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
     @Autowired StorageCleanupService oldCleanup;
     @Autowired EntityManager em;
     @Autowired PlatformTransactionManager tm;
@@ -50,18 +49,37 @@ class DataManagementIntegrationTest {
     DtnJob job(UUID input){DtnJob j=new DtnJob();j.setId(UUID.randomUUID());j.setInputId(input);j.setState("COMPLETED");j.setTestType("AFS_METADATA");j.setCreatedAt(old);j.setUpdatedAt(old);return jobs.saveAndFlush(j);}
     Key key(DtnJob job){return new Key(Kind.DTN,job.getId());}
     Operation remove(Key key){return management.execute(management.preview(List.of(key)).token(),"TEST");}
-    @BeforeEach void clear(){tx(()->{for(String entity:List.of("DtnReceipt","DtnLogEntry","DtnJob","RoleResultEntity","TestSessionEntity","ManagementEntry"))em.createQuery("delete from "+entity).executeUpdate();});}
+    @BeforeEach void clear(){tx(()->{for(String entity:List.of("DtnReceipt","DtnLogEntry","DtnJob","ManagementEntry"))em.createQuery("delete from "+entity).executeUpdate();});}
 
-    @Test void defaultsKeepExistingAfsAndDtnAndListDoesNotExposeBodies() throws Exception {
+    @Test void defaultsKeepDtnAndArchiveTablesWithoutExposingBodies() throws Exception {
         var j=job(null);j.setSentJson("PRIVATE_PAYLOAD_MARKER");jobs.saveAndFlush(j);
-        UUID afs=UUID.randomUUID();sessions.save(new TestSessionEntity(afs,SessionState.COMPLETED,TestType.TEST_A_NORMAL,"sender","receiver",null,100,"done",Verdict.PASS,"{}",old,old));
+        UUID afs=UUID.randomUUID();
+        jdbc.execute("create table if not exists test_session (session_id uuid primary key, request_json clob)");
+        jdbc.update("insert into test_session(session_id,request_json) values (?,?)",afs,"archived-afs");
         assertFalse(management.settings().tests().enabled());oldCleanup.cleanup();management.cleanup();
-        assertTrue(jobs.existsById(j.getId()));assertTrue(sessions.find(afs).isPresent());
+        assertTrue(jobs.existsById(j.getId()));
         mvc.perform(get("/lnis/api/v1/data-management/items").param("kind","DTN")).andExpect(status().isOk()).andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("PRIVATE_PAYLOAD_MARKER"))));
-        assertEquals(1,management.list(Kind.AFS,0,"","",null,null).total());
-        assertEquals("DELETED",remove(new Key(Kind.AFS,afs)).results().getFirst().status());
-        assertTrue(guard.deleted("AFS",afs));assertTrue(sessions.find(afs).isEmpty());
-        assertThrows(RuntimeException.class,()->sessions.save(new TestSessionEntity(afs,SessionState.COMPLETED,TestType.TEST_A_NORMAL,"sender","receiver",null,100,"late",Verdict.PASS,"{}",old,old)));
+        mvc.perform(get("/lnis/api/v1/data-management/items").param("kind","AFS")).andExpect(status().isGone());
+        assertThrows(RuntimeException.class,()->management.preview(List.of(new Key(Kind.AFS,afs))));
+        assertFalse(((Map<?,?>)management.summary().get("counts")).containsKey("AFS"));
+        assertEquals("archived-afs",jdbc.queryForObject("select request_json from test_session where session_id=?",String.class,afs));
+    }
+    @Test void oldAfsManagementHistoryIsReadableButCannotBeReplayed() throws Exception {
+        var json=new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules();
+        var key=new Key(Kind.AFS,UUID.randomUUID());
+        var row=new Row(key,"legacy","COMPLETED",old,old,0,false,"");
+        var preview=new Preview(UUID.randomUUID(),"sender",Instant.now().plusSeconds(300),
+                List.of(new PlanItem(row,List.of(),0,0,0,"")));
+        var operation=new Operation(UUID.randomUUID(),old,"MANUAL",List.of(new Result(key,"FAILED","old failure")));
+        String operationJson=json.writeValueAsString(operation), previewJson=json.writeValueAsString(preview);
+        tx(()->{
+            em.persist(new ManagementEntry("OP:"+operation.id(),"OP",operationJson));
+            em.persist(new ManagementEntry("PREVIEW:"+preview.token(),"PREVIEW",previewJson));
+        });
+        assertEquals(key,management.history().getFirst().results().getFirst().key());
+        assertThrows(RuntimeException.class,()->management.retry(operation.id()));
+        assertThrows(RuntimeException.class,()->management.execute(preview.token(),"TEST"));
+        assertFalse(guard.deleted("AFS",key.id()));
     }
     @Test void sharedInputPinsLateCallbacksAndPendingTrialsAreProtected() throws Exception {
         var input=inputs.create("shared.graw",3,InputKind.GRAW_UPLOAD);inputs.append(input.inputId(),0,new byte[]{1,2,3});

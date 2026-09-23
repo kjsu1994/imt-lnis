@@ -13,9 +13,6 @@ import server.central.agent.AgentRepository;
 import server.central.dtn.DtnJob;
 import server.central.dtn.DtnService;
 import server.central.input.InputBufferService;
-import server.central.session.ActiveSessionLockRepository;
-import server.central.session.CreateSessionRequest;
-import server.central.session.SessionService;
 import server.shared.model.LnisModels.*;
 
 import java.net.InetSocketAddress;
@@ -40,7 +37,7 @@ class IndependentNodeIntegrationTest {
 
     @Test
     @Timeout(240)
-    void dtnRoundTripAndAfsTestsUseIndependentDatabases() throws Exception
+    void dtnRoundTripUsesIndependentDatabases() throws Exception
     {
         int receiverPort = tcpPort();
         int senderPort = tcpPort();
@@ -190,25 +187,6 @@ class IndependentNodeIntegrationTest {
             assertFalse(senderLogs.hasStage(negativeDelay, "지연 계산"));
             delivered.set(legacyDelivered);
 
-            SessionService txSessions = sender.getBean(SessionService.class);
-            for (TestType type : TestType.values()) {
-                await(() -> ready(sender, "sender-1") && ready(sender, "receiver-1"), 15);
-                CreateSessionRequest request = new CreateSessionRequest("sender-1", "receiver-1", input,
-                        new AfsSettings(1), new TestOptions(type, 1, 1, 10, Map.of()));
-                UUID session = txSessions.create(request).sessionId();
-                await(() -> txSessions.snapshot(session).rxResult() != null, 25);
-                await(() -> sender.getBean(ActiveSessionLockRepository.class).current().isEmpty(), 10);
-                SessionSnapshot result = txSessions.snapshot(session);
-                assertNotNull(result.txResult(), type.name());
-                assertNotNull(result.rxResult(), type.name());
-                assertNotEquals(SessionState.CANCELLED, result.state(), type.name());
-                assertTrue(receiver.getBean(ActiveSessionLockRepository.class).current().isEmpty());
-                if (type == TestType.TEST_A_NORMAL) {
-                    assertEquals(Verdict.PASS, result.verdict());
-                } else {
-                    assertTrue(result.txResult().counters().injectedBitCount() > 0);
-                }
-            }
             // 파일 H2를 닫고 같은 수신 노드를 다시 열어 최초 원문과 결과가 보존되는지 확인한다.
             receiver.close();
             try (ConfigurableApplicationContext restarted = node("receiver", receiverPort, senderPort)) {
@@ -221,7 +199,6 @@ class IndependentNodeIntegrationTest {
                 assertEquals(mapper.readTree(mapper.writeValueAsBytes(hdtn)), mapper.readTree(restored.get(test).getHdtnConfigJson()));
                 assertNull(restored.get(test).getReferenceJson());
                 assertArrayEquals(delivered.get(), restored.payload(test, "received").getBody());
-                assertTrue(restarted.getBean(ActiveSessionLockRepository.class).current().isEmpty());
             }
             sender.close();
             try (ConfigurableApplicationContext restarted = node("sender", senderPort, tcpPort())) {

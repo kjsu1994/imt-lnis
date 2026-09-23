@@ -135,7 +135,7 @@ public final class AgentWebSocketClient implements WebSocket.Listener, AutoClose
             1,
             System.getProperty("os.name"),
             System.getProperty("os.arch"),
-            Map.of("com", config.role().name().equals("SENDER"), "afsTransfer", true),
+            Map.of("com", config.role().name().equals("SENDER"), "afsTransfer", false),
             localIpv4Addresses(serverUri.get()));
     send(
         Envelope.of(

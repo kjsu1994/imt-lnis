@@ -7,14 +7,12 @@ import java.nio.file.Path;
 import java.util.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.*;
-import server.agent.afs.AfsFrameBuilder;
 import server.agent.codec.NativeAfsCodec;
 import server.agent.codec.NativePvtIntegrationTest;
 import server.shared.codec.GrawCodec;
 import server.shared.codec.GrawCodec.*;
 import server.shared.codec.Hashing;
 import server.shared.model.DtnModels.*;
-import server.shared.model.LnisModels.*;
 
 @EnabledOnOs(OS.WINDOWS)
 class AfsMetadataCodecTest {
@@ -129,16 +127,10 @@ class AfsMetadataCodecTest {
     byte[] source = NativePvtIntegrationTest.sample();
     var records = GrawCodec.splitLengthPrefixed(source);
     try (var codec = NativeAfsCodec.load(directory)) {
-      var transfer = new Transfer(); transfer.setTestId(UUID.randomUUID()); transfer.setRecordCount(records.size());
-      transfer.setSourceSha256(Hashing.hex(Hashing.sha256Digest().digest(source)));
-      var frames = new ArrayList<Frame>();
-      for (var legacy : new AfsFrameBuilder(codec).prepare(records,
-          new TestOptions(TestType.TEST_A_NORMAL,0,0,0,Map.of()),1).frames()) {
-        Frame frame = new Frame(); frame.setIndex(frames.size()); frame.setWeek(legacy.week());
-        frame.setAfsItow(legacy.intervalOfWeek()); frame.setToi(legacy.timeOfInterval());
-        frame.setFrameBase64(Base64.getEncoder().encodeToString(legacy.payload())); frames.add(frame);
-      }
-      transfer.setFrames(frames);
+      Transfer transfer;
+      try (var fixture = getClass().getResourceAsStream("/dtn/legacy-afs-v1.json")) {
+        transfer = new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules().readValue(fixture, Transfer.class);
+      } catch (java.io.IOException e) { throw new java.io.UncheckedIOException(e); }
       var result = new DtnProcessor(codec,directory).receive(transfer.getTestId(),transfer);
       assertEquals(server.shared.model.DtnObservationView.fromRecords(records),result.getObservations());
       assertFalse(result.getPvt().getFirst().isPositionValid());

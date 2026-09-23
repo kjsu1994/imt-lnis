@@ -22,14 +22,12 @@ import server.central.agent.*;
 import server.central.common.ApiExceptionHandler;
 import server.central.dtn.*;
 import server.central.input.*;
-import server.central.session.*;
 import server.shared.model.LnisModels.*;
 
 /** 스타일 변경으로 HTTP 상태, JSON 포장 및 예외 응답이 바뀌지 않는지 검사한다. */
 class ServerResponseContractTest {
     // 실제 Spring MVC와 동일하게 ProblemDetail 확장 필드를 최상위 JSON으로 직렬화한다.
     private final ObjectMapper objectMapper = Jackson2ObjectMapperBuilder.json().build();
-    private final SessionService sessionService = mock(SessionService.class);
     private final InputBufferService inputService = mock(InputBufferService.class);
     private final AgentRepository agentRepository = mock(AgentRepository.class);
     private final AgentCommandService commands = mock(AgentCommandService.class);
@@ -40,7 +38,6 @@ class ServerResponseContractTest {
     void setUp()
     {
         mvc = MockMvcBuilders.standaloneSetup(
-                new SessionController(sessionService),
                 new InputController(inputService),
                 new AgentController(agentRepository, commands),
                 new DtnController(dtnService, objectMapper),
@@ -51,12 +48,10 @@ class ServerResponseContractTest {
     }
 
     @Test
-    void preservesEmptyActiveSessionAndDiscovery() throws Exception
+    void retiresAfsSessionsAndPreservesDiscovery() throws Exception
     {
-        when(sessionService.activeSnapshot()).thenReturn(Optional.empty());
         mvc.perform(get("/lnis/api/v1/sessions/active"))
-                .andExpect(status().isNoContent())
-                .andExpect(content().string(""));
+                .andExpect(status().isNotFound());
         mvc.perform(get("/lnis/api/v1/discovery"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.service").value("lnis-server"))

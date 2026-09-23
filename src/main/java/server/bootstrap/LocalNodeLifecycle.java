@@ -53,7 +53,7 @@ public class LocalNodeLifecycle implements ApplicationListener<ApplicationReadyE
             connectionRegistry.registerEndpoint(agentConfig.agentId(), endpoint);
             Hello hello = new Hello("1.0.0", agentRuntime.codecAbiVersion(),
                     System.getProperty("os.name"), System.getProperty("os.arch"),
-                    Map.of("com", agentConfig.role() == AgentRole.SENDER, "afsTransfer", true,
+                    Map.of("com", agentConfig.role() == AgentRole.SENDER, "afsTransfer", false,
                             "local", true), localIpv4Addresses());
             receive(Envelope.of(MessageType.HELLO, agentConfig.agentId(), agentConfig.role(),
                     null, objectMapper.valueToTree(hello)));
@@ -95,7 +95,7 @@ public class LocalNodeLifecycle implements ApplicationListener<ApplicationReadyE
         }
     }
 
-    /** Linux에서도 AFS 대상 주소 자동 선택에 사용할 실제 IPv4 목록을 제공한다. */
+    /** Linux에서도 노드 연결 정보에 사용할 실제 IPv4 목록을 제공한다. */
     private List<String> localIpv4Addresses() throws java.net.SocketException
     {
         java.util.ArrayList<String> addresses = new java.util.ArrayList<>();

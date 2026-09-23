@@ -14,11 +14,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import server.central.agent.AgentRepository;
-import server.central.frameevidence.FrameEvidenceService;
 import server.central.input.InputBufferService;
 import server.central.realtime.EventService;
-import server.central.session.SessionRepository;
-import server.central.session.SessionService;
 import server.shared.model.AgentProtocol.Envelope;
 import server.shared.model.AgentProtocol.EventType;
 import server.shared.model.AgentProtocol.MessageType;
@@ -31,22 +28,18 @@ class AgentMessageServiceTest {
 
   @Mock private InputBufferService inputs;
 
-  @Mock private SessionRepository sessions;
 
   @Mock private EventService events;
 
-  @Mock private SessionService lifecycle;
 
-  @Mock private FrameEvidenceService frameEvidence;
 
-  @Mock private AgentConnectionRegistry connectionRegistry;
 
   @Test
   void statusWithoutEventTypeIsReportedAsErrorInsteadOfThrowingNullPointerException() {
     ObjectMapper json = new ObjectMapper().findAndRegisterModules();
     AgentMessageService service =
         new AgentMessageService(
-            json, agents, inputs, sessions, events, lifecycle, frameEvidence, connectionRegistry);
+            json, agents, inputs, events);
     UUID sessionId = UUID.randomUUID();
     Envelope malformedStatus =
         new Envelope(
@@ -77,8 +70,7 @@ class AgentMessageServiceTest {
   }
   @Test void olderAgentCanCompleteCaptureWithoutPvtCounters() throws Exception {
     var json = new ObjectMapper().findAndRegisterModules();
-    var service = new AgentMessageService(json, agents, inputs, sessions, events, lifecycle,
-        frameEvidence, connectionRegistry);
+    var service = new AgentMessageService(json, agents, inputs, events);
     UUID id = UUID.randomUUID();
     service.handle(Envelope.of(MessageType.STATUS, "sender", AgentRole.SENDER, id,
         json.valueToTree(new server.shared.model.AgentProtocol.Progress(EventType.GNSS_STATUS,
@@ -88,8 +80,7 @@ class AgentMessageServiceTest {
 
   @Test void invalidAgentPvtDoesNotMarkInputComplete() {
     var json = new ObjectMapper().findAndRegisterModules();
-    var service = new AgentMessageService(json, agents, inputs, sessions, events, lifecycle,
-        frameEvidence, connectionRegistry);
+    var service = new AgentMessageService(json, agents, inputs, events);
     UUID id = UUID.randomUUID();
     var pvt = new server.shared.model.DtnModels.Pvt();
     org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> service.handle(

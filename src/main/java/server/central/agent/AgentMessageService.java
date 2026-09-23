@@ -8,13 +8,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import server.central.dtn.DtnService;
-import server.central.frameevidence.FrameEvidenceService;
 import server.central.input.InputBufferEntity;
 import server.central.input.InputBufferService;
 import server.central.realtime.EventService;
-import server.central.session.SessionRepository;
-import server.central.session.SessionService;
-import server.central.session.TestSessionEntity;
 import server.shared.model.AgentProtocol.*;
 import server.shared.model.LnisModels.*;
 
@@ -28,18 +24,14 @@ import java.util.Map;
 /**
  * Agent protocol 메시지를 기능별 저장소와 브라우저 이벤트로 연결한다.
  *
- * <p>이 클래스가 Agent WebSocket transport와 input/session/realtime 도메인 사이의 경계다. 메시지 종류별 payload 타입을 여기서
+ * <p>이 클래스가 Agent WebSocket transport와 input/DTN/realtime 도메인 사이의 경계다. 메시지 종류별 payload 타입을 여기서
  * 확정하고, Agent가 보낸 임의 JSON이 Repository까지 직접 전달되지 않게 한다.
  */
 public class AgentMessageService {
     private final ObjectMapper objectMapper;
     private final AgentRepository agentRepository;
     private final InputBufferService inputBufferService;
-    private final SessionRepository sessionRepository;
     private final EventService eventService;
-    private final SessionService sessionService;
-    private final FrameEvidenceService frameEvidenceService;
-    private final AgentConnectionRegistry connectionRegistry;
     private DtnService dtnService;
     @Autowired(required=false) private server.central.dtn.DtnLogService logs;
 
@@ -59,7 +51,7 @@ public class AgentMessageService {
         var lock=managementGuard.gate.readLock();lock.lock();
         try {
             java.util.UUID id=envelope.sessionId();
-            if(managementGuard.deleted("AFS",id) || managementGuard.deleted("DTN",id) || managementGuard.deleted("INPUT",id)) return;
+            if(managementGuard.deleted("DTN",id) || managementGuard.deleted("INPUT",id)) return;
             handleMessage(envelope);
         } finally {lock.unlock();}
     }
@@ -69,8 +61,6 @@ public class AgentMessageService {
         // 연결 정보(HELLO/HEARTBEAT), 입력, 진행 이벤트, 최종 결과를 각 도메인 서비스로 분배한다.
         // WebSocket Handler는 인증과 역직렬화만 담당하고 업무 상태 변경은 이 계층에서 시작된다.
         switch (envelope.type()) {
-            case AFS_TRANSFER_START, AFS_TRANSFER_BATCH, AFS_TRANSFER_COMPLETE ->
-                    forwardAfsTransfer(envelope);
             case DTN_DATA -> dtnService.agentData(envelope);
             case COMMAND_ACK -> {
                 if (dtnService != null && !envelope.payload().path("accepted").asBoolean()) {
@@ -139,24 +129,6 @@ public class AgentMessageService {
                             envelope.role(),
                             null,
                             objectMapper.treeToValue(envelope.payload(), PortList.class));
-            case FRAME_EVIDENCE ->
-                    frameEvidenceService.save(
-                            envelope.sessionId(),
-                            envelope.role(),
-                            objectMapper.treeToValue(
-                                    envelope.payload(), FrameEvidenceMessage.class));
-            case ROLE_RESULT -> {
-                RoleResult result = objectMapper.treeToValue(envelope.payload(), RoleResult.class);
-                // 조회 API가 즉시 결과를 볼 수 있도록 저장을 먼저 끝낸 뒤 브라우저에 알린다.
-                sessionRepository.saveResult(result);
-                eventService.publish(
-                        EventType.RESULT,
-                        envelope.agentId(),
-                        envelope.role(),
-                        envelope.sessionId(),
-                        result);
-                sessionService.onResult(envelope.sessionId());
-            }
             case ERROR -> {
                     if(logs!=null && logs.exists(envelope.sessionId())) logs.add(envelope.sessionId(),"INPUT","ERROR","COM 수집",false,envelope.payload().path("message").asText("장치 처리 오류"));
                     eventService.publish(
@@ -169,22 +141,6 @@ public class AgentMessageService {
             }
             default -> {}
         }
-    }
-
-    /** Sender가 만든 AFS frame batch를 세션에 등록된 Receiver의 기존 연결로 전달한다. */
-    private void forwardAfsTransfer(Envelope envelope)
-    {
-        TestSessionEntity session = sessionRepository.find(envelope.sessionId())
-                .orElseThrow(() -> new IllegalArgumentException("Session not found: " + envelope.sessionId()));
-        if (!session.senderAgentId().equals(envelope.agentId())
-                || envelope.role() != AgentRole.SENDER
-                || !session.senderAgentId().equals(envelope.payload().path("senderAgentId").asText())
-                || !session.receiverAgentId().equals(envelope.payload().path("receiverAgentId").asText())) {
-            throw new IllegalArgumentException("AFS transfer의 세션 참여자가 일치하지 않습니다.");
-        }
-        Envelope forwarded = Envelope.of(envelope.type(), session.receiverAgentId(),
-                AgentRole.RECEIVER, envelope.sessionId(), envelope.payload());
-        connectionRegistry.send(session.receiverAgentId(), forwarded);
     }
 
     /** 최초 접속 정보를 Agent 조회용 JPA 엔티티로 만들고 READY 이벤트를 방송한다. */

@@ -3,7 +3,7 @@ package server.central.config;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 
-/** AFS·DTN 화면과 기존 북마크 URL의 HTTP 상태 및 문서를 그대로 유지한다. */
+/** DTN 화면을 제공하고 기존 AFS 북마크는 DTN으로 이동한다. */
 @Controller
 public class WebPageController {
     @GetMapping("/lnis/data-management")
@@ -18,19 +18,19 @@ public class WebPageController {
     @GetMapping("/")
     String root()
     {
-        return "redirect:/lnis/afstest/sender";
+        return "redirect:/lnis/dtntest/sender";
     }
 
-    @GetMapping({"/lnis/afstest/sender", "/lnis/test/sender"})
+    @GetMapping({"/lnis/afstest/sender", "/lnis/test/sender", "/afs-sender.html"})
     String sender()
     {
-        return "forward:/afs-sender.html";
+        return "redirect:/lnis/dtntest/sender";
     }
 
-    @GetMapping({"/lnis/afstest/receiver", "/lnis/test/receiver"})
+    @GetMapping({"/lnis/afstest/receiver", "/lnis/test/receiver", "/afs-receiver.html"})
     String receiver()
     {
-        return "forward:/afs-receiver.html";
+        return "redirect:/lnis/dtntest/receiver";
     }
 
     @GetMapping({"/lnis/dtntest/sender", "/lnis/dtntest/sender/clear"})

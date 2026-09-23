@@ -7,8 +7,6 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 import server.central.dtn.DtnJob;
 import server.central.dtn.DtnRepository;
-import server.central.session.ActiveSessionLockRepository;
-import server.central.session.SessionService;
 
 import java.time.Instant;
 import java.util.List;
@@ -18,14 +16,11 @@ import java.util.List;
 @Profile("node")
 @RequiredArgsConstructor
 public class NodeRecoveryService {
-    private final ActiveSessionLockRepository locks;
-    private final SessionService sessions;
     private final DtnRepository dtnRepository;
 
     @EventListener(ApplicationStartedEvent.class)
     public void recover()
     {
-        locks.current().ifPresent(sessions::cancel);
         for (DtnJob job : dtnRepository.findByStateIn(List.of("PREPARING", "CALCULATING"))) {
             job.setState("FAILED");
             job.setMessage("노드 재시작으로 진행 중 계산이 중단되었습니다. 새 시험으로 다시 시작하세요.");

@@ -1,18 +1,17 @@
 package server.shared.model;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.util.ArrayList;
+import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
-import server.shared.model.AgentProtocol.FrameEvidenceMessage;
 import server.shared.model.AgentProtocol.Hello;
-import server.shared.model.LnisModels.AfsSettings;
+import server.shared.model.LnisModels.InputKind;
+import server.shared.model.LnisModels.InputManifest;
 
-/** record를 Lombok 불변 클래스로 바꾼 뒤에도 기존 생성·JSON·방어적 복사 계약을 검증한다. */
+/** Verify the shared Agent and GNSS input JSON contracts after retiring AFS-only models. */
 class LombokModelCompatibilityTest {
   private final ObjectMapper json = new ObjectMapper().findAndRegisterModules();
 
@@ -31,26 +30,13 @@ class LombokModelCompatibilityTest {
   }
 
   @Test
-  void constructorsKeepExistingDefaultsAndValidation() throws Exception {
-    assertEquals(1, new AfsSettings(null).prn());
-    assertThrows(IllegalArgumentException.class, () -> new AfsSettings(9));
-  }
+  void inputManifestPreservesDtnUploadContract() throws Exception {
+    InputManifest source = new InputManifest(UUID.randomUUID(), InputKind.GRAW_UPLOAD,
+        "sample.graw", 128, "abc", 2, 1, Instant.parse("2026-09-23T00:00:00Z"));
+    String encoded = json.writeValueAsString(source);
 
-  @Test
-  void constructorStillDefensivelyCopiesMutableInputs() {
-    byte[] frame = {1, 2, 3};
-    List<Integer> positions = new ArrayList<>(List.of(7));
-    FrameEvidenceMessage message =
-        new FrameEvidenceMessage(
-            0, frame, null, null, null, positions, false, false, false, false, false, 0, 0, 0,
-            false, null, null, null);
-
-    frame[0] = 9;
-    positions.add(8);
-
-    assertEquals(1, message.referenceFrame()[0]);
-    assertNotSame(frame, message.referenceFrame());
-    assertEquals(List.of(7), message.injectedBitPositions());
-    assertThrows(UnsupportedOperationException.class, () -> message.injectedBitPositions().add(8));
+    assertEquals(source, json.readValue(encoded, InputManifest.class));
+    assertEquals("GRAW_UPLOAD", json.readTree(encoded).path("kind").asText());
+    assertEquals(128, json.readTree(encoded).path("size").asInt());
   }
 }

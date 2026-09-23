@@ -11,6 +11,7 @@ public interface DtnRepository extends JpaRepository<DtnJob, UUID> {
 
     List<DtnJob> findTop50ByOrderByCreatedAtDesc();
     List<DtnJob> findByCancelPendingTrue();
+    boolean existsByInputId(UUID inputId);
     boolean existsByIqFileIdAndStateIn(UUID iqFileId, List<String> states);
 }
 

@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
 import server.agent.codec.NativePvtIntegrationTest;
-import server.central.session.CreateSessionRequest;
 import server.shared.model.LnisModels.*;
 
 import java.net.InetSocketAddress;
@@ -78,21 +77,6 @@ public final class NodeContainerVerification {
                     + "/lnis/api/v1/dtn/tests/" + id + "/payload/received")).GET().build(),
                     HttpResponse.BodyHandlers.ofByteArray()).body());
             System.out.println("PASS: Linux containers DTN external REST roundtrip, isolated DB, original JSON, PVT comparison");
-            for (TestType type : TestType.values()) {
-                Thread.sleep(3500);
-                CreateSessionRequest request = new CreateSessionRequest("sender-1", "receiver-1", input,
-                        new AfsSettings(1), new TestOptions(type, 1, 1, 10, Map.of()));
-                String session = json("POST", sender + "/lnis/api/v1/sessions", request).path("sessionId").asText();
-                JsonNode afs = waitComplete(sender + "/lnis/api/v1/sessions/" + session);
-                assertTrue(afs.path("rxResult").isObject(), afs.toString());
-                assertTrue(afs.path("txResult").isObject(), afs.toString());
-                if (type == TestType.TEST_A_NORMAL) {
-                    assertEquals("PASS", afs.path("verdict").asText());
-                } else {
-                    assertTrue(afs.path("txResult").path("counters").path("injectedBitCount").asLong() > 0);
-                }
-                System.out.println("PASS: Linux containers " + type + " -> " + afs.path("verdict").asText());
-            }
         } finally {
             adapter.stop(0);
         }

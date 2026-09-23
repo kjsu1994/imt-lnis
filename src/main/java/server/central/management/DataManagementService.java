@@ -14,7 +14,6 @@ import org.springframework.web.server.ResponseStatusException;
 import server.central.config.StorageProperties;
 import server.central.dtn.*;
 import server.central.input.*;
-import server.central.session.*;
 import java.nio.file.*;
 import java.time.*;
 import java.util.*;
@@ -32,13 +31,16 @@ public class DataManagementService {
     private final IqService iq;
     private final InputBufferService inputs;
     private final InputBufferRepository inputRepository;
-    private final SessionService sessions;
-    private final ActiveSessionLockRepository activeSession;
     @Value("${lnis.node.role:server}") private String role;
     @Value("${lnis.iq.directory:/exchange}") private String iqDirectory;
     @Value("${spring.datasource.url:}") private String databaseUrl;
     private static final Set<String> TERMINAL=Set.of("COMPLETED","FAILED","CANCELLED","INCONCLUSIVE");
+    // AFS는 과거 관리 작업 이력의 역직렬화에만 사용한다.
     public enum Kind { DTN, AFS, RECEIPT, INPUT, IQ }
+    private static final List<Kind> ACTIVE_KINDS=List.of(Kind.DTN,Kind.RECEIPT,Kind.INPUT,Kind.IQ);
+    private static void requireSupported(Kind kind) {
+        if(kind==Kind.AFS) throw new ResponseStatusException(HttpStatus.GONE,"독립 AFS 시험 관리 기능은 종료되었습니다. 기존 기록은 DB에 보관됩니다.");
+    }
     public record Key(Kind kind,UUID id) {
         public Key { if(kind==null || id==null) throw new IllegalArgumentException("자료 종류와 ID가 필요합니다."); }
         public String code(){return kind+":"+id;}
@@ -82,14 +84,13 @@ public class DataManagementService {
     }
     private boolean pinned(Key key) {return em.find(ManagementEntry.class,"PIN:"+key.code())!=null;}
     private String table(Kind kind) {
-        return switch(kind){case DTN->"DtnJob";case AFS->"TestSessionEntity";case RECEIPT->"DtnReceipt";case INPUT->"InputBufferEntity";default->throw new IllegalArgumentException();};
+        return switch(kind){case DTN->"DtnJob";case RECEIPT->"DtnReceipt";case INPUT->"InputBufferEntity";default->throw new IllegalArgumentException();};
     }
-    private String idField(Kind kind){return kind==Kind.AFS?"sessionId":kind==Kind.INPUT?"inputId":"id";}
+    private String idField(Kind kind){return kind==Kind.INPUT?"inputId":"id";}
     private String dateField(Kind kind){return kind==Kind.RECEIPT?"arrivedAt":"createdAt";}
     private String projection(Kind kind) {
         return switch(kind){
             case DTN->"e.id,e.testType,e.state,e.createdAt,e.updatedAt,e.cancelPending";
-            case AFS->"e.sessionId,e.testType,e.state,e.createdAt,e.updatedAt,e.progress";
             case RECEIPT->"e.id,e.contentType,e.status,e.arrivedAt,e.arrivedAt,e.sizeBytes";
             case INPUT->"e.inputId,e.fileName,e.complete,e.createdAt,e.completedAt,e.receivedSize";
             default->throw new IllegalArgumentException();
@@ -99,7 +100,7 @@ public class DataManagementService {
         Key key=new Key(kind,(UUID)values[0]);
         String state=kind==Kind.INPUT?(Boolean.TRUE.equals(values[2])?"COMPLETE":"INCOMPLETE"):String.valueOf(values[2]);
         String blocked="";
-        if((kind==Kind.DTN || kind==Kind.AFS) && !TERMINAL.contains(state)) blocked="진행 중인 시험";
+        if((kind==Kind.DTN) && !TERMINAL.contains(state)) blocked="진행 중인 시험";
         if(kind==Kind.DTN && Boolean.TRUE.equals(values[5])) blocked="상대 노드 중지 확인 대기";
         if(kind==Kind.INPUT && state.equals("INCOMPLETE") && ((Instant)values[3]).isAfter(Instant.now().minus(Duration.ofHours(1)))) blocked="최근 업로드·수집 중인 입력";
         if(kind==Kind.INPUT && referenced(key,null)) blocked="시험에서 참조하는 입력";
@@ -109,6 +110,7 @@ public class DataManagementService {
                 kind==Kind.INPUT || kind==Kind.RECEIPT?((Number)values[5]).longValue():0,pin,blocked);
     }
     public Page list(Kind kind,int page,String search,String state,Instant from,Instant to) {
+        requireSupported(kind);
         if(page<0 || page>1_000_000) throw new IllegalArgumentException("페이지 범위 오류");
         if(from!=null && to!=null && from.isAfter(to)) throw new IllegalArgumentException("조회 기간 오류");
         search=search==null?"":search.trim();state=state==null?"":state.trim();
@@ -135,6 +137,7 @@ public class DataManagementService {
         return new Page(query.setFirstResult(page*50).setMaxResults(50).getResultList().stream().map(v->row(kind,v)).toList(),total.getSingleResult(),page);
     }
     private Row get(Key key) {
+        requireSupported(key.kind());
         if(key.kind()==Kind.IQ) return iqRows().stream().filter(r->r.key().equals(key)).findFirst().orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND,"파일이 없습니다."));
         var values=em.createQuery("select "+projection(key.kind())+" from "+table(key.kind())+" e where e."+idField(key.kind())+"=:id",Object[].class).setParameter("id",key.id()).getResultList();
         if(values.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND,"자료가 없습니다.");
@@ -148,8 +151,6 @@ public class DataManagementService {
         String field=resource.kind()==Kind.INPUT?"inputId":"iqFileId";
         var query=em.createQuery("select e.id from DtnJob e where e."+field+"=:id",UUID.class).setParameter("id",resource.id());
         if(query.getResultList().stream().anyMatch(id->excluding==null || excluding.kind()!=Kind.DTN || !excluding.id().equals(id))) return true;
-        if(resource.kind()==Kind.INPUT) return em.createQuery("select e.sessionId from TestSessionEntity e where e.inputId=:id",UUID.class).setParameter("id",resource.id()).getResultList().stream()
-                .anyMatch(id->excluding==null || excluding.kind()!=Kind.AFS || !excluding.id().equals(id));
         return false;
     }
     private List<Row> iqRows() {
@@ -187,7 +188,7 @@ public class DataManagementService {
     }
     public Map<String,Object> summary() {
         var result=new LinkedHashMap<String,Object>();result.put("role",role);result.put("localOnly",true);result.put("settings",settings());
-        var counts=new LinkedHashMap<String,Long>();for(Kind kind:Kind.values())counts.put(kind.name(),list(kind,0,"","",null,null).total());result.put("counts",counts);
+        var counts=new LinkedHashMap<String,Long>();for(Kind kind:ACTIVE_KINDS)counts.put(kind.name(),list(kind,0,"","",null,null).total());result.put("counts",counts);
         try {
             result.put("inputBytes",size(storage.getDataDirectory().resolve("files/inputs")));
             result.put("iqBytes",size(Path.of(iqDirectory)));
@@ -202,7 +203,6 @@ public class DataManagementService {
         String base="/lnis/api/v1/";
         result.put("detailUrl",switch(key.kind()) {
             case DTN->base+"dtn/tests/"+key.id()+"/report";
-            case AFS->base+"sessions/"+key.id();
             case RECEIPT->base+"dtn/receipts/"+key.id()+"/body";
             default->base+"data-management/files/"+key.kind()+"/"+key.id();
         });
@@ -210,12 +210,12 @@ public class DataManagementService {
         result.put("related",plan(key));return result;
     }
     private PlanItem plan(Key key) {
+        requireSupported(key.kind());
         if(guard.deleted(key.kind().name(),key.id()))return new PlanItem(new Row(key,"삭제된 자료","DELETED",null,null,0,false,""),List.of(),0,0,0,"");
         Row row=get(key);var related=new ArrayList<Key>();long receipts=0;
-        if(key.kind()==Kind.DTN || key.kind()==Kind.AFS) {
+        if(key.kind()==Kind.DTN) {
             UUID inputId,iqId=null;
-            if(key.kind()==Kind.DTN){var refs=em.createQuery("select e.inputId,e.iqFileId from DtnJob e where e.id=:id",Object[].class).setParameter("id",key.id()).getSingleResult();inputId=(UUID)refs[0];iqId=(UUID)refs[1];receipts=count("select count(e) from DtnReceipt e where e.testId=:id",key.id());}
-            else inputId=em.createQuery("select e.inputId from TestSessionEntity e where e.sessionId=:id",UUID.class).setParameter("id",key.id()).getSingleResult();
+            {var refs=em.createQuery("select e.inputId,e.iqFileId from DtnJob e where e.id=:id",Object[].class).setParameter("id",key.id()).getSingleResult();inputId=(UUID)refs[0];iqId=(UUID)refs[1];receipts=count("select count(e) from DtnReceipt e where e.testId=:id",key.id());}
             if(inputId!=null && count("select count(e) from InputBufferEntity e where e.inputId=:id",inputId)>0) addRelated(related,new Key(Kind.INPUT,inputId),key);
             if(iqId!=null && iqExists(iqId)) addRelated(related,new Key(Kind.IQ,iqId),key);
         }
@@ -226,9 +226,7 @@ public class DataManagementService {
         }
         long logs=count("select count(e) from DtnLogEntry e where e.scopeId=:id",key.id());
         for(Key resource:related)logs+=count("select count(e) from DtnLogEntry e where e.scopeId=:id",resource.id());
-        long evidence=key.kind()==Kind.AFS?count("select count(e) from FrameEvidenceEntity e where e.sessionId=:id",key.id()):0;
-        if(key.kind()==Kind.AFS)logs+=count("select count(e) from RealtimeEventEntity e where e.sessionId=:id",key.id());
-        return new PlanItem(row,related,logs,receipts,evidence,blocked);
+        return new PlanItem(row,related,logs,receipts,0,blocked);
     }
     private boolean iqExists(UUID id){return iqRows().stream().anyMatch(r->r.key().id().equals(id));}
     private void addRelated(List<Key> related,Key resource,Key owner) {
@@ -246,21 +244,24 @@ public class DataManagementService {
         finally{lock.unlock();}
     }
     private void idle() {
-        if(activeSession.current().isPresent() || dtn.managementBusy() || iq.managementBusy(null)
+        if(dtn.managementBusy() || iq.managementBusy(null)
             || em.createQuery("select count(e) from DtnJob e where e.state not in ('COMPLETED','FAILED','CANCELLED','INCONCLUSIVE') or e.cancelPending=true",Long.class).getSingleResult()>0
-            || em.createQuery("select count(e) from TestSessionEntity e where cast(e.state as string) not in ('COMPLETED','FAILED','CANCELLED','INCONCLUSIVE')",Long.class).getSingleResult()>0
             || em.createQuery("select count(e) from AgentEntity e where cast(e.state as string)='BUSY'",Long.class).getSingleResult()>0)
             throw new ResponseStatusException(HttpStatus.CONFLICT,"시험·수집·파일 작업 또는 중지 확인이 진행 중입니다. 완료 후 정리하세요.");
     }
     private <T> T exclusive(Supplier<T> action) {
         var lock=guard.gate.writeLock();lock.lock();
-        try {synchronized(dtn){synchronized(sessions){synchronized(iq){synchronized(inputs){idle();return action.get();}}}}}
+        try {synchronized(dtn){synchronized(iq){synchronized(inputs){idle();return action.get();}}}}
         finally{lock.unlock();}
     }
     public Operation execute(UUID token,String source) {
         return exclusive(()->{
             var preview=stored("PREVIEW:"+token,Preview.class);
             if(preview==null || preview.expiresAt().isBefore(Instant.now()))throw new ResponseStatusException(HttpStatus.CONFLICT,"미리보기가 만료됐습니다. 다시 확인하세요.");
+            for(var item:preview.items()) {
+                requireSupported(item.row().key().kind());
+                item.related().forEach(key->requireSupported(key.kind()));
+            }
             var results=new ArrayList<Result>();
             UUID operationId=UUID.randomUUID();Instant operationAt=Instant.now();
             for(var item:preview.items()) results.add(new Result(item.row().key(),"FAILED","정리 미완료: 재시도할 수 있습니다."));
@@ -289,6 +290,7 @@ public class DataManagementService {
         });
     }
     private void remove(Key key) {
+        requireSupported(key.kind());
         if(pinned(key))throw new IllegalStateException("보관 고정 자료입니다.");
         if(key.kind()==Kind.INPUT) {
             var input=em.find(InputBufferEntity.class,key.id());if(input!=null)inputRepository.delete(key.id(),input.chunkCount());
@@ -297,9 +299,6 @@ public class DataManagementService {
             catch(java.io.IOException error){throw new IllegalStateException("파일 삭제 실패: 재시도하세요.",error);}
         } else if(key.kind()==Kind.DTN) {
             delete("DtnReceipt","testId",key.id());delete("DtnJob","id",key.id());
-        } else if(key.kind()==Kind.AFS) {
-            delete("FrameEvidenceEntity","sessionId",key.id());delete("RoleResultEntity","sessionId",key.id());
-            delete("RealtimeEventEntity","sessionId",key.id());delete("TestSessionEntity","sessionId",key.id());
         } else delete("DtnReceipt","id",key.id());
         delete("DtnLogEntry","scopeId",key.id());
         put("DELETED:"+key.code(),"DELETED",key);
@@ -324,14 +323,14 @@ public class DataManagementService {
     }
     private List<Key> candidates(Settings settings) {
         var keys=new ArrayList<Key>();Instant now=Instant.now();
-        for(Kind kind:Kind.values()) {
-            Policy policy=kind==Kind.DTN || kind==Kind.AFS?settings.tests():kind==Kind.RECEIPT?settings.receipts():settings.files();
+        for(Kind kind:ACTIVE_KINDS) {
+            Policy policy=kind==Kind.DTN?settings.tests():kind==Kind.RECEIPT?settings.receipts():settings.files();
             if(!policy.enabled())continue;
             Instant cutoff=now.minus(Duration.ofDays(policy.days()));
             for(int page=0;keys.size()<500;page++) {
                 Page rows=list(kind,page,"","",null,null);
                 for(Row row:rows.items()) {
-                    Instant date=(kind==Kind.DTN || kind==Kind.AFS)?row.updatedAt():row.createdAt();
+                    Instant date=(kind==Kind.DTN)?row.updatedAt():row.createdAt();
                     if(row.blocked().isEmpty() && date!=null && date.isBefore(cutoff)) keys.add(row.key());
                     if(keys.size()==500)break;
                 }

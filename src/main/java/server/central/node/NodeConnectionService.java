@@ -6,8 +6,6 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import server.central.dtn.DtnRepository;
 import server.central.dtn.DtnService;
-import server.central.session.ActiveSessionLockRepository;
-import server.central.session.SessionService;
 import server.shared.model.LnisModels.AgentRole;
 import server.shared.model.LnisModels.AgentState;
 
@@ -23,8 +21,6 @@ public class NodeConnectionService {
     private final NodePeerClient client;
     private final NodePeerSettingRepository settings;
     private final NodePeerConnection connection;
-    private final SessionService sessions;
-    private final ActiveSessionLockRepository locks;
     private final DtnService dtn;
     private final DtnRepository jobs;
 
@@ -79,8 +75,7 @@ public class NodeConnectionService {
     {
         requireSender();
         URI address = address(request);
-        // AFS와 DTN 시작 경로와 같은 모니터를 사용해 busy 확인 직후 새 시험이 끼어들지 못하게 한다.
-        synchronized (sessions) {
+        // DTN 시작과 주소 변경이 겹치지 않게 같은 모니터를 사용한다.
             synchronized (dtn) {
                 if (busy()) {
                     throw new IllegalStateException("시험 진행 중에는 수신 노드 주소를 변경할 수 없습니다.");
@@ -96,12 +91,11 @@ public class NodeConnectionService {
                 connection.applyAddress(address);
                 return configuration();
             }
-        }
     }
 
     private boolean busy()
     {
-        return locks.current().isPresent() || !jobs.findByStateIn(
+        return !jobs.findByStateIn(
                 List.of("PREPARING", "WAITING_DTN", "WAITING_RECEIVER", "CALCULATING")).isEmpty();
     }
 

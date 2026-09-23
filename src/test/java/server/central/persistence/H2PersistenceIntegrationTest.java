@@ -13,22 +13,14 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import server.central.agent.AgentEntity;
 import server.central.agent.AgentRepository;
-import server.central.frameevidence.FrameEvidenceRepository;
 import server.central.input.GrawFileStorage;
 import server.central.input.InputBufferService;
 import server.central.realtime.RealtimeEventRepository;
 import server.central.realtime.EventService;
-import server.central.session.TestSessionEntity;
-import server.central.session.ActiveSessionLockRepository;
-import server.central.session.SessionRepository;
 import server.shared.codec.GrawCodec;
-import server.shared.model.AgentProtocol.FrameEvidenceMessage;
 import server.shared.model.LnisModels.AgentRole;
 import server.shared.model.LnisModels.AgentState;
 import server.shared.model.LnisModels.InputKind;
-import server.shared.model.LnisModels.SessionState;
-import server.shared.model.LnisModels.TestType;
-import server.shared.model.LnisModels.Verdict;
 
 /** Redis 제거 후 핵심 메타데이터, BLOB 증거, GRAW 파일 저장이 함께 동작하는지 검증한다. */
 @SpringBootTest(
@@ -41,13 +33,11 @@ import server.shared.model.LnisModels.Verdict;
 @ActiveProfiles("server")
 class H2PersistenceIntegrationTest {
   @Autowired private AgentRepository agents;
-  @Autowired private FrameEvidenceRepository evidence;
-  @Autowired private ActiveSessionLockRepository locks;
   @Autowired private InputBufferService inputs;
   @Autowired private GrawFileStorage files;
   @Autowired private RealtimeEventRepository realtimeEvents;
   @Autowired private EventService eventService;
-  @Autowired private SessionRepository sessions;
+  @Autowired private server.central.dtn.DtnRepository jobs;
   @Autowired private server.central.dtn.DtnLogService dtnLogs;
   @Autowired private org.springframework.jdbc.core.JdbcTemplate jdbc;
 
@@ -84,7 +74,7 @@ class H2PersistenceIntegrationTest {
   }
 
   @Test
-  void storesAgentAndMaintainsSingleActiveSessionLock() {
+  void storesAgentMetadata() {
     var agent =
         new AgentEntity(
             "sender-integration",
@@ -101,15 +91,6 @@ class H2PersistenceIntegrationTest {
 
     assertEquals(List.of("192.0.2.10"), agents.find(agent.agentId()).orElseThrow().ipv4Addresses());
 
-    UUID first = UUID.randomUUID();
-    UUID second = UUID.randomUUID();
-    assertTrue(locks.tryAcquire(first));
-    assertFalse(locks.tryAcquire(second));
-    assertEquals(first, locks.current().orElseThrow());
-    locks.release(second);
-    assertEquals(first, locks.current().orElseThrow());
-    locks.release(first);
-    assertTrue(locks.current().isEmpty());
   }
 
   @Test
@@ -131,18 +112,6 @@ class H2PersistenceIntegrationTest {
   }
 
   @Test
-  void storesFrameEvidenceAsBlobAndUpdatesRetransmission() {
-    UUID sessionId = UUID.randomUUID();
-    evidence.save(sessionId, AgentRole.SENDER, frame("first"));
-    evidence.save(sessionId, AgentRole.SENDER, frame("retransmitted"));
-
-    var stored = evidence.find(sessionId, AgentRole.SENDER, 0).orElseThrow();
-    assertEquals("retransmitted", stored.evidence().note());
-    assertArrayEquals(new byte[750], stored.evidence().referenceFrame());
-    assertEquals(1, evidence.findAll(sessionId).size());
-  }
-
-  @Test
   void storesGrawBytesInFileAndMetadataInH2() {
     var input = inputs.create("integration.graw", 3, InputKind.GRAW_UPLOAD);
     inputs.append(input.inputId(), 0, new byte[] {1, 2, 3});
@@ -155,29 +124,26 @@ class H2PersistenceIntegrationTest {
   }
 
   @Test
-  void explicitlyRemovesInputReferencedBySessionLikeBaseline() {
+  void retentionPreservesInputReferencedByDtn() {
     var input = inputs.create("explicit-remove.graw", 3, InputKind.GRAW_UPLOAD);
     UUID sessionId = UUID.randomUUID();
     Instant now = Instant.now();
-    sessions.save(
-        new TestSessionEntity(
-            sessionId,
-            SessionState.CREATED,
-            TestType.TEST_A_NORMAL,
-            "sender",
-            "receiver",
-            input.inputId(),
-            0,
-            "created",
-            Verdict.INCONCLUSIVE,
-            "{}",
-            now,
-            now));
+    var job = new server.central.dtn.DtnJob();
+    job.setId(sessionId);
+    job.setInputId(input.inputId());
+    job.setState("COMPLETED");
+    job.setTestType("GNSS_RAW");
+    job.setCreatedAt(now);
+    job.setUpdatedAt(now);
+    jobs.saveAndFlush(job);
+
+    inputs.removeExpired(input);
+    assertNotNull(inputs.get(input.inputId()));
+    jobs.deleteById(sessionId);
 
     inputs.remove(input.inputId());
 
     assertThrows(IllegalArgumentException.class, () -> inputs.get(input.inputId()));
-    sessions.delete(sessionId);
   }
 
   @Test
@@ -224,25 +190,4 @@ class H2PersistenceIntegrationTest {
         .array();
   }
 
-  private static FrameEvidenceMessage frame(String note) {
-    return new FrameEvidenceMessage(
-        0,
-        new byte[750],
-        null,
-        null,
-        null,
-        List.of(),
-        false,
-        false,
-        false,
-        false,
-        false,
-        0,
-        0,
-        0,
-        false,
-        null,
-        null,
-        note);
-  }
 }

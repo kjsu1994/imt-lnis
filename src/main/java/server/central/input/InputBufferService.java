@@ -4,7 +4,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import server.central.config.StorageProperties;
-import server.central.session.SessionRepository;
+import server.central.dtn.DtnRepository;
 import server.shared.model.LnisModels.InputKind;
 
 import java.io.ByteArrayOutputStream;
@@ -26,17 +26,17 @@ public class InputBufferService {
     private final Duration incompleteRetention;
     private final Duration completedRetention;
     private final InputBufferRepository inputBufferRepository;
-    private final SessionRepository sessionRepository;
+    private final DtnRepository dtnRepository;
     @org.springframework.beans.factory.annotation.Autowired(required=false)
     private server.central.dtn.DtnLogService logs;
 
     public InputBufferService(
             InputBufferRepository inputBufferRepository,
-            SessionRepository sessionRepository,
+            DtnRepository dtnRepository,
             StorageProperties properties)
     {
         this.inputBufferRepository = inputBufferRepository;
-        this.sessionRepository = sessionRepository;
+        this.dtnRepository = dtnRepository;
         this.incompleteRetention = properties.getIncompleteRetention();
         this.completedRetention = properties.getCompletedRetention();
     }
@@ -204,7 +204,7 @@ public class InputBufferService {
     @Transactional
     public void removeExpired(InputBufferEntity input)
     {
-        if (!sessionRepository.existsByInputId(input.inputId())) {
+        if (!dtnRepository.existsByInputId(input.inputId())) {
             inputBufferRepository.delete(input.inputId(), input.chunkCount());
         }
     }

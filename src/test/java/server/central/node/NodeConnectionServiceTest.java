@@ -5,8 +5,6 @@ import org.springframework.mock.env.MockEnvironment;
 import server.central.dtn.DtnJob;
 import server.central.dtn.DtnRepository;
 import server.central.dtn.DtnService;
-import server.central.session.ActiveSessionLockRepository;
-import server.central.session.SessionService;
 import server.shared.model.LnisModels.AgentRole;
 import server.shared.model.LnisModels.AgentState;
 
@@ -27,10 +25,9 @@ class NodeConnectionServiceTest {
     private final NodePeerClient client = mock(NodePeerClient.class);
     private final NodePeerSettingRepository settings = mock(NodePeerSettingRepository.class);
     private final NodePeerConnection connection = mock(NodePeerConnection.class);
-    private final ActiveSessionLockRepository locks = mock(ActiveSessionLockRepository.class);
     private final DtnRepository jobs = mock(DtnRepository.class);
     private final NodeConnectionService service = new NodeConnectionService(properties, client, settings,
-            connection, mock(SessionService.class), locks, mock(DtnService.class), jobs);
+            connection, mock(DtnService.class), jobs);
 
     @Test
     void testDoesNotSaveOrChangeCurrentAddressAndReportsFailure()
@@ -59,11 +56,8 @@ class NodeConnectionServiceTest {
     }
 
     @Test
-    void activeAfsOrDtnPreventsAddressChange()
+    void activeDtnPreventsAddressChange()
     {
-        when(locks.current()).thenReturn(Optional.of(UUID.randomUUID()));
-        assertThrows(IllegalStateException.class, () -> service.save(request("192.168.1.30", 8088)));
-        when(locks.current()).thenReturn(Optional.empty());
         when(jobs.findByStateIn(anyList())).thenReturn(List.of(new DtnJob()));
         assertThrows(IllegalStateException.class, () -> service.save(request("192.168.1.30", 8088)));
         verifyNoInteractions(client, settings, connection);
