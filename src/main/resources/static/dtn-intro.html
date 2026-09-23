@@ -36,14 +36,16 @@
     .plain, .primary { border: 1px solid var(--line); border-radius: 9px; background: white; padding: 8px 14px; font-weight: 600; }
     .plain:hover:not(:disabled) { background: #eaf0f7; }
     .primary { background: var(--ink); color: white; border-color: var(--ink); }
-    .tabs { display: flex; gap: 6px; padding: 5px; background: #e6ecf3; border-radius: 12px; width: fit-content; margin-bottom: 19px; }
-    .tabs button { border: 0; background: transparent; padding: 10px 20px; border-radius: 8px; font-weight: 700; }
-    .tabs [aria-selected="true"] { background: white; box-shadow: 0 2px 5px #17334b12; color: var(--blue); }
     .purpose { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px 20px; margin-bottom: 15px; }
     .purpose p { color: var(--muted); font-size: 14px; }
     .panel { border: 1px solid var(--line); border-radius: 16px; background: white; overflow: hidden; }
     .diagram-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 14px 21px; border-bottom: 1px solid var(--line); font-size: 13px; }
     .diagram-head span { color: var(--muted); }
+    .delay-toggle { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+    .delay-toggle input { accent-color: var(--blue); }
+    .check-tag { display: block; margin: 4px auto 0; width: fit-content; padding: 1px 5px; border-radius: 4px; background: #edf2f7; color: #41576a; font-size: 10px; font-weight: 600; }
+    .node.active .check-tag { background: #f7e4c2; }
+    .outcome[data-stage="compare"] .evidence-facts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .scroll-hint { display: none; }
     .diagram-scroll { overflow-x: auto; }
     .scene { position: relative; min-width: 930px; height: 390px; }
@@ -80,7 +82,7 @@
       white-space: nowrap;
       pointer-events: none;
     }
-    .running .node.active, .running .network.active { animation: current-step 1.8s ease-in-out infinite; }
+    .node.active, .network.active { animation: current-step 1.8s ease-in-out infinite; }
     @keyframes current-step {
       0%, 100% { box-shadow: 0 0 0 4px #e3a43735; }
       50% { box-shadow: 0 0 0 9px #e3a43780; }
@@ -89,7 +91,7 @@
     .node:hover { border-color: #cc871f; }
     .node:focus-visible { z-index: 3; }
     .tx-node { top: 14%; }
-    .rx-node { top: 69%; }
+    .rx-node { top: 67%; padding-top: 8px; padding-bottom: 6px; }
     .network { position: absolute; left: 84%; top: 45.5%; transform: translateX(-50%); border: 1px solid #d4c8ed; background: #f5f1fc; padding: 6px 15px; border-radius: 20px; font-size: 12px; white-space: nowrap; }
     .network.active { border: 3px solid #b46a08; background: #fffaf0; box-shadow: 0 0 0 5px #e3a43740; z-index: 2; }
     .clock-note { position: absolute; left: 25%; top: 46%; color: var(--muted); font-size: 12px; max-width: 48%; }
@@ -97,12 +99,8 @@
     .wire.reference { stroke: #8c9caa; stroke-dasharray: 3 4; }
     .wire { fill: none; stroke: #5286c0; stroke-width: 2; }
     .wire.active { stroke: #276fc0; stroke-width: 3; stroke-dasharray: 7 5; }
-    .running .wire.active { animation: flow var(--flow-period, .65s) linear infinite; }
+    .wire.active { animation: flow .65s linear infinite; }
     @keyframes flow { to { stroke-dashoffset: -24; } }
-    .playback-panel { margin-bottom: 18px; }
-    .controls { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 13px 20px; }
-    .playback-speed { display: inline-flex; gap: 7px; align-items: center; margin-left: 6px; font-size: 13px; }
-    .playback-speed select { border: 1px solid var(--line); border-radius: 8px; background: white; color: var(--ink); padding: 8px; }
     .diagram-head .step-count { margin-left: auto; padding: 4px 10px; border-radius: 20px; background: #edf3fc; color: var(--blue); font-variant-numeric: tabular-nums; font-size: 13px; white-space: nowrap; }
     .progress { height: 3px; background: #e9eef4; }
     .progress div { height: 100%; background: var(--blue); transition: width .2s; }
@@ -147,8 +145,6 @@
     #satellite-comparison th, #satellite-comparison td { padding: 8px 6px; }
     #satellite-comparison td:nth-child(3) { color: #965e08; background: #fff8e8; }
     caption { text-align: left; font-size: 12px; color: var(--muted); padding: 4px 0; }
-    .advance-control { display: inline-flex; gap: 7px; align-items: center; font-size: 13px; }
-    .advance-control select { border: 1px solid var(--line); border-radius: 8px; background: white; color: var(--ink); padding: 8px; }
     .learn { margin-top: 18px; }
     details { border-bottom: 1px solid var(--line); }
     details:last-child { border-bottom: 0; }
@@ -191,12 +187,9 @@
     @media (max-width: 760px) {
       .wrap { padding: 20px 14px; }
       .scroll-hint { display: block; width: 100%; }
-      .tabs { width: 100%; }
-      .tabs button { flex: 1; padding: 10px 8px; }
+      .outcome[data-stage="compare"] .evidence-facts { grid-template-columns: 1fr; }
       .evidence-facts dd { margin-bottom: 0; }
       .scene { height: 390px; aspect-ratio: auto; }
-      .controls { padding: 12px; }
-      .controls button { padding: 8px 10px; }
       dl { grid-template-columns: 1fr; gap: 4px; }
       dd { margin-bottom: 10px; }
       footer { flex-direction: column; gap: 4px; }
@@ -210,7 +203,7 @@
     :fullscreen .scene { height: 360px; }
     @media print {
       .wrap { max-width: none; padding: 0; }
-      .playback-panel, #fullscreen { display: none; }
+      #fullscreen { display: none; }
       .scroll-hint { display: none; }
     .diagram-scroll { overflow: visible; }
       .scene { min-width: 0; height: 360px; }
@@ -238,37 +231,14 @@
     <div class="hero">
       <h1>GNSS 데이터는 어떻게 전달되고 비교될까요?</h1>
     </div>
-    <nav class="tabs" role="tablist" aria-label="시험 목적">
-      <button id="tab-delay" role="tab" aria-selected="true" aria-controls="guide" type="button" data-mode="delay">01 · 지연·PVT 비교</button>
-      <button id="tab-transfer" role="tab" aria-selected="false" aria-controls="guide" tabindex="-1" type="button" data-mode="transfer">02 · 전송·무결성 검증</button>
-    </nav>
-    <section id="guide" role="tabpanel" aria-labelledby="tab-delay">
-      <section class="panel playback-panel" aria-label="설명 재생 제어">
-        <div class="controls">
-          <button class="primary" id="play" type="button">▶ 흐름 재생</button>
-          <button class="plain" id="previous" type="button" aria-label="이전 단계">← 이전</button>
-          <button class="plain" id="next" type="button" aria-label="다음 단계">다음 →</button>
-          <button class="plain" id="reset" type="button">처음으로</button>
-          <label class="advance-control" for="advance-mode">진행 방식
-            <select id="advance-mode">
-              <option value="manual" selected>수동 · 다음 버튼</option>
-              <option value="auto">자동 · 시간 간격</option>
-            </select>
-          </label>
-          <label class="playback-speed" for="playback-speed">재생속도
-            <select id="playback-speed">
-              <option value="0.5">0.5배</option>
-              <option value="1" selected>1배 · 기본</option>
-              <option value="1.5">1.5배</option>
-              <option value="2">2배</option>
-            </select>
-          </label>
-        </div>
-      </section>
+    <section id="guide" aria-labelledby="purpose-title">
       <div class="purpose"><h2 id="purpose-title"></h2><p id="purpose-copy"></p></div>
       <section class="panel" aria-label="송수신 구성도">
         <div class="diagram-head">
           <strong id="selection-summary"></strong>
+          <label id="delay-toggle-label" class="delay-toggle" title="설명용 선택입니다. 실제 시험 설정에는 영향을 주지 않습니다.">
+            <input id="delay-toggle" type="checkbox" checked> 지연 반영
+          </label>
           <span class="step-count" id="step-count"></span>
           <small class="scroll-hint">↔ 구성도를 좌우로 밀어 전체 경로를 확인하세요.</small>
         </div>
@@ -291,11 +261,11 @@
             <p class="clock-note" id="clock-note">시계 동기화는 시험 전제입니다.<br>지연 = 수신 본문 수신 완료 − 시험 시작 접수 · 수집 후 시작 전 대기시간 제외</p>
             <button class="network" data-node="network" type="button">전송망 · 저장 / 대기 / 전달 ↓</button>
             <div class="lane-label rx">수신측 <small>수신 확인 → 복원·검증 → 결과 비교</small></div>
-            <button class="node receiver rx-node switch" id="rx-switch" style="left:86%" type="button"><svg fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><use href="#icon-router"/></svg><strong id="rx-label">HDTN</strong><small>수신 엔진 변경 ↻</small></button>
-            <button class="node receiver rx-node" data-node="decode" style="left:66%" type="button"><svg fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><use href="#icon-wave"/></svg><strong>I/Q 추적·복호</strong><small>신호에서 관측값 추출</small></button>
-            <button class="node receiver rx-node" data-node="restore" style="left:48%" type="button"><svg fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><use href="#icon-frame"/></svg><strong id="restore-label">AFS Frame 해석</strong><small id="restore-subtitle">관측·항법정보 복원</small></button>
+            <button class="node receiver rx-node switch" id="rx-switch" style="left:86%" type="button"><svg fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><use href="#icon-router"/></svg><strong id="rx-label">HDTN</strong><small>수신 엔진 변경 ↻</small><span class="check-tag" title="어댑터가 전달한 JSON은 LNIS 수신 서비스에서 검증합니다.">LNIS 접수 · JSON 검증</span></button>
+            <button class="node receiver rx-node" data-node="decode" style="left:66%" type="button"><svg fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><use href="#icon-wave"/></svg><strong>I/Q 추적·복호</strong><small>신호에서 관측값 추출</small><span class="check-tag">파일 검증 → 신호 복원</span></button>
+            <button class="node receiver rx-node" data-node="restore" style="left:48%" type="button"><svg fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><use href="#icon-frame"/></svg><strong id="restore-label">AFS Frame 해석</strong><small id="restore-subtitle">관측·항법정보 복원</small><span class="check-tag" id="restore-check">복호 · 원본 대조</span></button>
             <button class="node receiver rx-node" data-node="calculate" style="left:30%" type="button"><svg fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><use href="#icon-location"/></svg><strong id="calculate-label">PVT 재계산</strong><small id="calculate-subtitle">위치 · 속도 · 시계오차</small></button>
-            <button class="node receiver rx-node" data-node="compare" style="left:12%" type="button"><svg fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><use href="#icon-data"/></svg><strong>결과 비교</strong><small>원본 기준 ↔ 수신 결과</small></button>
+            <button class="node receiver rx-node" data-node="compare" style="left:12%" type="button"><svg fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><use href="#icon-data"/></svg><strong>결과 비교</strong><small>원본 기준 ↔ 수신 결과</small><span class="check-tag">전달 · 무결성 · PVT</span></button>
           </div>
         </div>
         <section class="explanation" aria-labelledby="step-title">
@@ -355,8 +325,8 @@
       </div>
       <section class="panel learn" aria-label="더 자세한 설명">
         <details><summary>처음 사용한다면 · 무엇부터 보면 되나요?</summary><div class="detail-body">
-          <p><strong>① 목적 선택 → ② 데이터·엔진 선택 → ③ 흐름 재생 → ④ 비교할 결과 확인</strong></p>
-          <p>첫 번째 탭은 전송 지연을 GNSS 거리 오차로 바꿨을 때 계산기가 이를 어떻게 해석하는지 설명합니다. 두 번째 탭은 선택한 엔진 조합에서 데이터가 목적지까지 온전하게 도달하는지 설명합니다.</p>
+          <p><strong>① 데이터·엔진 선택 → ② 지연 반영 선택 → ③ 그림 클릭 또는 ← → 방향키로 단계 이동 → ④ 검증·비교 항목 확인</strong></p>
+          <p>하나의 흐름에서 최종 수신, 내용 무결성, PVT 비교를 함께 살펴봅니다. 애니메이션은 계속 재생되며 단계는 그림 클릭 또는 ← → 방향키로만 이동합니다. 그림의 검증 표시는 확인할 항목이며 실제 성공 상태가 아닙니다. RAW·AFS의 지연 반영을 켜면 공통 지연이 Clock Bias로 반영되는지도 설명합니다.</p>
           <p>실제 시험에서는 송신 화면에서 입력을 준비하고, 필요하면 ‘지연 반영 PVT’를 선택한 뒤 시험을 시작합니다. 송신측은 요청·접수 정보를, 수신측은 도착·복원·비교 정보를 확인합니다. 이 안내 화면의 선택은 실제 시험 설정에 반영되지 않습니다.</p>
         </div></details>
         <details id="math-details"><summary>지연이 큰데 위치는 왜 거의 같을까요? · 시각과 수식</summary><div class="detail-body">
@@ -405,6 +375,15 @@
           <p><strong>상호운용:</strong> DTN/HDTN 조합을 바꾸는 것은 엔진 선택이며 BP 버전 변환을 의미하지 않습니다. BP 버전 외에도 TCPCL/LTP 등 전송 계층, 목적지 식별자, 경로, 수명, 보안 설정이 호환돼야 합니다.</p>
           <p><strong>무결성과 계산:</strong> 데이터가 동일하게 도착한 것과 PVT 계산이 유효한 것은 별도 결과입니다. LNIS의 수신·검증 결과와 실제 라우터 동작 근거도 구분해 확인하세요.</p>
         </div></details>
+        <details><summary>시험 전 준비 · 결과 기록 · 실패 시 확인 순서</summary><div class="detail-body">
+          <p><strong>시험 전:</strong> GNSS 입력의 관측 시점과 선행 항법정보, 원본 Reference PVT의 유효성을 확인하세요. 송수신 어댑터 연결·주소·인증과 엔진별 전송 설정을 확인하고, 지연 시험에서는 두 PC의 시계를 동기화하세요. 이 화면의 선택은 실제 시험에 적용되지 않습니다.</p>
+          <p><strong>비교할 조건:</strong> 같은 입력과 시험 조건을 유지하며 데이터 유형·엔진 조합을 바꿔 비교하세요. 지연 시험은 선택한 1 Epoch를 기준으로 하며, I/Q 신호 추적 결과와 RAW·AFS의 지연 주입 결과는 같은 방식의 측정이 아닙니다.</p>
+          <p><strong>남길 결과:</strong> testId, 데이터 유형·크기, 엔진 조합, 송신 접수와 최종 수신 여부, 무결성 검증 근거, 유효한 PVT 여부를 기록하세요. PVT 차이는 수신 − Reference 기준이며 위치는 m, 속도는 m/s, Clock Bias는 s로 읽습니다. 지연 시험은 Δt·Clock Bias 증가량·잔차를 함께 확인하세요.</p>
+          <p><strong>지연 결과:</strong> 모든 위성에 같은 거리값을 더하면 주로 Clock Bias가 증가할 것으로 기대합니다. 큰 공통 거리 증가가 곧 큰 위치 이동을 뜻하지 않습니다. Doppler가 같아도 위치·위성 방향·수치 계산으로 속도에 작은 차이가 날 수 있습니다. 해가 유효하지 않거나 일부 항목만 비교 가능하면 해당 제한을 함께 기록하세요.</p>
+          <p><strong>미수신:</strong> 송신 요청·어댑터 접수 → 어댑터·라우터 저장·대기·전달 로그 → 수신 callback 순서로 확인하세요. 송신측 접수 로그만으로 상대 도착을 판단하지 않습니다.</p>
+          <p><strong>검증 실패:</strong> 수신 원문과 송신 원문, 동일 testId, JSON 변경, RAW 해시 또는 AFS CRC·Metadata 대조, I/Q 파일 존재·크기·SHA-256을 확인하세요. 어댑터 부가 로그는 원본 시험 데이터와 구분합니다.</p>
+          <p><strong>PVT 계산 실패:</strong> 무결성 결과와 분리하여 관측·항법정보 및 해의 유효성을 확인하세요. I/Q는 파일 검증 뒤의 신호 획득·추적·프레임 복호 로그도 확인해야 합니다. 무결성 성공만으로 PVT 정확성이나 라우터 전체 동작을 입증하지 않습니다.</p>
+        </div></details>
         <details><summary>용어를 쉽게 이해하기</summary><div class="detail-body"><dl>
           <dt>GNSS RAW</dt><dd>위치 계산 전의 위성별 관측값과 항법정보입니다.</dd>
           <dt>PVT</dt><dd>Position·Velocity·Time. 위치·속도·시각 관련 해를 말합니다.</dd>
@@ -428,11 +407,10 @@
     'use strict';
 
     // Presentation state only: never read or modify service configuration or test data.
-    const state = { mode: 'delay', data: 'afs', tx: 'HDTN', rx: 'HDTN', step: 0, running: true, speed: 1, advance: 'manual' };
+    const state = { delayEnabled: true, data: 'afs', tx: 'HDTN', rx: 'HDTN', step: 0 };
     const types = ['raw', 'afs', 'iq'];
     const labels = { raw: 'GNSS RAW', afs: 'AFS Frame + Metadata', iq: 'I/Q Sample' };
     const $ = id => document.getElementById(id);
-    let timer = null;
 
     function steps() {
       const result = ['source', 'data'];
@@ -448,7 +426,7 @@
     function explanation(key) {
       const iq = state.data === 'iq';
       const raw = state.data === 'raw';
-      const transfer = state.mode === 'transfer';
+      const original = !state.delayEnabled;
       const items = {
         source: [
           '송신측 · 원본 확보',
@@ -504,12 +482,12 @@
           raw ? 'Base64를 복원하고 크기·SHA-256·레코드 수를 검증한 뒤 관측·항법정보를 읽습니다.' : iq ? '복호한 AFS에서 항법정보를 복원합니다. PVT 관측값은 I/Q 신호 추적 결과를 사용합니다.' : 'AFS 프레임을 복호하고 CRC·원본 Metadata 대조 등을 거쳐 SB2·SB3·SB4에서 관측·항법정보를 복원합니다.',
           '원문 수신, 내용 검증, PVT 계산은 구분되는 처리 단계입니다.'
         ],
-        calculate: transfer
+        calculate: original && !iq
           ? [
             '수신측 · PVT 계산',
             '검증·복원한 입력으로 PVT를 계산합니다.',
-            iq ? '신호 추적 관측값과 복원한 AFS 항법정보로 PVT를 계산합니다. 추적 후 파일을 다시 검증해 처리 중 변경 여부도 확인합니다.' : 'RAW 또는 AFS에서 검증·복원한 관측·항법정보로 PVT를 계산합니다. 실제 시험의 지연 반영 옵션에 따라 원본 또는 지연 반영 값을 사용합니다.',
-            '전송·무결성 탭은 설명 관점입니다. 실제 서비스의 복원·PVT 계산을 생략하는 실행 모드가 아닙니다.'
+            iq ? '신호 추적 관측값과 복원한 AFS 항법정보로 PVT를 계산합니다. 추적 후 파일을 다시 검증해 처리 중 변경 여부도 확인합니다.' : 'RAW 또는 AFS에서 검증·복원한 관측·항법정보로 PVT를 계산합니다. 원본 의사거리를 유지하며 통신 지연을 추가하지 않습니다.',
+            '지연 반영을 끄면 원본 복원 비교입니다. 전송 검증과 PVT 계산은 모두 수행합니다.'
           ]
           : iq
             ? [
@@ -524,26 +502,12 @@
               '지연 반영 옵션이 켜진 1 Epoch 시험을 설명합니다. GNSS 관측 시각에 Δt를 더하고 각 의사거리에 c × Δt를 추가합니다. Doppler·C/N0·궤도정보 등 나머지 값은 유지합니다.',
               '수집 후 시작 전 대기는 제외합니다. 옵션을 끄면 기존 원본 복원 비교 경로입니다.'
             ],
-        compare: transfer
-          ? [
-            '결과 비교 · 전송 시험',
-            '목적지 전달과 데이터 무결성을 확인합니다.',
-            '엔진 조합별로 실제 수신 여부와 내용 일치 여부를 확인합니다. 대용량 파일은 크기·해시 등으로 확인하며, 라우터 내부 동작은 어댑터·라우터 로그로 보완합니다.',
-            'LNIS 결과만으로 BP 버전이나 라우터의 모든 동작을 증명할 수는 없습니다.'
-          ]
-          : iq
-            ? [
-              '결과 비교 · I/Q 경로',
-              '원본 PVT와 신호 기반 결과를 비교합니다.',
-              '원본 Reference와 수신측 PVT의 위치·속도·시각 관련 차이를 확인합니다. 추적 성공 여부와 유효한 해가 존재하는지도 함께 봅니다.',
-              '동일한 파일이 도착해도 신호 추적과 PVT 계산은 별도로 검증해야 합니다.'
-            ]
-            : [
-              '결과 비교 · 공통 지연 시험',
-              '지연이 Clock Bias로 반영됐는지 봅니다.',
-              'Clock Bias 증가량이 주입한 Δt와 얼마나 가까운지, 잔차가 얼마나 작은지 확인합니다. 위치와 속도 차이도 함께 비교합니다.',
-              '계산기는 오차의 원인이 통신이라고 식별하지 않습니다. 공통 증가분을 시계오차로 설명할 수 있는지 확인하는 시험입니다.'
-            ]
+        compare: [
+          '결과 비교 · 세 가지 확인',
+          '전달·무결성·PVT 결과를 구분해 확인합니다.',
+          '같은 testId의 최종 수신, 원본 데이터의 보존, Reference와 수신 PVT의 차이를 각각 확인합니다.',
+          '데이터가 온전해도 유효한 PVT가 보장되지는 않습니다. 라우터 내부 동작은 어댑터·라우터 로그로 확인합니다.'
+        ]
       };
       return items[key];
     }
@@ -563,7 +527,7 @@
     function evidenceContent(stage, skippedReason) {
       const iq = state.data === 'iq';
       const raw = state.data === 'raw';
-      const transport = state.mode === 'transfer';
+      const original = !state.delayEnabled;
       const make = (title, kind, flow, facts, note, detail, summary = '필드와 해석 자세히 보기') =>
         ({ title, kind, flow, facts, note, detail, summary });
 
@@ -646,14 +610,14 @@
             '동일한 BP 버전 외에도 TCPCL/LTP 등 전송 계층, 목적지 식별자, 경로, 수명, 보안 설정이 호환돼야 합니다.\nLNIS 결과만으로 라우터의 모든 동작을 확인할 수는 없습니다. 스케줄링과 내부 전달의 근거는 어댑터·라우터 로그를 함께 확인합니다.');
         case 'receive':
           return make(
-            transport || iq ? '도착과 접수는 서로 다른 시점' : '지연 측정의 시작과 끝',
-            transport || iq ? '수신 확인 기준' : '설명용 시간선',
+            original || iq ? '도착과 접수는 서로 다른 시점' : '지연 측정의 시작과 끝',
+            original || iq ? '수신 확인 기준' : '설명용 시간선',
             ['S · 시험 시작 접수', '준비·대기·전달', 'R · 본문 수신 완료'],
             [
               ['시험 식별', '같은 testId로 송신 시험과 수신 내용을 연결'],
               ['다음 확인', '본문 도착 후 내용 검증과 계산 결과를 별도로 확인']
             ],
-            transport || iq ? '본문 도착만으로 내용 검증이나 PVT 계산까지 성공한 것은 아닙니다.' : '수집 후 시작 전 대기는 제외합니다. 두 PC의 시계 차이는 측정 지연에 섞일 수 있습니다.',
+            original || iq ? '본문 도착만으로 내용 검증이나 PVT 계산까지 성공한 것은 아닙니다.' : '수집 후 시작 전 대기는 제외합니다. 두 PC의 시계 차이는 측정 지연에 섞일 수 있습니다.',
             'S는 시험 시작 접수 시각이고 R은 수신 본문 수신 완료 시각입니다. Δt = R − S로 측정합니다.\n실제 계산 시간축은 GNSS 관측 시각을 유지하며 PC의 UTC를 그대로 대입하지 않습니다. I/Q 신호 기반 PVT와 RAW·AFS 공통 지연 주입은 다른 경로입니다.',
             '측정 범위와 시계 동기화 보기');
         case 'decode':
@@ -680,7 +644,7 @@
             iq ? 'I/Q PVT는 프레임 원본 관측값이 아닌 추적 관측값을 사용합니다.' : '이 단계의 의사거리는 원본 값입니다. 지연 반영 옵션이 켜져 있으면 다음 계산 단계에서 변환합니다.',
             raw ? 'GNSS RAW는 LNIS 내부 GRAW 바이트를 Base64로 전달합니다. 바이트 복원과 원본 검증 후 관측·항법 레코드를 계산에 사용합니다.' : iq ? 'I/Q v2는 복호한 AFS에서 항법정보를 복원하고, 관측값은 신호 추적에서 얻습니다. SB4 원본 관측값이나 Metadata로 RF 추적 관측값을 대체하지 않습니다.' : 'AFS v4는 프레임 복호 결과와 원본 Metadata를 대조합니다. SB2·SB3·SB4에서 계산 입력을 복원하며 Metadata를 계산 결과의 대체 입력으로 사용하지 않습니다.');
         case 'calculate':
-          if (transport) return make(
+          if (original && !iq) return make(
             '검증·복원 이후 PVT 계산', 'LNIS 수신 처리',
             [iq ? '추적 관측 + AFS 항법' : '복원 관측·항법정보', 'PVT 계산', 'Reference와 비교'],
             [
@@ -688,7 +652,7 @@
               ['계산 결과', '위치·속도·시각 및 해의 유효성']
             ],
             '데이터 무결성이 정상이어도 유효한 PVT 해가 보장되지는 않습니다.',
-            iq ? '현재 I/Q v2는 파일 검증 후 추적·복호·PVT 계산을 수행합니다. 과거 PVT 메타데이터가 없는 파일은 파일 검증만 가능할 수 있습니다.' : '지연 반영 옵션을 끄면 원본 복원 비교, 켜면 선택한 1 Epoch에 공통 지연을 반영합니다. 이 설명 탭은 실제 시험 옵션을 변경하지 않습니다.');
+            iq ? '현재 I/Q v2는 파일 검증 후 추적·복호·PVT 계산을 수행합니다. 과거 PVT 메타데이터가 없는 파일은 파일 검증만 가능할 수 있습니다.' : '지연 반영 옵션을 끄면 원본 복원 비교, 켜면 선택한 1 Epoch에 공통 지연을 반영합니다. 이 설명 화면은 실제 시험 옵션을 변경하지 않습니다.');
           if (iq) return make(
             '신호 기반 PVT 계산', '계산 입력과 출력',
             ['추적 관측 + 복원 항법', 'PVT 계산기', '수신측 PVT'],
@@ -707,44 +671,33 @@
             'GNSS 시간축: t_txᵢ = t₀ − Pᵢ/c, t₁ = t₀ + Δt. 따라서 P′ᵢ = c(t₁ − t_txᵢ) = Pᵢ + cΔt.\nPC 시험 시간축: 가상 송신 시각 T*ᵢ = S − Pᵢ/c. c(R − T*ᵢ)도 같은 결과입니다. T*ᵢ는 시험 시작에 맞춘 설명용 가상 시각입니다.\n나머지 원본 값은 유지합니다. 관측 시각은 GNSS 시간축에서 Δt만큼 이동하고 GPS 주차 경계를 정규화합니다.',
             '송신 시각 역산과 보정 수식');
         case 'compare':
-          if (transport) return integrityContent(iq, true);
-          return make(
-            iq ? 'Reference와 신호 기반 결과 비교' : '변환값이 아니라 계산 결과를 비교합니다',
-            '결과 해석 · 측정값 아님',
-            ['원본 Reference', '차이 계산', '수신측 PVT'],
-            [
-              ['위치 차이 · m', iq ? '원본과 신호 기반 위치 차이를 확인' : '공통 증가분이 시계오차로 설명되면 이상적으로 작음'],
-              ['속도 차이 · m/s', iq ? '신호 추적 결과의 속도를 원본과 비교' : 'Doppler가 같아도 위성 방향·수치 계산으로 작은 차이가 생길 수 있음'],
-              ['시각 / Clock Bias', iq ? '시각 관련 결과와 비교 가능 여부를 확인' : 'Clock Bias 증가량이 주입한 Δt와 얼마나 가까운지 확인'],
-              ['유효성 / 판정', '유효한 위치·속도 해가 있는지 먼저 확인']
-            ],
-            iq ? '유효한 해가 없는 경우에도 성공한 것처럼 임의의 비교값을 표시하지 않습니다.' : 'Clock Bias 증가량과 Δt가 같아도, 실제 네트워크 지연이 정확히 측정됐다는 증명은 아닙니다.',
-            iq ? '파일 무결성 성공과 PVT 계산 성공은 별도 결과입니다. 실제 위치·속도·시각 차이는 수신측 계산 결과에서 확인합니다. 이 안내는 수치를 만들어 표시하지 않습니다.' : 'Clock Bias 잔차 = (수신 Clock Bias − Reference Clock Bias) − Δt.\n현재 지연 비교 결과는 MEASURED(측정), PARTIAL(일부 비교), INCONCLUSIVE(계산·비교 불가)로 구분합니다. MEASURED가 허용오차 기반 자동 합격을 뜻하지 않습니다.\n관측 시각은 Δt만큼 이동하며, 위치·속도 차이와 Clock Bias 증가량은 각각 다른 비교 항목입니다.',
-            '비교 항목과 판정 의미');
+          return comparisonContent();
         default:
           return make(
             '이 경로에서 생략하는 단계', '경로 안내', [], [],
             skippedReason || '다른 데이터 경로에서 사용하는 처리입니다.',
-            '데이터 아이콘으로 RAW·AFS·I/Q를 선택하거나 시험 목적 탭을 바꾸면 해당 경로의 설명을 볼 수 있습니다.');
+            '데이터 아이콘으로 RAW·AFS·I/Q를 선택하거나 지연 반영 옵션을 바꾸면 해당 경로의 설명을 볼 수 있습니다.');
       }
     }
 
-    function integrityContent(iq, final) {
+    function comparisonContent() {
+      const iq = state.data === 'iq';
+      const delay = state.delayEnabled && !iq;
       return {
-        title: final ? '최종 수신 · 내용 일치 · 계산 결과 구분' : '원본과 수신 내용을 확인하는 근거',
-        kind: '서비스 검증 항목',
-        flow: ['원본 데이터', iq ? '크기 / SHA-256' : '시험 JSON / 원본 검증', '수신 데이터'],
+        title: '전달 · 무결성 · PVT 비교',
+        kind: '확인할 항목 · 실제 결과 아님',
+        flow: [],
         facts: [
-          ['최종 수신', '같은 testId의 데이터가 목적지 서비스에 도착했는지'],
-          [iq ? '파일 무결성' : '내용 무결성', iq ? '파일 크기와 SHA-256이 원본과 같은지' : '원본 시험 데이터가 유지됐는지'],
-          ['계산 결과', '복원·PVT 계산 결과를 무결성 결과와 구분해 확인'],
-          ['라우터 동작 근거', '어댑터·라우터 설정과 로그로 보완']
+          ['전달 확인', '같은 testId의 데이터가 LNIS 수신 서비스에 도착했는지 확인합니다. 어댑터 접수만으로 수신 완료를 판단하지 않습니다.'],
+          ['내용 무결성', iq ? 'JSON 원본 동일성과 I/Q 파일 크기·SHA-256을 확인합니다. 추적 이후에도 파일 변경 여부를 재검증합니다.' : state.data === 'raw' ? 'JSON 동일성, 복원한 GRAW의 크기·SHA-256·레코드 수를 확인합니다.' : 'JSON 동일성, AFS 복호·CRC, 프레임과 원본 Metadata 대조로 확인합니다.'],
+          ['PVT 비교', delay ? '위치·속도·시각 차이와 Clock Bias 증가량을 확인합니다. 증가량이 주입 지연 Δt와 가까운지, 잔차가 작은지 봅니다.' : '원본 Reference와 수신 PVT의 위치·속도·시각 차이를 확인합니다. 먼저 유효한 해와 비교 가능한 항목이 있는지 봅니다.']
         ],
-        note: '어댑터 접수 응답 하나로 이 확인 항목들을 모두 성공 처리하지 않습니다.',
-        detail: iq
-          ? 'JSON의 file.sizeBytes와 file.sha256은 파일 확인에 쓰입니다. 실제 파일 내용과 비교해야 하며 파일명이나 경로가 같다는 것만으로 일치를 판단하지 않습니다.\n유효한 파일 도착과 GNSS 신호 추적 성공은 별도로 확인합니다.'
-          : 'testId로 시험을 연결하고 JSON의 시험 데이터와 복원 결과를 검증합니다. 어댑터가 부가한 로그는 원본 시험 데이터와 구분해서 확인합니다.\nGNSS RAW는 GRAW 바이트, AFS v4는 프레임과 원본 Metadata를 함께 검증합니다.',
-        summary: '검증 근거 자세히 보기'
+        note: '무결성 성공과 PVT 계산 성공은 별개입니다. 이 화면은 실제 측정값이나 합격 판정을 생성하지 않습니다.',
+        detail: delay
+          ? 'Clock Bias 잔차 = (수신 Clock Bias − Reference Clock Bias) − Δt. 공통 지연은 이상적으로 주로 시계오차로 반영되지만, 위치·속도에는 수치 계산 등의 차이가 생길 수 있습니다. MEASURED는 측정 완료를 뜻하며 허용오차 기반 합격을 뜻하지 않습니다. PC 시계 차이는 측정 지연에 섞일 수 있습니다.'
+          : iq ? '파일이 같아도 신호 추적·프레임 복호·유효한 PVT 해 확보는 별도로 확인합니다. Reference는 비교에만 사용하며 추적 관측값을 대신하지 않습니다. 과거 PVT 메타데이터가 없는 파일은 파일 검증만 가능할 수 있습니다.'
+          : '원본 복원 비교에서는 통신 지연을 의사거리에 추가하지 않습니다. 위치·속도·시각과 유효성을 실제 계산 결과로 비교하며 전송 성공만으로 PVT 정확성을 판단하지 않습니다.',
+        summary: '비교 항목과 판정 의미'
       };
     }
 
@@ -798,7 +751,7 @@
     }
 
     function renderEvidence(stage, skippedReason) {
-      const key = [state.mode, state.data, stage].join(':');
+      const key = [state.delayEnabled, state.data, stage].join(':');
       const details = $('evidence-details');
       if (key !== evidenceKey) {
         if (evidenceKey) expandedEvidence.set(evidenceKey, details.open);
@@ -830,7 +783,7 @@
       $('evidence-summary').textContent = content.summary;
       $('evidence-detail-copy').textContent = content.detail;
       $('frame-explorer').hidden = stage !== 'frame';
-      const delay = state.mode === 'delay' && state.data !== 'iq';
+      const delay = state.delayEnabled && state.data !== 'iq';
       $('delay-example').hidden = !delay || !['receive', 'calculate', 'compare'].includes(stage);
       $('satellite-comparison').hidden = !delay || stage !== 'calculate';
       $('request-json').hidden = stage !== 'send';
@@ -904,7 +857,6 @@
       const line = (from, to) => `M${from.join(' ')}L${to.join(' ')}`;
       const node = name => `[data-node="${name}"]`;
       const sendFrom = state.data === 'raw' ? '#data-switch' : node('frame');
-      const transfer = state.mode === 'transfer';
       const txLeft = point('#tx-switch', 'left');
       const rxLeft = point('#rx-switch', 'left');
       const enterSender = from => `M${from.join(' ')}V196H${txLeft[0] - 14}V${txLeft[1]}H${txLeft[0]}`;
@@ -937,14 +889,14 @@
         path.setAttribute('class', 'wire' + (key === 'reference' ? ' reference' : '') + (current ? ' active' : ''));
         path.setAttribute('marker-end', 'url(#arrow)');
         group.append(path);
-        if (current && state.running) {
+        if (current) {
           const dot = document.createElementNS(ns, 'circle');
           dot.setAttribute('r', '5');
           dot.setAttribute('fill', '#245cbb');
           dot.setAttribute('class', 'traveler');
           const motion = document.createElementNS(ns, 'animateMotion');
           motion.setAttribute('path', d);
-          motion.setAttribute('dur', (1.8 / state.speed) + 's');
+          motion.setAttribute('dur', '1.8s');
           motion.setAttribute('repeatCount', 'indefinite');
           dot.append(motion);
           group.append(dot);
@@ -955,12 +907,13 @@
     function render() {
       const flow = steps();
       const active = flow[state.step];
-      const transfer = state.mode === 'transfer';
       const iq = state.data === 'iq';
-      $('purpose-title').textContent = transfer ? '온전하게 도착했을까?' : iq ? '신호에서 복원한 PVT는 원본과 얼마나 같을까?' : '같은 지연을 더하면, PVT는 어떻게 해석할까?';
-      $('purpose-copy').textContent = transfer ? '엔진 조합별 최종 수신과 내용 일치를 확인하는 시험입니다.' : iq ? 'I/Q는 신호 추적·복호 경로입니다. RAW·AFS 지연 주입과 구분합니다.' : '공통 거리 증가가 주로 수신기 시계오차로 반영되는지 확인합니다.';
-      $('reference-label').textContent = transfer ? '원본 데이터 · 비교 기준' : '원본 PVT · 비교 기준';
-      $('clock-note').textContent = transfer ? '같은 testId로 시험을 식별하고, 원본과 수신 내용을 비교합니다. 어댑터 접수와 최종 수신은 다릅니다.' : iq ? '신호 추적 관측값 + 복호한 항법정보로 계산합니다. 원본 PVT는 비교 기준으로만 사용합니다.' : '시계 동기화는 시험 전제입니다. 지연 = 수신 본문 수신 완료 − 시험 시작 접수 · 수집 후 시작 전 대기시간 제외';
+      $('purpose-title').textContent = '전달부터 무결성 검증, PVT 비교까지';
+      $('purpose-copy').textContent = '그림의 검증 항목은 해당 단계에서 확인할 내용입니다. 성공 여부를 뜻하지 않습니다.';
+      $('reference-label').textContent = '원본 데이터 · PVT 기준';
+      $('clock-note').textContent = iq ? '파일 검증 → 신호 추적·복호 → PVT 계산 · Reference는 비교에만 사용합니다.' : state.delayEnabled ? '지연 = 본문 수신 완료 − 시험 시작 접수 · 수집 후 시작 전 대기 제외 · PC 시계 동기화 필요' : '원본 관측값을 복원해 비교합니다. 통신 지연을 의사거리에 추가하지 않습니다.';
+      $('delay-toggle-label').hidden = iq;
+      $('delay-toggle').checked = state.delayEnabled;
       $('selection-summary').textContent = labels[state.data] + ' · ' + state.tx + ' → ' + state.rx;
       $('data-label').textContent = labels[state.data];
       $('data-icon').setAttribute('href', '#icon-' + (iq ? 'wave' : state.data === 'raw' ? 'data' : 'frame'));
@@ -969,9 +922,10 @@
       $('data-switch').setAttribute('aria-label', '데이터 유형: ' + labels[state.data] + '. 클릭하여 변경');
       $('tx-switch').setAttribute('aria-label', '송신 엔진: ' + state.tx + '. 클릭하여 변경');
       $('rx-switch').setAttribute('aria-label', '수신 엔진: ' + state.rx + '. 클릭하여 변경');
+      $('restore-check').textContent = state.data === 'raw' ? '내용 검증' : iq ? '항법정보 확인' : '복호 · 원본 대조';
       $('restore-label').textContent = state.data === 'raw' ? 'RAW 읽기' : 'AFS Frame 해석';
       $('restore-subtitle').textContent = iq ? '항법정보 복원' : '원본 검증 · 정보 복원';
-      $('calculate-label').textContent = transfer ? 'PVT 계산' : 'PVT 재계산';
+      $('calculate-label').textContent = state.delayEnabled && !iq ? '지연 반영 PVT' : 'PVT 계산';
       $('calculate-subtitle').textContent = '위치 · 속도 · 시계오차';
       for (const el of document.querySelectorAll('[data-node], .node.switch')) {
         const key = el.dataset.node || ({ 'data-switch': 'data', 'tx-switch': 'send', 'rx-switch': 'receive' })[el.id];
@@ -980,46 +934,22 @@
         if (key === active) el.setAttribute('aria-current', 'step');
         else el.removeAttribute('aria-current');
       }
-      document.querySelectorAll('[data-mode]').forEach(tab => {
-        const selected = tab.dataset.mode === state.mode;
-        tab.setAttribute('aria-selected', String(selected));
-        tab.tabIndex = selected ? 0 : -1;
-      });
-      $('guide').setAttribute('aria-labelledby', 'tab-' + state.mode);
       const [owner, title, copy, takeaway] = explanation(active);
       $('step-owner').textContent = owner;
       $('step-title').textContent = title;
       $('step-copy').textContent = copy;
       $('step-takeaway').textContent = takeaway;
       renderEvidence(active);
-      $('math-details').hidden = transfer || iq;
+      $('math-details').hidden = !state.delayEnabled || iq;
       $('step-count').textContent = (state.step + 1) + ' / ' + flow.length + ' 단계';
-      $('previous').disabled = state.step === 0;
-      $('next').disabled = state.step === flow.length - 1;
-      $('play').textContent = state.running ? 'Ⅱ 일시정지' : state.advance === 'manual' ? '▶ 애니메이션 재생' : state.step === flow.length - 1 ? '↻ 다시 재생' : '▶ 흐름 재생';
-      $('scene').classList.toggle('running', state.running);
-      $('scene').style.setProperty('--flow-period', (0.65 / state.speed) + 's');
       $('progress').style.width = ((state.step + 1) / flow.length * 100) + '%';
       $('announcement').textContent = (state.step + 1) + '단계. ' + title;
       drawWires(active);
     }
 
-    function stop() {
-      clearInterval(timer);
-      timer = null;
-      state.running = false;
-    }
-
-    function select(change) {
-      stop();
-      Object.assign(state, change, { step: 0 });
-      render();
-    }
-
-    // Navigation preserves playback; give the selected stage its full reading time.
+    // Stages change only through explicit navigation; animation loops continuously.
     function goToStep(index) {
       state.step = Math.max(0, Math.min(steps().length - 1, index));
-      if (state.running) schedulePlayback();
       render();
     }
 
@@ -1035,64 +965,20 @@
       render();
     }
 
-    // Engine selection changes labels, not the route length or playback timer.
+    // Engine selection keeps the current stage.
     function toggleEngine(side) {
       state[side] = state[side] === 'HDTN' ? 'DTN' : 'HDTN';
       render();
     }
 
-    // A speed change replaces the current timer; the selected stage stays in place.
-    function schedulePlayback() {
-      clearInterval(timer);
-      timer = null;
-      if (!state.running || state.advance !== 'auto') return;
-      timer = setInterval(() => {
-        state.step = Math.min(state.step + 1, steps().length - 1);
-        if (state.step >= steps().length - 1) stop();
-        render();
-      }, 5500 / state.speed);
-    }
-
-    $('advance-mode').addEventListener('change', event => {
-      state.advance = event.target.value;
-      schedulePlayback();
-      render();
-    });
-
-    $('playback-speed').addEventListener('change', event => {
-      const speed = Number(event.target.value);
-      if (![0.5, 1, 1.5, 2].includes(speed)) return;
-      state.speed = speed;
-      if (state.running) schedulePlayback();
-      render();
-    });
-
-    $('play').addEventListener('click', () => {
-      if (state.running) {
-        stop();
-      } else {
-        if (state.advance === 'auto' && state.step === steps().length - 1) state.step = 0;
-        state.running = true;
-        schedulePlayback();
-      }
-      render();
-    });
-    $('previous').addEventListener('click', () => goToStep(state.step - 1));
-    $('next').addEventListener('click', () => goToStep(state.step + 1));
-    $('reset').addEventListener('click', () => goToStep(0));
     $('data-switch').addEventListener('click', toggleData);
     $('tx-switch').addEventListener('click', () => toggleEngine('tx'));
     $('rx-switch').addEventListener('click', () => toggleEngine('rx'));
-    document.querySelectorAll('[data-mode]').forEach(tab => tab.addEventListener('click', () => select({ mode: tab.dataset.mode })));
-    document.querySelector('[role="tablist"]').addEventListener('keydown', event => {
-      if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-      event.preventDefault();
-      const mode = event.key === 'Home' ? 'delay' : event.key === 'End' ? 'transfer' : state.mode === 'delay' ? 'transfer' : 'delay';
-      select({ mode });
-      $('tab-' + mode).focus();
+    $('delay-toggle').addEventListener('change', event => {
+      state.delayEnabled = event.target.checked;
+      render();
     });
     document.querySelectorAll('[data-node]').forEach(node => node.addEventListener('click', () => {
-      stop();
       const index = steps().indexOf(node.dataset.node);
       if (index < 0) {
         render();
@@ -1125,20 +1011,16 @@
       $('fullscreen').textContent = document.fullscreenElement ? '전체화면 종료' : '전체화면';
     });
     if (!document.fullscreenEnabled) $('fullscreen').hidden = true;
-    document.addEventListener('visibilitychange', () => {
-      if (document.hidden) { stop(); render(); }
-    });
-    // Leave arrow keys to editable fields, tabs and scrollable evidence.
+    // Leave arrow keys to editable fields and scrollable evidence.
     document.addEventListener('keydown', event => {
       if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
       if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
       const target = event.target;
-      if (target.isContentEditable || target.closest('input, select, textarea, [role="tablist"], pre, .table-scroll')) return;
+      if (target.isContentEditable || target.closest('input, select, textarea, pre, .table-scroll')) return;
       if (target.matches('.diagram-scroll') && target.scrollWidth > target.clientWidth) return;
       event.preventDefault();
       goToStep(state.step + (event.key === 'ArrowRight' ? 1 : -1));
     });
-    window.addEventListener('pagehide', stop);
     new ResizeObserver(() => drawWires(steps()[state.step])).observe($('scene'));
     updateExample();
     render();
