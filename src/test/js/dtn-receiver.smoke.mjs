@@ -172,13 +172,33 @@ assert.equal(elements.get('reference-x').textContent,'1.000');
 assert.match(elements.get('pvt-match').textContent,/지연 반영/);
 assert.equal(elements.has('dtn-delay-note'),false);
 assert.match(elements.get('pvt-differences').textContent,/2.000000/);
-assert.match(elements.get('dtn-clock-analysis').textContent,/측정 지연 0.001000000 s/);
-assert.match(elements.get('dtn-clock-analysis').textContent,/-0.020 ns/);
+assert.equal(elements.get('pvt-delay-value').textContent,'0.001000000 s');
+assert.equal(elements.get('pvt-clock-change').textContent,'0.001000000 s');
+assert.equal(elements.get('pvt-delay-residual').textContent,'-0.020 ns');
+assert.equal(elements.get('pvt-match').className,'pill');
+assert.equal(elements.get('pvt-delay-details').hidden,false);
 assert.equal(elements.get('dtn-clock-analysis').hidden,false);
 context.setEpochs([{week:2400,towSeconds:999,positionValid:false}]);
-assert.match(elements.get('dtn-clock-analysis').textContent,/지연과의 차이 —/);
+assert.equal(elements.get('pvt-delay-residual').textContent,'—');
+assert.match(elements.get('pvt-delay-reason').textContent,/비교 가능한/);
+for (const [seconds, expected] of [[0,'0.000 ns'],[-1e-15,'음수 · 크기 < 0.001 ns'],[1e-15,'양수 · 크기 < 0.001 ns'],[2e-9,'2.000 ns'],[null,'—'],[NaN,'—']]) {
+  context.renderClockAnalysis({clockResidualSeconds:seconds});
+  assert.equal(elements.get('pvt-delay-residual').textContent,expected);
+}
+assert.equal(context.positionDifference(0.000316),'0.316 mm');
+assert.equal(context.positionDifference(2),'2.000000 m');
+assert.equal(context.positionDifference(null),'—');
+assert.equal(context.measured(-0,9,'s'),'0.000000000 s');
+context.setComparison({comparisonMode:'DELAY',delayEvidence:{delaySeconds:-1,error:'음수 지연 · 시계 동기화 확인'}});
+context.renderClockAnalysis({clockResidualSeconds:0,clockDifferenceSeconds:1});
+assert.equal(elements.get('pvt-delay-residual').textContent,'—');
+assert.match(elements.get('pvt-delay-reason').textContent,/음수 지연/);
 context.setComparison();
 assert.equal(elements.get('dtn-clock-analysis').hidden,true);
+assert.equal(elements.get('pvt-sync-note').hidden,true);
+assert.equal(elements.get('pvt-delay-details').hidden,true);
+assert.equal(elements.get('pvt-delay-evidence').textContent,'');
+assert.equal(elements.get('pvt-clock-change').textContent,'—');
 
 for (const id of removedHealth) assert.equal(elements.has(id),false,'receiver removes health details');
 elements.get('dtn-send-url').value='http://adapter:8080';

@@ -285,6 +285,16 @@
  * 입력 방식
  * ========================================================= */
 
+.pvt-delay-metrics { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 8px 0; }
+.pvt-delay-metrics > div { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; min-width: 0; }
+.pvt-delay-metrics span { font-size: 12px; color: #526071; }
+.pvt-delay-metrics strong { font-size: 14px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; color: #234b6b; }
+.pvt-delay-analysis > small { color: #526071; }
+.pvt-delay-analysis > small { display: block; }
+.pvt-difference-summary { margin: 10px 0; font-variant-numeric: tabular-nums; font-weight: 600; }
+.pvt-delay-details { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
+.pvt-delay-details summary { cursor: pointer; }
+.pvt-delay-details pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; line-height: 1.7; font-variant-numeric: tabular-nums; }
 .receiver-pvt-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .receiver-pvt-pair > div { min-width: 0; padding: 12px; border: 1px solid var(--line); border-radius: 8px; }
 .receiver-pvt-pair h3 { margin: 0 0 10px; font-size: 14px; }

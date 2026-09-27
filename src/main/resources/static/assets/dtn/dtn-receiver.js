@@ -18,12 +18,14 @@ function setComparison(report = {}) {
   $('received-pvt-label').textContent = delayComparison ? '수신 지연 반영 지구 PVT' : '수신 복원 지구 PVT';
   delayEvidence = report.delayEvidence ?? null;
   $('dtn-clock-analysis').hidden = !delayComparison;
+  $('pvt-sync-note').hidden = !delayComparison;
+  $('pvt-delay-details').hidden = !delayComparison;
   renderClockAnalysis(null);
   referenceEpochs = Array.isArray(report.referencePvt) ? report.referencePvt : [];
   comparisonEpochs = report.comparison?.epochs || [];
   const verdict = report.comparison?.verdict;
-  pill('pvt-match', verdict === 'MEASURED' ? (delayComparison ? '지연 반영 PVT 측정 완료 · 허용오차 미설정' : 'I/Q PVT 오차 측정 · 허용오차 미설정') : verdict === 'PARTIAL' ? '부분 비교 · 속도 비교 불가' : verdict === 'PASS' ? '전체 PVT 일치' : verdict === 'FAIL' ? '전체 PVT 불일치' : 'PVT 비교 불가',
-    verdict === 'PASS' ? 'online' : verdict === 'FAIL' ? 'error' : 'warning');
+  pill('pvt-match', verdict === 'MEASURED' ? (delayComparison ? '지연 반영 PVT 측정 완료' : 'I/Q PVT 오차 측정') : verdict === 'PARTIAL' ? '부분 비교 · 속도 비교 불가' : verdict === 'PASS' ? '전체 PVT 일치' : verdict === 'FAIL' ? '전체 PVT 불일치' : 'PVT 비교 불가',
+    verdict === 'PASS' ? 'online' : verdict === 'FAIL' ? 'error' : verdict === 'MEASURED' && delayComparison ? '' : 'warning');
 }
 const observations = createObservationView($('dtn-observations'), index => {
   if (epochs[index]) { $('pvt-epoch').value = String(index); renderEpoch(); }
@@ -52,28 +54,57 @@ function time(value) {
   return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString('ko-KR');
 }
 
-function renderClockAnalysis(delta) {
-  if (!delayComparison) return;
-  const seconds = delta?.clockResidualSeconds;
-  const residual = Number.isFinite(seconds)
-    ? numeric(seconds, 12) + ' s (' + numeric(seconds * 1e9, 3) + ' ns)'
-    : '—';
-  $('dtn-clock-analysis').textContent = '측정 지연 ' + numeric(delayEvidence?.delaySeconds, 9)
-    + ' s · Clock Bias 변화 ' + numeric(delta?.clockDifferenceSeconds, 12)
-    + ' s · 지연과의 차이 ' + residual;
-  $('dtn-clock-analysis').title = '지연과의 차이 = (수신 Bias − 원본 Bias) − 측정 지연. '
-    + '표시 자릿수는 측정 정확도를 보증하지 않으며 합격 기준은 설정하지 않았습니다. '
-    + '시간 차이의 거리 환산값: ' + numeric(delta?.clockResidualMeters, 6) + ' m (위치 오차가 아님).';
+function measured(value, digits, unit) {
+  if (!Number.isFinite(value)) return '—';
+  const rounded = value.toFixed(digits);
+  return (Number(rounded) === 0 ? (0).toFixed(digits) : rounded) + ' ' + unit;
+}
+
+function positionDifference(value) {
+  return Number.isFinite(value) && Math.abs(value) < 1
+    ? measured(value * 1000, 3, 'mm') : measured(value, 6, 'm');
+}
+
+function renderClockAnalysis(delta, reference, pvt) {
+  const available = delayComparison && !delayEvidence?.error;
+  const seconds = available ? delta?.clockResidualSeconds : null;
+  const residual = Number.isFinite(seconds) && seconds !== 0 && Math.abs(seconds) < 1e-12
+    ? (seconds < 0 ? '음수 · ' : '양수 · ') + '크기 < 0.001 ns'
+    : measured(seconds * 1e9, 3, 'ns');
+  $('pvt-delay-value').textContent = delayComparison ? measured(delayEvidence?.delaySeconds, 9, 's') : '—';
+  $('pvt-clock-change').textContent = measured(available ? delta?.clockDifferenceSeconds : null, 9, 's');
+  $('pvt-delay-residual').textContent = Number.isFinite(seconds) ? residual : '—';
+  $('pvt-delay-reason').textContent = !delayComparison ? '' : delayEvidence?.error
+    || (!delta ? '비교 가능한 PVT 결과가 없습니다.' : !Number.isFinite(seconds) ? '시계오차 비교 근거가 없습니다.' : '');
+  const raw = value => Number.isFinite(value) ? String(value) : '—';
+  const epoch = value => value && Number.isFinite(value.week) && Number.isFinite(value.towSeconds)
+    ? 'Week ' + value.week + ' / TOW ' + value.towSeconds + ' s' : '—';
+  const vector = values => Array.isArray(values) && values.length === 3 ? values.map(raw).join(' / ') : '—';
+  $('pvt-delay-evidence').textContent = !delayComparison ? '' : [
+    '시작 접수 (UTC): ' + (delayEvidence?.timing?.startedAt ?? '—'),
+    '본문 수신 완료 (UTC): ' + (delayEvidence?.timing?.receivedAt ?? '—'),
+    '송신 기준 GNSS 시각: ' + epoch(delayEvidence?.originalTime),
+    '지연 반영 GNSS 시각: ' + epoch(delayEvidence?.shiftedTime),
+    '시험 전달 지연: ' + raw(delayEvidence?.delaySeconds) + ' s',
+    '송신 기준 Clock Bias: ' + raw(reference?.positionValid ? reference.receiverClockBiasSeconds : null) + ' s',
+    '수신 Clock Bias: ' + raw(pvt?.positionValid ? pvt.receiverClockBiasSeconds : null) + ' s',
+    '시계오차 변화: ' + raw(available ? delta?.clockDifferenceSeconds : null) + ' s',
+    '지연 반영 잔차: ' + raw(seconds) + ' s',
+    '잔차 = (수신 Bias − 송신 기준 Bias) − 시험 전달 지연',
+    '위치 변화 X / Y / Z (m): ' + vector(delta?.positionDeltaMeters),
+    '속도 변화 X / Y / Z (m/s): ' + vector(delta?.velocityDeltaMetersPerSecond),
+    '사용 위성 (송신 / 수신): ' + raw(reference?.satellitesUsed) + ' / ' + raw(pvt?.satellitesUsed)
+  ].join('\n');
 }
 
 function renderEpoch() {
   observations.select(Number($('pvt-epoch').value));
   const pvt = epochs[Number($('pvt-epoch').value)];
   const delta = pvt && comparisonEpochs.find(e=>e.week===pvt.week && e.towSeconds===pvt.towSeconds);
-  $('pvt-differences').textContent = '위치 차이 '+number(delta?.positionDifferenceMeters,6)+' m · 속도 차이 '+number(delta?.velocityDifferenceMetersPerSecond,6)+' m/s'
+  $('pvt-differences').textContent = '위치 차이 '+positionDifference(delta?.positionDifferenceMeters)+' · 속도 차이 '+measured(delta?.velocityDifferenceMetersPerSecond,6,'m/s')
     + (delayComparison ? '' : ' · 시계오차 차이 '+number(delta?.clockDifferenceSeconds,12)+' s');
-  renderClockAnalysis(delta);
   const reference = pvt && (delayComparison ? referenceEpochs[0] : referenceEpochs.find(value => value.week === pvt.week && value.towSeconds === pvt.towSeconds));
+  renderClockAnalysis(delta, reference, pvt);
   ['x', 'y', 'z'].forEach((axis, index) => {
     $('reference-' + axis).textContent = number(reference?.positionValid ? reference.ecefMeters?.[index] : null);
     $('reference-v' + axis).textContent = number(reference?.velocityValid ? reference.velocityMetersPerSecond?.[index] : null);
@@ -145,6 +176,7 @@ async function renderTest(force = false) {
   payloadViewer.setJob(job);
   renderSummary(job);
   if (changed || !job) {
+    $('pvt-delay-details').open = false;
     reportKey = '';
     setComparison();
     setEpochs([]);

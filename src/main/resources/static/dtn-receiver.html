@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>LNIS DTN Receiver</title>
   <link rel="stylesheet" href="/lnis/assets/common/app.css?v=20260918-admin-icon">
-  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20260923-presets-log">
+  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20260927-pvt-compact">
 </head>
 <body data-page="dtn-receiver">
 <header>
@@ -86,6 +86,8 @@
   <section class="card receiver-pvt">
     <div class="card-title">
       <h2 id="receiver-pvt-title">수신 지구 PVT · 송신 기준 비교</h2>
+      <span id="pvt-match" class="pill">PVT 비교 대기</span>
+      <span id="pvt-sync-note" class="pill warning" hidden>PC 시계 동기화 미확인</span>
     </div>
     <div class="receiver-epoch-row">
       <label for="pvt-epoch">관측 시각</label>
@@ -93,6 +95,15 @@
       <span id="pvt-count">0개 관측</span>
       <span id="pvt-validity" class="pill">결과 대기</span>
     </div>
+    <div id="dtn-clock-analysis" class="pvt-delay-analysis" hidden>
+      <div class="pvt-delay-metrics">
+        <div title="시작 접수 → 본문 수신 완료"><span>시험 전달 지연</span><strong id="pvt-delay-value">—</strong></div>
+        <div title="수신 Bias − 송신 기준 Bias"><span>시계오차 변화</span><strong id="pvt-clock-change">—</strong></div>
+        <div title="시계오차 변화 − 전달 지연"><span>지연 반영 잔차</span><strong id="pvt-delay-residual">—</strong></div>
+      </div>
+      <small id="pvt-delay-reason" role="status"></small>
+    </div>
+    <p id="pvt-differences" class="pvt-difference-summary" title="원본 Reference 대비 재계산 결과의 차이이며 실제 위치 정확도가 아닙니다.">위치 차이 — · 속도 차이 —</p>
     <div class="receiver-pvt-pair">
     <div><h3>송신 기준 지구 PVT</h3><div class="pvt-grid">
       <div class="pvt-value"><span>ECEF X</span><strong id="reference-x">-</strong><small>m</small></div>
@@ -116,12 +127,11 @@
     </div>
     </div></div>
     <small id="pvt-message">지구 ECEF · GPS L1 C/A</small>
-    <div class="dtn-comparison-card" role="status">
-      <strong>송·수신 비교</strong>
-      <span id="pvt-match" class="pill">PVT 비교 대기</span>
-      <small id="pvt-differences" title="원본 Reference 대비 재계산 결과의 차이입니다. 실제 정답 좌표에 대한 위치 정확도를 의미하지 않습니다.">위치 차이 — m · 속도 차이 — m/s · 시계오차 차이 — s</small>
-      <small id="dtn-clock-analysis" hidden></small>
-    </div>
+    <details id="pvt-delay-details" class="pvt-delay-details" hidden>
+      <summary>계산 근거·상세</summary>
+      <pre id="pvt-delay-evidence"></pre>
+      <small>준비·변환·전송 대기를 포함하며 수신 후 PVT 계산 시간은 제외합니다. 잔차는 실제 통신 지연의 측정오차가 아닙니다. 허용오차 기반 합격 판정은 하지 않습니다.</small>
+    </details>
   </section>
 
   <section class="card" id="receiver-iq" hidden><h2>I/Q 수신 파일 검증</h2><div id="receiver-iq-result" class="iq-file-view"></div></section>
@@ -133,6 +143,6 @@
   </section>
   </div>
 </main>
-<script type="module" src="/lnis/assets/dtn/dtn-receiver.js?v=20260923-presets-log"></script>
+<script type="module" src="/lnis/assets/dtn/dtn-receiver.js?v=20260927-pvt-compact"></script>
 </body>
 </html>
