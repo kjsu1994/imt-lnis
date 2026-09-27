@@ -27,7 +27,7 @@ Java 21 · Spring Boot · H2 · HTML/JavaScript. 기존 AFS 코덱과 GPS L1 지
 
 ## 실행·설정
 
-애플리케이션 설정은 `src/main/resources/application.yml` 하나에서 관리합니다. 내부의 `spring.config.activate.on-profile` 조건으로 공통·서버·통합 노드·별도 Agent 설정을 구분하며, PC별 주소·포트·토큰은 기존처럼 `.env`로 지정합니다.
+애플리케이션 설정은 `src/main/resources/application.yml` 하나에서 관리합니다. 통합 `node` 실행만 지원하며, PC별 역할·주소·포트·토큰은 기존처럼 배포 폴더의 `.env`로 지정합니다. `server`/`node` Spring profile은 웹·통합 실행 설정을 묶는 내부 설정이며 별도 서버 실행 모드가 아닙니다.
 
 독립 노드 배포 폴더에서 `.env`의 역할·포트·본인/상대 URL·관리 토큰을 설정하고 실행합니다.
 
@@ -271,22 +271,29 @@ docker compose -f src/test/dtn-native-compose.yml down
 
 일반 `build`는 운영 폴더를 변경하지 않습니다. 배포는 명시적으로 수행합니다.
 실제 F9T·운영 WSL2 USB·실제 DTN/HDTN 연동은 합성 데이터 회귀시험과 별도로 확인해야 합니다.
-기존 중앙 서버/Windows Agent 모드는 유지하며 설정은 [기존 배포 문서](deployment/compose/README.md)를 참고하세요.
+중앙 서버 + 별도 Windows Agent 실행·탐색·제어 WebSocket과 전용 배포 파일은 제거했습니다. 배포 기준은 `deployment/node`와 `linuxNodeDistZip`입니다. 소스 저장소 루트가 아니라 배포 ZIP을 푼 각 노드 폴더에서 `docker compose up -d --build`를 실행합니다. Windows 개발용 네이티브 검증은 유지합니다.
 
 
 ## 유지보수할 때 찾을 위치
 
 | 영역 | 위치 | 역할 |
 |---|---|---|
-| 실행 모드 | `server/bootstrap` | 중앙 서버·독립 노드·별도 Agent 시작 |
-| 서버 기능 | `server/central` | 기존 Controller → Service → Repository 구조 |
-| 로컬 실행기 | `server/agent` | 수집·송수신·코덱 실행 |
-| 공통 계약 | `server/shared` | 모델·명령·코덱 계약 |
+| 설정·노드 | `server/config`, `server/node` | 시작·종료, 역할·상태, 상대 PC 연결 |
+| GNSS 입력 | `server/gnss` | COM·UBX·GRAW 수집과 저장 |
+| AFS·PVT·I/Q | `server/afs`, `server/pvt`, `server/iq` | 변환·계산·생성·트래킹 |
+| 시험 | `server/dtn` | 등록·REST 송수신·진행·결과 저장 |
+| 관리·실시간 | `server/management`, `server/realtime` | 보관·삭제·브라우저 이벤트 |
+| 공통 | `server/common` | 기존 공통 모델·HTTP·해시·로그 |
 | 화면 공통 | `static/assets/common` | 기본 CSS, HTTP 요청, 노드 연결 |
 | DTN 화면 | `static/assets/dtn` | 송수신 화면, 어댑터 상태, 관측값·원문·로그 |
 
-화면 HTML 4개는 `static` 바로 아래에 둡니다. 기존 `/lnis/assets/*.js`·CSS 주소는 새 위치로 리다이렉트하므로 캐시된 HTML에서도 파일을 찾을 수 있습니다.
-`common/api.js`는 기존 import 진입점이며, JSON 응답 처리는 `common/http.js`, AFS 결과 표시는 `afs/result-presentation.js`에서 관리합니다. 빈 응답·404·오류 문구 정책은 호출 화면별로 유지하며 바이너리 다운로드와 WebSocket은 별도 처리합니다.
+같은 JVM 안의 실행 요청과 결과는 직접 메서드·콜백으로 전달합니다. 내부 JSON 명령/ACK·Base64 청크는 사용하지 않습니다. 비동기 실행·취소·크기 제한·삭제 보호·네이티브 자원 수명은 유지합니다. 브라우저 WebSocket, PC 간 REST, 어댑터 JSON, 기존 DB 테이블·파일 형식은 변경하지 않습니다. `/agents`와 `agentId` 이름은 기존 화면/API 호환을 위해 유지합니다.
+
+자체 Java와 테스트는 4칸 들여쓰기, 같은 줄 여는 중괄호, 제어문 본문 줄바꿈을 사용합니다. 원본 네이티브 코드·주석·패치는 포맷 변경 대상이 아닙니다.
+
+2026-09-27 구조 변경 검증: Java 테스트 180건 통과·1건 제외(과거 네이티브 진단 로그 비교 자료 필요), 화면 테스트·배포 ZIP 빌드 통과, 원본 네이티브 82개 파일 해시 유지. 개발용 REST 중계로 GNSS RAW/AFS 원본 복원(PVT 차이 0), 양쪽 지연 반영, 90초·2.16GB I/Q 생성·수신·추적 PVT 계산을 확인했습니다. 실제 GNSS 장비와 외부 DTN/HDTN 엔진 시험을 대체하지 않습니다.
+
+화면 HTML은 `static`, JSON 응답 처리는 `common/http.js`에 있습니다. 바이너리 다운로드와 브라우저 WebSocket은 별도로 처리합니다.
 DTN 스타일은 기존 적용 순서를 유지한 `dtn/dtn-ui.css` 하나에 모았습니다. 개발용 합성 재생 영역의 `hidden`과 `/clear`의 화면 초기화 동작은 유지합니다.
 
 ## 기존 WSL 노드에 JAR 갱신
@@ -302,7 +309,7 @@ DTN 스타일은 기존 적용 순서를 유지한 `dtn/dtn-ui.css` 하나에 �
 기본 대상은 `C:\lnis-compose`와 `C:\lnis-compose-리시버`입니다. 하나만 갱신하려면 `-TargetDirectories 'C:\lnis-compose'`를 지정하고, WSL 배포판은 `-Distribution Ubuntu`로 선택합니다. 진행 중인 시험·수집을 종료한 뒤 실행하세요.
 
 스크립트는 기존 `node` 서비스의 이미지·DB 마운트를 확인하고 JAR의 SHA-256과 필수 ZIP 항목을 검증한 다음 교체합니다. 각 노드의 `backups/날짜-시간`에 이전 JAR·설정과 정지 상태의 DB를 보관하고, 이미지를 빌드한 뒤 노드를 순서대로 재기동하여 Docker readiness를 기다립니다. Compose에 `build`가 없는 수신 노드도 지원합니다. 기존 `.env`, Compose, Dockerfile, 네이티브 파일은 덮어쓰지 않습니다.
-실패한 노드는 이전 JAR·이미지로 복구를 시도합니다. 앞서 성공한 노드는 새 버전을 유지하며 DB는 자동으로 과거 상태로 되돌리지 않습니다. 기존 중앙 서버/Windows Agent용 배포와 개발 중계·USB용 Compose 추가 파일은 각 실행 방식에 필요하므로 유지합니다.
+실패한 노드는 이전 JAR·이미지로 복구를 시도합니다. 앞서 성공한 노드는 새 버전을 유지하며 DB는 자동으로 과거 상태로 되돌리지 않습니다. 개발 중계·USB용 Compose 추가 파일은 유지합니다.
 
 
 ### HDTN 설정 화면
@@ -328,13 +335,13 @@ DTN 스타일은 기존 적용 순서를 유지한 `dtn/dtn-ui.css` 하나에 �
 
 `detail=true`인 시험 로그도 INFO에서 확인할 수 있습니다. 화면 상세 토글을 해제해도 콘솔 출력은 유지됩니다.
 저장된 시험/원문/보고서를 화면에서 조회하는 동작은 INFO에 본문을 재출력하지 않습니다.
-AFS 서버 이벤트는 발행 시 한 번, 브라우저에서만 생기는 메시지는 공통 화면 로그 API로 한 번 기록합니다.
+시험 서버 이벤트는 발행 시 한 번, 브라우저에서만 생기는 메시지는 공통 화면 로그 API로 한 번 기록합니다.
 브라우저가 서버에 연결되지 못한 동안의 화면 전용 메시지는 화면에 남고 재전송하지 않습니다.
 
 `API_END`의 `direction=OUT`은 LNIS가 보낸 요청, `IN`은 LNIS가 받은 요청입니다.
 `method`, `url`, `status`, `elapsedMs`, `requestBytes`, `responseBytes`로 어떤 요청과 응답인지 확인합니다.
 IN의 `peer`는 Servlet이 식별한 클라이언트 IP·포트, `local`은 서버 측 IP·포트이며 Docker/NAT/프록시 환경에서는 내부 주소일 수 있습니다.
-`mapping=/lnis/api/v1/sessions/{id}/evidence`처럼 매핑 경로도 표시하지만 컨트롤러/메서드명은 표시하지 않습니다.
+`mapping=/lnis/api/v1/dtn/tests/{id}/report`처럼 매핑 경로도 표시하지만 컨트롤러/메서드명은 표시하지 않습니다.
 요청이 매핑되기 전에 거절되면 `mapping=unresolved`입니다. OUT의 상대 서버 주소·포트는 `url`로 확인합니다.
 클라이언트 포트는 임시 포트일 수 있으며, 외부 어댑터의 서비스 포트와는 다릅니다.
 
@@ -367,4 +374,4 @@ Docker 로그는 서비스별 `100m` 파일 5개로 순환 보관합니다. 한�
 
 ### 설정·로그·구성도 추가 검증
 
-`./gradlew test --tests server.central.dtn.DtnPresetTest webTest`로 프리셋 DB·동시 저장·API와 기존 화면 회귀 검증을 실행합니다. 실제 Chromium 검증은 Playwright 설치 경로를 `PLAYWRIGHT_MODULE`로 지정하고 `node src/test/js/dtn-features.browser.cjs`를 실행합니다. 테스트는 임시 HTTP 서버와 모의 API를 사용하며 운영 서비스를 재기동하거나 시험 데이터를 전송하지 않습니다.
+`./gradlew test --tests server.dtn.DtnPresetTest webTest`로 프리셋 DB·동시 저장·API와 기존 화면 회귀 검증을 실행합니다. 실제 Chromium 검증은 Playwright 설치 경로를 `PLAYWRIGHT_MODULE`로 지정하고 `node src/test/js/dtn-features.browser.cjs`를 실행합니다. 테스트는 임시 HTTP 서버와 모의 API를 사용하며 운영 서비스를 재기동하거나 시험 데이터를 전송하지 않습니다.

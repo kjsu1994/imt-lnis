@@ -1,8 +1,0 @@
-lnis:
-  agent:
-    id: receiver-1
-    token: change-me-receiver
-  server:
-    ws: ws://192.168.1.72:8088/lnis/agent/ws
-  native:
-    dir: native

@@ -1,9 +1,9 @@
 # LNIS API 명세서
 
-현재 소스 코드에 구현된 LNIS 송신·수신 독립 노드 및 기존 중앙 서버의 REST API와 WebSocket 계약입니다.
+현재 소스 코드에 구현된 LNIS 송신·수신 통합 노드의 REST API와 브라우저 WebSocket 계약입니다.
 
 - 기준 버전: `1.0.0`
-- Agent WebSocket protocol: `3`
+- 통합 노드 내부는 직접 호출하며 외부 REST·브라우저 이벤트 형식은 유지합니다.
 - 2026-09-22 확인한 로컬 시험 주소: 송신 `http://192.168.1.72:8088`, 수신 `http://192.168.1.72:8089`
 - 운영은 송신·수신 각각 다른 PC입니다. 위 주소는 현재 시험 환경 예시이며 실제 노드 주소·포트로 바꿉니다.
 - REST 기본 경로: `/lnis/api/v1`
@@ -28,14 +28,7 @@ JSON 응답에서는 값이 `null`인 속성이 생략될 수 있습니다.
 
 현재 브라우저 REST API에는 사용자 인증이 없습니다. 신뢰할 수 있는 시험 LAN에서만 사용해야 합니다.
 
-Agent WebSocket은 다음 두 헤더로 인증합니다.
-
-```http
-X-LNIS-Agent-Id: sender-1
-Authorization: Bearer <agent-token>
-```
-
-Agent ID와 token은 서버의 `LNIS_AGENT_TOKENS` 설정과 일치해야 합니다.
+노드 간 관리 요청과 어댑터 수신 요청은 각 REST 인증 설정을 사용합니다. 별도 Agent 인증·제어 WebSocket은 제거되었습니다.
 
 ### HTTP 상태 코드
 
@@ -68,7 +61,6 @@ Agent ID와 token은 서버의 `LNIS_AGENT_TOKENS` 설정과 일치해야 합니
 
 | 구분 | Method | 경로 | 설명 |
 |---|---|---|---|
-| Discovery | GET | `/discovery` | 중앙 서버 식별 |
 | Agent | GET | `/agents` | 전체 Agent 조회 |
 | Agent | GET | `/agents/{agentId}` | Agent 조회 |
 | Agent | POST | `/agents/{agentId}/serial-ports/refresh` | COM 포트 목록 요청 |
@@ -85,18 +77,9 @@ Agent ID와 token은 서버의 `LNIS_AGENT_TOKENS` 설정과 일치해야 합니
 | Actuator | GET | `/actuator/health/readiness` | 준비 상태 |
 | Actuator | GET | `/actuator/info` | 서버 정보 |
 
-## 3. Discovery
+## 3. 제거된 구형 인터페이스
 
-```http
-GET /lnis/api/v1/discovery
-```
-
-```json
-{
-  "service": "lnis-server",
-  "agentWebSocketPath": "/lnis/agent/ws"
-}
-```
+`GET /discovery`와 `/lnis/agent/ws`는 더 이상 제공하지 않습니다. 노드 상태는 기존 `/node/peer/status` 관리 API를 사용합니다. `/agents` 조회·COM 요청과 JSON의 `agentId`, `senderAgentId`, `receiverAgentId`는 기존 API 호환을 위해 유지하며 별도 Agent 프로세스를 뜻하지 않습니다.
 
 Windows Agent가 LAN에서 중앙 서버 후보를 식별할 때 사용합니다.
 
@@ -314,36 +297,6 @@ ws://192.168.1.72:8088/lnis/ws/status
 `AGENT_STATUS`, `GNSS_STATUS`, `TX_STATUS`, `RX_STATUS`, `SESSION_STATUS`, `RESULT`, `ERROR`
 
 WebSocket은 실시간 표시용입니다. 재접속 시 `/agents` 및 `/dtn/tests` 조회로 현재 상태를 확인합니다.
-
-### Agent 제어
-
-```text
-ws://192.168.1.72:8088/lnis/agent/ws
-```
-
-Handshake에는 `X-LNIS-Agent-Id`와 `Authorization: Bearer ...`가 필요합니다.
-
-```json
-{
-  "protocolVersion": 3,
-  "type": "HEARTBEAT",
-  "messageId": "e933e096-3ddf-45a7-a27e-a30a30d829ee",
-  "correlationId": null,
-  "agentId": "receiver-1",
-  "role": "RECEIVER",
-  "sessionId": null,
-  "occurredAt": "2026-09-04T02:17:57.277580Z",
-  "payload": {}
-}
-```
-
-메시지 종류:
-
-`HELLO`, `HELLO_ACK`, `HEARTBEAT`, `COMMAND`, `COMMAND_ACK`, `STATUS`, `PORT_LIST`, `INPUT_CHUNK`, `INPUT_COMPLETE`, `DTN_DATA`, `ERROR`
-
-명령 종류:
-
-`LIST_PORTS`, `START_CAPTURE`, `STOP_CAPTURE`, `DTN_PROCESS`, `DTN_STOP_CAPTURE`
 
 ## 11. 화면 경로
 
@@ -1119,7 +1072,7 @@ LNIS는 어댑터 로그를 수신 노드의 `[DTN]` 상세 항목으로 저장�
 
 ### 공통 HTTP API 로깅
 
-`API_START` / `API_END`는 모든 `/lnis/api/v1/` 호출과 외부 HTTP 호출(DTN 전송, 헬스체크, 노드 관리, 서버 탐색)에 적용됩니다. IN/OUT, requestId, traceId, 메서드, URL, HTTP 상태, 소요 시간, 실제 읽고 쓴 바이트 수, 안전한 헤더를 기록합니다. 본문에서 확인 가능한 testId도 표시합니다. 요청을 읽지 않고 거절한 경우 requestBytes는 0일 수 있으며 Content-Length와 구분합니다. WebSocket 메시지는 기존 연결/시험 이벤트 로그를 유지합니다.
+`API_START` / `API_END`는 모든 `/lnis/api/v1/` 호출과 외부 HTTP 호출(DTN 전송, 헬스체크, 노드 관리)에 적용됩니다. IN/OUT, requestId, traceId, 메서드, URL, HTTP 상태, 소요 시간, 실제 읽고 쓴 바이트 수, 안전한 헤더를 기록합니다. 본문에서 확인 가능한 testId도 표시합니다. 요청을 읽지 않고 거절한 경우 requestBytes는 0일 수 있으며 Content-Length와 구분합니다. WebSocket 메시지는 기존 연결/시험 이벤트 로그를 유지합니다.
 
 `API_START`와 헤더는 DEBUG입니다. 정상 GET/HEAD/OPTIONS 조회 및 `/logs/screen` 전달 성공은 DEBUG이며, 연결 상태 변화와 변경 API 결과는 INFO입니다. 반복 연결 실패를 포함하여 HTTP 4xx·통신 실패는 매번 WARN, 5xx는 ERROR로 남깁니다. 정상 목록/보고서/원문 조회는 INFO에서 본문을 재출력하거나 상태 비교용으로 전체 응답을 보관하지 않습니다.
 
@@ -1156,7 +1109,7 @@ Docker 콘솔의 레벨 표시는 `[WARN]`만 굵은 노랑(ANSI 1;33), `[ERROR]
 
 시험 보관은 종료 갱신 시각, 미연결 원문은 수신 시각, 미사용 파일은 생성 시각(기존 I/Q는 최초 남아 있는 파일 시각)을 기준으로 한다. 10분마다 최대 500건씩 동일 삭제 로직을 사용한다. DTN 시험과 입력 정리는 이 설정을 사용하며 기존 LNIS_COMPLETED_RETENTION/INCOMPLETE_RETENTION으로 시험을 삭제하지 않는다. 내부 통신 이벤트 24시간 및 준비 로그 7일 정리는 유지한다. 운영 연결 설정·인증 값·Agent 등록은 관리 삭제 대상이 아니다.
 
-삭제는 요청과 경합하지 않게 직렬화하고 파일/DB 실패 시 이력을 보존해 재시도한다. 관리 테이블은 정책·고정·삭제 ID·작업 이력을 저장하며 원문을 복사하지 않는다. 삭제 ID는 늦은 재등록·콜백·Agent 메시지로 시험이 되살아나는 것을 차단하기 위해 유지한다. 운영 DB 초기화·압축·복원은 제공하지 않는다.
+삭제는 요청과 경합하지 않게 직렬화하고 파일/DB 실패 시 이력을 보존해 재시도한다. 관리 테이블은 정책·고정·삭제 ID·작업 이력을 저장하며 원문을 복사하지 않는다. 삭제 ID는 늦은 재등록·로컬 계산 콜백로 시험이 되살아나는 것을 차단하기 위해 유지한다. 운영 DB 초기화·압축·복원은 제공하지 않는다.
 
 
 ## 1 Epoch 지연 반영 PVT 비교 (LNIS 내부 기능)

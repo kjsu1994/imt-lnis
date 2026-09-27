@@ -1,0 +1,22 @@
+package server.dtn;
+
+import lombok.RequiredArgsConstructor;
+
+import org.springframework.http.CacheControl;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequiredArgsConstructor
+@RequestMapping("/lnis/api/v1/dtn/adapter-health")
+public class DtnAdapterHealthController {
+    private final DtnAdapterHealthService health;
+
+    @GetMapping
+    public ResponseEntity<DtnAdapterHealthService.HealthReport> check(
+            @RequestParam(required = false) String adapterUrl) {
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(health.check(adapterUrl));
+    }
+}

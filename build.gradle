@@ -101,7 +101,7 @@ tasks.register('syntheticGraw', JavaExec) {
     description = '실측이 아닌 지구 PVT 검증용 GRAW와 예상 결과를 생성한다.'
     dependsOn tasks.named('testClasses')
     classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'server.agent.codec.ExportSyntheticGraw'
+    mainClass = 'server.afs.ExportSyntheticGraw'
     javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }
     systemProperty 'lnis.native.candidate', providers.gradleProperty('nativeCandidate').orElse('native/bin/win-x64').get()
 }
@@ -196,84 +196,5 @@ tasks.named('test') { mustRunAfter tasks.named('nativeBuild') }
 tasks.named('syntheticGraw') { mustRunAfter tasks.named('nativeBuild') }
 tasks.named('linuxNativeVerificationZip') { mustRunAfter tasks.named('nativeBuild') }
 
-tasks.register('agentDistZip', Zip) {
-    dependsOn tasks.named('bootJar'), tasks.named('nativeBuild'), tasks.named('nativeLinuxSourcesZip')
-    archiveFileName = 'lnis-agent-windows.zip'
-    destinationDirectory = layout.buildDirectory.dir('distributions')
-
-    from(tasks.named('bootJar').flatMap { it.archiveFile }) {
-        rename { 'lnis.jar' }
-    }
-    from('build/native-pvt') {
-        include 'LnisAfsCodec.dll'
-        into 'native'
-    }
-    from(tasks.named('nativeLinuxSourcesZip').flatMap { it.archiveFile }) { into 'licenses' }
-    from('native/THIRD-PARTY-NOTICES.txt')
-    from('native/RTKLIB-README.txt')
-    from('config') {
-        into 'config'
-    }
-    from('deployment/agent')
-    from('dist/windows-agent/runtime/jdk-21') {
-        into 'runtime'
-    }
-
-    doFirst {
-        if (!file('dist/windows-agent/runtime/jdk-21/bin/java.exe').isFile()) {
-            throw new GradleException(
-                    'Agent 전용 Java 21 runtime이 없습니다. 기존 runtime 설치 절차를 먼저 실행하세요.')
-        }
-    }
-}
-
-// 운영 폴더는 소스 저장소와 분리한다. -PlnisComposeDir=...로 다른 경로를 지정할 수 있다.
-def lnisComposeDirectory = providers.gradleProperty('lnisComposeDir').orElse('C:/lnis-compose')
-
-tasks.register('deployComposeBundle') {
-    group = 'distribution'
-    description = '실행에 필요한 파일만 C:/lnis-compose에 복사한다.'
-    dependsOn tasks.named('bootJar')
-    dependsOn tasks.named('agentDistZip')
-    dependsOn tasks.named('check')
-
-    doFirst {
-        File existingCompose = new File(file(lnisComposeDirectory.get()), 'docker-compose.yml')
-        if (existingCompose.isFile() && existingCompose.getText('UTF-8').contains('LNIS_NODE_ROLE:')) {
-            throw new GradleException('대상 폴더는 독립 노드입니다. 중앙 서버 배포로 덮어쓰지 않습니다. linuxNodeDistZip 배포본을 사용하세요.')
-        }
-    }
-
-    doLast {
-        File target = file(lnisComposeDirectory.get())
-        target.mkdirs()
-
-        // Copy 대신 Gradle copy 작업을 명시적으로 사용해 기존 .env와 DB를 삭제하지 않는다.
-        copy {
-            from('deployment/compose')
-            into(target)
-        }
-        copy {
-            from(tasks.named('bootJar').flatMap { it.archiveFile })
-            into(target)
-            rename { 'lnis.jar' }
-        }
-        copy {
-            from(tasks.named('agentDistZip').flatMap { it.archiveFile })
-            into(new File(target, 'agent'))
-        }
-        new File(target, 'DB').mkdirs()
-        File environment = new File(target, '.env')
-        if (!environment.exists()) {
-            copy {
-                from('deployment/compose/.env.example')
-                into(target)
-                rename { '.env' }
-            }
-        }
-        logger.lifecycle("LNIS 운영 배포본 갱신 완료: ${target.absolutePath}")
-        logger.lifecycle('기존 .env와 DB 폴더는 유지했습니다.')
-    }
-}
 
 // Build verifies artifacts only. Deployment is always an explicit task.
