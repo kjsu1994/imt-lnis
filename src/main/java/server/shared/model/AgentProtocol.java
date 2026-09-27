@@ -32,11 +32,6 @@ public final class AgentProtocol {
     PORT_LIST,
     INPUT_CHUNK,
     INPUT_COMPLETE,
-    AFS_TRANSFER_START,
-    AFS_TRANSFER_BATCH,
-    AFS_TRANSFER_COMPLETE,
-    FRAME_EVIDENCE,
-    ROLE_RESULT,
     DTN_DATA,
     ERROR
   }
@@ -46,9 +41,6 @@ public final class AgentProtocol {
     LIST_PORTS,
     START_CAPTURE,
     STOP_CAPTURE,
-    ARM_RECEIVER,
-    START_SENDER,
-    CANCEL_SESSION,
     DTN_PROCESS,
     DTN_STOP_CAPTURE
   }

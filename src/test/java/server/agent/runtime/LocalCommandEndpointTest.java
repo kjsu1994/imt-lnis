@@ -67,6 +67,17 @@ class LocalCommandEndpointTest {
     }
 
     @Test
+    void refusesNonCommandMessagesBeforeExecution()
+    {
+        for (MessageType type : MessageType.values()) {
+            if (type == MessageType.COMMAND) continue;
+            var message = Envelope.of(type, "sender-1", AgentRole.SENDER, null, objectMapper.createObjectNode());
+            assertThrows(IllegalArgumentException.class, () -> endpoint.send(message));
+        }
+        verify(agentRuntime, never()).handle(any());
+    }
+
+    @Test
     void closesRuntimeOnceAndRefusesNewWork()
     {
         endpoint.close();

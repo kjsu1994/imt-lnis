@@ -40,12 +40,15 @@ docker compose ps
 `dtn_adapter`, `LNIS_DTN_SEND_TOKEN`, `LNIS_DTN_RECEIVE_TOKEN`.
 관리 토큰은 양쪽 동일하게, 어댑터 토큰은 해당 연결 상대와 맞춥니다. 기존 DB·토큰을 임의 삭제하지 마세요.
 
-- AFS 화면: `/lnis/afstest/sender`, `/lnis/afstest/receiver`
+- 독립 AFS Frame 검증시험은 제거했습니다. 과거 `/lnis/afstest/sender`, `/lnis/afstest/receiver` 북마크는 DTN 화면으로 이동합니다.
+- DTN의 AFS Frame + Metadata·I/Q와 공용 AFS 코덱은 유지합니다. 기존 AFS 시험 DB·산출물은 자동 삭제하지 않으며, 이전 버전 이력은 운영 백업으로 보존합니다.
 - DTN 화면: `/lnis/dtntest/sender`, `/lnis/dtntest/receiver`
 - [운영 USB/WSL2 연결](deployment/node/WSL2-GNSS.md)
 - [어댑터 개발자 공유 계약 — API-SPEC 맨 아래 15장 전체](API-SPEC.md#adapter-contract)
 
 ## 시험
+
+2026-09-27 재배포 검증: GNSS RAW·AFS v4 원본 복원 PVT는 `PASS`, 두 방식의 지연 반영은 `MEASURED`를 확인했습니다. 새 90초 I/Q(2,160,000,000 bytes)는 송수신 해시 일치 및 69 Epoch의 유효 위치·속도를 확인했습니다. I/Q 오차에는 합격 허용오차를 적용하지 않습니다. 개발용 REST 중계에서 검증한 결과이며 실물 COM·실제 DTN/HDTN 엔진 검증과 구분합니다.
 
 DTN의 GNSS 수집 데이터 화면은 관측값(RAWX)과 항법정보(SFRBX)를 별도 표로 표시합니다. 항법 메시지는 중복을 포함해 보존하며, 펼침 메뉴에서 저장된 전체 필드를 확인할 수 있습니다. 현재 GRAW는 RAWX/SFRBX와 수집 메타데이터를 저장하며 NAV-PVT·NMEA 등 수신기의 다른 출력은 포함하지 않습니다.
 
@@ -64,8 +67,8 @@ DTN의 GNSS 수집 데이터 화면은 관측값(RAWX)과 항법정보(SFRBX)를
 | 시험 | 전송 내용 | 검증 |
 |---|---|---|
 | GNSS RAW | 원본 GRAW 바이트의 Base64 | 입력 무결성·송수신 지구 PVT |
-| AFS + Metadata | 원본 형식 AFS SB2 항법정보 + JSON 관측값·보조 항법정보 | 복원 무결성·송수신 지구 PVT |
-| I/Q Sample | 90초 BIN 경로·크기·해시 + GPS LNAV + 초기 기준 PVT | 파일 무결성·I/Q 추적 관측값·보조 항법 기반 지구 PVT 오차 |
+| AFS + Metadata | v4 AFS SB2·SB3 항법정보 + SB4 관측값, JSON 원본 보존 metadata | 프레임 복원·원본 대조·송수신 지구 PVT |
+| I/Q Sample | 90초 BIN 경로·크기·해시 + 생성 정보·초기 기준 PVT | 파일 무결성·I/Q 추적 관측값·프레임 항법 기반 지구 PVT 오차(v2) |
 
 PVT는 지구 ECEF GPS L1 SPP입니다. 송수신 일치는 계산 재현성 검증이며 실제 위치 정확도 보증이 아닙니다.
 수신 화면은 전송 JSON의 송신 기준 PVT와 독립 계산한 수신 PVT를 좌우로 비교하고, 일치 여부와 차이를 표시합니다. 기준값이 없는 과거 시험은 비교 불가로 표시합니다. 송신 화면에는 기준 PVT만 표시하며 서버의 비교 판정은 유지합니다.
@@ -280,7 +283,6 @@ docker compose -f src/test/dtn-native-compose.yml down
 | 로컬 실행기 | `server/agent` | 수집·송수신·코덱 실행 |
 | 공통 계약 | `server/shared` | 모델·명령·코덱 계약 |
 | 화면 공통 | `static/assets/common` | 기본 CSS, HTTP 요청, 노드 연결 |
-| AFS 화면 | `static/assets/afs` | 송수신 화면, 결과 표시, 프레임·로그 |
 | DTN 화면 | `static/assets/dtn` | 송수신 화면, 어댑터 상태, 관측값·원문·로그 |
 
 화면 HTML 4개는 `static` 바로 아래에 둡니다. 기존 `/lnis/assets/*.js`·CSS 주소는 새 위치로 리다이렉트하므로 캐시된 HTML에서도 파일을 찾을 수 있습니다.

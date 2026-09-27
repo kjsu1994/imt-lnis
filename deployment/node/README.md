@@ -23,7 +23,7 @@ USB 매핑 없이도 GRAW 파일 업로드 시험은 가능합니다. 기본 구
 
 ## 통신 및 저장
 
-- 관리 REST 및 AFS 프레임 전송: 양쪽 TCP 8088(또는 `LNIS_SERVER_PORT`). 토큰은 URL에 넣지 않습니다. 신뢰하는 시험 LAN에서만 사용하고 외부망에서는 TLS/방화벽을 구성하세요.
+- 노드 관리 REST 및 DTN 수신 API: 양쪽 TCP 8088(또는 `LNIS_SERVER_PORT`). 독립 AFS 검증시험 전송은 제거했습니다. 토큰은 URL에 넣지 않습니다. 신뢰하는 시험 LAN에서만 사용하고 외부망에서는 TLS/방화벽을 구성하세요.
 - DTN: 송신 화면의 URL로 외부 어댑터에 POST합니다. 외부 수신 어댑터는 **수신 PC**의 `/lnis/api/v1/dtn/receive`에 같은 JSON과 `Authorization: Bearer 수신토큰`을 전달합니다.
 - 송신 DB: 입력, 송신 JSON, 기준 PVT, 수신 PVT 및 비교 결과.
 - 수신 DB: 사전 등록된 ID/해시, 최초 수신 JSON 원문, 복호화/PVT 결과. 기준 PVT나 송신 입력 파일은 복사하지 않습니다.

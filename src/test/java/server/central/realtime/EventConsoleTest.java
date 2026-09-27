@@ -25,14 +25,14 @@ class EventConsoleTest {
         try {
             UUID id = UUID.randomUUID();
             var payload = Map.of("message", "detail", "nested", Map.of("token", "PRIVATE_TOKEN"));
-            service.publish(EventType.TX_STATUS, "sender-1", AgentRole.SENDER, id, payload);
+            service.publish(EventType.GNSS_STATUS, "sender-1", AgentRole.SENDER, id, payload);
             service.publish(EventType.ERROR, "receiver-1", AgentRole.RECEIVER, id, payload);
             service.publish(EventType.ERROR, "receiver-1", AgentRole.RECEIVER, id, payload, true);
             verify(browser, times(3)).broadcast(any());
             assertEquals(2, output.list.size());
             assertEquals(Level.INFO, output.list.get(0).getLevel());
             assertEquals(Level.ERROR, output.list.get(1).getLevel());
-            assertTrue(output.list.getFirst().getFormattedMessage().contains("AFS_EVENT END"));
+            assertTrue(output.list.getFirst().getFormattedMessage().contains("AGENT_EVENT END"));
             assertFalse(output.list.toString().contains("PRIVATE_TOKEN"));
         } finally {
             logger.detachAppender(output); logger.setLevel(previous); output.stop();

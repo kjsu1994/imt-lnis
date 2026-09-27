@@ -133,18 +133,6 @@
  void append_CRC24(uint8_t* syms, int len)
  {
      uint8_t buff[256];
-@@ -3945,6 +4020,11 @@
-     return;
- }
- 
-+/* 확인 - 인터리빙
-+* AFS_SB234[0 ~ 2399]       SB2 2400심볼
-+AFS_SB234[2400 ~ 4139]    SB3 1740심볼
-+AFS_SB234[4140 ~ 5879]    SB4 1740심볼 
-+*/
- void interleave_AFS_SF234(uint8_t* syms_in, uint8_t* syms_out)
- {
-     int i, j, k;
 --- a/LANS-AFS-SIM/afs_nav.h
 +++ b/LANS-AFS-SIM/afs_nav.h
 @@ -1,3 +1,7 @@
@@ -197,36 +185,6 @@
  #include <stdio.h>
  #include <stdlib.h>
  #include <math.h>
-@@ -940,6 +976,29 @@
-     exit(0);
- }
- 
-+/*
-+ * AFS 데이터 프레임 생성 순서
-+ *
-+ * 1. SB2
-+ *    - 위성별 궤도 및 시계정보를 비트 필드로 구성
-+ *    - 데이터 1176비트 + CRC24 = 1200비트
-+ *    - LDPC 부호화 및 천공
-+ *    - 전송 심볼 2400개 생성
-+ *
-+ * 2. SB3/SB4
-+ *    - 현재 구현은 실제 항법정보 대신 0,1 반복 시험 패턴 사용
-+ *    - 데이터 846비트 + CRC24 = 870비트
-+ *    - filler 10비트 추가 후 LDPC 부호화 및 천공
-+ *    - 각 서브프레임당 전송 심볼 1740개 생성
-+ *
-+ * 3. SB2 + SB3 + SB4
-+ *    - 2400 + 1740 + 1740 = 5880심볼
-+ *    - 60행 × 98열 블록 인터리빙 수행
-+ *
-+ * 4. 전체 데이터 프레임
-+ *    - 동기 패턴 68 + SB1 52 + SB2~SB4 5880
-+ *    - 총 6000심볼, 심볼당 2ms이므로 12초
-+ */
- int main(int argc, char** argv)
- {
-     FILE *fp;
 @@ -1201,6 +1260,8 @@
  
      // Insert synchronization pattern 

@@ -47,12 +47,7 @@ public final class LocalCommandEndpoint implements CommandEndpoint, AutoCloseabl
                 || agentConfig.role() != message.role()) {
             throw new IllegalArgumentException("로컬 실행기의 역할, ID 또는 프로토콜 버전이 일치하지 않습니다.");
         }
-        if (message.type() != MessageType.COMMAND
-                && message.type() != MessageType.INPUT_CHUNK
-                && message.type() != MessageType.INPUT_COMPLETE
-                && message.type() != MessageType.AFS_TRANSFER_START
-                && message.type() != MessageType.AFS_TRANSFER_BATCH
-                && message.type() != MessageType.AFS_TRANSFER_COMPLETE) {
+        if (message.type() != MessageType.COMMAND) {
             throw new IllegalArgumentException("실행기에 전달할 수 없는 메시지 종류입니다.");
         }
 

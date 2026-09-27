@@ -17,3 +17,10 @@ for(const file of walk(root)) {
   }
 }
 console.log('PASS: all HTML asset links and ES module imports resolve after folder relocation');
+for (const name of ['afs-sender.html', 'afs-receiver.html', 'assets/afs/sender.js', 'assets/afs/receiver.js', 'assets/common/api.js']) {
+  assert.equal(existsSync(path.join(root, name)), false, 'Removed AFS-only asset returned: ' + name);
+}
+for (const name of ['dtn-sender.html', 'dtn-receiver.html']) {
+  assert.doesNotMatch(readFileSync(path.join(root, name), 'utf8'), /\/lnis\/afstest\/|test-suite-tabs/);
+}
+console.log('PASS: independent AFS pages/assets and suite tabs remain removed');

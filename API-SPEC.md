@@ -55,7 +55,7 @@ Agent ID와 token은 서버의 `LNIS_AGENT_TOKENS` 설정과 일치해야 합니
   "title": "Conflict",
   "status": 409,
   "detail": "Another test session is active",
-  "instance": "/lnis/api/v1/sessions",
+  "instance": "/lnis/api/v1/dtn/tests",
   "code": "CONFLICT"
 }
 ```
@@ -80,15 +80,6 @@ Agent ID와 token은 서버의 `LNIS_AGENT_TOKENS` 설정과 일치해야 합니
 | Capture | POST | `/captures` | GNSS 수집 시작 |
 | Capture | POST | `/captures/{captureId}/stop` | GNSS 수집 중지 |
 | Capture | POST | `/captures/{captureId}/complete` | 수집 입력 완료 |
-| Session | POST | `/sessions` | AFS 시험 시작 |
-| Session | GET | `/sessions/active` | 활성 시험 조회 |
-| Session | GET | `/sessions/{sessionId}` | 시험 조회 |
-| Session | POST | `/sessions/{sessionId}/cancel` | 시험 취소 |
-| Evidence | GET | `/sessions/{sessionId}/frame-evidence` | 프레임 증거 목록 |
-| Evidence | GET | `/sessions/{sessionId}/frame-evidence/{frameIndex}` | 프레임 증거 상세 |
-| Evidence | GET | `/sessions/{sessionId}/frame-evidence/artifacts/{fileName}` | 프레임 증거 파일 |
-| Artifact | GET | `/sessions/{sessionId}/artifacts/{fileName}` | 통합 결과 파일 |
-| Artifact | GET | `/sessions/{sessionId}/artifacts/{role}/{fileName}` | 역할별 결과 파일 |
 | Actuator | GET | `/actuator/health` | 서버 상태 |
 | Actuator | GET | `/actuator/health/liveness` | 생존 상태 |
 | Actuator | GET | `/actuator/health/readiness` | 준비 상태 |
@@ -292,182 +283,9 @@ POST /lnis/api/v1/captures/{captureId}/complete
 
 canonical GRAW 검증 후 완료된 Input 객체를 반환합니다. `raw-only` 입력은 시험 입력으로 완료할 수 없습니다.
 
-## 7. Session
+## 7–9. 제거된 독립 AFS 검증시험
 
-### 시험 생성
-
-```http
-POST /lnis/api/v1/sessions
-Content-Type: application/json
-```
-
-```json
-{
-  "senderAgentId": "sender-1",
-  "receiverAgentId": "receiver-1",
-  "inputId": "4c0694f1-ce13-4a03-90d1-94288775f7bd",
-  "afs": {"prn": 1},
-  "options": {
-    "testType": "TEST_A_NORMAL",
-    "errorCount": 1,
-    "errorSeed": 1,
-    "syncDamageInterval": 10,
-    "thresholds": {}
-  }
-}
-```
-
-시험 종류:
-
-- `TEST_A_NORMAL`: 정상 송수신
-- `TEST_B_RANDOM_ERRORS`: 임의 비트 오류
-- `TEST_C_BURST_ERRORS`: 연속 비트 오류
-- `TEST_D_SYNC_RECOVERY`: 동기 손상 후 재동기
-
-검증 조건:
-
-- 입력은 `complete=true`
-- Agent가 존재하고 Sender/Receiver 역할이 일치
-- 동시에 하나의 활성 시험만 허용
-- `afs.prn`: 1~8
-- Test B/C `errorCount`: 1~5,880
-- Test D `errorCount`: 1~68, `syncDamageInterval`: 1 이상
-
-| 0 또는 생략 시 기본값 | 값 |
-|---|---|
-| `afs.prn` | `1` |
-| `testType` | `TEST_A_NORMAL` |
-| `errorCount`, `errorSeed` | `1` |
-| `syncDamageInterval` | `10` |
-
-처리 순서:
-
-```text
-검증 → H2 lock → WAITING_RECEIVER 저장 → Receiver ARM
-     → Sender GRAW 전달 → Sender START
-```
-
-중간 실패 시 양쪽 Agent에 `CANCEL_SESSION`을 시도하고 세션을 `FAILED`로 저장한 후 lock을 해제합니다.
-
-### 활성 시험
-
-```http
-GET /lnis/api/v1/sessions/active
-```
-
-활성 시험이 있으면 `200`과 SessionSnapshot, 없으면 `204`입니다.
-
-### 시험 조회
-
-```http
-GET /lnis/api/v1/sessions/{sessionId}
-```
-
-| 필드 | 설명 |
-|---|---|
-| `sessionId` | 시험 UUID |
-| `state` | 실행 상태 |
-| `testType` | Test 종류 |
-| `senderAgentId`, `receiverAgentId` | 참여 Agent |
-| `inputId` | 입력 UUID |
-| `progress` | 0~100 |
-| `message` | 단계 또는 종료 사유 |
-| `verdict` | `PASS`, `FAIL`, `INCONCLUSIVE` |
-| `createdAt`, `updatedAt` | 생성·갱신 시각 |
-| `txResult`, `rxResult` | 역할별 결과, 미도착 시 생략 |
-
-상태 값:
-
-`CREATED`, `WAITING_RECEIVER`, `TRANSMITTING`, `EVALUATING`, `COMPLETED`, `CANCELLED`, `FAILED`, `INCONCLUSIVE`
-
-### 시험 취소
-
-```http
-POST /lnis/api/v1/sessions/{sessionId}/cancel
-```
-
-양쪽 Agent에 취소를 각각 시도하고 중앙 상태를 `CANCELLED`로 저장합니다. 한 Agent가 오프라인이어도 나머지 취소와 lock 해제를 계속합니다.
-
-## 8. 결과 산출물
-
-### 통합 결과
-
-```http
-GET /lnis/api/v1/sessions/{sessionId}/artifacts/lnis-report.json
-GET /lnis/api/v1/sessions/{sessionId}/artifacts/lnis-report.xlsx
-```
-
-통합 JSON 최상위 필드:
-
-```json
-{
-  "schemaVersion": 1,
-  "sessionId": "...",
-  "generatedAt": "...",
-  "senderResult": {},
-  "receiverResult": {},
-  "frameEvidence": []
-}
-```
-
-한 역할 결과만 있어도 생성되지만 양쪽 결과가 모두 없으면 `400`입니다.
-
-### 역할별 결과
-
-```http
-GET /lnis/api/v1/sessions/{sessionId}/artifacts/{role}/{fileName}
-```
-
-- Sender role: `tx`, `sender`
-- Receiver role: `rx`, `receiver`
-- 파일: `result.json`, `metrics-summary.csv`, `metrics-timeseries.csv`
-
-RoleResult에는 `schemaVersion`, `sessionId`, `role`, `verdict`, `completedAt`, `integrity`, `metrics`, `counters`, `samples`, `error`가 포함됩니다.
-
-## 9. Frame Evidence
-
-### 목록
-
-```http
-GET /lnis/api/v1/sessions/{sessionId}/frame-evidence
-```
-
-프레임 번호는 `0`부터 시작합니다. 주요 필드는 다음과 같습니다.
-
-- 증거: `senderEvidenceAvailable`, `receiverEvidenceAvailable`
-- Decoder/CRC: `decoderCompleted`, `decodeSucceeded`, `sb2CrcValid`, `sb3CrcValid`, `sb4CrcValid`
-- 판정 변경량: `sb2DecisionChanges`, `sb3DecisionChanges`, `sb4DecisionChanges`
-- 해시: `referenceSha256`, `transmittedSha256`, `receivedSha256`, `reencodedSha256`
-- 차이 수: `referenceToTransmittedDifferences`, `transmittedToReceivedDifferences`, `referenceToReencodedDifferences`
-- 진단: `injectedBitPositions`, `intentionalSyncRejection`, `failureReason`, `interpretation`, `sb2Ephemeris`
-
-### 상세
-
-```http
-GET /lnis/api/v1/sessions/{sessionId}/frame-evidence/{frameIndex}
-```
-
-```json
-{
-  "summary": {},
-  "referenceFrame": "<Base64>",
-  "transmittedFrame": "<Base64>",
-  "receivedFrame": "<Base64>",
-  "reencodedFrame": "<Base64>",
-  "referenceToTransmittedPositions": [123],
-  "transmittedToReceivedPositions": [],
-  "referenceToReencodedPositions": []
-}
-```
-
-각 프레임 원문은 750 byte이며 JSON에서는 Base64입니다.
-
-### 다운로드
-
-```http
-GET /lnis/api/v1/sessions/{sessionId}/frame-evidence/artifacts/frame-evidence.json
-GET /lnis/api/v1/sessions/{sessionId}/frame-evidence/artifacts/frame-diff-summary.csv
-```
+Session·결과 산출물·Frame Evidence API는 제거했습니다. DTN의 AFS_METADATA 및 I/Q 코덱은 유지합니다. 기존 AFS DB와 파일은 자동 삭제하지 않습니다.
 
 ## 10. WebSocket
 
@@ -495,7 +313,7 @@ ws://192.168.1.72:8088/lnis/ws/status
 
 `AGENT_STATUS`, `GNSS_STATUS`, `TX_STATUS`, `RX_STATUS`, `SESSION_STATUS`, `RESULT`, `ERROR`
 
-WebSocket은 실시간 표시용입니다. 재접속 기준 상태는 `/agents`, `/sessions/active`, `/sessions/{sessionId}`로 복원합니다.
+WebSocket은 실시간 표시용입니다. 재접속 시 `/agents` 및 `/dtn/tests` 조회로 현재 상태를 확인합니다.
 
 ### Agent 제어
 
@@ -521,11 +339,11 @@ Handshake에는 `X-LNIS-Agent-Id`와 `Authorization: Bearer ...`가 필요합니
 
 메시지 종류:
 
-`HELLO`, `HELLO_ACK`, `HEARTBEAT`, `COMMAND`, `COMMAND_ACK`, `STATUS`, `PORT_LIST`, `INPUT_CHUNK`, `INPUT_COMPLETE`, `FRAME_EVIDENCE`, `ROLE_RESULT`, `ERROR`
+`HELLO`, `HELLO_ACK`, `HEARTBEAT`, `COMMAND`, `COMMAND_ACK`, `STATUS`, `PORT_LIST`, `INPUT_CHUNK`, `INPUT_COMPLETE`, `DTN_DATA`, `ERROR`
 
 명령 종류:
 
-`LIST_PORTS`, `START_CAPTURE`, `STOP_CAPTURE`, `ARM_RECEIVER`, `START_SENDER`, `CANCEL_SESSION`
+`LIST_PORTS`, `START_CAPTURE`, `STOP_CAPTURE`, `DTN_PROCESS`, `DTN_STOP_CAPTURE`
 
 ## 11. 화면 경로
 
@@ -533,9 +351,9 @@ Handshake에는 `X-LNIS-Agent-Id`와 `Authorization: Bearer ...`가 필요합니
 
 | 경로 | 설명 |
 |---|---|
-| `/` | AFS Sender로 redirect |
-| `/lnis/afstest/sender` | AFS Sender |
-| `/lnis/afstest/receiver` | AFS Receiver |
+| `/` | DTN Sender로 redirect |
+| `/lnis/afstest/sender` | DTN Sender로 redirect |
+| `/lnis/afstest/receiver` | DTN Receiver로 redirect |
 | `/lnis/test/sender` | 기존 Sender 호환 주소 |
 | `/lnis/test/receiver` | 기존 Receiver 호환 주소 |
 | `/lnis/dtntest/sender` | DTN 송수신 및 PVT 비교 화면 |
@@ -543,27 +361,7 @@ Handshake에는 `X-LNIS-Agent-Id`와 `Authorization: Bearer ...`가 필요합니
 
 ## 12. 일반 사용 순서
 
-GRAW 파일 시험:
-
-```text
-GET  /agents
-POST /inputs
-PUT  /inputs/{id}/chunks/0...N
-POST /inputs/{id}/complete
-POST /sessions
-GET  /sessions/{id}
-GET  /sessions/{id}/artifacts/...
-```
-
-GNSS 수집 후 시험:
-
-```text
-POST /agents/{sender}/serial-ports/refresh
-POST /captures
-POST /captures/{id}/stop
-POST /captures/{id}/complete
-POST /sessions
-```
+GRAW 업로드 또는 COM 수집 완료 → DTN 입력 확인 → POST /dtn/tests → GET /dtn/tests/{id} 및 보고서 조회. 상세 계약은 13장을 참고합니다.
 
 ## 13. DTN 화면·시험 제어 API — LNIS 내부용
 
@@ -730,18 +528,18 @@ V는 ECEF 속도, 단위 m/s. T 비교 항목은 수신기 시계 오차, 단위
 
 JSON 접수 후 수신 복원·PVT 계산은 자동 수행된다. 새로고침은 재계산을 요청하지 않는다. COMPLETED는 처리 완료이며 최종 PASS와 구분한다. 수신 화면은 같은 시각의 기준·수신 PVT를 좌우로 표시한다. GNSS RAW·AFS는 기존 일치 판정, I/Q는 허용오차 미설정 상태의 오차 측정(MEASURED)을 표시한다. I/Q 추적 관측값과 보조 LNAV도 표로 표시하되 수신기 RAWX·SFRBX 원본과 구분한다. 메타데이터 없는 과거 I/Q 파일은 파일 검증만 수행한다.
 
-독립 송신 노드의 AFS/DTN 화면에서 공통으로 사용한다. 관리 토큰은 서버 설정을 사용하며 요청·응답에 토큰 값을 넣지 않는다.
+독립 송신 노드의 DTN 화면에서 공통으로 사용한다. 관리 토큰은 서버 설정을 사용하며 요청·응답에 토큰 값을 넣지 않는다.
 
 DTN 화면은 기존 수신측 IP·Port 옆에 연결 테스트와 저장·적용을 배치한다. 이 값은 수신 LNIS 관리 주소이며, 바로 아래의 DTN/HDTN 전송 URL과 별개다. 전송 URL은 전체 주소(HTTPS·경로·쿼리 포함)를 그대로 시험 생성 요청의 sendUrl로 전달한다. 연결 상태는 저장된 수신 노드 기준이고, 후보 주소의 테스트 결과는 버튼 아래에 별도로 표시한다.
 
 - `GET /lnis/api/v1/node/connection`: 현재 `ip`, `port`, `scheme`, `baseUrl`, `peerAgentId`, `tokenConfigured`, `editable`, `busy` 반환.
 - `POST /lnis/api/v1/node/connection/test`: `{"ip":"192.168.1.73","port":8088}`. 서버가 후보 수신 노드에 인증된 GET 상태 요청을 보낸다. `connected`, `ready`, `elapsedMilliseconds`, `message`, 정상 조회 시 `node` 반환. 현재 주소는 변경하지 않는다.
-- `PUT /lnis/api/v1/node/connection`: 같은 본문으로 연결을 다시 확인하고 READY인 경우 H2에 저장·적용한다. AFS/DTN 시험 진행 중이거나 연결 검증 실패 시 기존 설정을 유지한다. `scheme`은 생략 시 `http`이며 기존 HTTPS 설정도 지원한다.
+- `PUT /lnis/api/v1/node/connection`: 같은 본문으로 연결을 다시 확인하고 READY인 경우 H2에 저장·적용한다. DTN 시험 진행 중이거나 연결 검증 실패 시 기존 설정을 유지한다. `scheme`은 생략 시 `http`이며 기존 HTTPS 설정도 지원한다.
 
 화면 저장값은 환경 변수 `LNIS_NODE_PEER_URL`보다 우선하며 재시작 후 유지된다. IPv4/포트만 입력하며 URL 경로·호스트명·미지정/멀티캐스트/링크 로컬 주소는 거부한다. 잘못된 입력은 `400`, 시험 중 변경 등 상태 오류는 `409`다. 연결 테스트의 접속/인증 오류는 `200`과 `connected=false`로 표시한다. 이 검사는 관리 REST 연결 검사이며 외부 DTN 전달은 검증하지 않는다.
 
 `node` 실행 모드에서만 활성화된다. 기존 `server`, `sender`, `receiver` 실행 계약은 유지한다.
-로컬 실행기, 원격 AFS 준비·취소·결과 조회 및 DTN 수신 DB 분리를 지원한다.
+로컬 실행기와 DTN 원격 등록·중지·결과 조회 및 수신 DB 분리를 지원한다.
 Linux 독립 노드 Compose는 `deployment/node`에 있으며 기존 중앙 서버용 Compose와 분리한다.
 
 ### 14.1 설정
@@ -782,19 +580,6 @@ Linux 독립 노드 Compose는 `deployment/node`에 있으며 기존 중앙 서�
 클라이언트는 상대 ID, 반대 역할, 관리 프로토콜 버전을 검증한다.
 상태 응답에는 토큰, 관측 원본, AFS 프레임, 기준 PVT를 포함하지 않는다.
 
-### 14.3 AFS 원격 준비·취소 및 결과
-
-아래 모든 API는 `Authorization: Bearer <관리 토큰>`이 필요하다. 송신/수신 ID는 시작 시 지정한 상대와 일치해야 한다.
-
-- `POST /lnis/api/v1/node/peer/afs/commands`: 기존 Agent protocol v3 `COMMAND` envelope 사용. 수신 노드의 `ARM_RECEIVER`, `CANCEL_SESSION`만 허용한다. 최대 32 KiB. 응답 `200`은 SessionSnapshot이다.
-- ARM 인수는 기존 CreateSessionRequest와 같지만 입력 파일을 전송하지 않는다. 수신 PC의 DB/활성 잠금 저장 후 로컬 AFS 수신 세션을 준비한다.
-- 같은 시험 ID와 동일 설정의 ARM 재호출은 수신 세션을 중복 생성하지 않는다. 다른 설정 또는 종료된 시험 ID는 `409`.
-- 존재하지 않는 시험 취소는 `404`, 종료된 시험 취소는 기존 결과를 반환한다. 부분 준비 실패는 취소·DB 상태 기록·잠금 해제를 수행한다.
-- `GET /lnis/api/v1/node/peer/afs/sessions/{id}`: 수신 SessionSnapshot. 수신 PC에서 먼저 자체 결과를 완료하고 송신 PC가 TX/RX 종합 판정을 수행한다.
-- `GET /lnis/api/v1/node/peer/afs/sessions/{id}/evidence?after=-1`: `frameIndex > after`인 Receiver 프레임 증거를 오름차순 최대 32건 반환한다. 빈 배열이면 끝이다. AFS 분석 증거 전용이며 DTN 본문은 제공하지 않는다.
-
-입력 청크, START_SENDER, DTN_PROCESS는 노드 관리 채널에서 거부한다. AFS 프레임은 `AFS_TRANSFER_START`, `AFS_TRANSFER_BATCH`, `AFS_TRANSFER_COMPLETE` envelope로 기존 인증된 관리 연결을 통해 전송한다.
-
 ### 14.4 DTN 사전 등록
 
 `POST /lnis/api/v1/node/peer/dtn/tests` — 관리 토큰 필수, 수신 노드 전용, 최대 8 KiB.
@@ -833,7 +618,7 @@ Linux 독립 노드 Compose는 `deployment/node`에 있으며 기존 중앙 서�
 
 ### 14.6 재시작 및 연결 실패
 
-관리 요청은 설정된 상대 주소를 사용하며 리다이렉트를 따르지 않는다. 시험 데이터는 자동 재송신하지 않고, 연결 실패 중에는 다음 상태 조회를 기다린다. 중지 요청은 예외로 `cancelPending=true`인 동안 재시도한다. 재시작으로 사라진 AFS 실행은 취소하고, 메모리에서 진행하던 DTN PREPARING/CALCULATING은 FAILED로 기록한다. 영속 저장된 WAITING_DTN/WAITING_RECEIVER는 기존 접수 대기를 계속한다. 제한 시간은 각 노드의 시험 생성·등록 시각 기준 RAW/AFS 10분, I/Q 20분이다. 수신 노드는 JSON 접수 전에는 시험 종류가 아직 저장되지 않아 기본 10분 제한을 적용한다.
+관리 요청은 설정된 상대 주소를 사용하며 리다이렉트를 따르지 않는다. 시험 데이터는 자동 재송신하지 않고, 연결 실패 중에는 다음 상태 조회를 기다린다. 중지 요청은 예외로 `cancelPending=true`인 동안 재시도한다. 재시작 시 메모리에서 진행하던 DTN PREPARING/CALCULATING은 FAILED로 기록한다. 영속 저장된 WAITING_DTN/WAITING_RECEIVER는 기존 접수 대기를 계속한다. 제한 시간은 각 노드의 시험 생성·등록 시각 기준 RAW/AFS 10분, I/Q 20분이다. 수신 노드는 JSON 접수 전에는 시험 종류가 아직 저장되지 않아 기본 10분 제한을 적용한다.
 
 역할 선택 화면은 상대 노드 URL로 이동한다. 수신 PC에서 수집/업로드/전송 시작 API를 호출하면 `409`로 거부한다. 기존 `server` 모드의 화면 및 API 동작은 유지한다.
 
@@ -1168,7 +953,7 @@ UBX 직렬 바이트 원문과는 다릅니다. 어댑터는 내용을 해석·�
 - LNIS 수신이 CRC·0101 패턴·항법 참조·원본 GRAW SHA-256을 검사한 뒤 RAW 표와 PVT를 계산합니다. `referencePvt`는 비교용일 뿐 계산 입력이 아닙니다.
 - **어댑터는 satellites·metadata·referencePvt를 포함한 JSON 전체를 보존하여 콜백합니다.** 소수 반올림 금지. GPS LNAV 1·2·3 세트가 필요하며 관측값만 있는 입력은 GNSS RAW 시험을 사용합니다.
 
-과거 `schemaVersion=1` / `LNIS-GRAW-AFS-v1`(SB3/SB4의 GRAW) 및 `schemaVersion=2` / `LNIS-AFS-GNSS-v2`(분리된 frames/metadata.records)는 수신 호환을 유지합니다. 신규 전송은 v4이며 송신·수신 서비스 모두 업데이트해야 합니다. 별도 AFS Frame 오류 주입 시험과 RAW 계약은 유지합니다.
+과거 `schemaVersion=1` / `LNIS-GRAW-AFS-v1`(SB3/SB4의 GRAW) 및 `schemaVersion=2` / `LNIS-AFS-GNSS-v2`(분리된 frames/metadata.records)는 수신 호환을 유지합니다. 신규 전송은 v4이며 송신·수신 서비스 모두 업데이트해야 합니다. RAW 계약은 유지하며, 별도 AFS Frame 오류 주입 시험은 제거했습니다.
 
 
 #### C. I/Q Sample: 파일 주소 + 프레임 항법정보
@@ -1350,26 +1135,26 @@ Docker 콘솔의 레벨 표시는 `[WARN]`만 굵은 노랑(ANSI 1;33), `[ERROR]
 
 헬스체크 실패는 매번 WARN 한 줄로 기록하고 예상되는 연결 예외의 스택은 DEBUG에서 확인합니다. 예기치 않은 서버 내부 예외는 ERROR에 마스킹된 원인 체인과 스택을 남깁니다. HTTP 진단 수준은 `LNIS_HTTP_LOG_LEVEL=INFO`(기본)/`DEBUG`로 변경 후 컨테이너를 재생성합니다. 시간 표시는 Asia/Seoul이며 저장/전송 시각은 기존 UTC 계약을 유지합니다.
 
-AFS 화면 전용 메시지: `POST /lnis/api/v1/logs/screen`, 본문 `{scopeId?, occurredAt, level, message}`, 204 응답. 기존 DTN 화면 로그 계약과 동일하게 INFO/WARN/ERROR, 메시지 1~2000자입니다. 수신 노드에서도 허용하지만 다른 송신 전용 API의 제한은 유지합니다. AFS 서버 이벤트는 서버에서 한 번 기록하고 브라우저에서 재전송하지 않습니다. 기존 `POST /lnis/api/v1/dtn/logs/screen`은 그대로 지원합니다.
+화면 로그는 POST /lnis/api/v1/dtn/logs/screen만 사용합니다. 과거 독립 AFS 화면 로그 API는 제거했습니다.
 
 
 ### 관리자용 로컬 데이터 관리
 
-`/lnis/data-management`는 각 PC의 AFS·DTN 시험, 수신 원문, 입력 GRAW, I/Q 파일을 관리한다. AFS/DTN 송신·수신 페이지 좌측 최상단의 `data-management-entry` 링크는 `hidden` 기본값이다. 개발자 도구에서 해제해 사용한다. 별도 인증은 없으며 hidden은 접근 통제가 아니다.
+`/lnis/data-management`는 각 PC의 DTN 시험, 수신 원문, 입력 GRAW, I/Q 파일을 관리한다. DTN 송신·수신 페이지 좌측 최상단의 `data-management-entry` 링크는 `hidden` 기본값이다. 개발자 도구에서 해제해 사용한다. 별도 인증은 없으며 hidden은 접근 통제가 아니다.
 
 관리 API 기준 경로: `/lnis/api/v1/data-management`.
 - `GET /summary`: 현재 역할, DB 파일과 입력/IQ 파일 용량, 자료 건수. DB 물리 크기는 삭제 직후 줄어들지 않을 수 있다.
-- `GET /items?kind=DTN|AFS|RECEIPT|INPUT|IQ&page=0&search=&state=&from=&to=`: 메타데이터만 50건씩 최신순 조회. from 포함, to 미포함(ISO Instant). IQ는 서버 소유 파일 이름만 조회하며 사용자 경로를 받지 않는다.
+- `GET /items?kind=DTN|RECEIPT|INPUT|IQ&page=0&search=&state=&from=&to=`: 메타데이터만 50건씩 최신순 조회. from 포함, to 미포함(ISO Instant). IQ는 서버 소유 파일 이름만 조회하며 사용자 경로를 받지 않는다.
 - `GET /items/{kind}/{id}`: 상태·관련 자료·기존 조회/다운로드 API 연결.
 - `POST /pin`: `{item:{kind,id},pinned:true}`. 기존 입력/IQ 삭제 API에도 보관 고정 보호가 적용된다.
-- `POST /preview`: `{items:[{kind,id}]}` 최대 500건. 삭제 예정 원문·로그·프레임·단독 참조 파일과 제외 사유, 10분 유효한 token 반환.
+- `POST /preview`: `{items:[{kind,id}]}` 최대 500건. 삭제 예정 원문·로그·단독 참조 파일과 제외 사유, 10분 유효한 token 반환.
 - `POST /delete`: `{token}`. 실행 직전 재검사하며 진행 중 시험·중지 확인·생성·수집 중에는 409. 다른 시험이 참조하거나 보관 고정된 파일은 보존. 실패는 정리 내역에 남긴다.
 - `GET /history`, `POST /history/{id}/retry`: 최근 50건 정리 결과 및 실패 자료의 새 미리보기.
 - `GET /settings`, `POST /settings/preview`: `{tests:{enabled,days},receipts:{enabled,days},files:{enabled,days}}`. 최초 모두 disabled, 기본 입력 일수 30일, 허용 1~3650일. 설정 미리보기 후 `POST /settings`에 `{token}`으로 저장한다.
 - `POST /cleanup/preview`: 현재 보관 정책의 삭제 예정 목록. 실제 정리는 `/delete`로 확인한다.
 - `GET /files/INPUT|IQ/{id}`: 로컬 완료 파일 다운로드.
 
-시험 보관은 종료 갱신 시각, 미연결 원문은 수신 시각, 미사용 파일은 생성 시각(기존 I/Q는 최초 남아 있는 파일 시각)을 기준으로 한다. 10분마다 최대 500건씩 동일 삭제 로직을 사용한다. 기존 AFS 시험/입력 정리 스케줄은 이 설정으로 통합되어 기존 LNIS_COMPLETED_RETENTION/INCOMPLETE_RETENTION으로 시험을 삭제하지 않는다. 내부 통신 이벤트 24시간 및 준비 로그 7일 정리는 유지한다. 운영 연결 설정·인증 값·Agent 등록은 관리 삭제 대상이 아니다.
+시험 보관은 종료 갱신 시각, 미연결 원문은 수신 시각, 미사용 파일은 생성 시각(기존 I/Q는 최초 남아 있는 파일 시각)을 기준으로 한다. 10분마다 최대 500건씩 동일 삭제 로직을 사용한다. DTN 시험과 입력 정리는 이 설정을 사용하며 기존 LNIS_COMPLETED_RETENTION/INCOMPLETE_RETENTION으로 시험을 삭제하지 않는다. 내부 통신 이벤트 24시간 및 준비 로그 7일 정리는 유지한다. 운영 연결 설정·인증 값·Agent 등록은 관리 삭제 대상이 아니다.
 
 삭제는 요청과 경합하지 않게 직렬화하고 파일/DB 실패 시 이력을 보존해 재시도한다. 관리 테이블은 정책·고정·삭제 ID·작업 이력을 저장하며 원문을 복사하지 않는다. 삭제 ID는 늦은 재등록·콜백·Agent 메시지로 시험이 되살아나는 것을 차단하기 위해 유지한다. 운영 DB 초기화·압축·복원은 제공하지 않는다.
 

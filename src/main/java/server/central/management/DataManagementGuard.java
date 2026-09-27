@@ -22,8 +22,6 @@ public class DataManagementGuard {
             String field=type.equals("INPUT")?"inputId":"iqFileId";
             for(UUID trial:em.createQuery("select e.id from DtnJob e where e."+field+"=:id",UUID.class).setParameter("id",id).getResultList())
                 requireUnpinned("DTN",trial);
-            if(type.equals("INPUT")) for(UUID trial:em.createQuery("select e.sessionId from TestSessionEntity e where e.inputId=:id",UUID.class).setParameter("id",id).getResultList())
-                requireUnpinned("AFS",trial);
         }
     }
     public void requirePresent(String type,UUID id) {

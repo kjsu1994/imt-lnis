@@ -57,11 +57,6 @@ public final class AgentRuntime implements AutoCloseable {
       Command command = json.treeToValue(envelope.payload(), Command.class);
       if (dtn.active() && command.command() != CommandType.DTN_PROCESS && command.command() != CommandType.LIST_PORTS)
         throw new IllegalStateException("DTN 작업 중에는 다른 시험 명령을 실행할 수 없습니다.");
-      if (command.command() == CommandType.ARM_RECEIVER || command.command() == CommandType.START_SENDER
-          || command.command() == CommandType.CANCEL_SESSION) {
-        ack(envelope, false, "독립 AFS 시험은 지원하지 않습니다.");
-        return;
-      }
       if (command.command() == CommandType.START_CAPTURE && state.get() == AgentState.BUSY)
         throw new IllegalStateException("Agent가 다른 작업을 수행 중입니다.");
       switch (command.command()) {

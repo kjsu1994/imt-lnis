@@ -15,6 +15,8 @@ LANS/PocketSDR는 `O:\3.ing\LNIS\오픈소스`의 사용자 지정 기준 원본
 관련 프로젝트: https://github.com/osqzss/LANS-AFS-SIM / https://github.com/osqzss/PocketSDR-AFS
 LDPC는 원래 PocketSDR의 `lib/clone_lib.sh`에서 별도 확보하던 의존성이다. 별도 서비스로 실행하지 않는다.
 LDPC-codes는 Git 원본 바이트로, 제공본은 제공된 파일 바이트로 보존했다. 파일별 기준은 `UPSTREAM-SHA256.txt`다.
+2026-09-27: `afs_nav.c`·`afs_sim.c`의 해시 목록을 기존 `5b87ea6` 커밋에 저장된 파일 바이트와 일치하도록 정정했다. 소스 바이트는 변경하지 않았다. 이 해시는 저장소의 제공본 스냅샷 검증용이며 공식 upstream 원본과의 동일성을 증명하지 않는다.
+두 파일에 보존된 인터리빙·프레임 생성 순서 주석을 제외하면 이전 목록의 해시와 정확히 일치한다. `01-korean-comments.patch`에서 해당 주석의 중복 삽입만 제거하여 원본 주석 보존과 재빌드를 함께 유지한다.
 LANS에 포함된 mod2sparse와 LDPC-codes의 버전은 다르므로 임의로 합치지 않는다.
 
 ## 변경 패치

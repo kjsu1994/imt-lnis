@@ -46,7 +46,7 @@ assert.equal(requests.find(r=>r.url.endsWith('/delete')).body.token,'preview-tok
 await tabs[2].onclick();
 assert.equal(elements.get('tests-enabled').checked,false);
 assert.equal(elements.get('files-enabled').checked,false);
-for(const name of ['afs-sender.html','afs-receiver.html','dtn-sender.html','dtn-receiver.html']) {
+for(const name of ['dtn-sender.html','dtn-receiver.html']) {
  const page=readFileSync(new URL(name,base),'utf8');
  assert.match(page,/<a[^>]*class="data-management-entry"[^>]*hidden/);
 }
