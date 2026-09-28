@@ -575,16 +575,27 @@ class IndependentNodeIntegrationTest {
     }
 
     private ConfigurableApplicationContext node(String role, int port, int peerPort) {
+        String databaseUrl =
+                "jdbc:h2:file:"
+                        + directory.resolve(role).toAbsolutePath().toString().replace('\\', '/');
+        var legacy =
+                new org.springframework.jdbc.core.JdbcTemplate(
+                        new org.springframework.jdbc.datasource.DriverManagerDataSource(
+                                databaseUrl, "sa", ""));
+        // 운영 업그레이드처럼 6자리 시각 컬럼이 존재하는 DB에서 송수신을 시작한다.
+        legacy.execute(
+                """
+                CREATE TABLE IF NOT EXISTS DTN_JOB (
+                    ID UUID PRIMARY KEY,
+                    TEST_STARTED_AT TIMESTAMP(6) WITH TIME ZONE,
+                    RECEIVED_AT TIMESTAMP(6) WITH TIME ZONE
+                )
+                """);
         return new SpringApplicationBuilder(LnisApplication.class)
                 .profiles("server", "node")
                 .run(
                         "--server.port=" + port,
-                        "--spring.datasource.url=jdbc:h2:file:"
-                                + directory
-                                        .resolve(role)
-                                        .toAbsolutePath()
-                                        .toString()
-                                        .replace('\\', '/'),
+                        "--spring.datasource.url=" + databaseUrl,
                         "--spring.jpa.hibernate.ddl-auto=update",
                         "--lnis.storage.data-directory=" + directory.resolve(role + "-files"),
                         "--lnis.node.role=" + role,
