@@ -66,7 +66,7 @@ class ServerResponseContractTest {
                 job.setTestType("GNSS_RAW");
                 job.setSenderMode(tx);
                 job.setReceiverMode(rx);
-                when(dtnService.create(id, "sender-1", "receiver-1", null, "GNSS_RAW", tx, rx))
+                when(dtnService.createDelay(eq(id), eq("sender-1"), eq("receiver-1"), isNull(), eq("GNSS_RAW"), eq(tx), eq(rx), isNull(), isNull(), any()))
                         .thenReturn(job);
                 mvc.perform(
                                 post("/lnis/api/v1/dtn/tests")
@@ -89,7 +89,7 @@ class ServerResponseContractTest {
                         .andExpect(status().isAccepted())
                         .andExpect(jsonPath("$.senderMode").value(tx))
                         .andExpect(jsonPath("$.receiverMode").value(rx));
-                verify(dtnService).create(id, "sender-1", "receiver-1", null, "GNSS_RAW", tx, rx);
+                verify(dtnService).createDelay(eq(id), eq("sender-1"), eq("receiver-1"), isNull(), eq("GNSS_RAW"), eq(tx), eq(rx), isNull(), isNull(), any());
             }
         }
     }
@@ -175,7 +175,7 @@ class ServerResponseContractTest {
         job.setSenderAgentId("sender-1");
         job.setReceiverAgentId("receiver-1");
         job.setState("PREPARING");
-        when(dtnService.create(inputId, "sender-1", "receiver-1")).thenReturn(job);
+        when(dtnService.createDelay(eq(inputId), eq("sender-1"), eq("receiver-1"), isNull(), eq("AFS_METADATA"), eq("DTN"), eq("HDTN"), isNull(), isNull(), any())).thenReturn(job);
         when(dtnService.get(id)).thenReturn(job);
         when(dtnService.recent()).thenReturn(List.of(job));
         when(dtnService.configuration()).thenReturn(Map.of("configured", false));

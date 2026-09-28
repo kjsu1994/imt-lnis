@@ -8,7 +8,7 @@ const root = resolve(__dirname, '../../main/resources/static');
 const config = {maxNumberOfBundlesInPipeline:50,maxSumOfBundleBytesInPipeline:50000000,maxBundleSizeBytes:10485760,
   tcpclMaxSegmentSizeBytes:20000,neighborDepletedStorageDelaySeconds:10,enforceBundlePriority:false,
   storageDeletionPolicy:'DELETE_AFTER_FORWARDING',totalStorageCapacityBytes:8589934592,maxLtpReceiveUdpPacketSizeBytes:65536,acsSendPeriodMilliseconds:1000};
-let rows=[], id=0, job=null, starts=0;
+let rows=[], id=0, job=null, starts=0, reportFixture={referencePvt:[],receivedPvt:[]};
 const server=createServer((req,res)=>{
  const path=new URL(req.url,'http://localhost').pathname;
  const json=(value,status=200)=>{res.writeHead(status,{'Content-Type':'application/json'});res.end(JSON.stringify(value));};
@@ -34,7 +34,7 @@ const server=createServer((req,res)=>{
    if(path.endsWith('/tests')&&req.method==='POST'){starts++;return json({});}
    if(path.endsWith('/tests'))return json(job?[job]:[]);
    if(path.endsWith('/tests/test1'))return json(job);
-   if(path.endsWith('/report'))return json({referencePvt:[],receivedPvt:[]});
+   if(path.endsWith('/report'))return json(reportFixture);
    if(path.endsWith('/receipts'))return json([]);
    if(path.endsWith('/logs'))return json({entries:[{sequence:1,occurredAt:new Date().toISOString(),level:'INFO',stage:'검증',message:'일반 로그',detail:false},{sequence:2,occurredAt:new Date().toISOString(),level:'INFO',stage:'검증',message:'상세 확인',detail:true}],nextSequence:2,hasMore:false});
    return json({});
@@ -50,7 +50,7 @@ const server=createServer((req,res)=>{
  await new Promise(r=>server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+server.address().port;
  const browser=await chromium.launch();const context=await browser.newContext();
  await context.addInitScript(()=>{window.WebSocket=class {};});
- const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ const page=await context.newPage();page.setDefaultTimeout(15000);const errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.goto(base+'/sender');await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>!document.getElementById('preset-save').disabled);
  await page.locator('#preset-save').click();await page.locator('#preset-name').fill('기본');await page.locator('#preset-confirm').click();await page.waitForFunction(()=>document.getElementById('preset-status').textContent==='저장했습니다.');
  assert.equal(rows.length,1);assert.equal(rows[0].settings.hdtnConfig.maxNumberOfBundlesInPipeline,50);
@@ -70,6 +70,42 @@ const server=createServer((req,res)=>{
   await page.evaluate(()=>{document.getElementById('dtn-log').closest('section').requestFullscreen=()=>Promise.reject(new Error('denied'));});
   await page.locator('#dtn-log-fullscreen').click();await page.waitForFunction(()=>!!document.querySelector('.log-maximized'));await page.keyboard.press('Escape');assert.equal(await page.locator('.log-maximized').count(),0);
  }
+
+ const original = {constellationId:0,satelliteId:19,signalId:0,pseudorangeMeters:21000000,
+   dopplerHz:-100,carrierToNoiseDbHz:45,trackingStatus:1};
+ const epoch = {week:2400,receiverTowSeconds:100000,leapSeconds:18,receiverStatus:0,observations:[original]};
+ const received = {...original, transmitAt:{seconds:1790000000,femtoseconds:123456789012345}};
+ delete received.pseudorangeMeters;
+ job.receivedEpochs=1;
+ reportFixture = {
+   comparisonMode:'DELAY',referenceStatus:'COMPLETE',
+   referenceObservations:{epochs:[{observation:epoch}],navigation:[],navigationCount:0,records:[]},
+   observations:{epochs:[{observation:{...epoch,receiverTowSeconds:100001,
+     observations:[{...original,pseudorangeMeters:320792458}]}}],navigation:[],navigationCount:0,records:[],
+     receivedValues:{records:[{observation:{...epoch,observations:[received]}}]}},
+   delayEvidence:{delaySeconds:1},referencePvt:[],receivedPvt:[]
+ };
+ await page.goto(base+'/receiver');
+ await page.waitForFunction(()=>document.querySelector('#dtn-observations [data-integrity]')?.textContent==='데이터 일치');
+ const observationPanel=page.locator('#dtn-observations');
+ assert.match(await observationPanel.locator('[data-observations]').innerText(),/21000000\.000/);
+ assert.match(await observationPanel.locator('[data-observations]').innerText(),/320792458\.000/);
+ assert.equal(await observationPanel.locator('td.converted-range').evaluate(el=>getComputedStyle(el).color),'rgb(180, 35, 24)');
+ assert.equal(await observationPanel.locator('[data-epoch]').inputValue(),'0');
+ assert.match(await observationPanel.locator('[data-epoch]').innerText(),/100000\.000/);
+ assert.equal(await observationPanel.locator('[data-observations] tr').count(),1);
+ await page.screenshot({path:'build/receiver-observation-review.png',fullPage:true});
+ reportFixture.referenceStatus='WAITING';
+ reportFixture.referenceObservations=null;
+ await page.reload();
+ await page.waitForFunction(()=>document.querySelector('#dtn-observations [data-integrity]')?.textContent==='비교 대기');
+ assert.equal(await observationPanel.locator('[data-observations] td').nth(3).textContent(),'—');
+ assert.equal(await observationPanel.locator('td.converted-range').textContent(),'320792458.000');
+ reportFixture.referenceStatus='MISMATCH';
+ await page.reload();
+ await page.waitForFunction(()=>document.querySelector('#dtn-observations [data-integrity]')?.textContent==='데이터 불일치');
+ reportFixture={referencePvt:[],receivedPvt:[]};
+
  await page.goto(base+'/dtn-intro');assert.equal(await page.locator('.pc-boundary').count(),2);assert.equal(await page.locator('.scope-boundary').count(),4);
  await page.locator('#data-switch').click();assert.ok(await page.locator('.tx-folder').isVisible());
  const count=await page.locator('#step-count').innerText();await page.locator('#tx-adapter').click();assert.match(await page.locator('#step-title').innerText(),/POST \/transfers/);assert.equal(await page.locator('#step-count').innerText(),count);
@@ -88,7 +124,7 @@ const server=createServer((req,res)=>{
     return {
      aligned,
      fits:document.documentElement.scrollWidth<=innerWidth,
-     folderCorrect:state.data==='iq' ? !folder.hidden && box('.tx-folder').bottom<box('#tx-adapter').top : folder.hidden,
+     folderCorrect:state.data==='iq' ? !folder.hidden && box('.tx-folder').bottom<box('.tx-routing').top && box('.tx-folder').bottom<box('#tx-adapter').top : folder.hidden,
      noteCorrect:state.data!=='iq' || document.getElementById('clock-note').hidden,
      routersAligned:Math.abs((box('#tx-switch').left+box('#tx-switch').right)/2-(box('#rx-switch').left+box('#rx-switch').right)/2)<1
     };
@@ -96,5 +132,7 @@ const server=createServer((req,res)=>{
    assert.ok(Object.values(geometry).every(Boolean),JSON.stringify({width,mode,geometry}));
   }
  }
+ await page.setViewportSize({width:1600,height:1000});
+ await page.screenshot({path:'build/intro-layout-review.png',fullPage:true});
  assert.deepEqual(errors,[]);await browser.close();console.log('PASS: preset CRUD/apply/capacity/shared list, trial settings, real/fallback fullscreen, scoped intro and responsive layout.');
 })().catch(e=>{console.error(e);process.exitCode=1;}).finally(()=>{server.close();setTimeout(()=>process.exit(process.exitCode||0),1000).unref();});

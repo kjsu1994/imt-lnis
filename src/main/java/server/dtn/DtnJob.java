@@ -30,6 +30,7 @@ public class DtnJob {
     @Lob private String hdtnConfigJson;
 
     private String comparisonMode;
+    @Column(columnDefinition = "timestamp(9) with time zone")
     private Instant testStartedAt;
     @Lob private String selectedEpochJson;
     @Lob private String delayEvidenceJson;
@@ -42,6 +43,7 @@ public class DtnJob {
     private String expectedPayloadSha256;
 
     /** 송신 노드에서도 원문을 복사하지 않고 수신 완료 여부를 표시한다. */
+    @Column(columnDefinition = "timestamp(9) with time zone")
     private Instant receivedAt;
 
     /** 생성 시 확정한 전송 대상이다. 이후 화면 URL을 바꿔도 진행 중인 시험에는 영향을 주지 않는다. */
@@ -58,6 +60,11 @@ public class DtnJob {
     @Lob private String receivedRawJson;
 
     @Lob private String referenceJson;
+    @Lob private String referenceSourceBase64;
+    private String referenceStatus;
+    private Integer referenceAttempts;
+    private Instant referenceNextAttemptAt;
+    @Column(length = 2048) private String referenceMessage;
     @Lob private String receiverJson;
     @Lob private String comparisonJson;
 

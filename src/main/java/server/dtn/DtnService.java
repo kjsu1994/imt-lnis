@@ -327,6 +327,7 @@ public class DtnService {
             job.setTestStartedAt(java.util.Objects.requireNonNull(startedAt));
             job.setSelectedEpochJson(objectMapper.valueToTree(epoch).toString());
         }
+        if (epoch != null) job.setReferenceSourceBase64(Base64.getEncoder().encodeToString(data));
         beginLog(job, inputId);
         if (epoch != null) {
             trace(
@@ -347,6 +348,7 @@ public class DtnService {
                     job.getId(),
                     data,
                     "GNSS_RAW".equals(testType),
+                    startedAt,
                     (stage, message) -> calculationProgress(job.getId(), stage, message),
                     result -> calculated(sender, job.getId(), result));
         } catch (RuntimeException e) {
@@ -827,7 +829,9 @@ public class DtnService {
                     throw new IllegalArgumentException("송신 Reference PVT 계산 불가");
                 }
                 job.setReferenceJson(objectMapper.writeValueAsString(result.getPvt()));
-                result.getTransfer().setReferencePvt(result.getPvt());
+                if (!server.afs.DelayTransferCodec.supports(result.getTransfer())) {
+                    result.getTransfer().setReferencePvt(result.getPvt());
+                }
                 result.getTransfer().setSenderMode(job.getSenderMode());
                 result.getTransfer().setReceiverMode(job.getReceiverMode());
                 result.getTransfer()
@@ -836,7 +840,8 @@ public class DtnService {
                                         ? null
                                         : objectMapper.readValue(
                                                 job.getHdtnConfigJson(), HdtnConfig.class));
-                job.setSentJson(objectMapper.writeValueAsString(result.getTransfer()));
+                job.setSentJson(objectMapper.writeValueAsString(
+                        server.afs.DelayTransferCodec.packet(objectMapper, result.getTransfer())));
                 update(job, "WAITING_DTN", "외부 DTN 전달 및 수신 대기");
                 String packet = job.getSentJson();
                 startTask(job.getId(), "dtn-http-send", () -> sendExternal(job.getId(), packet));
@@ -849,6 +854,20 @@ public class DtnService {
                     job.setDelayEvidenceJson(
                             objectMapper.writeValueAsString(result.getDelayEvidence()));
                     var transfer = objectMapper.readValue(job.getReceivedJson(), Transfer.class);
+                    if (server.afs.DelayTransferCodec.supports(transfer)) {
+                        job.setReferenceStatus("WAITING");
+                        job.setReferenceAttempts(0);
+                        job.setReferenceNextAttemptAt(Instant.now());
+                        job.setReferenceMessage("비교자료 대기");
+                        if (logs != null) {
+                            logs.delay(job.getId(), result.getDelayEvidence());
+                            logs.pvt(job.getId(), "TEST", result.getPvt(), 0, "수신 독립 계산 PVT");
+                            trace(job.getId(), "수신 계산 입력", true, job.getObservationsJson());
+                        }
+                        update(job, result.getPvt().getFirst().isPositionValid()
+                                ? "COMPLETED" : "INCONCLUSIVE", "수신 계산 종료 · 비교자료 대기");
+                        return;
+                    }
                     job.setReferenceJson(
                             objectMapper.writeValueAsString(transfer.getReferencePvt()));
                     if (logs != null) {
@@ -1317,4 +1336,129 @@ public class DtnService {
                 error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage();
         update(job, "FAILED", message.substring(0, Math.min(2000, message.length())), stage);
     }
+    @Value("${lnis.native.dir:native}")
+    private String referenceNativeDirectory;
+    private final Set<UUID> referenceRequests = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /** 시험에 사용한 불변 스냅샷만 제공한다. 원본 입력을 다시 선택하지 않는다. */
+    public ReferenceSnapshot referenceSnapshot(UUID id) throws Exception {
+        if (!sendingNode()) throw new ResponseStatusException(HttpStatus.CONFLICT, "송신 노드 전용 API");
+        DtnJob job = get(id);
+        if (job.getReferenceSourceBase64() == null || job.getReferenceJson() == null || job.getSentJson() == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "시험 비교자료 없음");
+        }
+        byte[] source = Base64.getDecoder().decode(job.getReferenceSourceBase64());
+        return new ReferenceSnapshot(id,
+                DtnPayloadDigest.sha256(objectMapper, objectMapper.readTree(job.getSentJson())),
+                server.common.Hashing.hex(server.common.Hashing.sha256Digest().digest(source)),
+                job.getReferenceSourceBase64(), objectMapper.readValue(job.getReferenceJson(), new TypeReference<>() {}));
+    }
+
+    public synchronized void retryReference(UUID id) {
+        if (sendingNode()) throw new IllegalArgumentException("수신 노드 전용 기능");
+        DtnJob job = get(id);
+        if (job.getReferenceStatus() == null || "COMPLETE".equals(job.getReferenceStatus())) return;
+        job.setReferenceStatus("WAITING");
+        job.setReferenceAttempts(0);
+        job.setReferenceNextAttemptAt(Instant.now());
+        job.setReferenceMessage("비교자료 조회 대기");
+        job.setUpdatedAt(Instant.now());
+        dtnRepository.save(job);
+    }
+
+    @Scheduled(fixedDelay = 3000)
+    public void retryReferences() {
+        if (nodeLink == null || sendingNode()) return;
+        for (DtnJob job : dtnRepository.findByReferenceStatus("WAITING")) {
+            if (referenceRequests.size() >= 4) break;
+            if (job.getReferenceNextAttemptAt() != null
+                    && job.getReferenceNextAttemptAt().isAfter(Instant.now())) continue;
+            if (!referenceRequests.add(job.getId())) continue;
+            Thread.ofVirtual().name("dtn-reference").start(() -> {
+                try {
+                    fetchReference(job);
+                } finally {
+                    referenceRequests.remove(job.getId());
+                }
+            });
+        }
+    }
+
+    private void fetchReference(DtnJob pending) {
+        try {
+            ReferenceSnapshot snapshot = nodeLink.reference(pending.getId());
+            validateReference(pending, snapshot);
+            synchronized (this) {
+                DtnJob job = dtnRepository.findById(pending.getId()).orElse(null);
+                if (job == null || !"WAITING".equals(job.getReferenceStatus())) return;
+                job.setReferenceSourceBase64(snapshot.grawBase64());
+                job.setReferenceJson(objectMapper.writeValueAsString(snapshot.referencePvt()));
+                job.setReferenceStatus("COMPLETE");
+                job.setReferenceMessage("비교자료 확인 완료");
+                compareDelay(job, objectMapper.readValue(job.getReceiverJson(), new TypeReference<>() {}), false);
+            }
+        } catch (Exception error) {
+            synchronized (this) {
+                DtnJob job = dtnRepository.findById(pending.getId()).orElse(null);
+                if (job == null || !"WAITING".equals(job.getReferenceStatus())) return;
+                boolean permanent = error instanceof IllegalArgumentException
+                        || error instanceof server.node.NodePeerClient.RemoteRequestException remote
+                        && List.of(400, 401, 403, 404, 409, 410).contains(remote.statusCode());
+                int attempts = job.getReferenceAttempts() == null ? 1 : job.getReferenceAttempts() + 1;
+                job.setReferenceAttempts(attempts);
+                job.setReferenceStatus(error instanceof DataMismatchException ? "MISMATCH"
+                        : permanent ? "UNAVAILABLE" : "WAITING");
+                job.setReferenceNextAttemptAt(Instant.now().plusSeconds(attempts == 1 ? 10 : attempts == 2 ? 30 : 60));
+                String reason = Objects.toString(error.getMessage(), error.getClass().getSimpleName());
+                job.setReferenceMessage(reason.substring(0, Math.min(1900, reason.length())));
+                job.setUpdatedAt(Instant.now());
+                dtnRepository.save(job);
+                if (permanent || attempts == 1) {
+                    if (logs != null) logs.add(job.getId(), "TEST", "WARN", "비교자료 조회", false,
+                            "수신 계산 결과 유지 · " + (permanent ? "재조회 필요 · " : "자동 재시도 · ") + job.getReferenceMessage());
+                }
+            }
+        }
+    }
+
+    private static final class DataMismatchException extends IllegalArgumentException {
+        DataMismatchException(String message) { super(message); }
+    }
+
+    private void validateReference(DtnJob job, ReferenceSnapshot snapshot) throws Exception {
+        if (snapshot == null || !job.getId().equals(snapshot.testId())
+                || !Objects.equals(job.getExpectedPayloadSha256(), snapshot.payloadSha256())
+                || snapshot.grawBase64() == null
+                || snapshot.grawBase64().length() > ((DtnModels.MAX_INPUT_BYTES + 2) / 3) * 4
+                || snapshot.referencePvt() == null || snapshot.referencePvt().size() != 1) {
+            throw new IllegalArgumentException("비교자료 시험 식별/크기 오류");
+        }
+        byte[] source = Base64.getDecoder().decode(snapshot.grawBase64());
+        if (!server.common.Hashing.hex(server.common.Hashing.sha256Digest().digest(source))
+                .equals(snapshot.sourceSha256())) throw new IllegalArgumentException("비교자료 원본 해시 오류");
+        var records = GrawCodec.splitLengthPrefixed(source);
+        Transfer expected;
+        try (var codec = server.afs.NativeAfsCodec.load(java.nio.file.Path.of(referenceNativeDirectory))) {
+            expected = server.afs.DelayTransferCodec.prepare(job.getId(), records,
+                    "GNSS_RAW".equals(job.getTestType()), job.getTestStartedAt(), codec);
+        }
+        expected.setSenderMode(job.getSenderMode());
+        expected.setReceiverMode(job.getReceiverMode());
+        expected.setHdtnConfig(job.getHdtnConfigJson() == null ? null
+                : objectMapper.readValue(job.getHdtnConfigJson(), HdtnConfig.class));
+        String hash = DtnPayloadDigest.sha256(objectMapper,
+                objectMapper.readTree(objectMapper.writeValueAsBytes(
+                        server.afs.DelayTransferCodec.packet(objectMapper, expected))));
+        if (!hash.equals(snapshot.payloadSha256())) {
+            throw new DataMismatchException("비교자료와 실제 전달 데이터 불일치");
+        }
+        var epoch = objectMapper.readValue(job.getSelectedEpochJson(), DtnDelay.Epoch.class);
+        Pvt reference = snapshot.referencePvt().getFirst();
+        if (reference.getWeek() != epoch.week()
+                || Double.compare(reference.getTowSeconds(), epoch.towSeconds()) != 0) {
+            throw new IllegalArgumentException("Reference Epoch 불일치");
+        }
+    }
+
+
 }

@@ -5,7 +5,7 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>LNIS DTN Sender</title>
   <link rel="stylesheet" href="/lnis/assets/common/app.css?v=20260918-admin-icon">
-  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20260923-presets-log">
+  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20260928-delay-transfer">
 </head>
 <body data-page="dtn-sender">
 <header>
@@ -51,17 +51,11 @@
   <section class="card">
     <div class="card-title">
       <h2>시험 설정</h2>
-    <div class="dtn-delay-settings" id="dtn-comparison-settings">
-      <label class="dtn-delay-toggle" for="dtn-comparison-mode"
-             title="유효한 첫 Epoch에 통신 지연을 반영해 PVT를 다시 계산합니다. 해제하면 기존 원본 복원 비교를 사용합니다.">
-        <input id="dtn-comparison-mode" type="checkbox" checked>
-        <span>지연 반영 PVT</span>
-      </label>
-    </div>
+
     </div>
     <div class="test-type-selector" aria-label="시험 데이터 유형">
       <button type="button" class="test-type-button" data-test-type="GNSS_RAW">GNSS RAW</button>
-      <button type="button" class="test-type-button active" data-test-type="AFS_METADATA">AFS Frame + Metadata</button>
+      <button type="button" class="test-type-button active" data-test-type="AFS_METADATA">AFS Frame</button>
       <button type="button" class="test-type-button" data-test-type="IQ_SAMPLE">I/Q Sample</button>
     </div>
 
@@ -184,7 +178,7 @@
     <section id="trial-settings" class="trial-config" aria-label="시험 요청 설정"></section>
   <section class="sender-actions" aria-label="시험 실행">
     <div class="sender-summary">
-      <strong id="dtn-condition-summary">AFS Frame + Metadata · DTN → HDTN</strong>
+      <strong id="dtn-condition-summary">AFS Frame · DTN → HDTN</strong>
       <span id="dtn-input-summary">데이터 없음</span>
       <span class="sender-connection"><span id="dtn-peer-summary-dot" class="connection-dot unknown" aria-hidden="true"></span>수신 서비스 <strong id="dtn-peer-summary">미확인</strong></span>
       <span class="sender-connection"><span id="dtn-adapter-summary-dot" class="connection-dot unknown" aria-hidden="true"></span>송신 adapter <strong id="dtn-adapter-summary">미확인</strong></span>
@@ -224,5 +218,5 @@
   </div>
   </div>
 </main>
-<script type="module" src="/lnis/assets/dtn/dtn.js?v=20260923-presets-log"></script>
+<script type="module" src="/lnis/assets/dtn/dtn.js?v=20260928-delay-transfer"></script>
 </body></html>

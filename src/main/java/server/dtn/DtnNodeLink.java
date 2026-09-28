@@ -13,4 +13,8 @@ public interface DtnNodeLink {
     DtnRemoteResult result(UUID testId);
 
     void cancel(UUID testId);
+
+    default server.common.DtnModels.ReferenceSnapshot reference(UUID testId) {
+        throw new UnsupportedOperationException("비교자료 조회 미지원");
+    }
 }

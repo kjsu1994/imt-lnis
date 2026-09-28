@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>LNIS DTN Receiver</title>
   <link rel="stylesheet" href="/lnis/assets/common/app.css?v=20260918-admin-icon">
-  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20260927-pvt-compact">
+  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20260928-delay-transfer">
 </head>
 <body data-page="dtn-receiver">
 <header>
@@ -83,6 +83,15 @@
 
   <section class="card epoch-observation-card" id="dtn-observations"></section>
 
+  <section class="card" id="reference-panel" hidden>
+    <div class="card-title"><h2>송신 원본 · 비교 기준</h2>
+      <span id="reference-status" role="status"></span>
+      <button type="button" id="reference-retry" hidden>다시 조회</button>
+    </div>
+    <details id="reference-details"><summary>시험 원본 RAW 보기</summary>
+      <div id="reference-observations"></div>
+    </details>
+  </section>
   <section class="card receiver-pvt">
     <div class="card-title">
       <h2 id="receiver-pvt-title">수신 지구 PVT · 송신 기준 비교</h2>
@@ -143,6 +152,6 @@
   </section>
   </div>
 </main>
-<script type="module" src="/lnis/assets/dtn/dtn-receiver.js?v=20260927-pvt-compact"></script>
+<script type="module" src="/lnis/assets/dtn/dtn-receiver.js?v=20260928-delay-transfer"></script>
 </body>
 </html>

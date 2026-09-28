@@ -1,18 +1,40 @@
-import {renderTrialSettings} from './dtn-settings.js?v=20260923-presets';
+import {renderTrialSettings} from './dtn-settings.js?v=20260928-delay-transfer';
 import {requestJson} from '../common/http.js?v=20260915-structure';
 import {createDtnLog} from './dtn-log.js?v=20260923-fullscreen';
 import {initAdapterHealth} from './dtn-adapter-health.js?v=20260922-compact-structure';
 import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20260918-receiver-original';
-import {createObservationView, numeric} from './dtn-observations.js?v=20260921-clock-analysis';
+import {createObservationView, numeric} from './dtn-observations.js?v=20260928-delay-transfer';
 
 const $ = id => document.getElementById(id);
 const payloadViewer = createPayloadViewer($('dtn-payload'), {receivedOnly: true});
+const referenceView = createObservationView($('reference-observations'), () => {}, '송신 비교원본');
+function renderReference(report = {}) {
+  const status = report.referenceStatus;
+  $('reference-panel').hidden = !status;
+  $('reference-status').textContent = status === 'COMPLETE' ? '비교자료 수신 완료'
+    : status === 'WAITING' ? '수신 계산 완료 · 비교자료 조회 중' : status ? '비교자료 확인 필요' : '';
+  $('reference-status').title = report.referenceMessage || '';
+  $('reference-retry').hidden = !status || status === 'COMPLETE';
+  $('reference-details').hidden = !report.referenceObservations;
+  referenceView.setData(report.referenceObservations || null);
+}
+$('reference-retry').onclick = async () => {
+  if (!selectedId) return;
+  $('reference-retry').disabled = true;
+  try {
+    await requestJson('/lnis/api/v1/dtn/tests/' + encodeURIComponent(selectedId) + '/reference/retry',
+      {method: 'POST'});
+    await poll(true);
+  } catch (error) { log(error.message, 'ERROR'); }
+  finally { $('reference-retry').disabled = false; }
+};
 const clearScreen = location.pathname?.endsWith('/clear') === true;
 let tests = [], epochs = [], selectedId = '', renderVersion = 0, polling = false;
 let reportKey = '', lastEvent = '';
 let receivedIds = null;
 let referenceEpochs = [], comparisonEpochs = [], delayComparison = false, delayEvidence = null;
 function setComparison(report = {}) {
+  renderReference(report);
   delayComparison = report.comparisonMode === 'DELAY';
   $('receiver-pvt-title').textContent = delayComparison ? '수신 지연 반영 PVT · Reference 비교' : '수신 지구 PVT · 송신 기준 비교';
   $('received-pvt-label').textContent = delayComparison ? '수신 지연 반영 지구 PVT' : '수신 복원 지구 PVT';
@@ -139,7 +161,7 @@ function setEpochs(values, preserve = false) {
 function renderSummary(job) {
   renderTrialSettings($('trial-settings'), job);
   $('dtn-observations').hidden = job?.testType === 'IQ_SAMPLE' && !job?.receivedEpochs;
-  const types = {GNSS_RAW: 'GNSS RAW', AFS_METADATA: 'AFS Frame + Metadata', IQ_SAMPLE: 'I/Q Sample'};
+  const types = {GNSS_RAW: 'GNSS RAW', AFS_METADATA: 'AFS Frame', IQ_SAMPLE: 'I/Q Sample'};
   $('receiver-type').textContent = types[job?.testType] || '시험 선택 대기';
   $('receiver-mode').textContent = job?.senderMode && job?.receiverMode ? job.senderMode + ' → ' + job.receiverMode : '경로 정보 없음';
   $('receiver-iq').hidden = job?.testType !== 'IQ_SAMPLE';
@@ -193,7 +215,7 @@ async function renderTest(force = false) {
     if (version !== renderVersion || selectedId !== job.testId) return;
     setComparison(report);
     setEpochs(report.receivedPvt, !changed);
-    observations.setData(report.observations, !changed, delayComparison ? report.delayEvidence : null);
+    observations.setData(report.observations, !changed, delayComparison ? report.delayEvidence : null, report);
     reportKey = event;
   } catch (error) {
     if (version !== renderVersion) return;

@@ -406,11 +406,10 @@ V는 ECEF 속도, 단위 m/s. T 비교 항목은 수신기 시계 오차, 단위
 계산 실패는 positionValid=false이며, 속도 해가 없으면 velocityValid=false다.
 이때 해당 좌표/속도는 null이며 정상적인 0으로 표시하지 않는다.
 
-동일 관측 시각에 대해 위치 차이 0.001 m 이하, 속도 차이 0.001 m/s 이하,
-시계 오차 차이 1e-9 s 이하를 일치로 판정한다.
-양쪽 유효성 차이나 임계값 초과는 FAIL.
-비교 가능한 위치 또는 속도 해가 없으면 INCONCLUSIVE.
-이 판정은 전달 전후 계산 일치성이지 절대 위치 정확도 인증이 아니다.
+신규 RAW/AFS는 1 Epoch 지연 PVT로 위치·속도·Clock Bias 차이를 측정한다.
+MEASURED는 측정 완료, PARTIAL은 부분 비교, INCONCLUSIVE는 비교 불가다.
+데이터 무결성 일치와 PVT 측정은 별개이며 절대 위치 정확도나 허용오차 합격을 인증하지 않는다.
+과거 원본 복원 시험에만 위치·속도 0.001 및 시계 오차 1e-9 s 일치 기준을 사용했다.
 
 ### 13.3 운영 설정
 
@@ -549,9 +548,9 @@ Linux 독립 노드 Compose는 `deployment/node`에 있으며 기존 중앙 서�
 
 `payloadSha256`는 JSON 객체 필드를 이름순으로 재귀 정렬한 뒤 compact JSON UTF-8을 SHA-256 처리한 소문자 64자리 값이다. 배열 순서 및 값은 유지한다. 실제 전송 원문은 정렬하거나 바꾸지 않는다.
 
-응답은 `202`와 14.5의 상태 객체다. 같은 ID/해시/참여자의 재등록은 최초 상태를 유지하며, 변경된 등록은 `409`다. 등록 단계에서는 송신 JSON, 입력 ID/파일, 기준 PVT를 전달하지 않는다. 이후 어댑터 callback 원문에는 `referencePvt`가 포함되며 수신 JSON과 함께 보관한다.
+응답은 `202`와 14.5의 상태 객체다. 같은 ID/해시/참여자의 재등록은 최초 상태를 유지하며, 변경된 등록은 `409`다. 등록 단계에서는 송신 JSON, 입력 ID/파일, 기준 PVT를 전달하지 않는다. RAW/AFS의 원본·Reference는 수신 계산 후 송신 관리 API로 별도 조회한다. I/Q callback은 기존 Reference를 포함한다.
 
-송신 노드는 사전 등록 성공 후에만 외부 DTN/HDTN URL로 기존 Transfer JSON을 POST한다. 외부 wire schema는 변경하지 않는다. 외부 수신 callback은 기존 `/lnis/api/v1/dtn/receive`를 **수신 PC**에서 호출한다. 외부 callback 토큰과 관리 토큰은 별개다.
+송신 노드는 사전 등록 성공 후에만 외부 DTN/HDTN URL로 기존 Transfer JSON을 POST한다. 외부 wire schema는 15절의 RAW v2 / AFS v5 / I/Q v2를 사용한다. 외부 수신 callback은 기존 `/lnis/api/v1/dtn/receive`를 **수신 PC**에서 호출한다. 외부 callback 토큰과 관리 토큰은 별개다.
 
 ### 14.5 DTN 수신 결과 조회
 
@@ -637,7 +636,7 @@ Authorization: Bearer <LNIS_DTN_SEND_TOKEN>
 | hdtnConfig | 선택 객체. HDTN이 포함된 경로의 시험별 설정. DTN → DTN 및 기존 설정 없는 요청에서는 생략 |
 | profile | RAW/AFS: `POCKETSDR-GPS-L1CA-SPP-v1`, I/Q: `LANS-AFS-IQ-v1` |
 | format | 아래 유형별 데이터 형식 |
-| referencePvt | 송신 기준 PVT 배열. RAW/AFS는 관측 시점별, 신규 IQ_SAMPLE은 생성 시작 시점 1개. 비교용이며 수신 계산 입력이 아님 |
+| referencePvt | I/Q 전송의 생성 시작 기준 PVT 1개. 신규 RAW/AFS 전송에서는 제외하고 계산 후 LNIS 관리 API로 조회 |
 
 네 가지 경로 DTN→DTN, DTN→HDTN, HDTN→DTN, HDTN→HDTN을 모두 지원해야 합니다.
 선택값은 시험 시작 시 확정되며, 어댑터는 전송 중 UI 변경과 무관하게 이 요청값을 사용합니다.
@@ -708,210 +707,98 @@ Authorization: Bearer <LNIS_DTN_SEND_TOKEN>
 - 기존 합의는 DTN 설정에 `dtnConfig`, HDTN 설정에 `hdtnConfig`를 사용하는 것입니다. 새 자료의 ION 모드에서도 `hdtnConfig`를 읽는다는 설명과 차이가 있으므로 DTN 구현 전 최종 JSON 규격을 확인합니다.
 - DTN 설정은 추가 규격 대기 상태를 유지합니다. TCPCL의 ION 기본값 1400 외에 아직 확정되지 않은 변환식·기본값을 임의로 정하지 않습니다.
 
-#### 공통 PVT 필드 — GNSS_RAW / AFS_METADATA
+#### A. GNSS RAW — 변환 관측 JSON
 
-두 유형의 요청에는 다음 `referencePvt`가 함께 들어갑니다. 수신기는 이를 계산 입력으로 사용하지 않고, 수신 데이터로 독립 계산한 PVT와 비교·표시합니다. 어댑터는 재계산하거나 숫자를 반올림하지 않습니다.
-
-```json
-{
-  "referencePvt": [{
-    "week": 2400,
-    "towSeconds": 100000.0,
-    "positionValid": true,
-    "velocityValid": true,
-    "ecefMeters": [-3049086.2376831067, 4046274.1024044757, 3861624.97488378],
-    "velocityMetersPerSecond": [-674.6603865750864, 417.4570716281086, 1394.7745784465806],
-    "receiverClockBiasSeconds": -2.4781070279303227e-13,
-    "satellitesUsed": 5,
-    "message": ""
-  }]
-}
-```
-
-위 값은 합성 검증 데이터의 예시이며 실측값이 아닙니다. `week`·`towSeconds`는 GPS 관측 시각이고, 위치는 지구 ECEF X/Y/Z(m), 속도는 ECEF X/Y/Z(m/s), 시계 오차는 초(s)입니다. PVT 실패도 전송 가능한 시험이므로 `positionValid=false` 또는 `velocityValid=false`일 수 있고 관련 값은 null/생략될 수 있습니다. 0으로 치환하지 않습니다. 과거 요청에는 `referencePvt`가 없을 수 있습니다.
-
-아래 A/B 예시는 간결성을 위해 `referencePvt`를 생략했습니다. 실제 송신 요청에 포함된 배열은 반드시 콜백까지 그대로 전달합니다.
-
-#### A. GNSS RAW
+신규 요청은 1 Epoch이며 원본 GRAW Base64 대신 `raw.records`를 전달합니다.
+관측의 `pseudorangeMeters`를 제거하고 송신부에서 계산한 `transmitAt`으로 대체합니다.
+나머지 선택 RAW 레코드 필드는 유지합니다. 아래는 구조 예시이며 완성된 PVT 입력이 아닙니다.
 
 ```json
 {
-  "schemaVersion": 1,
-  "testId": "438a4035-a13c-4b49-a278-0e5fb7f774bd",
+  "schemaVersion": 2,
+  "testId": "<UUID>",
+  "profile": "POCKETSDR-GPS-L1CA-SPP-v1",
+  "format": "LNIS-GRAW-DELAY-v2",
   "testType": "GNSS_RAW",
-  "senderMode": "DTN",
+  "senderMode": "HDTN",
   "receiverMode": "HDTN",
-  "profile": "POCKETSDR-GPS-L1CA-SPP-v1",
-  "format": "LNIS-GRAW-RAW-v1",
-  "sourceSha256": "<원본 GRAW SHA-256: 대문자 HEX 64자리>",
-  "recordCount": 19,
-  "prn": 1,
-  "grawBase64": "<length-prefixed GRAW 파일 전체 바이트의 Base64>"
+  "raw": {
+    "startedAt": "2026-09-28T01:00:00Z",
+    "records": [{
+      "testId": "<원본 레코드 UUID>",
+      "messageId": "<원본 메시지 UUID>",
+      "sequence": 96,
+      "capturedAt": "2026-09-07T00:00:00Z",
+      "observation": {
+        "week": 2400,
+        "receiverTowSeconds": 100000.0,
+        "leapSeconds": 18,
+        "receiverStatus": 0,
+        "observations": [{
+          "constellationId": 0,
+          "satelliteId": 19,
+          "signalId": 0,
+          "dopplerHz": -100.0,
+          "carrierToNoiseDbHz": 45,
+          "trackingStatus": 1,
+          "transmitAt": {"seconds": 1790557199, "femtoseconds": 929951540008388}
+        }]
+      }
+    }]
+  }
 }
 ```
 
-`grawBase64`는 최대 1 MiB 원본 GRAW 파일입니다. 관측 시각·의사거리·도플러·항법 레코드가 포함됩니다.
-UBX 직렬 바이트 원문과는 다릅니다. 어댑터는 내용을 해석·반올림·재계산하지 않고 그대로 전달합니다.
-`recordCount`는 관측 시점 수가 아니라 GRAW 전체 레코드 수이며 `prn`은 공통 모델의 호환 필드입니다.
+예시에서 다른 RAW 필드와 선행 항법 레코드는 생략했습니다.
+`transmitAt.seconds`는 Unix 정수 초, `femtoseconds`는 0~999999999999999의 정수입니다.
+큰 절대시각을 double 하나로 합치거나 소수로 반올림하지 마세요.
+유효한 양의 원본 의사거리가 없으면 `transmitAt:null`이며 유효 의사거리로 사용하지 않습니다.
 
-#### B. AFS Frame + Metadata
-
-**신규 v4: 계산은 AFS 프레임, 원본 보존은 metadata.**
-
-- `schemaVersion=4`, `format=LNIS-AFS-GNSS-v4`; `testType=AFS_METADATA`와 `profile`은 유지합니다.
-- `satellites[]`/`metadata.commonRecords`/관측·항법 레코드 JSON 구조는 기존과 같습니다. v4의 `navigationSupplement` word는 SB2 비트를 지우지 않은 **원본 전체**입니다.
-- 각 Epoch의 계산 대상 GPS L1 관측마다 프레임 하나를 생성합니다. SB3·SB4에 epochIndex·PRN이 있고 SB4에 원본 관측 순서·GNSS 시각이 있어 다중 Epoch를 구분합니다.
-- `frames[].index`는 전체 프레임 순번, `week/afsItow/toi`는 해당 관측 Epoch 기준, `prn`은 위성 식별자입니다. v4는 `navigationRecordIndices`를 보내지 않습니다.
-- 프레임당 750 bytes(6000 bits), Base64 길이 1000을 유지합니다. SB2는 기존 항법 배치, SB3는 항법 보충정보, SB4는 원본 의사거리·Doppler·C/N0·시각·상태와 전리층 정보를 담습니다. 상세 비트 배치는 README의 LNIS SB3·SB4 배치를 참조합니다.
-- LNIS는 원본 metadata 복원 해시와 프레임 내용의 대응을 확인한 뒤 **프레임에서 복원한 값으로만 PVT를 계산**합니다. Reference는 비교용입니다. 지연 시험의 시각 기록·변환·판정은 변경하지 않습니다.
-- 원본에 계산 가능한 GPS 관측이 없는 Epoch는 PRN=0의 빈 Epoch 표식을 사용합니다. 이를 어댑터가 필터링하면 안 됩니다.
-- v4 보고서 `observations.frameInput`은 `{source:"AFS_V4", frameCount, epochs, navigation}` 형태의 계산 입력 근거입니다. 외부 전송 JSON에 추가되는 필드는 아닙니다.
-- 어댑터는 버전별 DTO 재생성·필드 제거·숫자 반올림 없이 원문 전체를 중계해야 합니다. 새 버전 거절/누락 여부를 송수신 서비스 갱신 후 확인해야 합니다.
-
-**신규 v4 JSON 구조 예시** — 관측 위성 19번의 일부 항목만 표시했습니다. 나머지 위성·관측·항법 레코드·Reference 내용은 생략했고 Base64·해시는 자리표시자입니다. 그대로 전송할 수 있는 완성 payload가 아닙니다.
+#### B. AFS Frame — 프레임만으로 수신 PVT 계산
 
 ```json
 {
-  "schemaVersion": 4,
-  "testId": "a4ccd677-0921-44af-b490-a136b6dd8bd8",
-  "testType": "AFS_METADATA",
-  "senderMode": "DTN",
-  "receiverMode": "HDTN",
+  "schemaVersion": 5,
+  "testId": "<UUID>",
   "profile": "POCKETSDR-GPS-L1CA-SPP-v1",
-  "format": "LNIS-AFS-GNSS-v4",
-  "sourceSha256": "<원본 GRAW SHA-256: 대문자 HEX 64자리>",
-  "recordCount": 97,
-  "prn": 1,
-  "metadata": { "commonRecords": [] },
+  "format": "LNIS-AFS-GNSS-v5",
+  "testType": "AFS_METADATA",
+  "senderMode": "HDTN",
+  "receiverMode": "HDTN",
   "satellites": [{
     "constellationId": 0,
     "prn": 19,
     "frames": [{
       "index": 0,
+      "prn": 19,
       "week": 2400,
       "afsItow": 83,
       "toi": 33,
-      "frameBase64": "<SB2·SB3·SB4를 부호화한 750바이트의 Base64: 1000문자>",
-      "prn": 19
-    }],
-    "metadata": {
-      "observations": [{
-        "recordIndex": 96,
-        "measurementIndex": 0,
-        "week": 2400,
-        "towSeconds": 100000.0,
-        "observation": {
-          "pseudorangeMeters": 20453375.9180534,
-          "carrierPhaseCycles": 0.0,
-          "dopplerHz": -430.0,
-          "constellationId": 0,
-          "satelliteId": 19,
-          "signalId": 0,
-          "frequencyId": 0,
-          "lockTimeMilliseconds": 1000,
-          "carrierToNoiseDbHz": 45,
-          "pseudorangeStdDev": 1,
-          "carrierPhaseStdDev": 1,
-          "dopplerStdDev": 1,
-          "trackingStatus": 1
-        }
-      }],
-      "navigationSupplement": []
-    }
-  }],
-  "referencePvt": []
+      "frameBase64": "<750 bytes의 Base64: 1000문자>"
+    }]
+  }]
 }
 ```
 
-`hdtnConfig`는 앞의 공통 규칙을 따르며 이 구조 예시에서는 생략했습니다. 실제 전송에는 해당 시험에서 확정된 설정과 생략하지 않은 원본 레코드·Reference를 보냅니다.
-
-**필드 해석과 어댑터 주의사항:**
-
-- `satellites` 개수, `frames` 개수, `recordCount`는 서로 다릅니다. 확인한 합성 1 Epoch 입력은 항법 레코드 96개 + 관측 레코드 1개로 `recordCount=97`입니다. 항법정보 보존 때문에 `satellites`는 32개지만, 계산 대상 관측 PRN 19·23·24·28·29에만 프레임이 있어 **총 5개 프레임**입니다. 프레임 없는 위성의 metadata도 삭제하지 않습니다. 이 숫자는 해당 입력의 예이며 고정 규격이 아닙니다.
-- `metadata.commonRecords`에는 RAWX 공통 헤더·수집 환경 등 원본 공통 정보가 있습니다. 공통 RAWX의 `observations: []`는 위성별 `metadata.observations`로 분리했기 때문이며 관측 누락을 뜻하지 않습니다.
-- 최상위 `testId`는 현재 전송시험 UUID, metadata 내부 `record.testId`는 원본 수집 UUID입니다. 서로 다를 수 있으며 내부 UUID를 현재 시험 UUID로 치환하지 않습니다.
-- 최상위 `prn=1`은 호환 필드입니다. 실제 위성은 `satellites[].prn` 및 `frames[].prn`으로 식별합니다. `profile`의 `v1`은 계산 프로파일 이름이며 `schemaVersion=4`와 충돌하지 않습니다.
-- `frameBase64`는 암호문이 아닙니다. Base64 해제 후 750바이트가 되며 SB별 내용을 읽으려면 AFS 인터리빙·FEC·CRC 복호화가 필요합니다. 어댑터는 프레임을 다시 만들거나 내부 값을 변경하지 않습니다.
-- v4는 SB3·SB4의 LNIS 확장 type=63/version=2를 사용합니다. 이는 LNIS 로컬 페이로드 버전이며 JSON의 `schemaVersion=4`와 별개입니다. 공식 할당 메시지 번호를 의미하지 않습니다.
-- v4의 `navigationSupplement`는 원본 항법 words 전체입니다. 과거 v3처럼 SB2에 들어간 비트를 0으로 만들면 원본 검증에 실패합니다.
-- SB4 의사거리는 원본 GNSS 관측값입니다. 지연 반영 의사거리와 시험 시작 기준 가상 위성 송신시각은 수신 LNIS가 계산합니다. 어댑터는 관측 시각·의사거리·Doppler를 보정하지 않습니다.
-- 송신·수신 LNIS를 모두 v4 지원 JAR로 갱신해야 합니다. 네이티브 라이브러리만 교체해서는 송신 JSON 버전이 바뀌지 않습니다. 과거 시험의 저장 원문은 생성 당시 버전으로 유지됩니다.
-
-아래는 **과거 v3 호환 규격**입니다. v4의 항법 word 의미와 혼용하지 마세요.
-
-
-**과거 v3: `satellites[]`에 PRN별 AFS 프레임과 metadata를 함께 묶습니다.** SB2는 GPS 항법정보, SB3/SB4는 원본 `0101…` 패턴입니다. 아래는 일부 필드·레코드를 생략한 구조 예시입니다.
-
-```json
-{
-  "schemaVersion": 3,
-  "testId": "438a4035-a13c-4b49-a278-0e5fb7f774bd",
-  "testType": "AFS_METADATA",
-  "senderMode": "HDTN",
-  "receiverMode": "DTN",
-  "profile": "POCKETSDR-GPS-L1CA-SPP-v1",
-  "format": "LNIS-AFS-GNSS-v3",
-  "sourceSha256": "<복원할 원본 GRAW SHA-256: 대문자 HEX 64자리>",
-  "recordCount": 19,
-  "prn": 1,
-  "satellites": [{
-    "constellationId": 0,
-    "prn": 19,
-    "frames": [{
-      "index": 0, "prn": 19, "week": 2400, "afsItow": 83, "toi": 33,
-      "navigationRecordIndices": [0, 1, 2], "frameBase64": "<750바이트 AFS 프레임의 Base64>"
-    }],
-    "metadata": {
-      "observations": [{
-        "recordIndex": 18, "measurementIndex": 0, "week": 2400, "towSeconds": 100000.0,
-        "observation": {
-          "constellationId": 0, "satelliteId": 19, "signalId": 0, "frequencyId": 0,
-          "pseudorangeMeters": 20453375.918, "carrierPhaseCycles": 0.0, "dopplerHz": -430.0,
-          "lockTimeMilliseconds": 1000, "carrierToNoiseDbHz": 45,
-          "pseudorangeStdDev": 1, "carrierPhaseStdDev": 1, "dopplerStdDev": 1, "trackingStatus": 1
-        }
-      }],
-      "navigationSupplement": [{"recordIndex": 0, "record": {
-        "testId": "<수집 세션 UUID>", "messageId": "<GRAW 레코드 UUID>",
-        "sequence": 0, "capturedAt": "2026-09-07T00:00:00Z",
-        "navigation": {
-          "constellationId": 0, "satelliteId": 19, "signalId": 0,
-          "frequencyId": 0, "sfrbxVersion": 2,
-          "words": ["<SB2 필드를 비운 unsigned 32-bit 정수 10개>"]
-        }
-      }}]
-    }
-  }],
-  "metadata": {"commonRecords": [{"recordIndex": 18, "record": {
-      "testId": "<수집 세션 UUID>", "messageId": "<GRAW 레코드 UUID>",
-      "sequence": 18, "capturedAt": "2026-09-07T00:00:00Z",
-      "observation": {
-        "receiverTowSeconds": 100000.0, "week": 2400,
-        "leapSeconds": 18, "receiverStatus": 1, "rawxVersion": 1,
-        "observations": []
-      }
-  }}]}
-}
-```
-
-- `satellites[]`는 `(constellationId, prn)`별 묶음입니다. `frames`와 해당 위성의 관측값·보조 항법정보가 나란히 있습니다. 여러 시점·신호·항법 갱신을 배열로 보존하며 프레임마다 같은 관측값을 복제하지 않습니다. 관측값 없는 위성은 `observations: []`, GPS 항법 세트가 없는 위성/다른 GNSS는 `frames: []`일 수 있습니다.
-- 최상위 `metadata.commonRecords`에는 공통 관측 시각·상태 및 수집 환경만 둡니다. RAWX의 `observations: []`는 누락이 아니라 위성별 이동을 뜻합니다. 최상위 `frames`는 null/생략입니다.
-- `recordIndex`는 원본 GRAW 전체 배열의 0-based 위치이며 `sequence`와 다를 수 있습니다. 공통 레코드와 위성별 `navigationSupplement`를 합치면 `0..recordCount-1`이 중복·누락 없이 완성됩니다. 각 관측값의 `measurementIndex`는 해당 RAWX 내 원래 순서입니다. 수신은 이 두 인덱스로 원본 순서를 복원합니다.
-- `pseudorangeMeters`는 **수신기가 이미 측정한 의사거리(m)**입니다. LNIS 수신은 이를 다시 신호에서 구하지 않고 SB2+보조 항법정보와 함께 지구 PVT를 계산합니다. 위상(cycle), 도플러(Hz), C/N₀(dB-Hz), 추적시간(ms), 편차 코드·유효성 비트도 그대로 보존합니다. 이 예시 숫자만 읽고 나머지 필드를 삭제하지 않습니다.
-- `frames[].prn`은 실제 GPS PRN(1~32)입니다. `navigationRecordIndices`는 같은 위성의 `navigationSupplement[].recordIndex` 세 개이며 LNAV subframe 1·2·3 순서입니다. 같은 레코드를 여러 프레임이 참조할 수 있습니다.
-- `navigation.words`는 **보조 항법 잔여 워드**입니다. 프레임이 참조하는 레코드에서는 SB2가 담당하는 toe/toc, e(상위 31 bit), sqrtA, i0, Ω0, ω, M0, af0/af1 비트를 0으로 비웁니다. GPS 이심률 최하위 1 bit, 보정항·상태·패리티 등은 남깁니다. 참조하지 않는 항법 레코드는 원문 그대로입니다. 이 배열만으로 완성된 SFRBX라고 해석하면 안 됩니다. LNIS가 AFS 복호화 후 채워 복원합니다.
-- 수집 환경 레코드가 있으면 `receiver`에 `receiverModel`, `firmwareVersion`, `portName`, `baudRate`, `sessionName`을 보존합니다.
-- `index`는 **모든 위성에 걸친 AFS 프레임 번호**(0부터 연속)입니다. `frameBase64`는 750바이트/1,000문자입니다. `week`·`afsItow`·`toi`는 AFS 시간이며 ITOW는 1,200초 구간, TOI는 구간 내 12초 슬롯(0~99)입니다. 최상위 `prn=1`은 이전 공통 모델 호환 필드이며 위성 식별에 쓰지 않습니다.
-- SFRBX 메시지 수와 프레임 수는 다릅니다. 합성 예제는 **96건(수집 순번 0~95) → 32 PRN × subframe 1·2·3 → AFS 32개(index 0~31)**입니다. `recordCount=97`은 RAWX 1건까지 포함한 수입니다. 실제 입력은 항법 중복·갱신·누락 때문에 항상 3:1은 아닙니다.
-- LNIS 수신이 CRC·0101 패턴·항법 참조·원본 GRAW SHA-256을 검사한 뒤 RAW 표와 PVT를 계산합니다. `referencePvt`는 비교용일 뿐 계산 입력이 아닙니다.
-- **어댑터는 satellites·metadata·referencePvt를 포함한 JSON 전체를 보존하여 콜백합니다.** 소수 반올림 금지. GPS LNAV 1·2·3 세트가 필요하며 관측값만 있는 입력은 GNSS RAW 시험을 사용합니다.
-
-과거 `schemaVersion=1` / `LNIS-GRAW-AFS-v1`(SB3/SB4의 GRAW) 및 `schemaVersion=2` / `LNIS-AFS-GNSS-v2`(분리된 frames/metadata.records)는 수신 호환을 유지합니다. 신규 전송은 v4이며 송신·수신 서비스 모두 업데이트해야 합니다. RAW 계약은 유지하며, 별도 AFS Frame 오류 주입 시험은 제거했습니다.
-
+- `testType=AFS_METADATA`는 API 식별자를 유지한 것이며 신규 v5에는 metadata가 없습니다.
+- GPS L1 관측별 1프레임, 전체 순번 `index`는 0부터 연속입니다. 선택한 단일 Epoch만 전송합니다.
+- SB2 항법정보, SB3 보충 항법정보, SB4 원본 GNSS 시각·가상 송신 시각·Doppler·C/N₀·상태·전리층·시험 시작 시각을 담습니다.
+- SB3/SB4 확장 type=63, version=3은 LNIS 시험용 식별이며 공식 메시지 할당을 뜻하지 않습니다.
+- SB3 사용 517/846비트, SB4 사용 670/846비트이며 각각 미사용 데이터는 `010101…`로 채웁니다. 상세 비트 도식은 README를 참조하세요.
+- 원본 의사거리·Reference·원본 RAW metadata·원본 GRAW 해시를 외부 JSON에 넣지 않습니다.
+- 위 RAW/AFS 예시에는 `hdtnConfig`를 생략했습니다. 실제 요청은 확정한 HDTN 설정을 같은 이름으로 포함합니다.
+- 어댑터는 JSON 전체를 그대로 콜백합니다. 자체 계산·필드 삭제·숫자 반올림은 하지 않습니다.
+- RAW/AFS의 원본과 Reference는 수신 계산 이후 LNIS 관리 REST로만 조회합니다. I/Q는 아래 별도 규격입니다.
+- 과거 RAW v1, AFS v1~v4는 신규 송신 규격이 아닙니다. 양쪽 LNIS를 함께 업데이트해야 합니다.
 
 #### C. I/Q Sample: 파일 주소 + 프레임 항법정보
 
-신규 파일은 `schemaVersion=2`, `format=LNIS-IQ-FILE-v2`, `metadata.pvtMethod=AFS_IQ_FRAME_PVT-v2`입니다. 파일 크기·90초·12 MHz·경로 규칙과 JSON 필드 구조는 유지합니다. JSON AFS v4와 동일한 SB3·SB4 내용이 I/Q 변조에 사용됩니다.
+`referencePvt`의 각 항목은 `week`, `towSeconds`, `positionValid`, `velocityValid`,
+`ecefMeters:[X,Y,Z]`, `velocityMetersPerSecond:[X,Y,Z]`, `receiverClockBiasSeconds`, `satellitesUsed`, `message`입니다.
+좌표는 지구 ECEF(m), 속도는 m/s, Clock Bias는 초이며 무효값은 null/생략하고 0으로 만들지 않습니다.
+RAW/AFS의 별도 Reference 조회도 같은 PVT 필드를 사용합니다.
+
+신규 파일은 `schemaVersion=2`, `format=LNIS-IQ-FILE-v2`, `metadata.pvtMethod=AFS_IQ_FRAME_PVT-v2`입니다. 파일 크기·90초·12 MHz·경로 규칙과 JSON 필드 구조는 유지합니다. I/Q는 기존 version=2 SB3·SB4 관측 내용을 유지하며 신규 AFS 지연 v5와 구분합니다.
 
 수신은 CRC 검증된 SB2·SB3·SB4의 항법정보와 실제 I/Q 추적 관측값으로 PVT를 계산합니다. 새 방식의 `metadata.gpsLnav`는 기존 구조의 부가자료이며 계산에 사용하지 않습니다(빈 배열도 허용). 필요한 프레임을 복원하지 못하면 JSON으로 대체하지 않습니다. Reference·SB4 원본 관측값을 I/Q 추적 측정값으로 대신하지 않습니다. `metadata.week/towSeconds/prns`는 샘플 시각과 탐색 채널 설정에 계속 사용합니다.
 
@@ -1114,56 +1001,35 @@ Docker 콘솔의 레벨 표시는 `[WARN]`만 굵은 노랑(ANSI 1;33), `[ERROR]
 
 ## 1 Epoch 지연 반영 PVT 비교 (LNIS 내부 기능)
 
-송신 설정의 **통신 지연을 반영해 PVT 재계산** 체크박스는 신규 화면에서 기본 체크입니다.
-해제하면 기존 원본 복원 비교입니다. GNSS RAW/AFS Metadata만 지원하며 I/Q는 기존 방식입니다.
+GNSS_RAW/AFS_METADATA는 항상 지연 PVT이며 체크박스는 없습니다. I/Q는 기존 RF 추적 시험입니다.
 
-- `GET /lnis/api/v1/dtn/inputs/{id}/delay-epochs`: `[{epoch:{recordIndex,week,towSeconds},reference:Pvt}]`.
-  화면은 위치가 유효한 첫 Epoch를 자동 선택하며, 체크박스로 지연 반영 여부만 설정합니다. API의 명시적 Epoch 선택은 유지합니다.
-- 기존 `POST /lnis/api/v1/dtn/tests`에 `comparisonMode:"DELAY"`와 `selectedEpoch`를 추가합니다.
-  선택 Epoch 생략 시 서버가 자동 선택합니다. 비교 방식 생략/null/`RESTORE`는 기존 동작입니다.
-- 선택 Epoch와 그 이전 항법·수신기 메타데이터만 시험용 입력으로 묶습니다. 원본 입력 파일은 보존합니다.
-- 송신 서버 시작 요청 접수부터 수신 서버 본문 수신 완료까지를 측정합니다.
-  시작 이후 준비/계산/변환/관리 등록/어댑터/전송 대기는 포함하고 수신 검증·PVT 계산은 제외합니다.
-  시스템 시계 정확도는 자동 보증하지 않으며 음수 지연은 계산 불가입니다.
-- GPS 시각 `t₀`, 원본 의사거리 `Pᵢ`, `c=299792458 m/s`에 대해
-  `t_txᵢ=t₀−Pᵢ/c`, `t₁=t₀+Δt`, `P′ᵢ=Pᵢ+c×Δt`입니다.
-  계산 복사본의 관측 시각·의사거리만 변경하고 Ephemeris/Doppler/C/N0 등은 유지합니다.
-  위치·속도·Clock Bias는 기존 RTKLIB SPP로 계산합니다. 실제 미래 GNSS 관측 재현은 아닙니다.
-- 외부 어댑터 JSON 구조와 schemaVersion은 변경하지 않습니다. 비교 방식·시작 시각·선택 Epoch는
-  인증된 LNIS 사전 등록에만 추가합니다. `/node/peer/dtn/tests/capabilities`의 `delaySupported`로
-  지원 여부를 확인하며 구버전 상대에는 새 시험을 전송하지 않습니다. 양쪽 LNIS를 함께 갱신하세요.
-- `/tests/{id}/report`의 `delayEvidence`에 시작/접수 시각, 원본/계산 GPS 시각, 지연, 추가 거리,
-  위성·신호별 원본/재계산 의사거리 및 역산 시각을 저장합니다. `comparison.mode=DELAY`입니다.
-  `MEASURED`는 측정 완료, `PARTIAL`은 속도 등 일부 비교 불가, `INCONCLUSIVE`는 위치 계산 불가입니다.
-  기존 PASS 허용오차를 새 시험에 적용하지 않습니다. 차이는 **수신−Reference**이며 관측 시각과 Clock Bias를 구분합니다.
-- 송신 화면/로그: 선택 원본 Epoch, Reference, 어댑터 접수까지의 시작·전송 과정, 이후 상대 상태 알림. 최종 비교 수치는 수신 화면에서 확인합니다.
-  수신 화면/로그: 수신 원본(변환 전), 접수·지연, 위성별 변환 근거, 지연 반영 PVT와 비교 기준 Reference.
-  수신 위성별 상세 로그를 송신 로그에 복제하지 않습니다. 기존 TXT 로그 다운로드와 `@Slf4j` 출력에 포함합니다.
-- 최초 정상 수신 시각과 결과를 고정하여 재접수·조회·재기동으로 다시 계산하거나 중복 기록하지 않습니다.
-  신규 근거 필드는 기존 시험에서 null이며 시험 삭제/보관 정책을 따릅니다.
-
-
-### 지연 시험 시간 정렬 및 Clock Bias 검증
-
-- 시작 기준 S는 송신 서버의 시험 시작 요청 접수 시각, R은 수신 본문 수신 완료 시각입니다.
-  수집 후 시작 전 대기시간은 제외하며, 준비·어댑터 처리·전송 시간은 포함합니다.
-- 위성별 원본 역산 시각은 `t₀−Pᵢ/c`, 시험 기준 가상 송신 시각은 `S−Pᵢ/c`입니다.
-  후자는 실제 위성 송신 시각을 관측한 값이 아닙니다. GPS와 UTC 절대시각을 직접 빼지 않습니다.
-- `P′ᵢ=Pᵢ+c×(R−S)`로 계산합니다. PVT 계산 시간축은 원본 GNSS 관측 시각에 지연을 더하며,
-  원본 Ephemeris·Doppler·C/N0는 유지합니다. 실제 시험 날짜로 궤도를 재생성하지 않습니다.
-- 보고서의 `delayTimeAlignment`는 기존 `delayEvidence`에서 조회 시 파생합니다.
-  `{timing:{startedAt,receivedAt},satellites:[{constellationId,satelliteId,signalId,alignedTransmitAt}]}` 형식이며
-  `alignedTransmitAt`은 UTC ISO 시각(최대 ns 자릿수), 근거가 없으면 null입니다. 이 시각의 표시 반올림으로
-  의사거리를 다시 계산하지 않습니다. 원문·DB의 기존 시험 기록·외부 어댑터 JSON은 변경하지 않습니다.
-- 지연 비교 `comparison.epochs[]`에 `clockResidualSeconds`와 `clockResidualMeters`를 추가합니다.
-  각각 `(수신 Clock Bias−Reference Clock Bias)−delaySeconds`, 그 값에 c를 곱한 값입니다.
-  부호를 유지하며, 후자는 위치 오차가 아닌 시간 차이의 거리 환산값입니다.
-- 계산 가능한 과거 지연 시험은 보고서 조회 시 같은 수치를 제공합니다. 누락·무효 값은 0으로 대체하지 않습니다.
-  `MEASURED/PARTIAL/INCONCLUSIVE`는 유지하며 합격 기준을 추가하지 않습니다.
-- 수신 RAWX 표에는 원본/변환 후 의사거리·증가량과 원본/변환 후 GNSS 관측 시각을 함께 표시합니다.
-  변환값은 저장된 계산 근거와 Epoch·위성·신호·원본 값이 일치할 때만 표시합니다.
-  원본 Doppler는 유지하지만 실제 속도 계산 결과의 미세한 차이를 강제로 없애지 않습니다.
-
+- `GET /lnis/api/v1/dtn/inputs/{id}/delay-epochs`: 유효 Reference가 있는 Epoch 후보.
+- `POST /lnis/api/v1/dtn/tests`: `selectedEpoch:{recordIndex,week,towSeconds}` 생략 시 첫 유효 Epoch 선택.
+  `comparisonMode` 생략/null/`DELAY`는 지연 시험, RAW/AFS의 `RESTORE`는 거절합니다.
+- 송신 `Ttxᵢ=S−Pᵢ/c`, 수신 `P′ᵢ=c×(R−Ttxᵢ)`, GNSS 계산 시각 `t₀+(R−S)`.
+  수집 후 시작 전 대기는 제외하고 시작 접수부터 본문 수신 완료까지 포함합니다.
+- `/node/peer/dtn/tests/capabilities`의 `delayTransferSupported:true`를 확인합니다. 양쪽 LNIS를 함께 갱신하세요.
+  사전 등록은 원본·Reference를 보내지 않습니다.
+- `GET /lnis/api/v1/node/peer/dtn/tests/{id}/reference`: 송신 노드 전용, 관리 Bearer 토큰 필수.
+  `{testId,payloadSha256,sourceSha256,grawBase64,referencePvt}` 반환.
+  GRAW는 시험에 고정한 1 Epoch+선행 레코드이며 전체 수집 파일과 다를 수 있습니다.
+- 수신은 독립 계산 후 원본을 조회하고 시험 ID·원본 해시·Epoch·재생성 전송 해시를 검사합니다.
+  원본이나 Reference를 수신 PVT 입력에 넣지 않습니다.
+- `referenceStatus`: `WAITING`(자동 재시도), `COMPLETE`, `MISMATCH`(자료 불일치), `UNAVAILABLE`(조회·검증 불가).
+  일시 오류는 10/30/60초, 이후 60초 간격이며 재시작 후에도 재시도합니다.
+  `POST /lnis/api/v1/dtn/tests/{id}/reference/retry`는 수신에서 재조회를 예약하고 202를 반환합니다.
+- 보고서 `observations.receivedValues`: 실제 변환 RAW JSON 또는 AFS 복원 관측값.
+  `observations.epochs`: 수신 계산 입력. `referenceObservations`: 별도 조회한 원본.
+  원문 다운로드에는 별도 조회값을 섞지 않습니다.
+- 표의 원본 의사거리는 조회 후 표시, 변환 후 의사거리는 빨간색입니다.
+  기준시간 옆 데이터 일치 여부는 의도한 변환·제외를 적용한 전달 데이터 대조 결과입니다.
+- `delayEvidence`는 S/R·지연·GNSS 시각·재계산 거리를 보존합니다. 새 수신 계산의 원본 거리·역산 근거는 null입니다.
+  실제 가상 송신 시각은 `observations.receivedValues`의 초/fs를 사용합니다.
+- `comparison.mode=DELAY`, 판정은 `MEASURED/PARTIAL/INCONCLUSIVE`이며 합격 허용오차는 없습니다.
+  `clockResidualSeconds=(수신 Bias−Reference Bias)−delaySeconds`, `clockResidualMeters=c×clockResidualSeconds`.
+  시간 잔차의 거리 환산은 위치 오차가 아닙니다.
+- 음수 지연은 시계 동기화 문제로 비교 불가입니다. 재조회·재시작으로 최초 수신 시각이나 PVT를 바꾸지 않습니다.
+- 송신 로그는 송신 처리·어댑터 접수, 수신 로그는 의사거리·독립 PVT·비교를 각각 기록합니다.
 
 ### 송신 접수 이후 로그 역할
 

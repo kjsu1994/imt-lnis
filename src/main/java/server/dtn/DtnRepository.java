@@ -13,6 +13,8 @@ public interface DtnRepository extends JpaRepository<DtnJob, UUID> {
 
     List<DtnJob> findByCancelPendingTrue();
 
+    List<DtnJob> findByReferenceStatus(String status);
+
     boolean existsByInputId(UUID inputId);
 
     boolean existsByIqFileIdAndStateIn(UUID iqFileId, List<String> states);

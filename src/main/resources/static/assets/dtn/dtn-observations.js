@@ -38,6 +38,7 @@ export function createObservationView(container, onSelect = () => {}, role = '')
   container.innerHTML = `
     <div class="gnss-data-header"><h2 data-title>GNSS 수집 데이터</h2>
       <label>GNSS 기준시간 <select data-epoch aria-label="관측 시점"></select></label>
+      <span data-integrity class="pill" role="status" hidden></span>
     <div class="observation-summary"><span data-source>데이터 없음</span><span data-nav>항법정보 —</span>
       <span data-count>관측 신호 —</span><span data-status></span></div></div>
     <h3 data-observation-title>관측값 · RAWX</h3>
@@ -51,8 +52,8 @@ export function createObservationView(container, onSelect = () => {}, role = '')
         <th>C/N₀ <small>dB-Hz</small></th><th>추적시간 <small>ms</small></th>
         <th title="수신기가 출력한 표준편차 코드. SI 단위의 표준편차가 아닙니다.">편차 코드 <small>PR / CP / DO</small></th>
         <th>측정 유효성</th><th title="GPS L1·의사거리 유효 조건. 최종 계산에서 사용한 위성 수는 PVT 결과에 표시됩니다.">PVT 입력</th>
-        <th title="관측 수신 시각 − 의사거리 / 299,792,458. 위성 시계·시스템 간 시간 보정 전 추정값이며 실제 정확도를 의미하지 않습니다. 주 경계를 넘으면 이전 주로 표시합니다.">위성 송신 시각 추정 <small>TOW(s) · 보정 전</small></th>
-      </tr></thead><tbody></tbody></table></div>
+        <th data-transmit-heading title="관측 수신 시각 − 의사거리 / 299,792,458. 위성 시계·시스템 간 시간 보정 전 추정값이며 실제 정확도를 의미하지 않습니다. 주 경계를 넘으면 이전 주로 표시합니다.">위성 송신 시각 추정 <small>TOW(s) · 보정 전</small></th>
+      </tr></thead><tbody data-observations></tbody></table></div>
     <details data-frame-input hidden>
       <summary>AFS 프레임에서 복원한 PVT 계산 입력 · 지연 적용 전</summary>
       <p data-frame-summary></p>
@@ -72,12 +73,14 @@ export function createObservationView(container, onSelect = () => {}, role = '')
     <details data-record-details><summary>저장된 전체 필드 보기 · JSON</summary><pre data-records class="log"></pre></details>
     `;
   const select = container.querySelector('[data-epoch]');
-  const body = container.querySelector('tbody');
-  let data = null, delayEvidence = null;
+  const body = container.querySelector('[data-observations]');
+  let data = null, delayEvidence = null, report = null;
   function render(notify = true) {
+    if (data?.receivedValues) { renderWire(notify); return; }
+    container.querySelector('[data-integrity]').hidden = true;
     const item = data?.epochs?.[Number(select.value)];
     const epoch = item?.observation;
-    const comparison = !!delayEvidence && role === '수신 원본' && data?.source !== 'IQ_TRACKING';
+    const comparison = !data?.receivedValues && !!delayEvidence && role === '수신 원본' && data?.source !== 'IQ_TRACKING';
     const epochMatches = !!epoch && !!delayEvidence?.shiftedTime && !delayEvidence?.error && epoch.week === delayEvidence?.originalTime?.week
       && epoch?.receiverTowSeconds === delayEvidence?.originalTime?.towSeconds;
     container.querySelector('[data-range-heading]').textContent = comparison ? '원본 의사거리 (m)' : '의사거리 (m)';
@@ -144,11 +147,75 @@ export function createObservationView(container, onSelect = () => {}, role = '')
       (epoch && data?.navigationCount === 0 ? ' · PVT 계산 불가' : '');
     container.querySelector('[data-count]').textContent = '관측 신호 ' + (epoch?.observations?.length ?? '—');
     container.querySelector('[data-status]').textContent = iq ? '위상은 상대 누적값 · F9T 편차·상태 정보 없음' : epoch ? '윤초 ' + epoch.leapSeconds + ' s · 수신기 상태 0x' + epoch.receiverStatus.toString(16) : '';
+
     if (notify) onSelect(Number(select.value), epoch);
   }
+
+  function renderWire(notify) {
+    const wire = data.receivedValues;
+    const rawEpoch = wire.records?.find(record => record.observation)?.observation;
+    const values = rawEpoch?.observations || wire.observations || [];
+    const week = rawEpoch?.week ?? values[0]?.week;
+    const tow = rawEpoch?.receiverTowSeconds ?? values[0]?.towSeconds;
+    const reference = report?.referenceObservations?.epochs?.find(item =>
+      item.observation.week === week && item.observation.receiverTowSeconds === tow)?.observation;
+    const calculated = data.epochs?.[Number(select.value)]?.observation;
+    const matchSignal = (a, b) => a.constellationId === b.constellationId
+      && a.satelliteId === b.satelliteId && a.signalId === b.signalId;
+    const status = report?.referenceStatus;
+    const integrity = container.querySelector('[data-integrity]');
+    integrity.hidden = false;
+    integrity.textContent = status === 'COMPLETE' ? '데이터 일치'
+      : status === 'MISMATCH' ? '데이터 불일치'
+      : status === 'UNAVAILABLE' ? '비교 불가' : '비교 대기';
+    integrity.className = 'pill ' + (status === 'COMPLETE' ? 'online' : status === 'MISMATCH' ? 'error' : 'warning');
+    integrity.title = '송신 시 의도한 변환·제외를 적용한 뒤 전달 대상 데이터만 대조합니다. 원본 의사거리와 Reference는 별도 조회하며 수신 PVT 계산에 사용하지 않습니다.';
+    container.querySelector('[data-title]').textContent = '수신 원본 GNSS 관측값';
+    container.querySelector('[data-observation-title]').textContent = '관측값 · RAWX';
+    container.querySelector('[data-range-heading]').textContent = '원본 의사거리 (m)';
+    container.querySelector('[data-range-heading]').title = '계산 후 송신 서비스에서 별도로 조회한 원본입니다. 조회 전에는 표시하지 않습니다.';
+    container.querySelector('[data-range-after]').hidden = false;
+    container.querySelector('[data-range-after]').classList.add('converted-range');
+    container.querySelector('[data-range-added]').hidden = true;
+    container.querySelector('[data-transmit-heading]').textContent = '보정 송신 시각 (Unix s)';
+    container.querySelector('[data-transmit-heading]').title = '어댑터를 통해 받은 가상 송신 시각. 정수 초와 fs를 그대로 표시합니다.';
+    container.querySelector('[data-delay-summary]').hidden = true;
+    container.querySelector('[data-frame-input]').hidden = true;
+    container.querySelector('[data-source]').textContent = rawEpoch ? '수신 RAW JSON' : 'AFS 프레임 복원';
+    container.querySelector('[data-nav]').textContent = '항법정보 ' + (data.navigationCount ?? 0) + '건';
+    container.querySelector('[data-count]').textContent = '관측 신호 ' + values.length;
+    container.querySelector('[data-status]').textContent = '';
+    container.querySelector('[data-navigation-title]').textContent = '수신 항법정보 · SFRBX';
+    container.querySelector('[data-navigation-caption]').textContent = rawEpoch ? '전달된 항법 메시지' : 'SB2·SB3·SB4에서 복원한 항법 메시지';
+    select.replaceChildren(new Option('Week ' + (week ?? '—') + ' / TOW ' + numeric(tow) + ' s', '0'));
+    select.disabled = true;
+    body.replaceChildren();
+    for (const observation of values) {
+      const originals = reference?.observations?.filter(o => matchSignal(o, observation)) || [];
+      const original = originals.length === 1 ? originals[0] : null;
+      const converted = calculated?.observations?.find(o => matchSignal(o, observation));
+      const cells = observationCells(observation, tow);
+      cells[3] = numeric(original?.pseudorangeMeters);
+      if (!rawEpoch) cells[8] = '—';
+      const stamp = observation.transmitAt;
+      cells[11] = stamp ? String(stamp.seconds) + '.' + String(stamp.femtoseconds).padStart(15, '0') : '—';
+      cells.splice(4, 0, numeric(delayEvidence?.error ? null : converted?.pseudorangeMeters));
+      const row = document.createElement('tr');
+      cells.forEach((value, index) => {
+        const cell = document.createElement('td');
+        cell.textContent = String(value ?? '—');
+        if (index === 4) cell.className = 'converted-range';
+        row.append(cell);
+      });
+      body.append(row);
+    }
+    if (notify) onSelect(0, calculated);
+  }
+
   select.onchange = () => render();
   return {
-    setData(next, preserve = false, evidence = null) {
+    setData(next, preserve = false, evidence = null, comparisonReport = null) {
+      report = comparisonReport;
       const selected = preserve ? Number(select.value) : 0;
       data = next;
       delayEvidence = evidence;
@@ -157,7 +224,12 @@ export function createObservationView(container, onSelect = () => {}, role = '')
       navigationBody.replaceChildren();
       for (const item of data?.navigation || []) {
         const row = document.createElement('tr');
-        for (const value of navigationCells(item, iq)) {
+        const navigation = navigationCells(item, iq);
+        if (data?.receivedValues && !data.receivedValues.records) {
+          // 프레임에 없는 수집 순번·수집 시각·수신기 헤더를 실제 수신값처럼 표시하지 않는다.
+          for (const index of [0, 1, 4, 5, 6]) navigation[index] = '—';
+        }
+        for (const value of navigation) {
           const cell = document.createElement('td'); cell.textContent = String(value ?? '—'); row.append(cell);
         }
         navigationBody.append(row);
@@ -170,7 +242,7 @@ export function createObservationView(container, onSelect = () => {}, role = '')
       const details = container.querySelector('[data-record-details]');
       const renderRecords = () => {
         container.querySelector('[data-records]').textContent = details.open
-          ? JSON.stringify(data?.records || [], null, 2) : '';
+          ? JSON.stringify(data?.receivedValues || data?.records || [], null, 2) : '';
       };
       details.ontoggle = renderRecords;
       renderRecords();

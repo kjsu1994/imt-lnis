@@ -53,7 +53,7 @@ class DtnWorkerCancellationTest {
         var release = new CountDownLatch(1);
         var output = new AtomicInteger();
         var processor = mock(DtnProcessor.class);
-        when(processor.prepare(any(), any(), anyBoolean(), any()))
+        when(processor.prepare(any(), any(), anyBoolean(), any(), any()))
                 .thenAnswer(
                         call -> {
                             started.countDown();

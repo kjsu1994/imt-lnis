@@ -238,10 +238,10 @@
     .shared-folder { display: flex; align-items: center; justify-content: center; gap: 5px; left: 77.5%; width: 19%; background: #fffaf0; border-color: #d8c49c; }
     .scene.iq { height: 740px; }
     .scene.iq .tx-pc { height: 48%; }
-    .scene.iq .tx-service { top: 6%; height: 34%; }
-    .scene.iq .tx-routing { top: 6%; height: 34%; }
+    .scene.iq .tx-service { top: 13%; height: 31%; }
+    .scene.iq .tx-routing { top: 13%; height: 31%; }
     .scene.iq #tx-switch { top: 27%; }
-    .scene.iq .tx-folder { top: 10%; }
+    .scene.iq .tx-folder { top: 6%; }
     .scene.iq .rx-service, .scene.iq .rx-routing { height: 27%; }
     .scene.iq #rx-adapter { top: 82%; }
     .scene.iq .rx-folder { top: 92%; }
@@ -307,8 +307,8 @@
             <button type="button" class="shared-folder tx-folder" data-link="tx-file" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 5h8l2 3h10v12H2z"/></svg>송신 공유 폴더 · BIN</button>
             <button type="button" class="shared-folder rx-folder" data-link="rx-file" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 5h8l2 3h10v12H2z"/></svg>수신 공유 폴더 · BIN</button>
             <button type="button" class="management-link" data-link="management">서비스 간 REST · 시험 등록 / 결과 확인 ↕</button>
-            <button class="node tx-node" data-node="source" style="left:12%" type="button"><svg fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><use href="#icon-satellite"/></svg><strong>GNSS 수신기</strong><small>관측값 + 원본 PVT</small></button>
-            <button class="node tx-node switch" id="data-switch" style="left:30%" type="button" title="클릭하여 RAW, AFS, I/Q 순서로 전환"><svg fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><use id="data-icon" href="#icon-frame"/></svg><strong id="data-label"></strong><small>클릭하여 데이터 변경 ↻</small></button>
+            <button class="node tx-node" data-node="source" style="left:12%" type="button"><svg fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><use href="#icon-satellite"/></svg><strong>GNSS 수신기</strong><small>관측값 + 원본 PVT<br>시간 동기화</small></button>
+            <button class="node tx-node switch" id="data-switch" style="left:30%" type="button" title="클릭하여 RAW, AFS, I/Q 순서로 전환"><svg fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><use id="data-icon" href="#icon-frame"/></svg><strong id="data-label"></strong><small>클릭하여 변경 ↻</small></button>
             <button class="node tx-node" data-node="frame" style="left:48%" type="button"><svg fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><use href="#icon-frame"/></svg><strong>AFS Frame 구성</strong><small>고정 6,000 bits</small></button>
             <button class="node tx-node" data-node="encode" style="left:66%" type="button"><svg fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><use href="#icon-wave"/></svg><strong>I/Q 생성</strong><small>프레임 → 신호 샘플</small></button>
             <button class="node tx-node switch" id="tx-switch" style="left:86%" type="button"><svg fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><use href="#icon-router"/></svg><strong id="tx-label">HDTN</strong><small>송신 엔진 변경 ↻</small></button>

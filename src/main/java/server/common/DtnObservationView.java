@@ -15,7 +15,20 @@ public record DtnObservationView(
         List<StoredRecord> records,
         @com.fasterxml.jackson.annotation.JsonInclude(
                         com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
-                FrameInput frameInput) {
+                FrameInput frameInput,
+        com.fasterxml.jackson.databind.JsonNode receivedValues) {
+
+    public DtnObservationView(List<Epoch> epochs, int navigationCount,
+            GrawCodec.ReceiverMetadata receiver, List<Navigation> navigation,
+            List<StoredRecord> records, FrameInput frameInput) {
+        this(epochs, navigationCount, receiver, navigation, records, frameInput, null);
+    }
+
+    public DtnObservationView withReceivedValues(com.fasterxml.jackson.databind.JsonNode values) {
+        return new DtnObservationView(epochs, navigationCount, receiver, navigation,
+                records, frameInput, values);
+    }
+
     public record FrameInput(
             String source, int frameCount, List<Epoch> epochs, List<Navigation> navigation) {}
 

@@ -151,6 +151,8 @@ public class DtnController {
         @jakarta.validation.constraints.Size(max = 2048)
         private String sendUrl;
 
+        @jakarta.validation.constraints.NotNull
+        @jakarta.validation.constraints.Pattern(regexp = "GNSS_RAW|AFS_METADATA|IQ_SAMPLE")
         private String testType = "AFS_METADATA";
 
         @jakarta.validation.constraints.Pattern(regexp = "RESTORE|DELAY")
@@ -206,7 +208,10 @@ public class DtnController {
         }
 
         DtnJob dtnJob;
-        if ("DELAY".equals(request.getComparisonMode())) {
+        if ("RESTORE".equals(request.getComparisonMode()) && !"IQ_SAMPLE".equals(request.getTestType())) {
+            throw new IllegalArgumentException("RAW·AFS는 지연 반영 PVT 시험으로 통합되었습니다.");
+        }
+        if (!"IQ_SAMPLE".equals(request.getTestType())) {
             String senderMode = request.getSenderMode();
             String receiverMode = request.getReceiverMode();
             if (senderMode == null && receiverMode == null) {
@@ -301,6 +306,11 @@ public class DtnController {
                         : objectMapper.readValue(
                                 job.getDelayEvidenceJson(), DtnDelay.Evidence.class);
         report.put("delayEvidence", evidence);
+        report.put("referenceStatus", job.getReferenceStatus());
+        report.put("referenceMessage", job.getReferenceMessage());
+        report.put("referenceObservations", job.getReferenceSourceBase64() == null ? null
+                : server.common.DtnObservationView.fromRecords(server.gnss.GrawCodec.splitLengthPrefixed(
+                        Base64.getDecoder().decode(job.getReferenceSourceBase64()))));
         report.put("delayTimeAlignment", DtnDelay.alignment(evidence));
         report.put(
                 "observations",
@@ -392,6 +402,12 @@ public class DtnController {
                             .build());
         }
         return new ResponseEntity<>(payload.getBody(), headers, HttpStatus.OK);
+    }
+
+    @PostMapping("/tests/{id}/reference/retry")
+    public ResponseEntity<Void> retryReference(@PathVariable UUID id) {
+        dtnService.retryReference(id);
+        return ResponseEntity.accepted().build();
     }
 
     /* 외부 DTN 수신 결과 접수: 인증 후 크기와 JSON을 검증한다. */

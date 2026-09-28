@@ -34,6 +34,12 @@ public class AgentCommandService {
         local.runtime(agentId).worker().prepare(id, data, raw, progress, result);
     }
 
+    public void prepare(String agentId, UUID id, byte[] data, boolean raw,
+            java.time.Instant startedAt, BiConsumer<String, String> progress,
+            Consumer<AgentResult> result) {
+        local.runtime(agentId).worker().prepare(id, data, raw, startedAt, progress, result);
+    }
+
     public void receive(
             String agentId,
             UUID id,

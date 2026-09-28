@@ -1,9 +1,9 @@
-import {initPresetControls, renderTrialSettings} from './dtn-settings.js?v=20260923-presets';
+import {initPresetControls, renderTrialSettings} from './dtn-settings.js?v=20260928-delay-transfer';
 import {requestJson} from '../common/http.js?v=20260915-structure';
 import {createDtnLog} from './dtn-log.js?v=20260923-fullscreen';
 import {initAdapterHealth, validAdapterUrl} from './dtn-adapter-health.js?v=20260922-compact-settings';
 import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20260915-structure';
-import {createObservationView, numeric} from './dtn-observations.js?v=20260921-role';
+import {createObservationView, numeric} from './dtn-observations.js?v=20260928-delay-transfer';
 
 const api = '/lnis/api/v1', $ = id => document.getElementById(id);
 const payload = createPayloadViewer($('dtn-payload'), {sentOnly: true});
@@ -191,15 +191,13 @@ function updateHdtnControls() {
 }
 const presets = initPresetControls({read: () => ({
   testType: selectedType, senderMode, receiverMode,
-  delayEnabled: $('dtn-comparison-mode').checked, hdtnConfig: readHdtnConfig()
+  hdtnConfig: readHdtnConfig()
 }), isLocked: locked, apply: settings => {
   if (locked()) throw new Error('처리 중에는 불러올 수 없습니다.');
   if (!['GNSS_RAW', 'AFS_METADATA', 'IQ_SAMPLE'].includes(settings.testType)
-      || !['DTN', 'HDTN'].includes(settings.senderMode) || !['DTN', 'HDTN'].includes(settings.receiverMode)
-      || typeof settings.delayEnabled !== 'boolean') throw new Error('프리셋 설정을 확인하세요.');
+      || !['DTN', 'HDTN'].includes(settings.senderMode) || !['DTN', 'HDTN'].includes(settings.receiverMode)) throw new Error('프리셋 설정을 확인하세요.');
   const configValues = Object.fromEntries(Object.keys(hdtnRules).map(key => [key, hdtnValue(key, String(settings.hdtnConfig?.[key] ?? ''))]));
   selectedType = settings.testType; senderMode = settings.senderMode; receiverMode = settings.receiverMode;
-  $('dtn-comparison-mode').checked = settings.delayEnabled;
   for (const [key, value] of Object.entries(configValues)) $('hdtn-' + key).value = String(value);
   for (const button of document.querySelectorAll('.test-type-button')) {
     const selected = button.dataset.testType === selectedType;
@@ -224,7 +222,7 @@ function showSettings(open) {
 $('dtn-settings-open').onclick = () => showSettings($('dtn-settings-view').hidden);
 $('dtn-settings-close').onclick = () => showSettings(false);
 function updateInputSummary() {
-  const type = {GNSS_RAW: 'GNSS RAW', AFS_METADATA: 'AFS Frame + Metadata', IQ_SAMPLE: 'I/Q Sample'}[selectedType];
+  const type = {GNSS_RAW: 'GNSS RAW', AFS_METADATA: 'AFS Frame', IQ_SAMPLE: 'I/Q Sample'}[selectedType];
   $('dtn-condition-summary').textContent = type + ' · ' + senderMode + ' → ' + receiverMode + (delayMode() ? ' · 지연 반영 1 Epoch' : '');
   const source = inputMode === 'capture' ? 'COM ' + ($('dtn-port').value || '미선택') : 'capture.graw';
   $('dtn-input-summary').textContent = source + ' · ' + $('dtn-input-state').textContent;
@@ -251,7 +249,7 @@ function renderPvt() {
   $('pvt-message').textContent = value?.message || '지구 ECEF · GPS L1 C/A · 전송시험 시작 시 계산';
 
 }
-function delayMode() { return selectedType !== 'IQ_SAMPLE' && $('dtn-comparison-mode').checked; }
+function delayMode() { return selectedType !== 'IQ_SAMPLE'; }
 function selectedDelayEpoch() {
   return delayChoices.find(choice => choice.reference.positionValid);
 }
@@ -272,15 +270,8 @@ async function loadDelayEpochs() {
     log('시험 Epoch 확인 실패 · ' + error.message, 'WARN');
   }
 }
-function updateDelayControls() {
-  $('dtn-comparison-settings').hidden = selectedType === 'IQ_SAMPLE';
-  $('dtn-comparison-mode').disabled = locked() || selectedType === 'IQ_SAMPLE' || !config.delaySupported;
-}
-$('dtn-comparison-mode').onchange = updateControls;
-
 function updateControls() {
   presets.update();
-  updateDelayControls();
   updateInputSummary();
   $('dtn-settings-lock').hidden = !locked();
   updateHdtnControls();
@@ -580,7 +571,6 @@ async function initialize() {
   initializeHdtnConfig();
   try {
     config = await request('/dtn/config');
-    if (!config.delaySupported) $('dtn-comparison-mode').checked = false;
     if (config.iqEnabled) await loadIqFiles();
     $('dtn-send-url').value = config.defaultSendUrl || '';
     initAdapterHealth(config.adapterUrl || config.defaultSendUrl || '', log, (text, className) => {

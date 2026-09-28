@@ -79,6 +79,37 @@ public final class DtnProcessor {
         return result;
     }
 
+
+    public AgentResult prepare(UUID id, byte[] source, boolean raw,
+            java.time.Instant startedAt, java.util.function.BiConsumer<String, String> progress) {
+        if (startedAt == null) return prepare(id, source, raw, progress);
+        if (source.length == 0 || source.length > DtnModels.MAX_INPUT_BYTES) {
+            throw new IllegalArgumentException("DTN 수집 입력은 1 MiB 이하로 제한됩니다.");
+        }
+        var records = GrawCodec.splitLengthPrefixed(source);
+        AgentResult result = calculate(records, progress);
+        result.setTransfer(DelayTransferCodec.prepare(id, records, raw, startedAt, afs));
+        for (var epoch : result.getObservations().epochs()) {
+            for (var observation : epoch.observation().observations()) {
+                double range = observation.pseudorangeMeters();
+                if (!Double.isFinite(range) || range <= 0
+                        || (!raw && (observation.constellationId() != 0 || observation.signalId() != 0))) {
+                    continue;
+                }
+                var stamp = server.pvt.DelayTime.transmit(startedAt, range);
+                progress.accept("송신 시각 변환",
+                        "GNSS " + observation.constellationId() + " / PRN " + observation.satelliteId()
+                                + " / 신호 " + observation.signalId()
+                                + " · S = " + startedAt + " · P = " + range + " m"
+                                + " · Ttx = S−P/299792458 = " + stamp.seconds()
+                                + " s + " + stamp.femtoseconds() + " fs (시험 기준 가상 시각)");
+            }
+        }
+
+        progress.accept("송신 시각 변환", "시험 시작 기준 가상 송신 시각 생성 완료 · 원본 의사거리/Reference 별도 보관");
+        return result;
+    }
+
     public AgentResult receive(UUID id, Transfer transfer) {
         return receive(id, transfer, (stage, message) -> {});
     }
@@ -93,6 +124,34 @@ public final class DtnProcessor {
             Transfer transfer,
             java.util.function.BiConsumer<String, String> progress,
             DtnDelay.Timing timing) {
+
+        if (DelayTransferCodec.supports(transfer)) {
+            if (!id.equals(transfer.getTestId())) throw new IllegalArgumentException("시험 ID 불일치");
+            if (timing != null && timing.seconds() < 0) {
+                AgentResult unavailable = new AgentResult();
+                String message = "음수 지연 · 송수신 PC 시계 동기화를 확인하세요.";
+                var decoded = DelayTransferCodec.restore(transfer, afs,
+                        new DtnDelay.Timing(timing.startedAt(), timing.startedAt()));
+                var original = decoded.evidence().originalTime();
+                Pvt invalid = new Pvt();
+                invalid.setWeek(original.week());
+                invalid.setTowSeconds(original.towSeconds());
+                invalid.setMessage(message);
+                unavailable.setPvt(List.of(invalid));
+                unavailable.setObservations(server.common.DtnObservationView.fromRecords(decoded.records())
+                        .withReceivedValues(decoded.receivedValues()));
+                unavailable.setDelayEvidence(new DtnDelay.Evidence(timing, timing.seconds(),
+                        DtnDelay.C * timing.seconds(), original, null, List.of(), message));
+                progress.accept("지연 계산", message);
+                return unavailable;
+            }
+            var restored = DelayTransferCodec.restore(transfer, afs, timing);
+            progress.accept("의사거리 계산", "P′ = c × (본문 수신 완료 − 가상 송신 시각) · 프레임/변환 RAW만 사용");
+            AgentResult result = calculate(restored.records(), progress);
+            result.setDelayEvidence(restored.evidence());
+            result.setObservations(result.getObservations().withReceivedValues(restored.receivedValues()));
+            return result;
+        }
         if (transfer != null && server.afs.AfsPvtFrameCodec.FORMAT.equals(transfer.getFormat())) {
             if (!id.equals(transfer.getTestId())) {
                 throw new IllegalArgumentException("시험 ID 불일치");

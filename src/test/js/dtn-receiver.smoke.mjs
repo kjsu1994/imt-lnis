@@ -60,7 +60,7 @@ for (const testType of ['GNSS_RAW', 'AFS_METADATA', 'IQ_SAMPLE']) {
   for (const senderMode of ['DTN', 'HDTN']) for (const receiverMode of ['DTN', 'HDTN']) {
     context.renderSummary({testType, senderMode, receiverMode, state: 'COMPLETED'});
     assert.equal(elements.get('dtn-observations').hidden, testType === 'IQ_SAMPLE');
-    assert.equal(elements.get('receiver-type').textContent, {GNSS_RAW:'GNSS RAW',AFS_METADATA:'AFS Frame + Metadata',IQ_SAMPLE:'I/Q Sample'}[testType]);
+    assert.equal(elements.get('receiver-type').textContent, {GNSS_RAW:'GNSS RAW',AFS_METADATA:'AFS Frame',IQ_SAMPLE:'I/Q Sample'}[testType]);
     assert.equal(elements.get('receiver-mode').textContent, senderMode + ' → ' + receiverMode);
   }
 }

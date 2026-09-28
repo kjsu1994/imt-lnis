@@ -28,6 +28,9 @@ public final class LinuxNativeVerification {
                     IllegalArgumentException.class,
                     () -> processor.receive(id, prepared.getTransfer()));
         }
+        var delay = new DelayTransferCodecTest();
+        delay.frameAndRawComputeWithoutOriginalOrReference();
+        delay.fillerAndTimestampBoundariesAreValidated();
         NativePvtIntegrationTest regression = new NativePvtIntegrationTest();
         regression.rejectsMalformedNativeInputWithoutFabricatingCoordinates();
         regression.reservedSignalByteDoesNotTreatCnavAsLnav();

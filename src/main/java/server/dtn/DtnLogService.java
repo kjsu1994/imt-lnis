@@ -388,6 +388,13 @@ public class DtnLogService {
                             + satellite.satelliteId()
                             + " / 신호 "
                             + satellite.signalId();
+            if (satellite.originalMeters() == null) {
+                add(id, "TEST", "의사거리 재계산", true, identity
+                        + " · 수신된 가상 송신 시각 기준 P′ = c×(R−T_tx) = "
+                        + satellite.recalculatedMeters() + " m · Doppler "
+                        + satellite.dopplerHz() + " Hz · 원본 의사거리/Reference 미사용");
+                continue;
+            }
             add(
                     id,
                     "TEST",

@@ -33,7 +33,16 @@ public class NodeDtnController {
     public java.util.Map<String, Boolean> capabilities(
             @RequestHeader(value = "Authorization", required = false) String authorization) {
         authentication.authenticate(authorization);
-        return java.util.Map.of("delaySupported", true);
+        return java.util.Map.of("delaySupported", true, "delayTransferSupported", true);
+    }
+
+    @GetMapping("/{testId}/reference")
+    public server.common.DtnModels.ReferenceSnapshot reference(
+            @PathVariable UUID testId,
+            @RequestHeader(value = "Authorization", required = false) String authorization)
+            throws Exception {
+        authentication.authenticate(authorization);
+        return dtnService.referenceSnapshot(testId);
     }
 
     @PostMapping

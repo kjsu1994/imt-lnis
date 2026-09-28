@@ -60,7 +60,7 @@ const context = {
       return healthFetch();
     }
     let body = {};
-    if (url.endsWith('/config')) body = {maximumInputBytes: 1048576, exampleEnabled: true,
+    if (url.endsWith('/config')) body = {maximumInputBytes: 1048576, exampleEnabled: true, delaySupported:true,
       defaultSendUrl: 'http://sender.default:8080', defaultReceiveUrl: 'http://receiver.default:8080'};
     else if (url.endsWith('/agents')) body = [tx, rx];
     else if (url.endsWith('/node/connection')) body = {ip: '127.0.0.1', port: 18091, editable: true};
@@ -75,6 +75,7 @@ const context = {
     else if (url.endsWith('/inputs/capture1')) body = {complete: true};
     else if (url.endsWith('/pvt')) body = [{positionValid: true, velocityValid: true, ecefMeters: [1, 2, 3], velocityMetersPerSecond: [0, 0, 0]}];
     else if (url.endsWith('/observations')) body = observations;
+    else if (url.endsWith('/delay-epochs')) body = [{epoch:{recordIndex:0,week:2400,towSeconds:1},reference:{positionValid:true}}];
     else if (url.endsWith('/tests/t1/cancel')) { cancels++; currentJob = {...currentJob, state: 'CANCELLED', cancelPending: false}; body = currentJob; }
     else if (url.endsWith('/tests/t1')) body = currentJob;
     else if (url.endsWith('/report')) body = {referencePvt: [{week: 2400, towSeconds: 1,
@@ -354,9 +355,9 @@ assert.equal(elements.get('dtn-cancel').disabled,false,'failed sender can clean 
 context.fetch = ordinaryFetch;
 console.log('PASS: trial cancellation, repeat prevention, failed trial cleanup and stale polling guard');
 
-// New mode selects exactly one source epoch; original API path above stays unchanged.
+// RAW/AFS always select exactly one valid source epoch.
 vm.runInContext("config.delaySupported=true; selectedType='GNSS_RAW'; job=null; busy=false; inputId='input1';",context);
-elements.get('dtn-comparison-mode').checked=true;
+assert.equal(elements.has('dtn-comparison-mode'),false,'RAW/AFS always use delay PVT');
 vm.runInContext("delayChoices=[{epoch:{recordIndex:95},reference:{positionValid:false}},{epoch:{recordIndex:96,week:2400,towSeconds:100000},reference:{positionValid:true,velocityValid:false}}]",context);
 context.updateControls();
 assert.equal(elements.has('dtn-epoch-summary'),false);

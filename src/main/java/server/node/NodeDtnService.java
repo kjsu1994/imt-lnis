@@ -72,7 +72,8 @@ public class NodeDtnService implements DtnNodeLink {
                                 null,
                                 com.fasterxml.jackson.databind.JsonNode.class,
                                 4096);
-                if (!capabilities.path("delaySupported").asBoolean()) {
+                if (!capabilities.path("delaySupported").asBoolean()
+                        || !capabilities.path("delayTransferSupported").asBoolean()) {
                     throw new IllegalStateException("지연 시험 미지원");
                 }
             } catch (RuntimeException error) {
@@ -127,6 +128,12 @@ public class NodeDtnService implements DtnNodeLink {
             throw new IllegalStateException("상대 노드의 결과 식별자가 다릅니다.");
         }
         return result;
+    }
+
+    @Override
+    public server.common.DtnModels.ReferenceSnapshot reference(UUID testId) {
+        return peerClient.exchange("/lnis/api/v1/node/peer/dtn/tests/" + testId + "/reference",
+                null, server.common.DtnModels.ReferenceSnapshot.class, DtnModels.MAX_JSON_BYTES);
     }
 
     @Override

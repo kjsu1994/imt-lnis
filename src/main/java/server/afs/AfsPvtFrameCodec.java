@@ -12,7 +12,7 @@ import java.util.*;
 public final class AfsPvtFrameCodec {
     public static final String FORMAT = "LNIS-AFS-GNSS-v4";
     public static final int TYPE = 63, VERSION = 2;
-    public static final int SB3_USED = 517, SB4_USED = 606;
+    public static final int SB3_USED = 517, SB4_USED = 506;
     private static final UUID INTERNAL_ID = new UUID(0, 0);
     // LNAV subframe, bit offset (parity stripped), AFS SB2 offset, bit count.
     private static final int[][] FIELDS = {
@@ -289,6 +289,94 @@ public final class AfsPvtFrameCodec {
             add(records, new ObservationEpoch(first.tow(), first.week(), 0, 0, 1, observations));
         }
         return records;
+    }
+
+
+    public record DelayPayload(Payload observation, server.pvt.DelayTime transmitAt, Instant startedAt) {}
+
+    /** v5는 SB4 의사거리 대신 가상 송신 시각을 전달한다. */
+    public static Blocks encodeDelay(Payload p, Instant start) {
+        Blocks original = encode(p);
+        byte[] sb3 = original.sb3().clone();
+        put(sb3, 6, 8, 3);
+        for (int i = SB3_USED; i < 846; i++) sb3[i] = (byte) ((i - SB3_USED) % 2);
+        Bits b4 = header(p, 4);
+        put(b4.data, 6, 8, 3);
+        b4.write(p.measurement(), 8);
+        b4.write(p.week(), 16);
+        b4.write(Double.doubleToRawLongBits(p.tow()), 64);
+        var transmit = p.prn() == 0 ? server.pvt.DelayTime.from(start)
+                : server.pvt.DelayTime.transmit(start, p.range());
+        b4.write(transmit.seconds(), 64);
+        b4.write(transmit.femtoseconds(), 50);
+        b4.write(Float.floatToRawIntBits(p.doppler()), 32);
+        b4.write(p.cn0(), 8);
+        b4.write(p.status(), 8);
+        b4.write(p.ionosphere() == null ? 0 : 1, 1);
+        b4.write(p.ionPrn(), 8);
+        for (int i = 0; i < 10; i++) {
+            b4.write(p.ionosphere() == null ? 0 : p.ionosphere()[i], 24);
+        }
+        var anchor = server.pvt.DelayTime.from(start);
+        b4.write(anchor.seconds(), 64);
+        b4.write(anchor.femtoseconds(), 50);
+        if (b4.offset != 670) throw invalid("지연 SB4 비트 수 오류");
+        for (int i = b4.offset; i < 846; i++) b4.data[i] = (byte) ((i - b4.offset) % 2);
+        return new Blocks(original.sb2(), sb3, b4.data);
+    }
+
+    public static DelayPayload decodeDelay(byte[] sb2, byte[] sb3, byte[] sb4, Instant received) {
+        checkBits(sb2, 1176);
+        Bits b3 = new Bits(sb3), b4 = new Bits(sb4);
+        int[] h3 = readDelayHeader(b3, 3), h4 = readDelayHeader(b4, 4);
+        if (!Arrays.equals(h3, h4)) throw invalid("지연 SB 식별 불일치");
+        boolean hasNav = b3.read(1) != 0;
+        int[][] nav = new int[3][10];
+        for (int i = 0; i < 720; i++) {
+            if (!MAPPED[i]) write(nav[i / 240], i % 240, 1, b3.read(1));
+        }
+        for (int[] f : FIELDS) write(nav[f[0]], f[1], f[3], read(sb2, f[2], f[3]));
+        int measurement = (int) b4.read(8), week = (int) b4.read(16);
+        double tow = Double.longBitsToDouble(b4.read(64));
+        var transmit = new server.pvt.DelayTime(b4.read(64), b4.read(50));
+        float doppler = Float.intBitsToFloat((int) b4.read(32));
+        int cn0 = (int) b4.read(8), status = (int) b4.read(8);
+        boolean hasIon = b4.read(1) != 0;
+        int ionPrn = (int) b4.read(8);
+        int[] ion = new int[10];
+        for (int i = 0; i < 10; i++) ion[i] = (int) b4.read(24);
+        var anchor = new server.pvt.DelayTime(b4.read(64), b4.read(50));
+        if (anchor.femtoseconds() % 1_000_000 != 0) throw invalid("시험 시작 시각 정밀도 오류");
+        Instant start = Instant.ofEpochSecond(anchor.seconds(), anchor.femtoseconds() / 1_000_000);
+        if (received.isBefore(start)) throw invalid("음수 지연: PC 시계 동기화를 확인하세요.");
+        boolean empty = h3[1] == 0;
+        if (empty ? !transmit.equals(anchor) : transmit.until(start) <= 0) {
+            throw invalid("가상 송신 시각 오류");
+        }
+        Payload p = new Payload(h3[0], measurement, week, tow, h3[1],
+                empty ? 0 : transmit.rangeAt(received), doppler, cn0, status,
+                hasNav ? nav : null, ionPrn, hasIon ? ion : null);
+        Blocks expected = encode(p);
+        byte[] canonical3 = expected.sb3().clone();
+        put(canonical3, 6, 8, 3);
+        for (int i = SB3_USED; i < 846; i++) canonical3[i] = (byte) ((i - SB3_USED) % 2);
+        if (!Arrays.equals(sb2, expected.sb2()) || !Arrays.equals(sb3, canonical3)) {
+            throw invalid("SB2/SB3 시간 또는 예약 비트 오류");
+        }
+        for (int i = b4.offset; i < 846; i++) {
+            if (sb4[i] != (i - b4.offset) % 2) throw invalid("SB4 예약 패턴 오류");
+        }
+        if (!hasIon && Arrays.stream(ion).anyMatch(v -> v != 0)) {
+            throw invalid("전리층 존재 플래그 오류");
+        }
+        return new DelayPayload(p, transmit, start);
+    }
+
+    private static int[] readDelayHeader(Bits bits, int block) {
+        if (bits.read(6) != TYPE || bits.read(8) != 3 || bits.read(3) != block) {
+            throw invalid("지연 확장 버전/블록 오류");
+        }
+        return new int[] {(int) bits.read(32), (int) bits.read(8)};
     }
 
     private static void addNavigation(List<byte[]> records, int prn, int[] words) {

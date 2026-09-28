@@ -52,10 +52,14 @@ public final class DtnModels {
 
         /** RAW transport preserves canonical GRAW bytes, not UBX serial bytes. */
         private String grawBase64;
+        private com.fasterxml.jackson.databind.JsonNode raw;
 
         /** Display/comparison only; never used as receiver solver input. */
         private List<Pvt> referencePvt;
     }
+
+    public record ReferenceSnapshot(UUID testId, String payloadSha256,
+            String sourceSha256, String grawBase64, List<Pvt> referencePvt) {}
 
     /** 시험별 HDTN 어댑터 설정. 실제 정책 적용은 어댑터가 담당한다. */
     @Data
