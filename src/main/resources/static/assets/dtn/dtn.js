@@ -3,7 +3,7 @@ import {requestJson} from '../common/http.js?v=20260915-structure';
 import {createDtnLog} from './dtn-log.js?v=20260923-fullscreen';
 import {initAdapterHealth, validAdapterUrl} from './dtn-adapter-health.js?v=20260922-compact-settings';
 import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20260915-structure';
-import {createObservationView, numeric} from './dtn-observations.js?v=20260928-delay-transfer';
+import {createObservationView, numeric} from './dtn-observations.js?v=20260928-observation-colors';
 
 const api = '/lnis/api/v1', $ = id => document.getElementById(id);
 const payload = createPayloadViewer($('dtn-payload'), {sentOnly: true});

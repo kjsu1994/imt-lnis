@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="ko">
 <head>
+  <link rel="icon" type="image/png" href="/lnis/assets/common/logo_v3.png?v=995392000e36">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="GNSS 데이터의 DTN/HDTN 전송 과정과 지연·PVT 비교 시험을 설명하는 대화형 안내">
@@ -30,7 +31,8 @@
     small { font-size: 12px; }
     .wrap { max-width: 1340px; margin: auto; padding: 20px 34px 24px; }
     .masthead { display: flex; justify-content: space-between; align-items: center; gap: 20px; margin-bottom: 14px; }
-    .brand { font-size: 13px; font-weight: 800; letter-spacing: .17em; }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand img { display: block; width: 56px; height: 56px; object-fit: contain; }
     .badge { display: inline-block; color: #526579; background: #e7edf4; border-radius: 20px; padding: 4px 12px; font-size: 12px; letter-spacing: 0; font-weight: 500; }
     .hero { margin-bottom: 18px; }
     .plain, .primary { border: 1px solid var(--line); border-radius: 9px; background: white; padding: 8px 14px; font-weight: 600; }
@@ -234,19 +236,17 @@
     #rx-adapter { top: 86%; }
     .adapter-node.active { border: 2px solid #b46a08; background: #fffaf0; }
     .shared-folder { display: flex; align-items: center; justify-content: center; gap: 5px; left: 77.5%; width: 19%; background: #fffaf0; border-color: #d8c49c; }
-    .scene.iq { height: 740px; }
-    .scene.iq .tx-pc { height: 48%; }
+    .scene.iq .tx-pc { height: 41%; }
     .scene.iq .tx-service, .scene.iq .tx-routing { top: 13%; bottom: 60%; height: auto; }
-    .scene.iq #tx-switch { top: 27%; }
+    .scene.iq #tx-switch { top: 25%; }
     .scene.iq .tx-folder { top: 6%; }
     .scene.iq .rx-service, .scene.iq .rx-routing { height: 27%; }
+    .scene.iq .rx-node { top: 70%; }
     .scene.iq #rx-adapter { top: 82%; }
     .scene.iq .rx-folder { top: 92%; }
-    :fullscreen .scene.iq { height: 740px; }
     .management-link { top: 48%; left: 30%; transform: translateX(-50%); font-size: 10px; color: #65758a; border-style: dashed; }
-    .scene.iq .management-link { top: 50%; }
     .clock-note { top: 48%; left: 40%; max-width: 35%; font-size: 11px; }
-    .reference-label { top: 48%; left: 12%; }
+    .reference-label { top: calc(17% + 124px); left: 30%; z-index: 3; white-space: nowrap; }
     .network { top: 48%; left: 87%; z-index: 2; }
     .wire.file { stroke: #977226; stroke-dasharray: 6 4; }
     .wire.management { stroke: #8c9caa; stroke-dasharray: 2 5; stroke-width: 1; }
@@ -267,7 +267,9 @@
   </svg>
   <main class="wrap">
     <header class="masthead">
-      <div class="brand">LNIS <span class="badge">설명용 · 실제 전송 없음</span></div>
+      <div class="brand">
+        <img src="/lnis/assets/common/logo_v3.png?v=995392000e36" alt="LNIS" width="56" height="56">
+      </div>
       <button class="plain" id="fullscreen" type="button">전체화면</button>
     </header>
     <div class="hero">
@@ -305,7 +307,7 @@
             <button class="node tx-node" data-node="frame" style="left:48%" type="button"><svg fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><use href="#icon-frame"/></svg><strong>AFS Frame 구성</strong><small>6,000 bits</small></button>
             <button class="node tx-node" data-node="encode" style="left:66%" type="button"><svg fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><use href="#icon-wave"/></svg><strong>I/Q 생성</strong><small>프레임 → 신호 샘플</small></button>
             <button class="node tx-node switch" id="tx-switch" style="left:86%" type="button"><svg fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><use href="#icon-router"/></svg><strong id="tx-label">HDTN</strong><small>송신 엔진 변경 ↻</small></button>
-            <span class="reference-label" id="reference-label">원본 PVT · 비교 기준</span>
+            <span class="reference-label" id="reference-label" title="수신부가 PVT 계산을 마친 뒤 서비스 간 REST로 조회하는 비교자료입니다.">원본·Reference 보관</span>
             <p class="clock-note" id="clock-note">시계 동기화는 시험 전제입니다.<br>지연 = 수신 본문 수신 완료 − 시험 시작 접수 · 수집 후 시작 전 대기시간 제외</p>
             <button class="network" data-node="network" type="button">번들 전송 · 저장 / 대기 ↓</button>
 
@@ -912,7 +914,7 @@
       const managementTop = point('.tx-service', 'bottom')[1];
       const managementBottom = point('.rx-service', 'top')[1];
       const routes = [
-        ['reference', `M${point('.tx-service', 'left')[0]} ${point('.tx-service', 'bottom')[1]}H${point(node('compare'), 'top')[0]}V${point(node('compare'), 'top')[1]}`],
+        ['reference', `M${point('#reference-label', 'left').join(' ')}H${point(node('compare'), 'top')[0]}V${point(node('compare'), 'top')[1]}`],
         ['management', `M${managementX} ${managementTop}V${managementBottom}`],
         ['data', line(point(node('source'), 'right'), point('#data-switch', 'left'))],
         ['frame', line(point('#data-switch', 'right'), point(node('frame'), 'left'))],
@@ -975,7 +977,7 @@
       $('tx-adapter').classList.toggle('active', active === 'send');
       $('rx-adapter').classList.toggle('active', active === 'receive');
       $('reference-label').hidden = iq;
-      $('reference-label').textContent = '계산 후 원본·PVT 조회';
+      $('reference-label').textContent = '원본·Reference 보관';
       document.querySelector('.management-link').textContent =
         iq ? '서비스 간 REST · 등록 / 결과 확인 ↕' : '서비스 간 REST · 등록 / 원본 조회 ↕';
       $('clock-note').hidden = iq;

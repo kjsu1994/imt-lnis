@@ -1032,7 +1032,8 @@ body[data-page="dtn-receiver"] .receiver-adapter .adapter-url-controls { grid-te
 .trial-config-values div { display: flex; align-items: baseline; gap: 6px; min-width: 0; max-width: 100%; }
 .trial-config-values dt { color: var(--muted); flex-shrink: 0; }
 .trial-config-values dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
-.epoch-observation-table .converted-range { color: #b42318; font-weight: 600; }
+.epoch-observation-table .converted-range,
+.epoch-observation-table .converted-value { color: #b42318; font-weight: 600; }
 #dtn-log-fullscreen { display: inline-flex; align-items: center; justify-content: center; margin-left: auto; }
 .log-scope { font-size: 12px; font-weight: normal; }
 body[data-page^="dtn-"] section.log-expanded { display: flex; flex-direction: column; box-sizing: border-box; width: 100%; height: 100dvh; padding: 18px; border-radius: 0; background: var(--panel, white); }

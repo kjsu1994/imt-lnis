@@ -72,6 +72,8 @@ export function createObservationView(container, onSelect = () => {}, role = '')
       </tr></thead><tbody data-navigation></tbody></table></div>
     <details data-record-details><summary>저장된 전체 필드 보기 · JSON</summary><pre data-records class="log"></pre></details>
     `;
+  const hideTransmitEstimate = role === '송신 원본';
+  container.querySelector('[data-transmit-heading]').hidden = hideTransmitEstimate;
   const select = container.querySelector('[data-epoch]');
   const body = container.querySelector('[data-observations]');
   let data = null, delayEvidence = null, report = null;
@@ -97,12 +99,13 @@ export function createObservationView(container, onSelect = () => {}, role = '')
     body.replaceChildren();
     if (!epoch) {
       const row = document.createElement('tr'), cell = document.createElement('td');
-      row.className = 'epoch-empty-row'; cell.colSpan = comparison ? 14 : 12; cell.textContent = '표시할 GNSS 관측값이 없습니다.';
+      row.className = 'epoch-empty-row'; cell.colSpan = (comparison ? 14 : 12) - (hideTransmitEstimate ? 1 : 0); cell.textContent = '표시할 GNSS 관측값이 없습니다.';
       row.append(cell); body.append(row);
     } else {
       for (const [index, observation] of epoch.observations.entries()) {
         const row = document.createElement('tr');
         const values = observationCells(observation, epoch.receiverTowSeconds);
+        if (hideTransmitEstimate) values.pop();
         if (comparison) {
           // 순서·위성·신호·원본 값을 대조하여 다른 관측의 변환값을 표시하지 않는다.
           const satellite = epochMatches ? delayEvidence.satellites?.[index] : null;
@@ -178,7 +181,8 @@ export function createObservationView(container, onSelect = () => {}, role = '')
     container.querySelector('[data-range-after]').classList.add('converted-range');
     container.querySelector('[data-range-added]').hidden = true;
     container.querySelector('[data-transmit-heading]').textContent = '보정 송신 시각 (Unix s)';
-    container.querySelector('[data-transmit-heading]').title = '어댑터를 통해 받은 가상 송신 시각. 정수 초와 fs를 그대로 표시합니다.';
+    container.querySelector('[data-transmit-heading]').classList.add('converted-value');
+    container.querySelector('[data-transmit-heading]').title = '송신부가 원본 의사거리에서 역산하고 시험 시작 시각에 맞춰 보정한 가상 송신 시각입니다.';
     container.querySelector('[data-delay-summary]').hidden = true;
     container.querySelector('[data-frame-input]').hidden = true;
     container.querySelector('[data-source]').textContent = rawEpoch ? '수신 RAW JSON' : 'AFS 프레임 복원';
@@ -205,6 +209,7 @@ export function createObservationView(container, onSelect = () => {}, role = '')
         const cell = document.createElement('td');
         cell.textContent = String(value ?? '—');
         if (index === 4) cell.className = 'converted-range';
+        if (index === cells.length - 1 && stamp) cell.className = 'converted-value';
         row.append(cell);
       });
       body.append(row);

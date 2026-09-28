@@ -198,20 +198,7 @@ COM/GRAW 입력 적용 → 지구 PVT 계산 → 90초 I/Q 생성 → 전송 →
 새 I/Q는 `LNIS-IQ-FILE-v2`, `pvtMethod=AFS_IQ_FRAME_PVT-v2`로 구분합니다. JSON의 PRN·첫 샘플 시각·Reference는 탐색/비교용이며 항법정보는 CRC 검증된 프레임에서 확보합니다. 4개 미만 PRN의 계산 프레임만 복원되면 메타데이터로 우회하지 않고 오류를 표시합니다. I/Q에는 기존처럼 통신 지연 재계산을 적용하지 않습니다.
 
 ## 개발용 눈으로 확인
-
-운영 ZIP에서는 개발용 중계·예제를 제외합니다. 개발 시만 `deployment/node/docker-compose.dev.yml`, `dev-relay.mjs`와 생성한 `examples`를 배포 폴더에 둡니다.
-두 노드가 사용할 `lnis-development` Docker 네트워크를 먼저 생성합니다.
-개발 중계기는 REST 전달과 두 로컬 폴더 사이 파일 복사만 수행하며 **실제 DTN/HDTN 시험이 아닙니다.**
-
-- Windows 개발: `COMPOSE_FILE=docker-compose.yml;docker-compose.dev.yml`
-- Linux 개발: `COMPOSE_FILE=docker-compose.yml:docker-compose.dev.yml`
-- 송신에만 `COMPOSE_PROFILES=relay`, `LNIS_DEV_EXAMPLES=true`.
-- `LNIS_DEV_RECEIVE_TOKEN`은 수신 LNIS의 수신 토큰, `LNIS_DTN_SEND_TOKEN`은 개발 중계 접수 토큰으로 설정합니다.
 - 중계 기본 콜백은 개발용 수신 8091입니다. 운영 주소·포트 계약이 아닙니다.
-
-송신 설정의 **합성 PVT 수집 재생 · 개발용**은 기본 `hidden`입니다. 개발자 도구에서 숨김을 해제하고 누르면 유효한 PVT 입력을 재생합니다.
-같은 입력으로 RAW와 AFS를 전송해 수신 화면과 비교하세요.
-이는 F9T 실측/COM 수집이 아닙니다. 기존 F9T 공개 예제는 항법정보가 없어 PVT 계산용이 아닙니다.
 
 ## 빌드·검증
 
@@ -245,12 +232,8 @@ COM/GRAW 입력 적용 → 지구 PVT 계산 → 90초 I/Q 생성 → 전송 →
 
 ### 새 PC 배포
 
-`build/distributions/lnis-node-linux.zip`을 송신·수신 PC에 각각 풀고 `.env.example`을 `.env`로 복사해 역할과 주소를 설정합니다. 이후 `docker compose up -d --build`로 실행합니다.
-배포 폴더에 JAR·SO·I/Q 실행파일과 필수 데이터가 포함되어 있으므로 **실행 PC에는 JDK·컴파일러·외부 원본 소스가 필요하지 않습니다.** 최초 기본 이미지 다운로드에는 인터넷이 필요합니다.
-`licenses/native-sources.zip`에는 원본·패치·빌드 자료를 함께 제공합니다.
+`build/distributions/lnis-node-linux.zip`을 송신·수신 PC에 각각 풀고 `.env.example`을 `.env`로 복사해 역할과 주소를 설정합니다.
 
-독립 실행 회귀시험은 배포 ZIP을 `build/native-system/bundle`에 푼 뒤 아래 명령으로 실행합니다.
-18090/18091 포트를 사용하며 기존 8090/8091 서비스·DB를 건드리지 않습니다. 90초 I/Q 생성과 복사에 디스크 여유 공간이 필요합니다.
 
 ```sh
 docker build -t lnis-native-verification:local build/native-system/bundle
@@ -281,40 +264,6 @@ docker compose -f src/test/dtn-native-compose.yml down
 | 공통 | `server/common` | 기존 공통 모델·HTTP·해시·로그 |
 | 화면 공통 | `static/assets/common` | 기본 CSS, HTTP 요청, 노드 연결 |
 | DTN 화면 | `static/assets/dtn` | 송수신 화면, 어댑터 상태, 관측값·원문·로그 |
-
-같은 JVM 안의 실행 요청과 결과는 직접 메서드·콜백으로 전달합니다. 내부 JSON 명령/ACK·Base64 청크는 사용하지 않습니다. 비동기 실행·취소·크기 제한·삭제 보호·네이티브 자원 수명은 유지합니다. 브라우저 WebSocket, PC 간 REST, 어댑터 JSON, 기존 DB 테이블·파일 형식은 변경하지 않습니다. `/agents`와 `agentId` 이름은 기존 화면/API 호환을 위해 유지합니다.
-
-자체 Java와 테스트는 4칸 들여쓰기, 같은 줄 여는 중괄호, 제어문 본문 줄바꿈을 사용합니다. 원본 네이티브 코드·주석·패치는 포맷 변경 대상이 아닙니다.
-
-2026-09-27 구조 변경 검증: Java 테스트 180건 통과·1건 제외(과거 네이티브 진단 로그 비교 자료 필요), 화면 테스트·배포 ZIP 빌드 통과, 원본 네이티브 82개 파일 해시 유지. 개발용 REST 중계로 GNSS RAW/AFS 원본 복원(PVT 차이 0), 양쪽 지연 반영, 90초·2.16GB I/Q 생성·수신·추적 PVT 계산을 확인했습니다. 실제 GNSS 장비와 외부 DTN/HDTN 엔진 시험을 대체하지 않습니다.
-
-화면 HTML은 `static`, JSON 응답 처리는 `common/http.js`에 있습니다. 바이너리 다운로드와 브라우저 WebSocket은 별도로 처리합니다.
-DTN 스타일은 기존 적용 순서를 유지한 `dtn/dtn-ui.css` 하나에 모았습니다. 개발용 합성 재생 영역의 `hidden`과 `/clear`의 화면 초기화 동작은 유지합니다.
-
-## 기존 WSL 노드에 JAR 갱신
-
-저장소에서 다음 명령을 실행합니다. 새 설치·네이티브 라이브러리 교체는 기존 배포 ZIP 절차를 사용합니다.
-
-```powershell
-.\gradlew.bat check bootJar
-.\scripts\deploy-nodes.ps1 -ValidateOnly
-.\scripts\deploy-nodes.ps1
-```
-
-기본 대상은 `C:\lnis-compose`와 `C:\lnis-compose-리시버`입니다. 하나만 갱신하려면 `-TargetDirectories 'C:\lnis-compose'`를 지정하고, WSL 배포판은 `-Distribution Ubuntu`로 선택합니다. 진행 중인 시험·수집을 종료한 뒤 실행하세요.
-
-스크립트는 기존 `node` 서비스의 이미지·DB 마운트를 확인하고 JAR의 SHA-256과 필수 ZIP 항목을 검증한 다음 교체합니다. 각 노드의 `backups/날짜-시간`에 이전 JAR·설정과 정지 상태의 DB를 보관하고, 이미지를 빌드한 뒤 노드를 순서대로 재기동하여 Docker readiness를 기다립니다. Compose에 `build`가 없는 수신 노드도 지원합니다. 기존 `.env`, Compose, Dockerfile, 네이티브 파일은 덮어쓰지 않습니다.
-실패한 노드는 이전 JAR·이미지로 복구를 시도합니다. 앞서 성공한 노드는 새 버전을 유지하며 DB는 자동으로 과거 상태로 되돌리지 않습니다. 개발 중계·USB용 Compose 추가 파일은 유지합니다.
-
-
-### HDTN 설정 화면
-
-전송 경로 아래 HDTN 영역에서 기본 7개 항목을 설정하고, 접힌 ‘고급 설정’에서 저장 용량·LTP 패킷 크기·ACS 주기를 수정합니다. ‘전체 기본값’은 10개 값을 한 번에 초기화합니다. 우선순위 기본값은 false, TCPCL은 20,000 Bytes이며 허용 범위는 20,000~200,000입니다. 삭제 정책은 지원하는 네 가지 값 중 선택합니다.
-
-단위는 항목명에, 허용 범위와 자세한 설명은 도움말 또는 입력란 포커스 시 표시됩니다. 입력란은 값과 항목명에 맞는 폭으로 배치하고 화면 너비에 따라 자동으로 줄을 바꿉니다. 범위를 벗어나거나 정수가 아닌 값은 저장·전송할 수 없습니다. 기존 브라우저 설정은 유효한 값을 유지하고 범위 밖 항목만 기본값으로 복구합니다. 고급 3개 항목의 입력 제한은 자료형 기준이므로 실제 엔진 허용 범위는 어댑터 확인이 필요합니다. HDTN 포함 경로에서만 설정을 전송하며 과거 시험 데이터는 변경하지 않습니다. 상세 범위는 [API 명세](API-SPEC.md)의 HDTN 설정을 참고하세요.
-
-수신 화면의 지연 안내 문구와 어댑터 헬스체크 상세 접기 영역은 제거했습니다. 수신부는 연결 상태·수동 확인·10초 자동 확인을 유지하며, 응답 시간·주소·원문 JSON 등의 상세 정보는 송신부에서 확인합니다. PVT 계산 근거와 상세 로그는 유지됩니다.
-
 
 ## Docker 로그 확인
 
@@ -357,16 +306,9 @@ docker logs --tail 0 -f lnis-node-node-1
 docker logs --since 10m -f lnis-receiver-node-1
 ```
 
-`--timestamps`는 Docker의 UTC 수집 시각을 추가하므로, 애플리케이션의 한국 시간과 두 시각이 함께 표시됩니다.
-`[WARN]`만 진한 노랑, `[ERROR]`만 빨강으로 표시합니다. JSON과 예외 스택의 줄바꿈은 유지합니다.
-
 헤더·조회 본문까지 필요한 경우 Compose 폴더의 `.env`에 `LNIS_HTTP_LOG_LEVEL=DEBUG`를 설정하고
 `docker compose up -d --no-deps node`로 컨테이너를 재생성합니다. 진단 후 `INFO`로 복원합니다.
 Docker 로그는 서비스별 `100m` 파일 5개로 순환 보관합니다. 한도를 넘는 오래된 Docker 로그는 삭제되며,
 시험 DB·원문 파일 보관 정책에는 영향을 주지 않습니다. 컨테이너 재생성 전 필요한 기존 로그는 별도로 보관합니다.
 
 네이티브 I/Q 파일 수신기는 분석보다 파일 읽기가 앞서면 대기하고, 파일 끝에서도 남은 채널 분석을 완료한 뒤 종료합니다. 기존 20배속 설정은 유지하며, 처리 정지·읽기 오류·취소를 정상 완료와 구분합니다. 자세한 정책과 검증 방법은 `native/README.md`의 파일 재생 설명을 참고하세요.
-
-### 설정·로그·구성도 추가 검증
-
-`./gradlew test --tests server.dtn.DtnPresetTest webTest`로 프리셋 DB·동시 저장·API와 기존 화면 회귀 검증을 실행합니다. 실제 Chromium 검증은 Playwright 설치 경로를 `PLAYWRIGHT_MODULE`로 지정하고 `node src/test/js/dtn-features.browser.cjs`를 실행합니다. 테스트는 임시 HTTP 서버와 모의 API를 사용하며 운영 서비스를 재기동하거나 시험 데이터를 전송하지 않습니다.
