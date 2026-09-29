@@ -1,6 +1,30 @@
 import {requestJson} from '../common/http.js?v=20260915-structure';
 
 const types = {GNSS_RAW: 'RAW', AFS_METADATA: 'AFS', IQ_SAMPLE: 'I/Q'};
+const trialStates = {PREPARING: '준비 중', WAITING_DTN: '수신 대기', WAITING_RECEIVER: '계산 대기',
+  CALCULATING: '계산 중', COMPLETED: '완료', INCONCLUSIVE: '비교 불가', FAILED: '실패', CANCELLED: '종료'};
+
+export function trialStatus(job) {
+  if (!job) return {label: '시험 선택', tone: 'neutral'};
+  const failed = job.state === 'FAILED' || job.verdict === 'FAIL';
+  const completed = job.state === 'COMPLETED';
+  return {
+    label: failed && completed ? '완료 · 불일치' : trialStates[job.state] || '상태 확인 중',
+    tone: failed ? 'failure' : completed ? 'success' : job.state === 'CANCELLED' ? 'neutral' : 'waiting'
+  };
+}
+
+export function trialOption(job, date, suffix = '') {
+  const status = trialStatus(job);
+  const option = new Option(date + ' · ' + status.label + suffix + ' · ' + job.testId.slice(0, 8), job.testId);
+  option.className = 'trial-' + status.tone;
+  return option;
+}
+
+export function colorTrialSelection(select, job) {
+  select.setAttribute('data-trial-tone', trialStatus(job).tone);
+}
+
 const fields = {
   maxNumberOfBundlesInPipeline: ['동시 번들', '개'],
   maxSumOfBundleBytesInPipeline: ['동시 용량', 'Bytes'],

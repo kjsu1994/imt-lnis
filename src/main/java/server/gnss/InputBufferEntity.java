@@ -62,6 +62,9 @@ public class InputBufferEntity {
     /** PVT calculated by the capture Agent, retained with the immutable completed input. */
     @Lob @com.fasterxml.jackson.annotation.JsonIgnore String capturedPvtJson;
 
+    /** null은 기존 입력, 나머지는 시간 초과 관측 데이터의 명시적 사용 결정이다. */
+    String captureDecision;
+
     public InputBufferEntity(
             UUID inputId,
             InputKind kind,
@@ -86,6 +89,7 @@ public class InputBufferEntity {
                 complete,
                 createdAt,
                 completedAt,
+                null,
                 null);
     }
 }

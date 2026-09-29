@@ -896,7 +896,11 @@ body[data-page="dtn-sender"] .sender-connection .connection-dot { flex-shrink: 0
 body[data-page="dtn-sender"] .sender-summary button:not(.primary) { background: none; border: 0; border-radius: 0; padding: 6px 2px; color: var(--teal); font-size: 13px; }
 body[data-page="dtn-sender"] .sender-summary button:not(.primary):hover:not(:disabled) { text-decoration: underline; }
 body[data-page="dtn-sender"] .sender-summary button:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
-body[data-page="dtn-sender"] #dtn-send { margin-left: auto; }
+body[data-page="dtn-sender"] #dtn-start { background: #fff; border: 1px solid var(--teal); border-radius: 7px; padding: 8px 12px; }
+body[data-page="dtn-sender"] #dtn-start:hover:not(:disabled) { background: #e8f5f0; text-decoration: none; }
+body[data-page="dtn-sender"] .capture-decision:not([hidden]) { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 12px; margin: 8px 0; border: 1px solid #e5c878; border-radius: 8px; background: #fff8e5; font-size: 13px; }
+body[data-page="dtn-sender"] .capture-decision small { flex-basis: 100%; overflow-wrap: anywhere; }
+body[data-page="dtn-sender"] .capture-decision .actions { margin: 0; }
 body[data-page="dtn-sender"] #dtn-message { margin: 4px 0 0; font-size: 12px; color: var(--muted); }
 body[data-page="dtn-sender"] #dtn-message:empty { display: none; }
 body[data-page="dtn-sender"] #dtn-settings-open[aria-expanded="true"] { background: #d9f3eb; color: #06725d; }
@@ -1074,5 +1078,14 @@ body[data-page^="dtn-"] section.log-expanded .log { flex: 1; height: auto; min-h
 /* 시험 선택과 개별 종료는 전송 버튼과 분리한다. */
 .receiver-selection #dtn-test-filter { flex: 0 1 110px; }
 .receiver-selection #dtn-tests { flex: 1 1 260px; }
+.sender-trial-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 20px; }
+.sender-trial-toolbar .receiver-selection { flex: 0 1 690px; min-width: 0; margin: 0; }
+.sender-trial-toolbar .receiver-selection #dtn-tests { flex: 1 1 180px; width: 240px; min-width: 150px; }
+.sender-trial-buttons { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+#dtn-tests[data-trial-tone="success"], #dtn-tests option.trial-success { color: #167044; }
+#dtn-tests[data-trial-tone="waiting"], #dtn-tests option.trial-waiting { color: #a34c00; }
+#dtn-tests[data-trial-tone="failure"], #dtn-tests option.trial-failure { color: #c62828; }
+#dtn-tests[data-trial-tone="neutral"], #dtn-tests option.trial-neutral { color: #52606d; }
+#dtn-tests option { background: #fff; color: #52606d; }
 #dtn-test-detail { margin: 8px 0 0; font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
 #dtn-tests-page { font-size: 12px; font-variant-numeric: tabular-nums; }

@@ -31,5 +31,12 @@ class UbxGrawImportTest {
         assertEquals(21_000_011, epochs.getLast().observations().getFirst().pseudorangeMeters());
         assertTrue(GrawCodec.decode(result.get(1)).message() instanceof GrawCodec.NavigationUpdate);
         assertThrows(IllegalArgumentException.class, () -> UbxGrawImport.convert(raw.toByteArray(), 13, Instant.EPOCH, "source"));
+        var all = GrawCodec.splitLengthPrefixed(UbxGrawImport.convertAll(raw.toByteArray(), Instant.EPOCH, "source.ubx"));
+        assertEquals(12, all.stream().map(GrawCodec::decode).map(GrawCodec.Envelope::message)
+                .filter(GrawCodec.ObservationEpoch.class::isInstance).count());
+        assertTrue(all.stream().map(GrawCodec::decode).allMatch(record -> record.capturedAt().equals(Instant.EPOCH)));
+        assertThrows(IllegalArgumentException.class, () -> UbxGrawImport.convertAll(new byte[0], Instant.EPOCH, "empty.ubx"));
+        assertThrows(IllegalArgumentException.class, () -> UbxGrawImport.convertAll(
+                UbloxParser.command(2, 0x13, nav), Instant.EPOCH, "nav-only.ubx"));
     }
 }

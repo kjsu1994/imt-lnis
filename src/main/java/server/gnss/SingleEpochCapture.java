@@ -12,6 +12,8 @@ public final class SingleEpochCapture {
     private final Predicate<List<byte[]>> solvable;
     private int bytes;
     private boolean complete;
+    private List<byte[]> candidate;
+    private boolean awaitingDecision;
 
     public SingleEpochCapture(Predicate<List<byte[]>> solvable) {
         this.solvable = solvable;
@@ -27,6 +29,7 @@ public final class SingleEpochCapture {
             if (epoch.observations().isEmpty()) return null;
             var candidate = new ArrayList<>(navigation);
             candidate.add(record);
+            this.candidate = List.copyOf(candidate);
             if (!solvable.test(candidate)) return null;
             complete = true;
             return List.copyOf(candidate);
@@ -34,5 +37,19 @@ public final class SingleEpochCapture {
         navigation.add(record);
         bytes += record.length + 4;
         return null;
+    }
+
+    /** 보관한 마지막 에폭과 그 이전 항법정보만 사용한다. 이후 항법정보를 섞지 않는다. */
+    public List<byte[]> onTimeout() {
+        if (complete || candidate == null) {
+            return null;
+        }
+        awaitingDecision = !solvable.test(candidate);
+        complete = true;
+        return candidate;
+    }
+
+    public boolean awaitingDecision() {
+        return awaitingDecision;
     }
 }

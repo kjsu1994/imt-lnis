@@ -5,7 +5,7 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>LNIS DTN Sender</title>
   <link rel="stylesheet" href="/lnis/assets/common/app.css?v=20260918-admin-icon">
-  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20260929-clock-precision">
+  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20260929-trial-controls">
 </head>
 <body data-page="dtn-sender">
 <header>
@@ -153,7 +153,7 @@
     </div>
     <div class="compact-tabs">
       <button type="button" class="input-mode" data-input-mode="capture">COM 포트</button>
-      <button type="button" class="input-mode active" data-input-mode="upload">capture.graw</button>
+      <button type="button" class="input-mode active" data-input-mode="upload">UBX / GRAW 파일</button>
     <div id="dtn-development" class="synthetic-tools" hidden>
       <button type="button" id="dtn-replay">실측 GNSS 10에폭 불러오기 · 개발용</button>
     </div>
@@ -165,7 +165,7 @@
     </div>
     <p id="dtn-port-status" role="status">포트 조회는 송신 서비스가 실행되는 PC 기준입니다. Docker/WSL에서는 장치 전달이 필요합니다.</p>
     <div id="dtn-upload-panel" class="compact-input-row">
-      <label>capture.graw<input id="dtn-graw-file" type="file" accept=".graw,application/octet-stream"></label>
+      <label>GNSS 파일<input id="dtn-graw-file" type="file" accept=".ubx,.graw,application/octet-stream"></label>
       <button id="dtn-upload" type="button">파일 적용</button>
       <label class="upload-progress-field">파일 적용 상태
         <progress id="dtn-upload-progress" max="100" value="0" aria-label="파일 적용 상태" title="파일 업로드·검증 완료 시 채워집니다. 전송시험 진행률이 아닙니다."></progress></label>
@@ -183,11 +183,20 @@
       <span id="dtn-input-summary">데이터 없음</span>
       <span class="sender-connection"><span id="dtn-peer-summary-dot" class="connection-dot unknown" aria-hidden="true"></span>수신 서비스 <strong id="dtn-peer-summary">미확인</strong></span>
       <span class="sender-connection"><span id="dtn-adapter-summary-dot" class="connection-dot unknown" aria-hidden="true"></span>송신 adapter <strong id="dtn-adapter-summary">미확인</strong></span>
-      <button id="dtn-start" type="button" hidden disabled title="유효한 지구 PVT 한 시점 확보 후 자동 종료 · 최대 120초">1에폭 수집</button>
-      <button id="dtn-send" type="button" class="primary" disabled>전송시험 시작</button>
     </div>
     <p id="dtn-message" role="status"></p>
     <p id="dtn-capture-status" role="status"></p>
+    <div id="capture-decision" class="capture-decision" hidden role="status">
+      <strong>PVT 계산 조건을 충족하지 못했습니다.</strong>
+      <span>확보한 데이터를 PVT 비교 없이 송수신 시험에 사용할까요?</span>
+      <small id="capture-decision-summary"></small>
+      <div class="actions">
+        <button id="capture-use" type="button" class="primary">이 데이터 사용</button>
+        <button id="capture-retry" type="button">다시 수집</button>
+        <button id="capture-discard" type="button">사용 안 함</button>
+      </div>
+    </div>
+    <div class="sender-trial-toolbar">
     <div class="receiver-selection" aria-label="시험 기록">
       <label for="dtn-tests">시험 기록</label>
       <select id="dtn-test-filter" aria-label="시험 상태"><option value="">전체</option><option value="WAITING_DTN">수신 대기</option></select>
@@ -196,6 +205,11 @@
       <span id="dtn-tests-page">1</span>
       <button id="dtn-tests-next" type="button" disabled aria-label="다음 시험 목록">다음</button>
       <button id="dtn-cancel" type="button" disabled title="LNIS 시험 대기·계산과 상대 수신 시험을 중지합니다. 이미 어댑터에 전달된 번들의 회수는 보장하지 않습니다.">시험 중지</button>
+    </div>
+    <div class="sender-trial-buttons" aria-label="수집 및 전송">
+      <button id="dtn-start" type="button" hidden disabled title="유효한 지구 PVT 한 시점 확보 후 자동 종료 · 최대 120초">1 Epoch 수집</button>
+      <button id="dtn-send" type="button" class="primary" disabled>전송시험 시작</button>
+    </div>
     </div>
     <p id="dtn-test-detail" role="status"></p>
     <div id="dtn-iq-panel" class="hidden">
@@ -229,5 +243,5 @@
   </div>
   </div>
 </main>
-<script type="module" src="/lnis/assets/dtn/dtn.js?v=20260929-real-gnss"></script>
+<script type="module" src="/lnis/assets/dtn/dtn.js?v=20260929-ubx-upload"></script>
 </body></html>

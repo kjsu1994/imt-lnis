@@ -192,7 +192,7 @@ public class DataManagementService {
             case DTN -> "e.id,e.testType,e.state,e.createdAt,e.updatedAt,e.cancelPending";
             case RECEIPT -> "e.id,e.contentType,e.status,e.arrivedAt,e.arrivedAt,e.sizeBytes";
             case INPUT ->
-                    "e.inputId,e.fileName,e.complete,e.createdAt,e.completedAt,e.receivedSize";
+                    "e.inputId,e.fileName,e.complete,e.createdAt,e.completedAt,e.receivedSize,e.captureDecision";
             default -> throw new IllegalArgumentException();
         };
     }
@@ -217,6 +217,9 @@ public class DataManagementService {
         }
         if (kind == Kind.INPUT && referenced(key, null)) {
             blocked = "시험에서 참조하는 입력";
+        }
+        if (kind == Kind.INPUT && "AWAITING_DECISION".equals(values[6])) {
+            blocked = "수집 데이터 사용 여부 선택 대기";
         }
         if (kind == Kind.RECEIPT && referenced(key, null)) {
             blocked = "시험과 연결된 원문: 시험 기록에서 함께 삭제하세요.";

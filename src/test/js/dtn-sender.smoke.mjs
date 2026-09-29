@@ -424,5 +424,59 @@ context.showPorts([{name:'COM4', description:'FT232R USB UART'}]);
 assert.equal(elements.get('dtn-port').value, '', 'unplugged port is no longer selected');
 context.showPorts([]);
 assert.match(elements.get('dtn-port-status').textContent, /0개 포트/);
-assert.match(html, />1에폭 수집<\/button>/);
+assert.match(html, />1 Epoch 수집<\/button>/);
 console.log('PASS: live serial-port refresh, selection preservation and unplug removal');
+
+for (const [state, verdict, label, tone] of [
+  ['COMPLETED', 'PASS', '완료', 'success'], ['WAITING_DTN', null, '수신 대기', 'waiting'],
+  ['FAILED', null, '실패', 'failure'], ['COMPLETED', 'FAIL', '완료 · 불일치', 'failure'],
+  ['INCONCLUSIVE', 'INCONCLUSIVE', '비교 불가', 'waiting'], ['CANCELLED', null, '종료', 'neutral']
+]) {
+  const status = context.trialStatus({state, verdict});
+  assert.equal(status.label, label);
+  assert.equal(status.tone, tone);
+  assert.equal(context.trialOption({testId: 'sample-id', state, verdict}, '오늘').className, 'trial-' + tone);
+}
+assert.match(html, /class="sender-trial-toolbar"/);
+assert.match(html, /class="sender-trial-buttons"[\s\S]*id="dtn-start"[\s\S]*id="dtn-send"/);
+vm.runInContext("busy=false; config.sendBusy=false; config.delaySupported=true; job=null; selectedType='GNSS_RAW'; agents[0].state='READY'; pendingCapture={inputId:'pending'}; inputId=null;", context);
+context.updateControls();
+assert.equal(elements.get('dtn-send').disabled, true);
+assert.equal(elements.get('dtn-start').disabled, true);
+assert.equal(elements.get('capture-use').disabled, false);
+assert.equal(elements.get('dtn-tests').disabled, true, 'pending capture cannot be overwritten by history selection');
+vm.runInContext("job={testId:'old',state:'COMPLETED'};", context);
+await context.showCaptureDecision({inputId: 'pending'});
+assert.equal(vm.runInContext('job', context), null, 'restored capture clears the previous report before polling');
+vm.runInContext("pendingCapture=null; acceptedCapture=true; inputId='approved'; delayChoices=[{reference:{positionValid:false},afsReady:false}]; epochIndex=0;", context);
+context.updateControls();
+assert.equal(elements.get('dtn-send').disabled, false, 'approved RAW may transmit without valid PVT');
+vm.runInContext("selectedType='AFS_METADATA';", context);
+context.updateControls();
+assert.equal(elements.get('dtn-send').disabled, true, 'AFS still needs navigation');
+vm.runInContext("config.iqEnabled=true; pvt=[{positionValid:false,velocityValid:false}];", context);
+context.updateControls();
+assert.equal(elements.get('iq-generate').disabled, true);
+console.log('PASS: Korean history states, colors, compact action group and incomplete capture approval controls');
+
+const previousFetch = context.fetch;
+let ubxUploads = 0;
+context.fetch = async (url, options) => {
+  if (url.includes('/inputs/ubx?')) {
+    ubxUploads++;
+    assert.equal(options.method, 'POST');
+    assert.equal(options.body.name, 'receiver.UBX');
+    assert.ok(url.includes('archiveTime='));
+    return {ok: true, json: async () => ({inputId: 'ubx-input', recordCount: 12})};
+  }
+  return previousFetch(url, options);
+};
+vm.runInContext("pendingCapture=null; busy=false; config.sendBusy=false; selectedType='GNSS_RAW';", context);
+await context.upload({name: 'receiver.UBX', size: 256, lastModified: 1000});
+assert.equal(ubxUploads, 1);
+assert.equal(vm.runInContext('inputId', context), 'ubx-input');
+assert.match(elements.get('dtn-input-state').textContent, /receiver.UBX · 12건/);
+assert.match(html, /accept="\.ubx,\.graw,application\/octet-stream"/);
+await assert.rejects(context.upload({name: 'large.ubx', size: 64 * 1024 * 1024 + 1}), /64 MiB/);
+context.fetch = previousFetch;
+console.log('PASS: direct UBX upload reuses observation/PVT preview and retains GRAW compatibility');

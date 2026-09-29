@@ -27,6 +27,10 @@ public class InputBufferRepository {
         return inputMetadataJpaRepository.findById(id);
     }
 
+    public Optional<InputBufferEntity> lockDecision(UUID id) {
+        return inputMetadataJpaRepository.lockDecision(id);
+    }
+
     public void putChunk(UUID id, long index, byte[] value, Duration ttl) {
         InputBufferEntity input =
                 inputMetadataJpaRepository
@@ -66,9 +70,18 @@ public class InputBufferRepository {
     public List<InputBufferEntity> completeBefore(Instant cutoff) {
         return inputMetadataJpaRepository.findByCompleteTrueAndCompletedAtBefore(cutoff);
     }
+
+    public List<InputBufferEntity> pendingCaptures() {
+        return inputMetadataJpaRepository.findByCaptureDecisionOrderByCreatedAtDesc("AWAITING_DECISION");
+    }
 }
 
 interface InputMetadataJpaRepository extends JpaRepository<InputBufferEntity, UUID> {
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("select e from InputBufferEntity e where e.inputId = :id")
+    Optional<InputBufferEntity> lockDecision(@org.springframework.data.repository.query.Param("id") UUID id);
+
+    List<InputBufferEntity> findByCaptureDecisionOrderByCreatedAtDesc(String decision);
     List<InputBufferEntity> findByCompleteFalseAndCreatedAtBefore(Instant cutoff);
 
     List<InputBufferEntity> findByCompleteTrueAndCompletedAtBefore(Instant cutoff);

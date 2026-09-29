@@ -1,4 +1,4 @@
-import {renderTrialSettings} from './dtn-settings.js?v=20260928-delay-transfer';
+import {renderTrialSettings, trialOption, colorTrialSelection} from './dtn-settings.js?v=20260929-trial-status';
 import {requestJson} from '../common/http.js?v=20260915-structure';
 import {createDtnLog} from './dtn-log.js?v=20260929-log-view';
 import {initAdapterHealth} from './dtn-adapter-health.js?v=20260922-compact-structure';
@@ -169,8 +169,8 @@ function renderSummary(job) {
   $('receiver-mode').textContent = job?.senderMode && job?.receiverMode ? job.senderMode + ' → ' + job.receiverMode : '경로 정보 없음';
   $('receiver-iq').hidden = job?.testType !== 'IQ_SAMPLE';
   renderIqFile($('receiver-iq-result'), job?.fileResult, job?.state === 'FAILED' ? 'I/Q 파일 검증 실패 · 로그를 확인하세요.' : 'I/Q 파일 수신·검증 대기');
-  const failed = ['FAILED', 'CANCELLED', 'INCONCLUSIVE'].includes(job?.state);
-  const completed = job?.state === 'COMPLETED';
+  const failed = ['FAILED', 'CANCELLED'].includes(job?.state);
+  const completed = ['COMPLETED', 'INCONCLUSIVE'].includes(job?.state);
   const received = !!job?.dtnReceived;
   const iq = job?.testType === 'IQ_SAMPLE';
   $('step-process').textContent = iq ? '③ I/Q 검증·추적·PVT' : '③ 복원·PVT 계산';
@@ -178,7 +178,7 @@ function renderSummary(job) {
     PREPARING: '시험 준비 중', WAITING_DTN: '외부 JSON 수신 대기',
     WAITING_RECEIVER: '수신 실행기 대기', CALCULATING: iq ? 'I/Q 검증·추적·PVT 처리 중' : '복원·PVT 계산 중',
     COMPLETED: iq ? 'I/Q 처리 완료' : '수신 계산 완료', FAILED: '처리 실패', CANCELLED: '시험 취소',
-    INCONCLUSIVE: '판정 불가'
+    INCONCLUSIVE: '수신·복원 완료 · PVT 비교 불가'
   };
   $('receive-state').textContent = job ? (job.lateReceivedAt ? '대기 종료 · 이후 수신됨' : job.state === 'WAITING_DTN' && job.message?.startsWith('수신 검증 실패') ? '검증 실패 · 재수신 대기' : states[job.state] || job.state) : '수신 대기';
   $('receive-state').className = failed ? 'receiver-error' : '';
@@ -267,10 +267,11 @@ async function poll(force = false) {
     renderAgents(agents);
     const selected = $('dtn-tests').value;
     $('dtn-tests').replaceChildren(...(clearScreen ? [new Option('시험 선택 · 화면 초기화됨', '')] : []), ...(tests.length ? tests.map(job =>
-      new Option(time(job.createdAt) + ' · ' + job.state + ' · ' + job.testId.slice(0, 8), job.testId))
+      trialOption(job, time(job.createdAt)))
       : [new Option('등록된 시험 없음', '')]));
     if (newlyReceived && !selectionPinned && historyPage === 0) $('dtn-tests').value = newlyReceived.testId;
     else if (tests.some(job => job.testId === selected)) $('dtn-tests').value = selected;
+    colorTrialSelection($('dtn-tests'), tests.find(job => job.testId === $('dtn-tests').value));
     await renderTest(force);
     payloadViewer.setReceipts(await get('/dtn/receipts').catch(() => []));
     $('last-updated').textContent = '최근 확인 ' + new Date().toLocaleTimeString('ko-KR') + ' · 자동 갱신';
@@ -297,7 +298,11 @@ async function initialize() {
   setTimeout(repeat, 2000);
 }
 
-$('dtn-tests').onchange = () => { selectionPinned = true; renderTest(); };
+$('dtn-tests').onchange = () => {
+  colorTrialSelection($('dtn-tests'), tests.find(job => job.testId === $('dtn-tests').value));
+  selectionPinned = true;
+  renderTest();
+};
 $('dtn-test-filter').onchange = () => { historyPage = 0; selectionPinned = false; poll(true); };
 for (const [id, step] of [['dtn-tests-prev', -1], ['dtn-tests-next', 1]]) $(id).onclick = () => {
   historyPage = Math.max(0, historyPage + step); selectionPinned = false; poll(true);

@@ -153,7 +153,7 @@ public final class DtnComparison {
         String verdict = !position ? "INCONCLUSIVE" : velocity ? "MEASURED" : "PARTIAL";
         String message =
                 !position
-                        ? "수신 완료 · PVT 계산 불가"
+                        ? "수신·복원 완료 · PVT 비교 불가"
                         : velocity ? "지연 반영 PVT 측정 완료" : "위치·시계 오차 측정 완료 · 속도 비교 불가";
         return Map.of(
                 "mode",

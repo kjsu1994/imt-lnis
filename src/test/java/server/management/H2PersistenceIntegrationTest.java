@@ -47,6 +47,39 @@ class H2PersistenceIntegrationTest {
     @Autowired private org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     @Test
+    void timedOutCaptureRequiresExplicitDecision() throws Exception {
+        var records = GrawCodec.splitLengthPrefixed(server.afs.NativePvtIntegrationTest.validSample());
+        var epoch = records.stream().filter(record -> GrawCodec.decode(record).message()
+                instanceof GrawCodec.ObservationEpoch).findFirst().orElseThrow();
+        byte[] data = ByteBuffer.allocate(4 + epoch.length).order(ByteOrder.BIG_ENDIAN)
+                .putInt(epoch.length).put(epoch).array();
+        var input = inputs.create("timeout.graw", data.length, InputKind.GNSS_CAPTURE);
+        try {
+            inputs.append(input.inputId(), 0, data);
+            inputs.awaitCaptureDecision(input.inputId(), "[]");
+            assertEquals("AWAITING_DECISION", inputs.get(input.inputId()).captureDecision());
+            assertThrows(IllegalStateException.class, () -> inputs.requireApproved(input.inputId()));
+            assertThrows(IllegalStateException.class,
+                    () -> inputs.create("next.graw", 0, InputKind.GNSS_CAPTURE));
+            inputs.complete(input.inputId());
+            assertEquals("AWAITING_DECISION", inputs.get(input.inputId()).captureDecision());
+            inputs.acceptCapture(input.inputId());
+            inputs.acceptCapture(input.inputId());
+            inputs.requireApproved(input.inputId());
+            assertEquals("ACCEPTED", inputs.get(input.inputId()).captureDecision());
+            assertThrows(IllegalStateException.class, () -> inputs.discardCapture(input.inputId()));
+        } finally {
+            inputs.remove(input.inputId());
+        }
+        var discarded = inputs.create("discard.graw", data.length, InputKind.GNSS_CAPTURE);
+        inputs.append(discarded.inputId(), 0, data);
+        inputs.awaitCaptureDecision(discarded.inputId(), "[]");
+        inputs.discardCapture(discarded.inputId());
+        inputs.discardCapture(discarded.inputId());
+        assertThrows(IllegalArgumentException.class, () -> inputs.get(discarded.inputId()));
+    }
+
+    @Test
     void dtnPreparationSnapshotsSurviveExpiryAndRemainLocal() {
         UUID input = UUID.randomUUID(), trial = UUID.randomUUID(), second = UUID.randomUUID();
         dtnLogs.add(input, "INPUT", "PVT", true, "계산 시작");

@@ -36,6 +36,77 @@ class IndependentNodeIntegrationTest {
     @TempDir Path directory;
 
     @Test
+    @Timeout(180)
+    void approvedIncompleteCaptureTransfersWithoutClaimingValidPvt() throws Exception {
+        int receiverPort = tcpPort(), senderPort = tcpPort();
+        var packets = new java.util.concurrent.LinkedBlockingQueue<byte[]>();
+        HttpServer adapter = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        adapter.createContext("/transfers", exchange -> {
+            try (exchange) {
+                packets.add(exchange.getRequestBody().readAllBytes());
+                exchange.sendResponseHeaders(202, -1);
+            }
+        });
+        adapter.start();
+        try (var receiver = node("receiver", receiverPort, senderPort);
+                var sender = node("sender", senderPort, receiverPort)) {
+            await(() -> ready(sender, "sender-1") && ready(sender, "receiver-1"), 20);
+            var inputs = sender.getBean(InputBufferService.class);
+            var tx = sender.getBean(DtnService.class);
+            var rx = receiver.getBean(DtnService.class);
+            var records = server.gnss.GrawCodec.splitLengthPrefixed(NativePvtIntegrationTest.validSample());
+            String url = "http://127.0.0.1:" + adapter.getAddress().getPort() + "/transfers";
+            for (String type : java.util.List.of("GNSS_RAW", "AFS_METADATA")) {
+                var output = new java.io.ByteArrayOutputStream();
+                for (byte[] record : records) {
+                    var envelope = server.gnss.GrawCodec.decode(record);
+                    if (envelope.message() instanceof server.gnss.GrawCodec.ObservationEpoch epoch) {
+                        var partial = new server.gnss.GrawCodec.ObservationEpoch(epoch.receiverTowSeconds(),
+                                epoch.week(), epoch.leapSeconds(), epoch.receiverStatus(), epoch.rawxVersion(),
+                                epoch.observations().subList(0, 1));
+                        record = server.gnss.GrawCodec.encode(new server.gnss.GrawCodec.Envelope(
+                                envelope.testId(), envelope.messageId(), envelope.sequence(), envelope.capturedAt(), partial));
+                    } else if (type.equals("GNSS_RAW")) {
+                        continue;
+                    }
+                    output.write(java.nio.ByteBuffer.allocate(4).putInt(record.length).array());
+                    output.write(record);
+                }
+                byte[] data = output.toByteArray();
+                UUID input = inputs.create("timeout.graw", data.length, InputKind.GNSS_CAPTURE).inputId();
+                inputs.append(input, 0, data);
+                inputs.awaitCaptureDecision(input, null);
+                var choice = tx.delayEpochs(input).getFirst();
+                assertFalse(choice.reference().isPositionValid());
+                assertThrows(IllegalStateException.class, () -> tx.createDelay(input, "sender-1", "receiver-1",
+                        url, type, "DTN", "DTN", null, choice.epoch(), java.time.Instant.now()));
+                inputs.acceptCapture(input);
+                if (type.equals("GNSS_RAW")) {
+                    assertFalse(choice.afsReady());
+                    assertThrows(IllegalArgumentException.class, () -> tx.createDelay(input, "sender-1", "receiver-1",
+                            url, "AFS_METADATA", "DTN", "DTN", null, choice.epoch(), java.time.Instant.now()));
+                }
+                UUID id = tx.createDelay(input, "sender-1", "receiver-1", url, type,
+                        "DTN", "DTN", null, choice.epoch(), java.time.Instant.now()).getId();
+                byte[] body = packets.poll(20, java.util.concurrent.TimeUnit.SECONDS);
+                assertNotNull(body, () -> tx.get(id).getMessage());
+                var request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + receiverPort
+                                + "/lnis/api/v1/dtn/receive"))
+                        .header("Authorization", "Bearer test-dtn-receive")
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofByteArray(body)).build();
+                assertEquals(202, HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString()).statusCode());
+                await(() -> "INCONCLUSIVE".equals(tx.get(id).getState()) || "FAILED".equals(tx.get(id).getState()), 45);
+                assertEquals("INCONCLUSIVE", tx.get(id).getState(), tx.get(id).getMessage());
+                assertEquals("INCONCLUSIVE", rx.get(id).getState(), rx.get(id).getMessage());
+                assertArrayEquals(body, rx.payload(id, "received").getBody());
+            }
+        } finally {
+            adapter.stop(0);
+        }
+    }
+
+    @Test
     @Timeout(240)
     void dtnRoundTripUsesIndependentDatabases() throws Exception {
         int receiverPort = tcpPort();

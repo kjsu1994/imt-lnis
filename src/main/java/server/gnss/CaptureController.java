@@ -26,6 +26,22 @@ public class CaptureController {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private server.dtn.DtnLogService logs;
 
+    @GetMapping("/pending")
+    public java.util.List<InputBufferEntity> pending() {
+        return inputBufferService.pendingCaptures();
+    }
+
+    @PostMapping("/{captureId}/accept")
+    public InputBufferEntity accept(@PathVariable UUID captureId) {
+        return inputBufferService.acceptCapture(captureId);
+    }
+
+    @PostMapping("/{captureId}/discard")
+    public Map<String, Boolean> discard(@PathVariable UUID captureId) {
+        inputBufferService.discardCapture(captureId);
+        return Map.of("discarded", true);
+    }
+
     /* GNSS 수집 시작: 명령 실패 시 생성한 입력을 정리한다. */
     @PostMapping
     public ResponseEntity<InputBufferEntity> start(@Valid @RequestBody CaptureRequest request) {

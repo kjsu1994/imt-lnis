@@ -45,7 +45,10 @@ public class InputBufferService {
 
     /** 메타데이터만 먼저 생성하며 미완성 보존 기간은 정리 작업에서 적용한다. */
     @Transactional
-    public InputBufferEntity create(String fileName, long declaredSize, InputKind kind) {
+    public synchronized InputBufferEntity create(String fileName, long declaredSize, InputKind kind) {
+        if (kind == InputKind.GNSS_CAPTURE && !pendingCaptures().isEmpty()) {
+            throw new IllegalStateException("확보한 관측 데이터의 사용 여부를 먼저 선택하세요.");
+        }
         UUID id = UUID.randomUUID();
         InputBufferEntity value =
                 new InputBufferEntity(
@@ -110,6 +113,9 @@ public class InputBufferService {
     @Transactional
     public synchronized InputBufferEntity complete(UUID id, String capturedPvtJson) {
         InputBufferEntity current = get(id);
+        if (current.complete()) {
+            return current;
+        }
         boolean recording = logs != null && logs.exists(id);
         if (recording) {
             logs.add(id, "INPUT", "GRAW 검증", true, "구조·CRC·크기·SHA-256 검사 시작");
@@ -147,6 +153,7 @@ public class InputBufferService {
                             Instant.now());
             complete.capturedPvtJson =
                     current.capturedPvtJson() != null ? current.capturedPvtJson() : capturedPvtJson;
+            complete.captureDecision = current.captureDecision();
             inputBufferRepository.save(complete, completedRetention);
             // 메타데이터만 먼저 만료돼 고아 청크가 남지 않도록 모든 청크 TTL도 같은 시점으로 연장한다.
             inputBufferRepository.touchChunks(id, current.chunkCount(), completedRetention);
@@ -185,6 +192,69 @@ public class InputBufferService {
                 .orElseThrow(() -> new IllegalArgumentException("Input not found: " + id));
     }
 
+    public java.util.List<InputBufferEntity> pendingCaptures() {
+        return inputBufferRepository.pendingCaptures();
+    }
+
+    /** 파일 검증 완료와 시험 사용 승인을 구분한다. 정상 수집 완료 경로는 변경하지 않는다. */
+    @Transactional
+    public synchronized InputBufferEntity awaitCaptureDecision(UUID id, String pvtJson) {
+        var input = get(id);
+        if (input.kind() != InputKind.GNSS_CAPTURE || input.complete()) {
+            throw new IllegalStateException("선택 대기로 전환할 수 없는 입력입니다.");
+        }
+        var records = GrawCodec.splitLengthPrefixed(readChunks(input, server.common.DtnModels.MAX_INPUT_BYTES));
+        var epochs = records.stream().map(GrawCodec::decode).map(GrawCodec.Envelope::message)
+                .filter(GrawCodec.ObservationEpoch.class::isInstance)
+                .map(GrawCodec.ObservationEpoch.class::cast).toList();
+        if (epochs.size() != 1 || epochs.getFirst().observations().isEmpty()) {
+            throw new IllegalArgumentException("확보한 관측 에폭이 없습니다.");
+        }
+        input.captureDecision = "AWAITING_DECISION";
+        inputBufferRepository.save(input, incompleteRetention);
+        return complete(id, pvtJson);
+    }
+
+    @Transactional
+    public synchronized InputBufferEntity acceptCapture(UUID id) {
+        var input = inputBufferRepository.lockDecision(id)
+                .orElseThrow(() -> new IllegalArgumentException("Input not found: " + id));
+        if ("ACCEPTED".equals(input.captureDecision())) {
+            return input;
+        }
+        if (!input.complete() || !"AWAITING_DECISION".equals(input.captureDecision())) {
+            throw new IllegalStateException("사용 여부 선택 대기 상태가 아닙니다.");
+        }
+        input.captureDecision = "ACCEPTED";
+        input.completedAt = Instant.now();
+        inputBufferRepository.save(input, completedRetention);
+        if (logs != null) {
+            logs.add(id, "INPUT", "WARN", "COM 수집", false, "사용자 승인 · PVT 조건 미충족 관측 데이터를 시험에 사용");
+        }
+        return input;
+    }
+
+    public void requireApproved(UUID id) {
+        if ("AWAITING_DECISION".equals(get(id).captureDecision())) {
+            throw new IllegalStateException("확보한 관측 데이터의 사용 여부를 먼저 선택하세요.");
+        }
+    }
+
+    @Transactional
+    public synchronized void discardCapture(UUID id) {
+        var input = inputBufferRepository.lockDecision(id).orElse(null);
+        if (input == null) {
+            return;
+        }
+        if (!"AWAITING_DECISION".equals(input.captureDecision())) {
+            throw new IllegalStateException("이미 다른 화면에서 사용 여부가 결정되었습니다.");
+        }
+        if (logs != null) {
+            logs.add(id, "INPUT", "COM 수집", false, "사용자 결정 · 시간 초과 관측 데이터 폐기");
+        }
+        remove(id);
+    }
+
     public byte[] chunk(UUID id, long index) {
         byte[] value = inputBufferRepository.getChunk(id, index);
         if (value == null) {
@@ -210,7 +280,7 @@ public class InputBufferService {
     }
 
     @Transactional
-    public void remove(UUID id) {
+    public synchronized void remove(UUID id) {
         if (managementGuard != null) {
             managementGuard.requireUnpinned("INPUT", id);
         }
@@ -222,7 +292,8 @@ public class InputBufferService {
     /** 보존 정리 작업에서 참조 검사를 통과한 입력을 제거한다. */
     @Transactional
     public void removeExpired(InputBufferEntity input) {
-        if (!dtnRepository.existsByInputId(input.inputId())) {
+        if (!"AWAITING_DECISION".equals(input.captureDecision())
+                && !dtnRepository.existsByInputId(input.inputId())) {
             inputBufferRepository.delete(input.inputId(), input.chunkCount());
         }
     }

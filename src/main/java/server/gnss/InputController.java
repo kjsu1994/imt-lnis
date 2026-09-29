@@ -22,6 +22,43 @@ public class InputController {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private server.dtn.DtnLogService logs;
 
+    /** UBX를 기존 입력 구조로 변환한 뒤 동일한 CRC·크기 검증과 PVT 경로를 사용한다. */
+    @PostMapping(value = "/ubx", consumes = MediaType.APPLICATION_OCTET_STREAM_VALUE)
+    public InputBufferEntity uploadUbx(
+            @RequestParam String fileName,
+            @RequestParam(required = false) java.time.Instant archiveTime,
+            jakarta.servlet.http.HttpServletRequest request) throws java.io.IOException {
+        if (fileName.isBlank() || fileName.length() > 255) {
+            throw new IllegalArgumentException("파일 이름을 확인하세요.");
+        }
+        int maximum = 64 * 1024 * 1024;
+        if (request.getContentLengthLong() > maximum) {
+            throw new IllegalArgumentException("UBX 파일은 64 MiB 이하여야 합니다.");
+        }
+        byte[] raw = request.getInputStream().readNBytes(maximum + 1);
+        if (raw.length == 0 || raw.length > maximum) {
+            throw new IllegalArgumentException("비어 있지 않은 64 MiB 이하 UBX 파일을 선택하세요.");
+        }
+        byte[] data = UbxGrawImport.convertAll(raw,
+                archiveTime == null ? java.time.Instant.now() : archiveTime, fileName);
+        var input = inputBufferService.create(fileName, data.length, server.common.LnisModels.InputKind.GRAW_UPLOAD);
+        try {
+            if (logs != null) {
+                logs.add(input.inputId(), "INPUT", "UBX 해석", false,
+                        "UBX RAWX·SFRBX 해석 완료 · " + raw.length + " bytes → " + data.length + " bytes · " + fileName);
+            }
+            inputBufferService.append(input.inputId(), 0, data);
+            return inputBufferService.complete(input.inputId());
+        } catch (RuntimeException error) {
+            try {
+                inputBufferService.remove(input.inputId());
+            } catch (RuntimeException cleanupError) {
+                error.addSuppressed(cleanupError);
+            }
+            throw error;
+        }
+    }
+
     /* GRAW 입력 등록 */
     @PostMapping
     public ResponseEntity<InputBufferEntity> createLogged(

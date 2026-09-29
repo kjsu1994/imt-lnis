@@ -123,11 +123,11 @@ public final class AgentRuntime implements AutoCloseable {
                                                     config.nativeDirectory())) {
                                         var results = pvt.calculate(records);
                                         var result = results.getFirst();
+                                        capturedPvt.set(results);
                                         if (!result.isPositionValid()
                                                 || !result.isVelocityValid()) {
                                             return false;
                                         }
-                                        capturedPvt.set(results);
                                         return true;
                                     }
                                 })
@@ -158,8 +158,10 @@ public final class AgentRuntime implements AutoCloseable {
                                 sessionId,
                                 EventType.GNSS_STATUS,
                                 100,
-                                "SingleEpochComplete",
-                                "한 시점 수집·지구 PVT 검증 완료",
+                                selection.awaitingDecision() ? "CaptureDecisionRequired" : "SingleEpochComplete",
+                                selection.awaitingDecision()
+                                        ? "120초 종료 · 관측 데이터 확보 · PVT 조건 미충족 · 사용 여부 선택 대기"
+                                        : "한 시점 수집·지구 PVT 검증 완료",
                                 Map.of("pvt", capturedPvt.get()));
                     },
                     progress -> status(sessionId, EventType.GNSS_STATUS, 0,

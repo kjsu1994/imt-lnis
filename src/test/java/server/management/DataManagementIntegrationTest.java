@@ -108,6 +108,29 @@ class DataManagementIntegrationTest {
     }
 
     @Test
+    void pendingCaptureIsProtectedFromRetentionCleanup() throws Exception {
+        var records = GrawCodec.splitLengthPrefixed(server.afs.NativePvtIntegrationTest.validSample());
+        byte[] epoch = records.stream().filter(record -> GrawCodec.decode(record).message()
+                instanceof GrawCodec.ObservationEpoch).findFirst().orElseThrow();
+        byte[] data = java.nio.ByteBuffer.allocate(epoch.length + 4).putInt(epoch.length).put(epoch).array();
+        var input = inputs.create("pending.graw", data.length, InputKind.GNSS_CAPTURE);
+        try {
+            inputs.append(input.inputId(), 0, data);
+            inputs.awaitCaptureDecision(input.inputId(), "[]");
+            jdbc.update("update input_buffers set created_at=?, completed_at=? where input_id=?",
+                    java.sql.Timestamp.from(old), java.sql.Timestamp.from(old), input.inputId());
+            var row = management.list(Kind.INPUT, 0, input.inputId().toString(), "", null, null).items().getFirst();
+            assertFalse(row.blocked().isBlank());
+            inputs.removeExpired(inputs.get(input.inputId()));
+            assertEquals("AWAITING_DECISION", inputs.get(input.inputId()).captureDecision());
+            assertEquals("FAILED", remove(new Key(Kind.INPUT, input.inputId())).results().getFirst().status());
+            assertEquals("AWAITING_DECISION", inputs.get(input.inputId()).captureDecision());
+        } finally {
+            inputs.discardCapture(input.inputId());
+        }
+    }
+
+    @Test
     void defaultsKeepDtnAndArchiveTablesWithoutExposingBodies() throws Exception {
         var j = job(null);
         j.setSentJson("PRIVATE_PAYLOAD_MARKER");

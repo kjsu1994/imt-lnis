@@ -45,6 +45,7 @@ public class IqController {
             logs.add(request.inputId(), "INPUT", "I/Q 준비", true, "I/Q 생성 요청 · 입력 및 지구 PVT 확인");
         }
         try {
+            inputs.requireApproved(request.inputId());
             var input = inputs.get(request.inputId());
             if (!input.complete()
                     || input.receivedSize() <= 0

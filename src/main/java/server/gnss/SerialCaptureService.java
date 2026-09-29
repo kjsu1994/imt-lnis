@@ -204,6 +204,16 @@ public final class SerialCaptureService implements AutoCloseable {
             byte[] buffer = new byte[8192];
             while (running.get()) {
                 if (selection != null && System.nanoTime() >= deadline) {
+                    var fallback = selection.onTimeout();
+                    if (fallback != null) {
+                        for (byte[] item : fallback) {
+                            writeRecord(canonicalChunk, item);
+                        }
+                        records = fallback.size();
+                        selected = true;
+                        running.set(false);
+                        break;
+                    }
                     throw new IllegalStateException(
                             "120초 안에 유효한 1에폭을 얻지 못했습니다: " + diagnostics.snapshot(System.nanoTime()).message());
                 }

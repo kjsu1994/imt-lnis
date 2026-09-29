@@ -76,6 +76,11 @@ public class AgentMessageService {
                         return;
                     }
                     boolean written = false;
+                    if (progress.type() == EventType.GNSS_STATUS
+                            && "CaptureDecisionRequired".equals(progress.stage())) {
+                        inputBufferService.awaitCaptureDecision(id,
+                                objectMapper.valueToTree(progress.counters().get("pvt")).toString());
+                    }
                     if (logs != null && logs.exists(id)) {
                         if (progress.type() == EventType.GNSS_STATUS) {
                             written = logs.capture(id, progress.stage(), progress.message());

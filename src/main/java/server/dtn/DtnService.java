@@ -118,7 +118,11 @@ public class DtnService {
 
     private DtnNodeLink nodeLink;
 
-    public record EpochChoice(DtnDelay.Epoch epoch, Pvt reference) {}
+    public record EpochChoice(DtnDelay.Epoch epoch, Pvt reference, boolean afsReady) {
+        public EpochChoice(DtnDelay.Epoch epoch, Pvt reference) {
+            this(epoch, reference, true);
+        }
+    }
 
     public List<EpochChoice> delayEpochs(UUID inputId) {
         if (pvtCalculator == null) {
@@ -135,7 +139,16 @@ public class DtnService {
             if (message instanceof GrawCodec.ObservationEpoch epoch) {
                 var identity =
                         new DtnDelay.Epoch(recordIndex, epoch.week(), epoch.receiverTowSeconds());
-                choices.add(new EpochChoice(identity, values.get(pvtIndex++)));
+                var selected = GrawCodec.splitLengthPrefixed(DtnDelay.select(records, identity));
+                boolean afsReady;
+                try {
+                    afsReady = server.afs.AfsPvtFrameCodec.select(selected).stream()
+                            .anyMatch(payload -> payload.navigation() != null);
+                } catch (IllegalArgumentException error) {
+                    // RAW 입력 조회는 AFS로 표현할 수 없는 관측값 때문에 실패시키지 않는다.
+                    afsReady = false;
+                }
+                choices.add(new EpochChoice(identity, values.get(pvtIndex++), afsReady));
             }
         }
         return choices;
@@ -161,7 +174,7 @@ public class DtnService {
         if (epoch == null) {
             epoch =
                     delayEpochs(inputId).stream()
-                            .filter(choice -> choice.reference().isPositionValid())
+                            .filter(choice -> choice.reference().isPositionValid() || approvedCapture(inputId))
                             .map(EpochChoice::epoch)
                             .findFirst()
                             .orElseThrow(
@@ -319,12 +332,19 @@ public class DtnService {
                     () -> prepareIq(job, inputId, senderMode, receiverMode));
             return job;
         }
+        inputBufferService.requireApproved(inputId);
         byte[] data = readInput(inputId);
         if (epoch != null) {
             data = DtnDelay.select(GrawCodec.splitLengthPrefixed(data), epoch);
             var reference = pvtCalculator.calculate(GrawCodec.splitLengthPrefixed(data));
-            if (reference.size() != 1 || !reference.getFirst().isPositionValid()) {
+            if (reference.size() != 1
+                    || (!reference.getFirst().isPositionValid() && !approvedCapture(inputId))) {
                 throw new IllegalArgumentException("선택 Epoch의 Reference 위치 PVT를 계산할 수 없습니다.");
+            }
+            if ("AFS_METADATA".equals(testType)
+                    && server.afs.AfsPvtFrameCodec.select(GrawCodec.splitLengthPrefixed(data)).stream()
+                            .noneMatch(payload -> payload.navigation() != null)) {
+                throw new IllegalArgumentException("AFS 생성에 필요한 GPS LNAV 항법정보 부족 · GNSS RAW로 전송 가능");
             }
         }
         DtnJob job = newJob(sender, receiver, destination, testType, senderMode, receiverMode);
@@ -445,6 +465,14 @@ public class DtnService {
             throw new IllegalStateException("입력 크기 불일치");
         }
         return data.toByteArray();
+    }
+
+    private boolean approvedCapture(UUID inputId) {
+        if (inputId == null) {
+            return false;
+        }
+        var input = inputBufferService.get(inputId);
+        return input != null && "ACCEPTED".equals(input.captureDecision());
     }
 
     private void prepareIq(DtnJob job, UUID inputId, String senderMode, String receiverMode) {
@@ -848,7 +876,8 @@ public class DtnService {
                 }
                 if ("DELAY".equals(job.getComparisonMode())
                         && (result.getPvt().size() != 1
-                                || !result.getPvt().getFirst().isPositionValid())) {
+                                || (!result.getPvt().getFirst().isPositionValid()
+                                    && !approvedCapture(job.getInputId())))) {
                     throw new IllegalArgumentException("송신 Reference PVT 계산 불가");
                 }
                 job.setReferenceJson(objectMapper.writeValueAsString(result.getPvt()));

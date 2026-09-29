@@ -12,6 +12,34 @@ import java.util.List;
 
 class SingleEpochCaptureTest {
     @Test
+    void timeoutPreservesLastEpochWithoutAddingLaterNavigation() throws Exception {
+        var records = GrawCodec.splitLengthPrefixed(NativePvtIntegrationTest.validSample());
+        var epoch = records.stream().filter(record -> GrawCodec.decode(record).message()
+                instanceof GrawCodec.ObservationEpoch).findFirst().orElseThrow();
+        var navigation = records.stream().filter(record -> GrawCodec.decode(record).message()
+                instanceof GrawCodec.NavigationUpdate).findFirst().orElseThrow();
+        var capture = new SingleEpochCapture(candidate -> false);
+        assertNull(capture.accept(epoch));
+        capture.accept(navigation);
+        assertNull(capture.accept(epoch));
+        capture.accept(navigation);
+        var selected = capture.onTimeout();
+        assertEquals(2, selected.size());
+        assertArrayEquals(navigation, selected.getFirst());
+        assertArrayEquals(epoch, selected.getLast());
+        assertTrue(capture.awaitingDecision());
+        assertNull(capture.onTimeout());
+        assertNull(capture.accept(epoch));
+    }
+
+    @Test
+    void timeoutWithoutObservationDoesNotOfferUnusableData() {
+        var capture = new SingleEpochCapture(candidate -> false);
+        assertNull(capture.onTimeout());
+        assertFalse(capture.awaitingDecision());
+    }
+
+    @Test
     void dropsUnsolvableEpochsAndKeepsNavigationOrder() throws Exception {
         var records = GrawCodec.splitLengthPrefixed(NativePvtIntegrationTest.validSample());
         var epoch =

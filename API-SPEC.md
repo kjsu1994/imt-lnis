@@ -72,10 +72,24 @@ JSON 응답에서는 값이 `null`인 속성이 생략될 수 있습니다.
 | Capture | POST | `/captures` | GNSS 수집 시작 |
 | Capture | POST | `/captures/{captureId}/stop` | GNSS 수집 중지 |
 | Capture | POST | `/captures/{captureId}/complete` | 수집 입력 완료 |
+| Capture | GET | `/captures/pending` | 시간 초과 후 사용 여부 선택 대기 입력 |
+| Capture | POST | `/captures/{captureId}/accept` | 확보한 데이터 사용 승인 |
+| Capture | POST | `/captures/{captureId}/discard` | 선택 대기 데이터 폐기 |
+| Input | POST | `/inputs/ubx` | UBX 직접 업로드·GRAW 변환 |
 | Actuator | GET | `/actuator/health` | 서버 상태 |
 | Actuator | GET | `/actuator/health/liveness` | 생존 상태 |
 | Actuator | GET | `/actuator/health/readiness` | 준비 상태 |
 | Actuator | GET | `/actuator/info` | 서버 정보 |
+
+UBX 직접 입력: `POST /lnis/api/v1/inputs/ubx?fileName=capture.ubx&archiveTime=2026-09-29T00:00:00Z`
+(`Content-Type: application/octet-stream`, 본문은 UBX 바이너리). `archiveTime`은 선택 사항이며 파일 보관 시각입니다.
+RAWX·SFRBX를 내부 GRAW로 변환·검증한 완료 입력(`inputId`, `recordCount` 등)을 반환합니다.
+UBX 최대 64 MiB, 최대 1000 Epoch, 변환 결과 최대 1 MiB이며 관측값 없는 파일은 거부합니다.
+PVT 유효성을 보장하는 API가 아니며 이후 기존 관측값·PVT 조회를 사용합니다. 외부 어댑터 계약은 바뀌지 않습니다.
+
+COM 단일 에폭 시간 초과 입력은 `complete=true`, `captureDecision=AWAITING_DECISION`으로 보관됩니다.
+승인 전 시험 사용·새 COM 수집을 차단합니다. `accept` 후 `ACCEPTED` 입력은 PVT 없이 RAW 전송 가능,
+AFS는 GPS LNAV 항법정보 필요, I/Q는 기존 유효 위치·속도 조건을 유지합니다. `discard`는 선택 대기 입력만 삭제합니다.
 
 ## 3. 제거된 구형 인터페이스
 

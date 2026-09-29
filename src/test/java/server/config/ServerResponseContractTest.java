@@ -50,6 +50,33 @@ class ServerResponseContractTest {
     }
 
     @Test
+    void ubxUploadUsesExistingInputValidationAndRejectsEmptyObservations() throws Exception {
+        byte[] payload = new byte[48];
+        var buffer = java.nio.ByteBuffer.wrap(payload).order(java.nio.ByteOrder.LITTLE_ENDIAN);
+        buffer.putDouble(100000).putShort((short) 2400).put((byte) 18).put((byte) 1).put((byte) 1).put((byte) 1);
+        buffer.position(16);
+        buffer.putDouble(21000000).putDouble(0).putFloat(-100);
+        payload[37] = 19;
+        payload[46] = 1;
+        UUID id = UUID.randomUUID();
+        var input = new InputBufferEntity(id, InputKind.GRAW_UPLOAD, "capture.ubx", 0, 0, 0, 0,
+                null, true, Instant.now(), Instant.now());
+        when(inputService.create(eq("capture.ubx"), anyLong(), eq(InputKind.GRAW_UPLOAD))).thenReturn(input);
+        when(inputService.complete(id)).thenReturn(input);
+        mvc.perform(post("/lnis/api/v1/inputs/ubx").param("fileName", "capture.ubx")
+                        .param("archiveTime", "2026-09-29T00:00:00Z")
+                        .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                        .content(UbloxParser.command(2, 0x15, payload)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.inputId").value(id.toString()));
+        var bytes = org.mockito.ArgumentCaptor.forClass(byte[].class);
+        verify(inputService).append(eq(id), eq(0L), bytes.capture());
+        org.junit.jupiter.api.Assertions.assertEquals(2, GrawCodec.splitLengthPrefixed(bytes.getValue()).size());
+        mvc.perform(post("/lnis/api/v1/inputs/ubx").param("fileName", "empty.ubx")
+                        .contentType(MediaType.APPLICATION_OCTET_STREAM).content(new byte[] {1, 2, 3}))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void retiresAfsSessionsAndPreservesDiscovery() throws Exception {
         mvc.perform(get("/lnis/api/v1/sessions/active")).andExpect(status().isNotFound());
         mvc.perform(get("/lnis/api/v1/discovery")).andExpect(status().isNotFound());
