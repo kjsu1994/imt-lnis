@@ -158,3 +158,17 @@ assert.equal(receiverPanel.hidden,false);
 assert.equal(receiverText.value,original,'receipt polling preserves formatting');
 assert.equal(receiverContainer.children.find(e=>e.role==='status').hidden,false,'rejection remains visible');
 console.log('PASS: rejected receipts integrated into original JSON viewer');
+
+await receiverViewer.setJob({testId:'another',receivedPayloadAvailable:false});
+await receiverViewer.setReceipts([
+  {id:'foreign',testId:'rejected',status:'REJECTED'},
+  {id:'unknown',testId:null,status:'REJECTED'}
+]);
+assert.equal(receiverText.value, '', 'unrelated and unidentified receipts never replace the selected trial');
+assert.equal(receiverDownload.href, undefined);
+assert.ok(!JSON.stringify(receiverContainer).includes('수신 원문 기록'));
+await receiverViewer.setJob({testId:'rejected',receivedPayloadAvailable:false});
+await receiverViewer.setReceipts([{id:'receipt-1',testId:'rejected',status:'REJECTED'}]);
+await receiverViewer.setJob({testId:'rejected',receivedPayloadAvailable:true});
+assert.ok(!receiverDownload.href.includes('/receipts/'), 'accepted original replaces rejected receipt automatically');
+console.log('PASS: JSON and downloads follow only the trial selected in the main history');

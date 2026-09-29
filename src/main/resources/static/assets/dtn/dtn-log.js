@@ -6,19 +6,18 @@ export function logLine(entry) {
 export function createDtnLog(target) {
   const $ = id => document.getElementById(id);
   const fullscreen = initLogFullscreen(target);
-  const toggle=$('dtn-log-detail'), select=$('dtn-log-history'), download=$('dtn-log-download');
+  const toggle=$('dtn-log-detail'), download=$('dtn-log-download');
   let current='', currentType='TEST', scope='', version=0, cursor=0, cleared=0, entries=[], local=[], detailed=false, running=false, lastError='';
-  let historyAt=0;
   const render=()=>{
     const follow=target.scrollHeight-target.scrollTop-target.clientHeight<36;
     const visible=entries.filter(e=>e.sequence>cleared && (detailed || !e.detail));
-    target.textContent=[...visible,...(select.value?[]:local)].sort((a,b)=>new Date(a.occurredAt)-new Date(b.occurredAt)).map(logLine).join('\n');
+    target.textContent=[...visible,...local].sort((a,b)=>new Date(a.occurredAt)-new Date(b.occurredAt)).map(logLine).join('\n');
     if(!target.textContent && scope) target.textContent=currentType==='TEST'
       ? '저장된 로그 없음 · 도입 전 시험 또는 처리 대기' : '처리 로그 대기';
     if(follow) target.scrollTop=target.scrollHeight;
   };
   const change=()=>{
-    const next=select.value || current;
+    const next=current;
     if(next!==scope) {scope=next;version++;cursor=cleared=0;entries=[];lastError='';}
     if(scope) {download.href='/lnis/api/v1/dtn/logs?scopeId='+encodeURIComponent(scope)+'&download=true';download.setAttribute('aria-disabled','false');}
     else {download.removeAttribute('href');download.setAttribute('aria-disabled','true');}
@@ -29,15 +28,6 @@ export function createDtnLog(target) {
     if(running || document.visibilityState==='hidden') return;
     running=true;
     try {
-      if(Date.now()-historyAt>10000) {
-        const response=await fetch('/lnis/api/v1/dtn/tests',{cache:'no-store',signal:AbortSignal.timeout(8000)});
-        if(response.ok) {
-          const tests=await response.json(), chosen=select.value;
-          select.replaceChildren(new Option('현재 작업',''),...tests.map(t=>new Option(new Date(t.createdAt).toLocaleString('ko-KR')+' · '+t.testType+' · '+t.testId.slice(0,8),t.testId)));
-          if(tests.some(t=>t.testId===chosen)) select.value=chosen;
-          historyAt=Date.now();change();
-        }
-      }
       if(!scope) return;
       const requested=scope, revision=version;
       let more;
@@ -68,12 +58,11 @@ export function createDtnLog(target) {
     local=local.slice(-200);render();
   }
   toggle.onclick=()=>{detailed=!detailed;toggle.setAttribute('aria-pressed',String(detailed));render();};
-  select.onchange=()=>{change();void poll();};
   $('dtn-log-clear').onclick=()=>{cleared=cursor;local=[];target.textContent='';};
   setInterval(()=>void poll(),2000);
   return {write,refresh:poll,setContext(id,type='TEST') {
     const next=id || '';
-    if(current!==next) {current=next;currentType=type;local=[];select.value='';}
+    if(current!==next) {current=next;currentType=type;local=[];}
     change();void poll();
   }};
 }

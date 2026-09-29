@@ -28,6 +28,10 @@ public class NodeDtnController {
     private final ObjectMapper mapper;
     private final Validator validator;
     private final server.dtn.DtnService dtnService;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private server.common.ServiceClock clock = new server.common.ServiceClock();
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private server.dtn.DtnRepository jobs;
 
     @GetMapping("/capabilities")
     public java.util.Map<String, Boolean> capabilities(
@@ -57,7 +61,19 @@ public class NodeDtnController {
         if (registration == null || !validator.validate(registration).isEmpty()) {
             throw new IllegalArgumentException("DTN 사전 등록 필수 항목을 확인하세요.");
         }
-        return new ResponseEntity<>(service.accept(registration), HttpStatus.ACCEPTED);
+        synchronized (clock) {
+            clock.requireAvailable();
+            var result = service.accept(registration);
+            if (jobs != null) {
+                jobs.findById(registration.getTestId()).ifPresent(job -> {
+                    if (job.getReceiverRegistrationClockJson() == null) {
+                        job.setReceiverRegistrationClockJson(mapper.valueToTree(clock.stamp()).toString());
+                        jobs.saveAndFlush(job);
+                    }
+                });
+            }
+            return new ResponseEntity<>(result, HttpStatus.ACCEPTED);
+        }
     }
 
     @PostMapping("/{testId}/cancel")

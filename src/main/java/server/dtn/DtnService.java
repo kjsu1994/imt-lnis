@@ -467,6 +467,43 @@ public class DtnService {
         return data.toByteArray();
     }
 
+    public synchronized void recordClock(DtnJob job, server.common.ServiceClock.Stamp stamp, boolean sender) {
+        String value = objectMapper.valueToTree(stamp).toString();
+        if (sender) {
+            job.setSenderClockJson(value);
+        } else if (job.getReceiverClockJson() == null && job.getReceivedAt() != null) {
+            job.setReceiverClockJson(value);
+            String before = job.getReceiverRegistrationClockJson();
+            if (before != null) {
+                try {
+                    var previous = objectMapper.readValue(before, server.common.ServiceClock.Stamp.class);
+                    if (!previous.session().equals(stamp.session()) || previous.revision() != stamp.revision()
+                            || previous.clockChanges() != stamp.clockChanges()) {
+                        job.setClockWarning("시험 중 시계 변경 또는 서비스 재시작 감지 · 전달 지연 해석 주의");
+                    }
+                } catch (java.io.IOException invalid) {
+                    job.setClockWarning("등록 시각의 보정 근거를 확인할 수 없습니다.");
+                }
+            }
+            if ("SYSTEM".equals(stamp.source()) || stamp.ageSeconds() > 300) {
+                if (job.getClockWarning() == null) {
+                    job.setClockWarning("수신 시험 시각 미보정 또는 마지막 보정 후 5분 경과");
+                }
+            }
+            try {
+                var source = job.getSenderClockJson() == null ? null
+                        : objectMapper.readValue(job.getSenderClockJson(), server.common.ServiceClock.Stamp.class);
+                if (job.getClockWarning() == null && (source == null || "SYSTEM".equals(source.source())
+                        || source.ageSeconds() > 300)) {
+                    job.setClockWarning("송신 시험 시각 미보정 또는 보정 정보가 오래됨");
+                }
+            } catch (java.io.IOException invalid) {
+                job.setClockWarning("송신 시각 보정 근거를 확인할 수 없습니다.");
+            }
+        }
+        dtnRepository.saveAndFlush(job);
+    }
+
     private boolean approvedCapture(UUID inputId) {
         if (inputId == null) {
             return false;

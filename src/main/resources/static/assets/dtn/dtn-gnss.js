@@ -31,7 +31,7 @@ export function initGnssControls({port, baud, refresh, changed = () => {}, log =
     $('gnss-time-detail').textContent = 'GNSS UTC: ' + (state.timeState === 'VALID' && state.utc ? state.utc : '—')
       + '\n최근 메시지 수신: ' + (state.updatedAt ? new Date(state.updatedAt).toLocaleTimeString('ko-KR') : '—')
       + '\n수신기 시간 정확도 추정: ' + (state.accuracyNanos == null ? '—' : state.accuracyNanos + ' ns (PC 정확도 아님)')
-      + '\n' + (state.message || '') + '\nPC 시계는 조정하지 않습니다. 시험은 기존 시스템 시간을 사용합니다.';
+      + '\n' + (state.message || '') + '\nWindows 시간은 변경하지 않습니다. 시험 시각 보정은 시간 맞추기에서 적용합니다.';
     if ($('gnss-dtr')) {
       $('gnss-dtr').disabled = $('gnss-rts').disabled = attached() || working;
       if (attached()) {
@@ -69,6 +69,67 @@ export function initGnssControls({port, baud, refresh, changed = () => {}, log =
       lastTransition = transition;
     }
     render();
+    await pollClock();
+  }
+  const tickNow = () => globalThis.performance?.now() ?? Date.now();
+  let clockSample = null, clockTick = 0, clockWorking = false;
+  const sourceLabel = value => ({SYSTEM: 'PC 시각 · 미보정', GNSS_USB: 'GNSS · 근사 보정',
+    PEER_GNSS: '상대 GNSS · 근사 보정', NTP: '공통 NTP · 근사 보정'}[value] || '미확인');
+  async function pollClock() {
+    if (!$('service-clock-value')) return;
+    try {
+      const start = tickNow();
+      const response = await requestJson('/node/clock', {cache: 'no-store'});
+      if (!response?.clock?.trialAt) throw new Error('시험 시각 응답 없음');
+      clockTick = tickNow();
+      clockSample = {response, milliseconds: Date.parse(response.clock.trialAt) + (clockTick - start) / 2};
+      const value = response.clock;
+      $('service-clock-state').textContent = sourceLabel(value.source) + (value.ageSeconds > 300 ? ' · 재확인 권장' : '');
+      $('service-clock-sync').disabled = clockWorking || response.busy;
+      $('service-clock-detail').textContent = 'PC UTC: ' + value.rawAt + '\n시험 UTC: ' + value.trialAt
+        + '\n보정량: ' + Number(value.offsetSeconds).toFixed(9) + ' s'
+        + '\n최근 보정: ' + (value.calibratedAt || '없음')
+        + '\n시간원: ' + sourceLabel(value.source)
+        + '\n조회 왕복 시간: ' + (value.roundTripSeconds == null ? '—' : (value.roundTripSeconds * 1000).toFixed(3) + ' ms')
+        + '\nPC 시각 변경 감지: ' + value.clockChanges + '회'
+        + '\n표시는 서버 시각을 기준으로 갱신합니다. 소수점 자릿수는 측정 정확도가 아닙니다.';
+    } catch {
+      clockSample = null;
+      $('service-clock-state').textContent = '시험 시각 조회 불가';
+      $('service-clock-sync').disabled = clockWorking;
+    }
+    drawClock();
+  }
+  function drawClock() {
+    if (!$('service-clock-value')) return;
+    const elapsed = tickNow() - clockTick;
+    $('service-clock-value').textContent = clockSample && elapsed < 6000
+      ? new Date(clockSample.milliseconds + elapsed + 9 * 3600000).toISOString().replace('T', ' ').slice(0, 23)
+      : '—';
+    if (clockSample && elapsed >= 6000) $('service-clock-state').textContent = '시각 갱신 끊김';
+  }
+  if ($('service-clock-sync')) {
+    $('service-clock-sync').onclick = async () => {
+      if (clockWorking) return;
+      clockWorking = true;
+      $('service-clock-sync').disabled = true;
+      try {
+        const proposal = await requestJson('/node/clock/prepare', {method: 'POST'});
+        if (!confirm(sourceLabel(proposal.source) + '\n내부 시험 시각 보정량: '
+            + Number(proposal.offsetSeconds).toFixed(6) + ' s\nWindows 시간은 변경하지 않습니다. 적용할까요?')) return;
+        await requestJson('/node/clock/apply', {method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ticket: proposal.ticket})});
+        log('시험 기준시각 보정 완료 · ' + sourceLabel(proposal.source), 'INFO');
+      } catch (error) {
+        log('시각 보정 미적용 · ' + error.message, 'WARN');
+        alert(error.message);
+      } finally {
+        clockWorking = false;
+        await pollClock();
+      }
+    };
+    const animateClock = () => { drawClock(); setTimeout(animateClock, 100); };
+    animateClock();
   }
   $(refresh).onclick = listPorts;
   $(port).addEventListener('change', render);

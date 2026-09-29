@@ -39,6 +39,11 @@ public class DtnJob {
     private Instant testStartedAt;
     @Lob private String selectedEpochJson;
     @Lob private String delayEvidenceJson;
+    /** 내부 시간 보정 근거. 외부 어댑터 JSON에는 포함하지 않는다. */
+    @Lob private String senderClockJson;
+    @Lob private String receiverClockJson;
+    @Lob private String receiverRegistrationClockJson;
+    private String clockWarning;
     private Boolean development;
     private Instant createdAt;
     private Instant updatedAt;

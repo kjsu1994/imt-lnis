@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>LNIS DTN Receiver</title>
   <link rel="stylesheet" href="/lnis/assets/common/app.css?v=20260918-admin-icon">
-  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20260929-persistent-gnss">
+  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20260929-clock-inline">
 </head>
 <body data-page="dtn-receiver">
 <header>
@@ -72,7 +72,13 @@
         </details>
       </div>
     </div>
-    <small id="gnss-summary" role="status">시스템 시간 사용 · GNSS 시간 미확인</small>
+    <div class="service-clock-row">
+      <span>시험 기준시각 <time id="service-clock-value">—</time><small>UTC+09:00</small></span>
+      <span id="service-clock-state">미보정</span>
+      <button id="service-clock-sync" type="button">시간 맞추기</button>
+      <details class="service-clock-detail"><summary>상세</summary><pre id="service-clock-detail"></pre></details>
+      <small id="gnss-summary" role="status">시스템 시간 사용 · GNSS 시간 미확인</small>
+    </div>
 
     <div class="receiver-trial-grid">
     <div>
@@ -83,8 +89,8 @@
       <button id="dtn-tests-prev" type="button" disabled aria-label="이전 시험 목록">이전</button>
       <span id="dtn-tests-page">1</span>
       <button id="dtn-tests-next" type="button" disabled aria-label="다음 시험 목록">다음</button>
-      <button id="dtn-refresh" type="button">새로고침</button>
-      <button id="dtn-cancel" type="button" disabled>대기 종료</button>
+      <span class="receiver-history-actions"><button id="dtn-refresh" type="button">새로고침</button>
+      <button id="dtn-cancel" type="button" disabled>대기 종료</button></span>
     </div>
     <div class="receiver-meta">
       <span>시험 ID <code id="test-id">-</code></span>
@@ -106,16 +112,17 @@
     </div>
   </section>
 
-  <section class="card epoch-observation-card" id="dtn-observations"></section>
-
-  <section class="card" id="reference-panel" hidden>
-    <div class="card-title"><h2>송신 원본 · 비교 기준</h2>
+  <section class="card epoch-observation-card" id="received-observation-card">
+    <div id="dtn-observations"></div>
+    <div id="reference-panel" hidden>
+    <div class="reference-heading"><button id="reference-toggle" type="button" aria-expanded="false" aria-controls="reference-details">송신 원본 · 비교 기준</button>
       <span id="reference-status" role="status"></span>
       <button type="button" id="reference-retry" hidden>다시 조회</button>
     </div>
-    <details id="reference-details"><summary>시험 원본 RAW 보기</summary>
+    <div id="reference-details" hidden>
       <div id="reference-observations"></div>
-    </details>
+    </div>
+    </div>
   </section>
   <section class="card receiver-pvt">
     <div class="card-title">
@@ -164,7 +171,6 @@
     <details id="pvt-delay-details" class="pvt-delay-details" hidden>
       <summary>계산 근거·상세</summary>
       <pre id="pvt-delay-evidence"></pre>
-      <small>준비·변환·전송 대기를 포함하며 수신 후 PVT 계산 시간은 제외합니다. 잔차는 실제 통신 지연의 측정오차가 아닙니다. 허용오차 기반 합격 판정은 하지 않습니다.</small>
     </details>
   </section>
 
@@ -172,11 +178,11 @@
   <div class="dtn-output-grid">
   <section id="dtn-payload" class="card receiver-payload"></section>
   <section class="card receiver-log">
-    <div class="card-title dtn-log-tools"><h2>수신 로그</h2><select id="dtn-log-history" aria-label="로그 시험 기록"><option value="">현재 작업</option></select><button id="dtn-log-detail" type="button" aria-pressed="false">상세 로그</button><a id="dtn-log-download" aria-disabled="true">다운로드</a><button id="dtn-log-clear" type="button" title="저장 로그는 삭제하지 않습니다">화면 지우기</button><button id="dtn-log-fullscreen" type="button" title="로그 전체화면" aria-label="로그 전체화면" aria-pressed="false"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M9 3H3v6M15 3h6v6M3 15v6h6M21 15v6h-6"/></svg></button></div>
+    <div class="card-title dtn-log-tools"><h2>수신 로그</h2><button id="dtn-log-detail" type="button" aria-pressed="false">상세 로그</button><a id="dtn-log-download" aria-disabled="true">다운로드</a><button id="dtn-log-clear" type="button" title="저장 로그는 삭제하지 않습니다">화면 지우기</button><button id="dtn-log-fullscreen" type="button" title="로그 전체화면" aria-label="로그 전체화면" aria-pressed="false"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M9 3H3v6M15 3h6v6M3 15v6h6M21 15v6h-6"/></svg></button></div>
     <pre id="dtn-log" class="log"></pre>
   </section>
   </div>
 </main>
-<script type="module" src="/lnis/assets/dtn/dtn-receiver.js?v=20260929-persistent-gnss"></script>
+<script type="module" src="/lnis/assets/dtn/dtn-receiver.js?v=20260929-unified-trial"></script>
 </body>
 </html>

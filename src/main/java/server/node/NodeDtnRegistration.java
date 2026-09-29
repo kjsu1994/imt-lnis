@@ -18,6 +18,7 @@ public class NodeDtnRegistration {
     @NotNull private UUID testId;
     private String comparisonMode;
     private java.time.Instant testStartedAt;
+    private server.common.ServiceClock.Stamp senderClock;
     private DtnDelay.Epoch selectedEpoch;
     @NotBlank private String senderAgentId;
     @NotBlank private String receiverAgentId;

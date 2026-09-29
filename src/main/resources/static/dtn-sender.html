@@ -5,7 +5,7 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>LNIS DTN Sender</title>
   <link rel="stylesheet" href="/lnis/assets/common/app.css?v=20260918-admin-icon">
-  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20260929-persistent-gnss">
+  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20260929-clock-inline">
 </head>
 <body data-page="dtn-sender">
 <header>
@@ -185,11 +185,19 @@
   <div id="dtn-main-view">
     <section id="trial-settings" class="trial-config" aria-label="시험 요청 설정"></section>
   <section class="sender-actions" aria-label="시험 실행">
+    <div class="sender-summary-row">
     <div class="sender-summary">
       <strong id="dtn-condition-summary">AFS Frame · DTN → HDTN</strong>
       <span id="dtn-input-summary">데이터 없음</span>
       <span class="sender-connection"><span id="dtn-peer-summary-dot" class="connection-dot unknown" aria-hidden="true"></span>수신 서비스 <strong id="dtn-peer-summary">미확인</strong></span>
       <span class="sender-connection"><span id="dtn-adapter-summary-dot" class="connection-dot unknown" aria-hidden="true"></span>송신 adapter <strong id="dtn-adapter-summary">미확인</strong></span>
+    </div>
+    <div class="service-clock-row">
+      <span>시험 기준시각 <time id="service-clock-value">—</time><small>UTC+09:00</small></span>
+      <span id="service-clock-state">미보정</span>
+      <button id="service-clock-sync" type="button">시간 맞추기</button>
+      <details class="service-clock-detail"><summary>상세</summary><pre id="service-clock-detail"></pre></details>
+    </div>
     </div>
     <p id="dtn-message" role="status"></p>
     <p id="dtn-capture-status" role="status"></p>
@@ -246,9 +254,9 @@
   </section>
   <div class="dtn-output-grid">
   <section id="dtn-payload" class="card"></section>
-  <section class="card"><div class="card-title dtn-log-tools"><h2>송신 로그</h2><select id="dtn-log-history" aria-label="로그 시험 기록"><option value="">현재 작업</option></select><button id="dtn-log-detail" type="button" aria-pressed="false">상세 로그</button><a id="dtn-log-download" aria-disabled="true">다운로드</a><button id="dtn-log-clear" type="button" title="저장 로그는 삭제하지 않습니다">화면 지우기</button><button id="dtn-log-fullscreen" type="button" title="로그 전체화면" aria-label="로그 전체화면" aria-pressed="false"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M9 3H3v6M15 3h6v6M3 15v6h6M21 15v6h-6"/></svg></button></div><pre id="dtn-log" class="log" aria-label="PC 시간 기준 로그"></pre></section>
+  <section class="card"><div class="card-title dtn-log-tools"><h2>송신 로그</h2><button id="dtn-log-detail" type="button" aria-pressed="false">상세 로그</button><a id="dtn-log-download" aria-disabled="true">다운로드</a><button id="dtn-log-clear" type="button" title="저장 로그는 삭제하지 않습니다">화면 지우기</button><button id="dtn-log-fullscreen" type="button" title="로그 전체화면" aria-label="로그 전체화면" aria-pressed="false"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M9 3H3v6M15 3h6v6M3 15v6h6M21 15v6h-6"/></svg></button></div><pre id="dtn-log" class="log" aria-label="PC 시간 기준 로그"></pre></section>
   </div>
   </div>
 </main>
-<script type="module" src="/lnis/assets/dtn/dtn.js?v=20260929-persistent-gnss"></script>
+<script type="module" src="/lnis/assets/dtn/dtn.js?v=20260929-unified-trial"></script>
 </body></html>

@@ -1,9 +1,9 @@
 import {initPresetControls, renderTrialSettings, trialOption, colorTrialSelection} from './dtn-settings.js?v=20260929-trial-status';
 import {requestJson} from '../common/http.js?v=20260915-structure';
-import {initGnssControls} from './dtn-gnss.js?v=20260929-persistent';
-import {createDtnLog} from './dtn-log.js?v=20260929-log-view';
+import {initGnssControls} from './dtn-gnss.js?v=20260929-service-clock';
+import {createDtnLog} from './dtn-log.js?v=20260929-unified-trial';
 import {initAdapterHealth, validAdapterUrl} from './dtn-adapter-health.js?v=20260922-compact-settings';
-import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20260929-payload-header';
+import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20260929-unified-trial';
 import {createObservationView, numeric, renderClockBias} from './dtn-observations.js?v=20260929-real-gnss';
 
 const api = '/lnis/api/v1', $ = id => document.getElementById(id);
@@ -309,7 +309,7 @@ function updateControls() {
   else if (acceptedCapture && selectedType === 'IQ_SAMPLE' && !pvt.some(v => v.positionValid && v.velocityValid)) $('dtn-message').textContent = 'I/Q 생성에는 유효한 위치·속도 PVT가 필요합니다.';
 }
 function renderIq() {
-  if(iqJob?.id && !active()) logView.setContext(iqJob.id,'IQ');
+  if(iqJob?.id && !job?.testId) logView.setContext(iqJob.id,'IQ');
   if (!iqJob) { $('iq-state').textContent = '파일 선택 또는 생성 대기'; renderIqFile($('iq-file'), null, ''); $('iq-progress').value = 0; return; }
   $('iq-state').textContent = iqJob.message;
   $('iq-progress').value = Math.min(100, 100 * (iqJob.generatedBytes || 0) / (iqJob.expectedBytes || 1));

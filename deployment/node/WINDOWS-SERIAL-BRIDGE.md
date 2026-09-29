@@ -26,6 +26,12 @@ Without `LNIS_SERIAL_BRIDGE_URL`, SerialCaptureService retains native local seri
 
 ## Validation on this PC (2026-09-29)
 
+### Internal trial clock
+
+The authenticated read-only `/time` bridge endpoint estimates UTC at the serial read boundary from recent valid NAV-TIMEUTC messages. Update both the bridge distribution and server JAR. **No OS clock setter, Windows Time service change, administrator privilege, or container `SYS_TIME` capability is used.**
+
+The web **시간 맞추기** button previews and applies an offset to the service's trial clock only. The calibrated clock advances using a monotonic timer; existing system logs keep PC time. Missing local GNSS falls back to a recently GNSS-calibrated peer, then the common `LNIS_NTP_SERVER` (default `time.windows.com`). Failure retains the current clock. Serial message output latency and network asymmetry remain; sample consistency is not proof of absolute accuracy. Restart resets calibration. See README and API-SPEC for trial evidence and reservation rules.
+
 - Unit HTTP tests: authentication, session ownership, byte preservation, duplicate open, unplug, expiry and unavailable server errors.
 - Full `gradlew check`: passed before the final baud-default update; final targeted checks are recorded in `WINDOWS-SERIAL-VALIDATION.json`.
 - Real browser: COM4 (FTDI) and COM5 (u-blox) enumerated through the WSL/Docker server.

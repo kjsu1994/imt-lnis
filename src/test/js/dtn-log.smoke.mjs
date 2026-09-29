@@ -5,7 +5,7 @@ class Element {
   setAttribute(k,v){this[k]=v;} removeAttribute(k){delete this[k];}
   replaceChildren(...v){this.options=v;this.value=v[0]?.value||'';}
 }
-const elements=new Map(['dtn-log-detail','dtn-log-history','dtn-log-download','dtn-log-clear'].map(k=>[k,new Element()]));
+const elements=new Map(['dtn-log-detail','dtn-log-download','dtn-log-clear'].map(k=>[k,new Element()]));
 globalThis.document={visibilityState:'visible',getElementById:id=>elements.get(id)};
 globalThis.Option=function(text,value){this.text=text;this.value=value;};
 globalThis.setInterval=()=>{};

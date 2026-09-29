@@ -1,9 +1,9 @@
 import {renderTrialSettings, trialOption, colorTrialSelection} from './dtn-settings.js?v=20260929-trial-status';
 import {requestJson} from '../common/http.js?v=20260915-structure';
-import {initGnssControls} from './dtn-gnss.js?v=20260929-persistent';
-import {createDtnLog} from './dtn-log.js?v=20260929-log-view';
+import {initGnssControls} from './dtn-gnss.js?v=20260929-service-clock';
+import {createDtnLog} from './dtn-log.js?v=20260929-unified-trial';
 import {initAdapterHealth} from './dtn-adapter-health.js?v=20260922-compact-structure';
-import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20260929-payload-header';
+import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20260929-unified-trial';
 import {createObservationView, numeric, renderClockBias} from './dtn-observations.js?v=20260929-clock-precision';
 
 const $ = id => document.getElementById(id);
@@ -12,18 +12,23 @@ const referenceView = createObservationView($('reference-observations'), () => {
 function renderReference(report = {}) {
   const status = report.referenceStatus;
   $('reference-panel').hidden = !status;
+  $('received-observation-card').hidden = $('dtn-observations').hidden && !status;
   $('reference-status').textContent = status === 'COMPLETE' ? '비교자료 수신 완료'
     : status === 'WAITING' ? '수신 계산 완료 · 비교자료 조회 중' : status ? '비교자료 확인 필요' : '';
   $('reference-status').title = report.referenceMessage || '';
   $('reference-retry').hidden = !status || status === 'COMPLETE';
-  $('reference-details').hidden = !report.referenceObservations;
+  $('reference-toggle').disabled = !report.referenceObservations;
+  if (!report.referenceObservations) {
+    $('reference-details').hidden = true;
+    $('reference-toggle').setAttribute('aria-expanded', 'false');
+  }
   referenceView.setData(report.referenceObservations || null);
 }
 $('reference-retry').onclick = async () => {
   if (!selectedId) return;
   $('reference-retry').disabled = true;
   try {
-    await requestJson('/lnis/api/v1/dtn/tests/' + encodeURIComponent(selectedId) + '/reference/retry',
+    await requestJson('/dtn/tests/' + encodeURIComponent(selectedId) + '/reference/retry',
       {method: 'POST'});
     await poll(true);
   } catch (error) { log(error.message, 'ERROR'); }
@@ -43,6 +48,13 @@ function setComparison(report = {}) {
   delayEvidence = report.delayEvidence ?? null;
   $('dtn-clock-analysis').hidden = !delayComparison;
   $('pvt-sync-note').hidden = !delayComparison;
+  const timingKnown = report.senderClock?.source && report.receiverClock?.source
+    && report.senderClock.source !== 'SYSTEM' && report.receiverClock.source !== 'SYSTEM';
+  $('pvt-sync-note').textContent = report.clockWarning || (timingKnown ? '내부 시각 근사 보정 적용' : '시험 시각 보정 미확인');
+  $('pvt-sync-note').title = report.senderClock && report.receiverClock
+    ? '송신: ' + report.senderClock.source + ' / 수신: ' + report.receiverClock.source
+      + '\n송신 보정량 ' + report.senderClock.offsetSeconds + ' s / 수신 보정량 ' + report.receiverClock.offsetSeconds + ' s'
+    : '과거 시험 또는 미보정 시각';
   $('pvt-delay-details').hidden = !delayComparison;
   renderClockAnalysis(null);
   referenceEpochs = Array.isArray(report.referencePvt) ? report.referencePvt : [];
@@ -96,6 +108,11 @@ async function saveSenderAddress(save) {
     await poll(true);
   }
 }
+$('reference-toggle').onclick = () => {
+  const opened = $('reference-details').hidden;
+  $('reference-details').hidden = !opened;
+  $('reference-toggle').setAttribute('aria-expanded', String(opened));
+};
 $('sender-address-save').onclick = () => saveSenderAddress(true);
 $('sender-address-test').onclick = () => saveSenderAddress(false);
 
@@ -201,6 +218,7 @@ function renderSummary(job) {
   $('dtn-cancel').textContent = job?.state === 'CALCULATING' ? '계산 중지' : job?.state === 'WAITING_DTN' ? '대기 종료' : '시험 중지';
   renderTrialSettings($('trial-settings'), job);
   $('dtn-observations').hidden = job?.testType === 'IQ_SAMPLE' && !job?.receivedEpochs;
+  $('received-observation-card').hidden = $('dtn-observations').hidden && $('reference-panel').hidden;
   const types = {GNSS_RAW: 'GNSS RAW', AFS_METADATA: 'AFS Frame', IQ_SAMPLE: 'I/Q Sample'};
   $('receiver-type').textContent = types[job?.testType] || '시험 선택 대기';
   $('receiver-mode').textContent = job?.senderMode && job?.receiverMode ? job.senderMode + ' → ' + job.receiverMode : '경로 정보 없음';
@@ -359,7 +377,7 @@ $('dtn-cancel').onclick = async () => {
   const id = selectedId;
   cancelling = true; $('dtn-cancel').disabled = true;
   try {
-    await requestJson('/lnis/api/v1/dtn/tests/' + encodeURIComponent(id) + '/cancel', {method:'POST'});
+    await requestJson('/dtn/tests/' + encodeURIComponent(id) + '/cancel', {method:'POST'});
     log('선택 시험 종료 · ' + id); await poll(true);
   } catch (error) { log(error.message, 'ERROR'); }
   finally { cancelling = false; renderSummary(tests.find(item => item.testId === selectedId)); }

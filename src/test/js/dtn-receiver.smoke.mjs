@@ -44,6 +44,9 @@ const context = {
       return {ok: true, json: async () => ({baseUrl: peerAddress, editable: true, busy: false, peerOnline: true})};
     }
     if (url.endsWith('/node/gnss/ports')) return {ok: true, json: async () => []};
+    if (url.endsWith('/node/clock')) return {ok: true, json: async () => ({busy:false, clock:{
+      trialAt:'2026-09-29T12:00:00Z', rawAt:'2026-09-29T12:00:00Z', source:'SYSTEM',
+      offsetSeconds:0, ageSeconds:0, clockChanges:0}})};
     if (url.endsWith('/node/gnss')) return {ok: true, json: async () => ({state: 'DISCONNECTED', timeState: 'UNAVAILABLE'})};
     if (options?.method === 'POST' && url.endsWith('/cancel')) {
       const id = url.split('/').at(-2);
@@ -259,3 +262,24 @@ await elements.get('dtn-cancel').onclick();
 assert.equal(nextTests.find(job=>job.testId==='selected').state, 'CANCELLED');
 assert.equal(nextTests.find(job=>job.testId==='another').state, 'WAITING_DTN');
 console.log('PASS: manual selection preserved and receiver cancellation targets one trial');
+assert.match(elements.get('service-clock-value').textContent, /^2026-09-29 21:00:0\d\.\d{3}$/);
+assert.match(elements.get('service-clock-state').textContent, /미보정/);
+assert.ok(requests.every(request => !String(request.url || request).includes('/lnis/api/v1/lnis/api/v1')),
+  'API prefix must never be duplicated');
+elements.get('reference-details').hidden = true;
+elements.get('reference-toggle').onclick();
+assert.equal(elements.get('reference-details').hidden, false);
+elements.get('reference-toggle').onclick();
+assert.equal(elements.get('reference-details').hidden, true);
+console.log('PASS: trial clock is visible and reference heading toggles the original data');
+
+assert.match(html, /id="received-observation-card">\s*<div id="dtn-observations"><\/div>\s*<div id="reference-panel"/);
+context.renderSummary({testType: 'IQ_SAMPLE', receivedEpochs: 0});
+context.renderReference({});
+assert.equal(elements.get('received-observation-card').hidden, true);
+context.renderReference({referenceStatus: 'WAITING'});
+assert.equal(elements.get('received-observation-card').hidden, false);
+context.renderSummary({testType: 'GNSS_RAW'});
+context.renderReference({});
+assert.equal(elements.get('received-observation-card').hidden, false);
+console.log('PASS: reference data shares the observation card without an empty I/Q card');

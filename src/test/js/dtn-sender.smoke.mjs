@@ -65,6 +65,9 @@ const context = {
     }
     let body = {};
     if (url.endsWith('/node/gnss/ports')) return {ok: true, json: async () => []};
+    if (url.endsWith('/node/clock')) return {ok: true, json: async () => ({busy:false, clock:{
+      trialAt:'2026-09-29T12:00:00Z', rawAt:'2026-09-29T12:00:00Z', source:'SYSTEM',
+      offsetSeconds:0, ageSeconds:0, clockChanges:0}})};
     if (url.endsWith('/node/gnss')) return {ok: true, json: async () => gnssStatus};
     if (url.endsWith('/config')) body = {maximumInputBytes: 1048576, exampleEnabled: true, delaySupported:true,
       defaultSendUrl: 'http://sender.default:8080', defaultReceiveUrl: 'http://receiver.default:8080'};
@@ -488,3 +491,8 @@ assert.match(html, /accept="\.ubx,\.graw,application\/octet-stream"/);
 await assert.rejects(context.upload({name: 'large.ubx', size: 64 * 1024 * 1024 + 1}), /64 MiB/);
 context.fetch = previousFetch;
 console.log('PASS: direct UBX upload reuses observation/PVT preview and retains GRAW compatibility');
+
+assert.match(html, /class="sender-summary-row">[\s\S]*?id="dtn-condition-summary"[\s\S]*?class="service-clock-row"/);
+assert.equal((html.match(/id="service-clock-value"/g) || []).length, 1);
+assert.ok(html.indexOf('id="service-clock-sync"') > html.indexOf('id="dtn-main-view"'));
+console.log('PASS: sender clock shares the trial summary row with unique existing controls');

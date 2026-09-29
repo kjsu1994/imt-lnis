@@ -38,6 +38,8 @@ public class DtnController {
     private DtnLogService logs;
 
     @org.springframework.beans.factory.annotation.Autowired private DtnReceiptService receipts;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private server.common.ServiceClock clock = new server.common.ServiceClock();
 
     @GetMapping("/receipts")
     public ResponseEntity<?> receipts() {
@@ -203,7 +205,18 @@ public class DtnController {
     @ResponseStatus(HttpStatus.ACCEPTED)
     public ResponseEntity<Map<String, Object>> create(@Valid @RequestBody CreateRequest request)
             throws Exception {
-        java.time.Instant startedAt = java.time.Instant.now();
+        synchronized (clock) {
+            clock.requireAvailable();
+            var stamp = clock.stamp();
+            synchronized (dtnService) {
+                return createAt(request, stamp);
+            }
+        }
+    }
+
+    private ResponseEntity<Map<String, Object>> createAt(CreateRequest request, server.common.ServiceClock.Stamp stamp)
+            throws Exception {
+        java.time.Instant startedAt = stamp.trialAt();
         UUID inputId = request.getInputId();
         if ("IQ_SAMPLE".equals(request.getTestType())) {
             inputId = request.getIqFileId();
@@ -279,6 +292,7 @@ public class DtnController {
                             request.getSendUrl());
         }
 
+        dtnService.recordClock(dtnJob, stamp, true);
         Map<String, Object> response = summary(dtnJob);
         return new ResponseEntity<>(response, HttpStatus.ACCEPTED);
     }
@@ -302,6 +316,9 @@ public class DtnController {
     public ResponseEntity<Map<String, Object>> report(@PathVariable UUID id) throws Exception {
         DtnJob job = dtnService.get(id);
         Map<String, Object> report = new LinkedHashMap<>(summary(job));
+        report.put("senderClock", job.getSenderClockJson() == null ? null : objectMapper.readTree(job.getSenderClockJson()));
+        report.put("receiverClock", job.getReceiverClockJson() == null ? null : objectMapper.readTree(job.getReceiverClockJson()));
+        report.put("clockWarning", job.getClockWarning());
         var evidence =
                 job.getDelayEvidenceJson() == null
                         ? null
@@ -419,12 +436,13 @@ public class DtnController {
         String authorization = request.getHeader("Authorization");
         dtnService.authenticate(authorization);
         byte[] bytes = request.getInputStream().readNBytes(DtnModels.MAX_JSON_BYTES + 1);
-        java.time.Instant receivedAt = java.time.Instant.now();
+        var receivedClock = clock.stamp();
+        java.time.Instant receivedAt = receivedClock.trialAt();
         boolean truncated = bytes.length > DtnModels.MAX_JSON_BYTES;
         if (truncated) {
             bytes = Arrays.copyOf(bytes, DtnModels.MAX_JSON_BYTES);
         }
-        var receipt = receipts.capture(bytes, request.getContentType(), truncated, receivedAt);
+        var receipt = receipts.capture(bytes, request.getContentType(), truncated, receivedClock.rawAt());
         if (truncated) {
             String message = "본문 16 MiB 초과 · 앞 16 MiB만 저장됨";
             receipts.finish(receipt, "REJECTED", message);
@@ -432,7 +450,11 @@ public class DtnController {
                     .body(Map.of("receiptId", receipt.getId(), "message", message));
         }
         try {
-            DtnJob job = dtnService.receive(authorization, bytes, receivedAt);
+            DtnJob job;
+            synchronized (dtnService) {
+                job = dtnService.receive(authorization, bytes, receivedAt);
+                dtnService.recordClock(job, receivedClock, false);
+            }
             boolean stopped = "CANCELLED".equals(job.getState());
             receipts.finish(receipt, stopped ? "AFTER_CANCEL" : "ACCEPTED",
                     stopped ? "대기 종료 이후 수신 · 원문만 보관" : "검증 통과 · 시험 처리 접수");

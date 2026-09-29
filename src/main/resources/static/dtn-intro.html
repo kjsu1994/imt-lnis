@@ -901,13 +901,18 @@
       const iq = state.data === 'iq';
       const senderOrigin = point(iq ? node('encode') : sendFrom, 'bottom');
       const receiverTarget = point(iq ? node('decode') : node('restore'), 'top');
+      const receiverEntry = point(iq ? node('decode') : node('restore'), 'right');
       const txLane = point('.tx-service', 'bottom')[1] - (iq ? 34 : 12);
-      const rxLane = receiverTarget[1] - 10;
+      const rxLane = receiverTarget[1] - 18;
       const senderRight = point(node('encode'), 'right');
       const enterSender = iq
         ? `M${senderRight.join(' ')}H830V${txLeft[1]}H${txLeft[0]}`
         : `M${senderOrigin.join(' ')}V${txLane}H830V${txLeft[1]}H${txLeft[0]}`;
-      const leaveReceiver = `M${rxLeft.join(' ')}H830V${rxLane}H${receiverTarget[0]}V${receiverTarget[1]}`;
+      // Approach the right edge horizontally so the arrow has a visible shaft,
+      // like the other right-to-left receiver processing connections.
+      const leaveReceiver = iq
+        ? `M${rxLeft.join(' ')}H830V${receiverEntry[1]}H${receiverEntry[0]}`
+        : `M${rxLeft.join(' ')}H830V${rxLane}H${receiverEntry[0] + 28}V${receiverEntry[1]}H${receiverEntry[0]}`;
       const txRouter = point('#tx-switch', 'bottom');
       const rxRouter = point('#rx-switch', 'top');
       const managementX = point('.management-link', 'top')[0];

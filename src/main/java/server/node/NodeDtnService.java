@@ -86,6 +86,9 @@ public class NodeDtnService implements DtnNodeLink {
             registration.setTestId(job.getId());
             registration.setComparisonMode(job.getComparisonMode());
             registration.setTestStartedAt(job.getTestStartedAt());
+            if (job.getSenderClockJson() != null) {
+                registration.setSenderClock(mapper.readValue(job.getSenderClockJson(), server.common.ServiceClock.Stamp.class));
+            }
             if (job.getSelectedEpochJson() != null) {
                 registration.setSelectedEpoch(
                         mapper.readValue(job.getSelectedEpochJson(), DtnDelay.Epoch.class));
@@ -232,6 +235,9 @@ public class NodeDtnService implements DtnNodeLink {
         job.setExpectedPayloadSha256(registration.getPayloadSha256());
         job.setComparisonMode(registration.getComparisonMode());
         job.setTestStartedAt(registration.getTestStartedAt());
+        if (registration.getSenderClock() != null) {
+            job.setSenderClockJson(mapper.valueToTree(registration.getSenderClock()).toString());
+        }
         if (registration.getSelectedEpoch() != null) {
             job.setSelectedEpochJson(
                     mapper.valueToTree(registration.getSelectedEpoch()).toString());

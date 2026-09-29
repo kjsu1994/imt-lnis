@@ -49,6 +49,20 @@ JSON 응답에서는 값이 `null`인 속성이 생략될 수 있습니다.
 GNSS `state`: `DISCONNECTED/CONNECTING/CONNECTED/RECONNECTING/ERROR`.
 `timeState`: `UNAVAILABLE/ACQUIRING/VALID/STALE`; `utc`, `updatedAt`, `accuracyNanos`는 GNSS 메시지와 그 수신 시각입니다. `VALID`는 **PC 동기화 완료를 뜻하지 않습니다**. 한쪽/양쪽 GNSS 부재 시에도 기존 시스템 시간으로 파일·REST 시험을 계속합니다. 포트 연결만으로 시험 실행기를 BUSY로 만들지 않으며 수집 종료 후 연결은 유지합니다.
 
+### 내부 시험 시각 보정 — 어댑터 계약 변경 없음
+
+| 메서드 | 경로 (`/lnis/api/v1` 뒤) | 용도 |
+|---|---|---|
+| GET | `/node/clock` | 서버 PC·시험 시각, 시간원, 보정 시점·나이·조회 RTT, 시험 진행 여부 |
+| POST | `/node/clock/prepare` | GNSS → 상대 GNSS → 공통 NTP로 보정안 생성. `ticket/source/offsetSeconds/roundTripSeconds/expiresInSeconds` |
+| POST | `/node/clock/apply` | `{ "ticket":"미리보기 응답값" }`; 30초 안에 사용자 확인 후 수동 적용 |
+| GET | `/node/peer/clock` | 관리 Bearer 인증. 시각 교환용 접수·응답 시각과 내부 시계 상태 |
+| POST | `/node/peer/clock/reservation` | 관리 Bearer 인증. `{ "token":"UUID", "release":false }`; 양쪽 새 시험을 잠시 차단, `true`로 해제 |
+
+보정은 서비스 프로세스 내부에서만 수행하며 OS·어댑터 시각을 변경하지 않습니다. 양쪽 서비스가 대기 상태여야 적용하며 예약은 단조 시계 기준 20초 후 만료됩니다. `source=SYSTEM/GNSS_USB/PEER_GNSS/NTP`. 보정 후 단조 시계로 진행하며 재시작하면 SYSTEM으로 초기화합니다. `GNSS_USB`도 USB 메시지 지연을 포함한 근사값입니다. 상대 GNSS는 로컬 GNSS로 보정된 지 5분 이내이며 입력이 VALID인 노드만 기준으로 사용합니다. NTP는 서버 설정 `LNIS_NTP_SERVER`(기본 `time.windows.com`, 빈 값은 사용 안 함)를 사용합니다. 외부 NTP는 인증된 시간원으로 보장되지 않습니다.
+
+시험 보고서 `senderClock`, `receiverClock`: `rawAt`(PC UTC), `trialAt`(계산 적용 UTC), `source`, `calibratedAt`, `offsetSeconds`, `ageSeconds`, `roundTripSeconds`, `session`, `revision`, `clockChanges`. 과거 기록은 null입니다. 송신 근거는 노드 사전 등록의 선택 필드 `senderClock`으로 전달하며 외부 어댑터 본문은 그대로입니다. `clockWarning`은 시간 변경·재시작/미보정 관련 주의사항입니다. 기존 `testStartedAt/receivedAt`은 보정된 시험 시각, 원문 접수 기록의 `arrivedAt`·운영 로그는 PC 시각입니다.
+
 ### HTTP 상태 코드
 
 | 상태 | 의미 |

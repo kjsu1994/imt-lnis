@@ -52,12 +52,14 @@ public class NodeRoleFilter extends OncePerRequestFilter {
                 && !path.startsWith("/lnis/api/v1/node/peer/")
                 && !("POST".equals(request.getMethod()) && java.util.List.of(
                         "/lnis/api/v1/node/gnss/connect", "/lnis/api/v1/node/gnss/disconnect",
+                        "/lnis/api/v1/node/clock/prepare", "/lnis/api/v1/node/clock/apply",
                         "/lnis/api/v1/node/connection/test").contains(path))
                 && !("PUT".equals(request.getMethod()) && path.equals("/lnis/api/v1/node/connection"))
                 && !path.startsWith("/lnis/api/v1/data-management/")
                 && !path.equals("/lnis/api/v1/dtn/receive")
                 && !("POST".equals(request.getMethod())
                         && (path.equals("/lnis/api/v1/dtn/logs/screen")
+                            || path.matches("/lnis/api/v1/dtn/tests/[0-9a-fA-F-]+/cancel")
                             || path.matches("/lnis/api/v1/dtn/tests/[0-9a-fA-F-]+/reference/retry")) )
                 && !("DELETE".equals(request.getMethod())
                         && path.matches("/lnis/api/v1/dtn/iq/[0-9a-fA-F-]+"))) {

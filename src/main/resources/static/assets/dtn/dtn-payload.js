@@ -107,20 +107,8 @@ export function createPayloadViewer(container, {receivedOnly = false, sentOnly =
   if (!sentOnly && !receivedOnly) container.append(title);
   container.append(controls, status, panel);
   let job = null, original = '', generation = 0, pending = null;
-  let automaticKey = null, receipt = null, receipts = [], retryAt = 0;
+  let automaticKey = null, receipt = null, retryAt = 0;
   status.hidden = singleDirection;
-  const history = create('select');
-  history.setAttribute('aria-label','수신 원문 기록'); history.hidden=true;
-  const historyMenu = create('details');
-  historyMenu.className = 'dtn-payload-history';
-  historyMenu.append(create('summary', '수신 기록'), history);
-  historyMenu.hidden = true;
-  if(receivedOnly) controls.append(historyMenu);
-  history.onchange=()=>{
-    receipt=receipts.find(e=>e.id===history.value)||null;
-    received.disabled=!receipt && !job?.receivedPayloadAvailable;
-    return show('received');
-  };
 
   function reset() {
     generation++;
@@ -209,24 +197,20 @@ export function createPayloadViewer(container, {receivedOnly = false, sentOnly =
   return {
     setReceipts(values) {
       if(!receivedOnly) return;
-      receipts=Array.isArray(values)?values:[];
-      const available=receipts.filter(e=>!job || e.testId===job.testId || !e.testId);
-      const options=available.map(e=>{
-        const option=create('option',new Date(e.arrivedAt).toLocaleString('ko-KR')+' · '+e.status+' · '+(e.testId||'시험 식별 불가'));
-        option.value=e.id; return option;
-      });
-      const defaultOption=create('option','시험 원문'); defaultOption.value='';
-      history.replaceChildren(defaultOption,...options); history.hidden=!available.length; historyMenu.hidden=history.hidden;
+      const available=Array.isArray(values) && job?.testId
+        ? values.filter(e=>e.testId===job.testId) : [];
       const previous=receipt;
-      receipt=available.find(e=>e.id===receipt?.id)||null;
-      if(!receipt && !job?.receivedPayloadAvailable) receipt=available.find(e=>e.testId===job?.testId)||(!job?available[0]:null);
-      history.value=receipt?.id||'';
+      receipt=job?.receivedPayloadAvailable ? null : available[0] || null;
       received.disabled=!receipt && !job?.receivedPayloadAvailable;
       if(receipt && (!previous || previous.id!==receipt.id || previous.status!==receipt.status)) return show('received');
     },
     setJob(nextJob) {
+      if (receipt && nextJob?.receivedPayloadAvailable) {
+        receipt = null;
+        automaticKey = null;
+      }
       if (job?.testId !== nextJob?.testId) {
-        automaticKey = null; retryAt = 0; receipt=null; history.hidden=true; historyMenu.hidden=true;
+        automaticKey = null; retryAt = 0; receipt=null;
         reset();
         status.textContent = nextJob
           ? (receivedOnly ? '수신 원문 준비 중입니다.' : sentOnly ? '송신 원문 준비 중입니다.' : '준비된 송신 또는 수신 JSON을 선택하세요.')

@@ -35,6 +35,27 @@ public final class GnssConnection implements AutoCloseable {
     private long validTick;
     private boolean utcValid;
     private final boolean collectNavigation;
+    private final TimeReference timeReference = new TimeReference();
+
+    /** Windows 중계가 있으면 USB 수신 지점에서 추정하고, 아니면 로컬 직렬 입력을 사용한다. */
+    public Map<String, Object> timeReference() {
+        WindowsSerialClient bridge = WindowsSerialClient.configured();
+        if (bridge != null) {
+            var result = bridge.request("/time", Map.of());
+            return new com.fasterxml.jackson.databind.ObjectMapper().convertValue(result,
+                    new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+        }
+        Instant received = Instant.now();
+        var reading = timeReference.reading();
+        var result = new LinkedHashMap<String, Object>();
+        result.put("receivedAt", received.toString());
+        result.put("sentAt", Instant.now().toString());
+        result.put("ready", "CONNECTED".equals(state) && reading.ready());
+        result.put("utc", reading.utc() == null ? null : reading.utc().toString());
+        result.put("samples", reading.samples());
+        result.put("spreadSeconds", reading.spreadSeconds());
+        return result;
+    }
 
     public GnssConnection() {
         this(false);
@@ -233,6 +254,7 @@ public final class GnssConnection implements AutoCloseable {
     }
 
     synchronized void observe(UbloxParser.UbxFrame frame, Instant receivedAt, long tick) {
+        timeReference.observe(frame, tick);
         if (frame.messageClass() == 1 && frame.messageId() == 0x21 && frame.payload().length == 20) {
             ByteBuffer data = ByteBuffer.wrap(frame.payload()).order(ByteOrder.LITTLE_ENDIAN);
             updatedAt = receivedAt;
@@ -272,6 +294,7 @@ public final class GnssConnection implements AutoCloseable {
     }
 
     private void resetInput() {
+        timeReference.reset();
         navigation.clear();
         utc = null;
         updatedAt = null;
