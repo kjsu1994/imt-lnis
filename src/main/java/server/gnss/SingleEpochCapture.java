@@ -11,20 +11,25 @@ public final class SingleEpochCapture {
     private final List<byte[]> navigation = new ArrayList<>();
     private final Predicate<List<byte[]>> solvable;
     private int bytes;
+    private boolean complete;
 
     public SingleEpochCapture(Predicate<List<byte[]>> solvable) {
         this.solvable = solvable;
     }
 
     public List<byte[]> accept(byte[] record) {
+        if (complete) return null;
         var message = GrawCodec.decode(record).message();
         if (bytes + record.length + 4 > DtnModels.MAX_INPUT_BYTES) {
             throw new IllegalStateException("수집 입력이 1 MiB를 초과했습니다. 장치 출력을 확인하세요.");
         }
-        if (message instanceof GrawCodec.ObservationEpoch) {
+        if (message instanceof GrawCodec.ObservationEpoch epoch) {
+            if (epoch.observations().isEmpty()) return null;
             var candidate = new ArrayList<>(navigation);
             candidate.add(record);
-            return solvable.test(candidate) ? List.copyOf(candidate) : null;
+            if (!solvable.test(candidate)) return null;
+            complete = true;
+            return List.copyOf(candidate);
         }
         navigation.add(record);
         bytes += record.length + 4;

@@ -80,8 +80,8 @@ public final class AgentRuntime implements AutoCloseable {
                                 config.agentId(),
                                 config.role(),
                                 new PortList(
-                                        capture.portNames().stream()
-                                                .map(name -> new PortDescriptor(name, name))
+                                        capture.ports().stream()
+                                                .map(p -> new PortDescriptor(p.name(), p.description()))
                                                 .toList()));
                 case START_CAPTURE -> startCapture(sessionId, arguments);
                 case STOP_CAPTURE -> stopCapture(sessionId);
@@ -118,13 +118,6 @@ public final class AgentRuntime implements AutoCloseable {
                 settings.singleEpoch()
                         ? new server.gnss.SingleEpochCapture(
                                 records -> {
-                                    status(
-                                            sessionId,
-                                            EventType.GNSS_STATUS,
-                                            0,
-                                            "PvtCalculating",
-                                            "관측값·항법정보 후보 확보 · 지구 PVT 계산 중",
-                                            Map.of());
                                     try (var pvt =
                                             new server.pvt.NativePvtCodec(
                                                     config.nativeDirectory())) {
@@ -132,13 +125,6 @@ public final class AgentRuntime implements AutoCloseable {
                                         var result = results.getFirst();
                                         if (!result.isPositionValid()
                                                 || !result.isVelocityValid()) {
-                                            status(
-                                                    sessionId,
-                                                    EventType.GNSS_STATUS,
-                                                    0,
-                                                    "PvtWaiting",
-                                                    "유효한 위치·속도 해 미확보 · 추가 관측값·항법정보 대기",
-                                                    Map.of());
                                             return false;
                                         }
                                         capturedPvt.set(results);
@@ -175,7 +161,10 @@ public final class AgentRuntime implements AutoCloseable {
                                 "SingleEpochComplete",
                                 "한 시점 수집·지구 PVT 검증 완료",
                                 Map.of("pvt", capturedPvt.get()));
-                    });
+                    },
+                    progress -> status(sessionId, EventType.GNSS_STATUS, 0,
+                            progress.stage(), progress.message(), progress.counters()),
+                    bytes -> {});
         } catch (Exception error) {
             state.set(AgentState.READY);
             throw error;

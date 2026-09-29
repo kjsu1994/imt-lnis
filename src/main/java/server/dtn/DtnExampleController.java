@@ -42,50 +42,33 @@ public class DtnExampleController {
         return read(syntheticFile, "synthetic-earth-pvt.graw");
     }
 
-    /** Canonical record replay, not a serial-port or UBX parser simulation. */
-    @PostMapping("/lnis/api/v1/dtn/example/replay")
-    public synchronized server.gnss.InputBufferEntity replay() throws IOException {
-        if (calculator == null) {
-            throw new IllegalStateException("통합 송신 노드에서 재생하세요.");
-        }
-        var selector =
-                new server.gnss.SingleEpochCapture(
-                        records -> {
-                            var pvt = calculator.calculate(records).getFirst();
-                            return pvt.isPositionValid() && pvt.isVelocityValid();
-                        });
-        var records = GrawCodec.splitLengthPrefixed(synthetic().getBody());
-        // Exercise the same navigation wait as capture: this epoch alone cannot solve.
-        for (var record : records) {
-            if (GrawCodec.decode(record).message() instanceof GrawCodec.ObservationEpoch) {
-                if (selector.accept(record) != null) {
-                    throw new IllegalStateException("항법정보 없이 재생이 완료되었습니다.");
-                }
-                break;
-            }
-        }
-        for (var record : records) {
-            var selected = selector.accept(record);
-            if (selected == null) {
-                continue;
-            }
-            var bytes = new java.io.ByteArrayOutputStream();
-            for (var item : selected) {
-                bytes.writeBytes(java.nio.ByteBuffer.allocate(4).putInt(item.length).array());
-                bytes.writeBytes(item);
-            }
-            var input =
-                    inputs.create(
-                            "SYNTHETIC-replay.graw",
-                            bytes.size(),
-                            server.common.LnisModels.InputKind.GNSS_CAPTURE);
-            inputs.append(input.inputId(), 0, bytes.toByteArray());
-            return inputs.complete(
-                    input.inputId(), json.writeValueAsString(calculator.calculate(selected)));
-        }
-        throw new IllegalStateException("합성 입력에서 유효한 PVT를 확보하지 못했습니다.");
+    @Value("${lnis.dtn.real-file:}")
+    private String realFile;
+
+    @GetMapping("/lnis/api/v1/dtn/example/real/file")
+    public ResponseEntity<byte[]> real() throws IOException {
+        return read(realFile, "real-gnss-10epochs.graw");
     }
 
+    /** Saved real receiver data; this endpoint never opens a serial port or uses synthetic fixtures. */
+    @PostMapping("/lnis/api/v1/dtn/example/replay")
+    public synchronized server.gnss.InputBufferEntity replay() throws IOException {
+        byte[] bytes = real().getBody();
+        var records = GrawCodec.splitLengthPrefixed(bytes);
+        if (records.stream().noneMatch(record -> GrawCodec.decode(record).message() instanceof GrawCodec.ObservationEpoch)) {
+            throw new IllegalArgumentException("실측 파일에 관측 에폭이 없습니다.");
+        }
+        var input = inputs.create("real-gnss-10epochs.graw", bytes.length,
+                server.common.LnisModels.InputKind.GRAW_UPLOAD);
+        try {
+            inputs.append(input.inputId(), 0, bytes);
+            return inputs.complete(input.inputId());
+        } catch (RuntimeException error) {
+            try { inputs.remove(input.inputId()); }
+            catch (RuntimeException cleanup) { error.addSuppressed(cleanup); }
+            throw error;
+        }
+    }
     private ResponseEntity<byte[]> read(String file, String filename) throws IOException {
         if (file.isBlank()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "예제 파일 미설정");

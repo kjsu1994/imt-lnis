@@ -46,6 +46,37 @@ docker compose ps
 - [운영 USB/WSL2 연결](deployment/node/WSL2-GNSS.md)
 - [어댑터 개발자 공유 계약 — API-SPEC 맨 아래 15장 전체](API-SPEC.md#adapter-contract)
 
+## 실제 GNSS 데이터와 1에폭 선택 (2026-09-29)
+
+검증: `gradlew check` 통과(197개 성공, 외부 자료가 필요한 4개 조건부 시험 제외), 브라우저에서 실제 USB 포트 조회·실측 10에폭 재생·각 에폭 선택을 확인했습니다. 웹의 실장치 RAWX/SFRBX 수신과 120초 제한·설정 복원도 확인했습니다. 현재 수신 구간은 항법정보 부족으로 PVT가 무효이며, 실측 PVT 성공으로 보고하지 않습니다.
+
+- [real-gnss-10epochs.graw](real-gnss-10epochs.graw): 연결된 ZED-F9T-20B에서 실제 수신한 **10에폭**, 25,924 bytes. GPS Week 2438 / TOW 197060.004 ~ 197069.004 s와 선행·중간 SFRBX 189건을 보존합니다. 합성 관측값을 넣지 않았습니다.
+- [real-gnss-source.ubx](real-gnss-source.ubx): 생성에 사용한 원본 수신 스트림입니다. GRAW의 호스트 기록 시각은 이 UBX 파일의 저장 시각이며, 각 에폭의 실제 GNSS 시각은 Week/TOW입니다.
+- 설정 → `capture.graw` → 파일 적용 후 **GNSS 기준시간**에서 사용할 1에폭을 선택합니다. 표·PVT·전송 요청 모두 선택한 에폭을 사용합니다. 유효하지 않은 에폭을 다른 에폭으로 몰래 바꾸지 않습니다.
+- 숨겨진 개발용 버튼은 **실측 GNSS 10에폭 불러오기**입니다. `LNIS_DTN_EXAMPLE_ENABLED=true`, `LNIS_DTN_REAL_FILE=/app/examples/real-gnss-10epochs.graw`와 파일 마운트가 필요합니다. 합성 예제로 대체하지 않고 저장된 실측 파일을 재생합니다.
+- 안테나 위치를 실내·창가에서 조정한 뒤에도 120초 추가 수집에서 유효 위치·속도 PVT는 0에폭이었습니다. 수신기는 안테나 상태 OK·전원 ON을 보고했으며, 검증 조건을 충족하지 못해 기존 실측 파일은 교체하지 않았습니다. 최종적으로 USB 공유를 해제하고 COM5를 Windows 유센터에 반환했습니다.
+- 이 실측 파일에서는 GPS 항법정보가 충분하지 않아 유효한 위치·속도를 계산하지 못했습니다. RAWX 해석·관측값 선택·원문 보존 시험에는 사용할 수 있지만, 유효한 Reference PVT가 필요한 지연 시험의 성공 자료는 아닙니다. 실외 안테나 환경에서 항법정보를 더 수신해 새 파일을 확보해야 합니다.
+- **COM 입력 → 포트 조회**는 송신 서비스가 실행되는 OS의 실제 직렬 장치와 설명·VID/PID를 표시합니다. `1에폭 수집`은 유효 위치·속도를 계산할 관측 1에폭과 필요한 항법정보를 확보하면 자동 종료하며, 최대 120초입니다. RAWX 0개·항법정보 부족·수신 정체를 상태로 표시합니다.
+- USB와 RS-232 모두 지원합니다. 현재 연결 포트의 RAWX/SFRBX만 임시 설정하고 재조회·복원하며, 다른 포트와 BBR/Flash 영구 설정은 바꾸지 않습니다. 보드레이트는 UART의 실제 설정과 맞춰야 합니다.
+
+### 웹서비스와 유센터 전환
+
+웹서비스가 WSL/Docker에서 실행되는 경우 Windows COM 포트가 자동으로 노출되지 않습니다. USB를 WSL에 전달하면 Windows의 COM5가 일시적으로 사라지고 Linux의 `/dev/ttyACM0`로 사용됩니다. 같은 USB를 유센터와 웹서비스에서 동시에 열 수 없습니다.
+
+이번 실행 환경은 `C:\lnis-compose`입니다. `start-gnss.ps1`은 전달된 `/dev/ttyACM0`를 매핑하여 시작하고, 일반 `start.ps1`은 유센터 사용 상태의 파일 기반 웹서비스를 시작합니다. 장치를 넘기는 명령은 BUSID를 먼저 확인합니다.
+
+```powershell
+usbipd list
+# 아래 BUSID는 이번 PC에서 확인한 값입니다. USB 위치를 바꿨다면 다시 확인하세요.
+usbipd bind --busid 2-1
+usbipd attach --wsl --busid 2-1
+C:\lnis-compose\start-gnss.ps1
+```
+
+유센터로 반환할 때는 웹 수집 종료를 먼저 확인하고 장치 매핑 없는 기본 Compose로 재기동한 뒤 `usbipd detach --busid 2-1`을 실행합니다. 공유도 해제하려면 관리자 PowerShell에서 `usbipd unbind --busid 2-1`을 실행합니다. Windows 장치 목록에 돌아온 COM5를 유센터에서 선택합니다. 기본 웹서비스에서는 파일 재생·10에폭 선택을 계속 사용할 수 있습니다.
+
+실측 검증 수치와 파일 해시는 [GNSS-VALIDATION.json](GNSS-VALIDATION.json)에 기록했습니다. 상세한 직렬 설정과 명령행 진단은 [REAL-GNSS.md](REAL-GNSS.md), 일반 운영 USB 전달은 [WSL2-GNSS.md](deployment/node/WSL2-GNSS.md)를 참고하세요.
+
 ## 시험
 
 2026-09-27 재배포 검증: GNSS RAW·AFS v4 원본 복원 PVT는 `PASS`, 두 방식의 지연 반영은 `MEASURED`를 확인했습니다. 새 90초 I/Q(2,160,000,000 bytes)는 송수신 해시 일치 및 69 Epoch의 유효 위치·속도를 확인했습니다. I/Q 오차에는 합격 허용오차를 적용하지 않습니다. 개발용 REST 중계에서 검증한 결과이며 실물 COM·실제 DTN/HDTN 엔진 검증과 구분합니다.
@@ -82,7 +113,7 @@ PVT는 지구 ECEF GPS L1 SPP입니다. 송수신 일치는 계산 재현성 검
 
 ### 1 Epoch 지연 반영 PVT와 Clock Bias 확인
 
-GNSS RAW와 AFS는 항상 지연 PVT 시험을 수행합니다. 체크박스는 없으며 첫 유효 Epoch와 선행 항법정보를 선택합니다. I/Q는 기존 RF 추적·복호 경로입니다.
+GNSS RAW와 AFS는 항상 지연 PVT 시험을 수행합니다. 체크박스는 없으며 GNSS 기준시간에서 선택한 1 Epoch와 선행 항법정보를 사용합니다. 파일을 처음 적용할 때는 첫 유효 Epoch를 기본 선택하고, 이후 사용자의 선택을 유지합니다. I/Q는 기존 RF 추적·복호 경로입니다.
 
 ```text
 S = 송신 서버 시험 시작 요청 접수 시각

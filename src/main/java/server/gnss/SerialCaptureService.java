@@ -13,7 +13,7 @@ import java.util.function.Consumer;
 /**
  * Windows COM 포트에서 GNSS 데이터를 읽어 canonical GRAW 청크로 변환한다.
  *
- * <p>전용 virtual thread에서 serial byte를 읽고 선택한 protocol parser에 전달한다. raw serial과 canonical GRAW를 함께
+ * <p>전용 platform thread에서 serial byte를 읽고 선택한 protocol parser에 전달한다. raw serial과 canonical GRAW를 함께
  * 계수하지만 서버에는 시험에 사용할 canonical 레코드만 별도 필드로 전달한다. stop 또는 close 시 포트를 닫고 가능한 경우 u-blox 임시 설정을 원래 값으로
  * 복원한다.
  */
@@ -82,7 +82,23 @@ public final class SerialCaptureService implements AutoCloseable {
     private final AtomicBoolean running = new AtomicBoolean();
     private volatile SerialPort port;
     private volatile Thread worker;
-    private final List<byte[]> restoreCommands = new ArrayList<>();
+    private UbloxCaptureConfiguration configuration;
+    private String detectedModel = "", detectedFirmware = "";
+    private Consumer<byte[]> rawObserver = bytes -> {};
+
+    public record CaptureProgress(String stage, String message, Map<String, Object> counters) {}
+    public record DetectedPort(String name, String description) {}
+
+    /** Enumerate on the OS running this node; enumeration does not open or claim a port. */
+    public List<DetectedPort> ports() {
+        return Arrays.stream(SerialPort.getCommPorts())
+                .map(p -> new DetectedPort(p.getSystemPortName(),
+                        p.getDescriptivePortName() + " · " + p.getPortDescription()
+                        + (p.getVendorID() < 0 ? "" : String.format(" · VID:%04X PID:%04X",
+                                p.getVendorID(), p.getProductID()))))
+                .sorted(Comparator.comparing(DetectedPort::name))
+                .toList();
+    }
 
     public List<String> portNames() {
         return Arrays.stream(SerialPort.getCommPorts())
@@ -102,6 +118,13 @@ public final class SerialCaptureService implements AutoCloseable {
             Consumer<Throwable> failure,
             SingleEpochCapture selection,
             Runnable completed) {
+        start(settings, chunks, failure, selection, completed, progress -> {}, bytes -> {});
+    }
+
+    public synchronized void start(
+            Settings settings, Consumer<CaptureChunk> chunks, Consumer<Throwable> failure,
+            SingleEpochCapture selection, Runnable completed,
+            Consumer<CaptureProgress> progress, Consumer<byte[]> rawObserver) {
         if (settings.singleEpoch
                 && (selection == null || !"ubx".equalsIgnoreCase(settings.protocolId))) {
             throw new IllegalArgumentException("한 시점 수집은 UBX만 지원합니다.");
@@ -109,6 +132,8 @@ public final class SerialCaptureService implements AutoCloseable {
         if (!running.compareAndSet(false, true)) {
             throw new IllegalStateException("Capture is already running");
         }
+        this.rawObserver = Objects.requireNonNull(rawObserver);
+        configuration = null;
         // 포트를 완전히 구성한 뒤 worker를 시작해 reader가 반쯤 적용된 직렬 설정을 보지 않게 한다.
         try {
             port = SerialPort.getCommPort(settings.portName);
@@ -116,6 +141,7 @@ public final class SerialCaptureService implements AutoCloseable {
             port.setNumDataBits(8);
             port.setNumStopBits(SerialPort.ONE_STOP_BIT);
             port.setParity(SerialPort.NO_PARITY);
+            port.setFlowControl(SerialPort.FLOW_CONTROL_DISABLED);
             port.setComPortTimeouts(SerialPort.TIMEOUT_READ_SEMI_BLOCKING, 1000, 1000);
             if (!port.openPort()) {
                 running.set(false);
@@ -132,13 +158,30 @@ public final class SerialCaptureService implements AutoCloseable {
                 port.clearRTS();
             }
             if ("ubx".equalsIgnoreCase(settings.protocolId)) {
-                configureUbloxTemporarily();
+                progress.accept(new CaptureProgress("Configuring", "현재 포트의 RAWX/SFRBX 출력 설정 확인 중", Map.of()));
+                detectedModel = "";
+                detectedFirmware = "";
+                for (var reply : exchange(UbloxParser.command(0x0a, 0x04, new byte[0]))) {
+                    if (reply.messageClass() != 0x0a || reply.messageId() != 0x04
+                            || reply.payload().length < 40) continue;
+                    byte[] payload = reply.payload();
+                    detectedFirmware = ascii(payload, 0, 30);
+                    for (int offset = 40; offset + 30 <= payload.length; offset += 30) {
+                        String extension = ascii(payload, offset, 30);
+                        if (extension.startsWith("MOD=")) detectedModel = extension.substring(4);
+                        if (extension.startsWith("FWVER=")) detectedFirmware = extension.substring(6);
+                    }
+                }
+                configuration = new UbloxCaptureConfiguration(this::exchange);
+                configuration.configure();
             }
             worker =
                     Thread.ofPlatform()
                             .name("lnis-gnss-capture")
-                            .start(() -> run(settings, chunks, failure, selection, completed));
+                            .start(() -> run(settings, chunks, failure, selection, completed, progress));
         } catch (RuntimeException error) {
+            try { restoreUbloxConfiguration(); }
+            catch (RuntimeException restoreError) { error.addSuppressed(restoreError); }
             if (port != null) {
                 port.closePort();
             }
@@ -152,7 +195,9 @@ public final class SerialCaptureService implements AutoCloseable {
             Consumer<CaptureChunk> chunks,
             Consumer<Throwable> failure,
             SingleEpochCapture selection,
-            Runnable completed) {
+            Runnable completed, Consumer<CaptureProgress> progress) {
+        CaptureDiagnostics diagnostics = new CaptureDiagnostics();
+        long lastProgress = 0;
         UbloxParser ubx = new UbloxParser();
         UUID testId = UUID.randomUUID();
         long sequence = 0, bytesRead = 0, records = 0, chunkIndex = 0;
@@ -172,8 +217,8 @@ public final class SerialCaptureService implements AutoCloseable {
                                         sequence++,
                                         Instant.now(),
                                         new GrawCodec.ReceiverMetadata(
-                                                settings.receiverModel,
-                                                settings.firmwareVersion,
+                                                detectedModel.isBlank() ? settings.receiverModel : detectedModel,
+                                                detectedFirmware.isBlank() ? settings.firmwareVersion : detectedFirmware,
                                                 settings.portName,
                                                 settings.baudRate,
                                                 settings.sessionName)));
@@ -188,15 +233,20 @@ public final class SerialCaptureService implements AutoCloseable {
             while (running.get()) {
                 if (selection != null && System.nanoTime() >= deadline) {
                     throw new IllegalStateException(
-                            "120초 안에 유효한 지구 PVT를 얻지 못했습니다. RAWX/SFRBX 출력과 안테나 수신 상태를 확인하세요.");
+                            "120초 안에 유효한 1에폭을 얻지 못했습니다: " + diagnostics.snapshot(System.nanoTime()).message());
                 }
                 int count = port.readBytes(buffer, buffer.length);
                 if (count < 0) {
                     throw new IllegalStateException("Serial read failed");
                 }
-                if (count == 0) {
-                    continue;
+                long now = System.nanoTime();
+                diagnostics.bytes(count, now);
+                if (now - lastProgress >= 1_000_000_000L) {
+                    progress.accept(diagnostics.snapshot(now));
+                    lastProgress = now;
                 }
+                if (count == 0) continue;
+                rawObserver.accept(Arrays.copyOf(buffer, count));
                 if (selection == null) {
                     rawChunk.write(buffer, 0, count);
                 }
@@ -204,8 +254,10 @@ public final class SerialCaptureService implements AutoCloseable {
                 // ubx는 검증·변환하고 canonical-v1은 이미 변환된 입력이므로 그대로 누적한다.
                 if ("ubx".equalsIgnoreCase(settings.protocolId)) {
                     for (var frame : ubx.push(buffer, count)) {
+                        diagnostics.frame(now);
                         var message = UbloxParser.toCanonical(frame);
                         if (message != null) {
+                            diagnostics.message(message, now);
                             byte[] record =
                                     GrawCodec.encode(
                                             new GrawCodec.Envelope(
@@ -296,6 +348,12 @@ public final class SerialCaptureService implements AutoCloseable {
         return bytes;
     }
 
+    private static String ascii(byte[] bytes, int offset, int length) {
+        int end = offset;
+        while (end < offset + length && bytes[end] != 0) end++;
+        return new String(bytes, offset, end - offset, java.nio.charset.StandardCharsets.US_ASCII).trim();
+    }
+
     public synchronized void stop() {
         running.set(false);
     }
@@ -312,61 +370,42 @@ public final class SerialCaptureService implements AutoCloseable {
         }
     }
 
-    /** RAWX/SFRBX 출력률을 임시 활성화하고 조회에 성공한 원래 설정은 종료 시 복원하도록 보관한다. */
-    private void configureUbloxTemporarily() {
-        restoreCommands.clear();
-        write(UbloxParser.command(0x0A, 0x04, new byte[0]));
-        for (int[] message : List.of(new int[] {0x02, 0x15}, new int[] {0x02, 0x13})) {
-            byte[] original = pollMessageRate(message[0], message[1]);
-            if (original != null) {
-                restoreCommands.add(UbloxParser.command(0x06, 0x01, original));
-                byte[] enabled = original.clone();
-                if (enabled.length >= 8) {
-                    enabled[3] = 1;
-                    enabled[5] = 1;
-                } else if (enabled.length >= 3) {
-                    enabled[2] = 1;
-                }
-                write(UbloxParser.command(0x06, 0x01, enabled));
-            } else {
-                write(
-                        UbloxParser.command(
-                                0x06, 0x01, new byte[] {(byte) message[0], (byte) message[1], 1}));
-            }
-        }
-    }
-
-    private byte[] pollMessageRate(int messageClass, int messageId) {
-        write(UbloxParser.command(0x06, 0x01, new byte[] {(byte) messageClass, (byte) messageId}));
+    /** Bounded request/reply exchange; keep a complete raw diagnostic stream. */
+    private List<UbloxParser.UbxFrame> exchange(byte[] request) {
+        write(request);
         UbloxParser parser = new UbloxParser();
+        List<UbloxParser.UbxFrame> replies = new ArrayList<>();
         long deadline = System.nanoTime() + 1_500_000_000L;
-        byte[] buffer = new byte[2048];
+        byte[] buffer = new byte[8192];
         while (System.nanoTime() < deadline) {
             int count = port.readBytes(buffer, buffer.length);
-            if (count <= 0) {
-                continue;
-            }
-            for (var frame : parser.push(buffer, count)) {
-                if (frame.messageClass() == 0x06
-                        && frame.messageId() == 0x01
-                        && frame.payload().length >= 3
-                        && (frame.payload()[0] & 0xff) == messageClass
-                        && (frame.payload()[1] & 0xff) == messageId) {
-                    return frame.payload();
-                }
-            }
+            if (count < 0) throw new IllegalStateException("수신기 설정 조회 중 직렬 연결 끊김");
+            if (count == 0) continue;
+            rawObserver.accept(Arrays.copyOf(buffer, count));
+            var received = parser.push(buffer, count);
+            replies.addAll(received);
+            if (received.stream().anyMatch(f -> matchesReply(request, f))) break;
         }
-        return null;
+        return replies;
+    }
+
+    /** Polls must wait for data; a delayed ACK from an earlier CFG-MSG is not its response. */
+    static boolean matchesReply(byte[] request, UbloxParser.UbxFrame reply) {
+        int payloadLength = Byte.toUnsignedInt(request[4]) | Byte.toUnsignedInt(request[5]) << 8;
+        boolean ratePoll = request[2] == 6 && request[3] == 1 && payloadLength == 2;
+        boolean poll = payloadLength == 0 || ratePoll;
+        if (reply.messageClass() == Byte.toUnsignedInt(request[2])
+                && reply.messageId() == Byte.toUnsignedInt(request[3])) {
+            return !ratePoll || (reply.payload().length >= 2
+                    && reply.payload()[0] == request[6] && reply.payload()[1] == request[7]);
+        }
+        return !poll && reply.messageClass() == 5 && reply.payload().length == 2
+                && reply.payload()[0] == request[2] && reply.payload()[1] == request[3];
     }
 
     private void restoreUbloxConfiguration() {
-        if (port == null || !port.isOpen()) {
-            return;
-        }
-        for (byte[] command : restoreCommands) {
-            write(command);
-        }
-        restoreCommands.clear();
+        if (configuration != null && port != null && port.isOpen()) configuration.restore();
+        configuration = null;
     }
 
     private void write(byte[] value) {

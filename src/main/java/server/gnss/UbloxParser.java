@@ -38,7 +38,13 @@ public final class UbloxParser {
         int leap = in.get();
         int count = Byte.toUnsignedInt(in.get());
         int receiverStatus = Byte.toUnsignedInt(in.get());
-        in.get(); // 기준 구현은 장치 RAWX version과 무관하게 canonical schema version 1로 정규화한다.
+        int version = Byte.toUnsignedInt(in.get());
+        if (version > 1) {
+            throw new IllegalArgumentException("Unsupported UBX-RXM-RAWX version " + version);
+        }
+        if (payload.length != 16 + count * 32) {
+            throw new IllegalArgumentException("Invalid UBX-RXM-RAWX measurement count/length");
+        }
         in.getShort(); // reserved 2 bytes
         List<GrawCodec.Observation> observations = new ArrayList<>(count);
 
@@ -64,7 +70,7 @@ public final class UbloxParser {
                             pr, cp, doppler, gnss, sv, sig, freq, lock, cno, prStd, cpStd, doStd,
                             tracking));
         }
-        return new GrawCodec.ObservationEpoch(tow, week, leap, receiverStatus, 1, observations);
+        return new GrawCodec.ObservationEpoch(tow, week, leap, receiverStatus, version, observations);
     }
 
     private static GrawCodec.NavigationUpdate sfrbx(byte[] payload) {
@@ -81,7 +87,7 @@ public final class UbloxParser {
         in.get();
         int version = Byte.toUnsignedInt(in.get());
         in.get();
-        if (in.remaining() < words * 4) {
+        if (in.remaining() != words * 4) {
             throw new IllegalArgumentException("Truncated UBX-RXM-SFRBX words");
         }
 
@@ -125,6 +131,9 @@ public final class UbloxParser {
     }
 
     public synchronized List<UbxFrame> push(byte[] bytes, int length) {
+        if (length < 0 || length > bytes.length) {
+            throw new IllegalArgumentException("Invalid serial read length");
+        }
         byte[] joined = Arrays.copyOf(pending, pending.length + length);
         System.arraycopy(bytes, 0, joined, pending.length, length);
         pending = joined;
@@ -142,12 +151,23 @@ public final class UbloxParser {
             }
 
             int payloadLength = (pending[offset + 4] & 0xff) | ((pending[offset + 5] & 0xff) << 8);
-            if (payloadLength > 65535) {
-                offset += 2;
+            // F9 RAWX/SFRBX cannot legitimately declare a near-64 KiB payload.
+            int cls = pending[offset + 2] & 0xff;
+            int id = pending[offset + 3] & 0xff;
+            if (cls == 2 && ((id == 0x15 && (payloadLength < 16
+                    || payloadLength > 8176 || (payloadLength - 16) % 32 != 0))
+                    || (id == 0x13 && (payloadLength < 8
+                    || payloadLength > 1028 || (payloadLength - 8) % 4 != 0)))) {
+                offset++;
                 continue;
             }
             int frameLength = payloadLength + 8;
             if (pending.length - offset < frameLength) {
+                int next = completeFrameAfter(offset + 1);
+                if (next >= 0) {
+                    offset = next;
+                    continue;
+                }
                 break;
             }
             if (checksum(
@@ -162,11 +182,24 @@ public final class UbloxParser {
                                 pending[offset + 3] & 0xff,
                                 Arrays.copyOfRange(
                                         pending, offset + 6, offset + 6 + payloadLength)));
+                offset += frameLength;
+            } else {
+                // A corrupt length must not consume the following valid frame.
+                offset++;
             }
-            offset += frameLength;
         }
         pending = Arrays.copyOfRange(pending, offset, pending.length);
         return frames;
+    }
+
+    private int completeFrameAfter(int start) {
+        for (int i = start; i + 8 <= pending.length; i++) {
+            if (pending[i] != (byte) 0xb5 || pending[i + 1] != 0x62) continue;
+            int size = (pending[i + 4] & 255) | ((pending[i + 5] & 255) << 8);
+            if (i + size + 8 <= pending.length && checksum(pending, i + 2, size + 4,
+                    pending[i + size + 6], pending[i + size + 7])) return i;
+        }
+        return -1;
     }
 
     /** UBX 동기·길이·Checksum 검사를 통과한 한 개의 수신 메시지다. */

@@ -85,6 +85,12 @@ assert.equal(nodes.get('[data-navigation]').children[0].children[8].textContent,
 view.setData(null);
 assert.equal(nodes.get('[data-observations]').children[0].children[0].colSpan, 12);
 assert.equal(nodes.get('[data-epoch]').disabled, true);
+view.setData({navigationCount: 0, navigation: [], epochs: [{observation: {
+  week: 0, receiverTowSeconds: 100, leapSeconds: 18, receiverStatus: 0, rawxVersion: 1, observations: []}}]});
+assert.match(nodes.get('[data-observations]').children[0].children[0].textContent, /관측 신호가 0개/);
+assert.match(nodes.get('[data-status]').textContent, /RAWX v1 · 윤초 미확정/);
+assert.equal(observationCells({...raw, pseudorangeMeters: NaN})[10], '제외');
+assert.equal(observationCells({...raw, dopplerHz: NaN})[10], '제외');
 const original = {navigationCount:1,navigation,epochs};
 const originalJson = JSON.stringify(original);
 const receiverView = createObservationView(container, () => {}, '수신 원본');

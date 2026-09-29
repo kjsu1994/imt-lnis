@@ -19,14 +19,42 @@ class UbloxParserTest {
     }
 
     @Test
-    void normalizesRawxVersionToCanonicalVersionOne() {
+    void preservesRawxVersionAndRejectsUnknownLayout() {
         byte[] payload = new byte[16];
+        for (int version : new int[] {0, 1}) {
+            payload[13] = (byte) version;
+            var message = (GrawCodec.ObservationEpoch) UbloxParser.toCanonical(
+                    new UbloxParser.UbxFrame(2, 0x15, payload));
+            assertEquals(version, message.rawxVersion());
+        }
         payload[13] = 9;
+        assertThrows(IllegalArgumentException.class, () -> UbloxParser.toCanonical(
+                new UbloxParser.UbxFrame(2, 0x15, payload)));
+    }
 
-        var message =
-                (server.gnss.GrawCodec.ObservationEpoch)
-                        UbloxParser.toCanonical(new UbloxParser.UbxFrame(0x02, 0x15, payload));
+    @Test
+    void recoversFromCorruptLengthAndChecksumInMixedNmeaStream() {
+        byte[] valid = UbloxParser.command(2, 0x15, new byte[16]);
+        byte[] corrupt = {(byte) 0xb5, 0x62, 0x0a, 0x36, (byte) 0xff, (byte) 0xff};
+        var stream = new java.io.ByteArrayOutputStream();
+        stream.writeBytes("$GNRMC,,V*00\r\n".getBytes(java.nio.charset.StandardCharsets.US_ASCII));
+        stream.writeBytes(corrupt);
+        stream.writeBytes(valid);
+        byte[] bad = valid.clone();
+        bad[bad.length - 1] ^= 1;
+        stream.writeBytes(bad);
+        stream.writeBytes(valid);
+        byte[] bytes = stream.toByteArray();
+        var frames = new UbloxParser().push(bytes, bytes.length);
+        assertEquals(2, frames.size());
+        assertTrue(frames.stream().allMatch(f -> f.messageId() == 0x15));
+    }
 
-        assertEquals(1, message.rawxVersion());
+    @Test
+    void rejectsPayloadCountsThatDoNotMatchWireLength() {
+        byte[] rawx = new byte[16]; rawx[11] = 1;
+        assertThrows(IllegalArgumentException.class, () -> UbloxParser.toCanonical(new UbloxParser.UbxFrame(2, 0x15, rawx)));
+        byte[] sfrbx = new byte[12];
+        assertThrows(IllegalArgumentException.class, () -> UbloxParser.toCanonical(new UbloxParser.UbxFrame(2, 0x13, sfrbx)));
     }
 }

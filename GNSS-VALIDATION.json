@@ -1,0 +1,47 @@
+{
+    "date":  "2026-09-29",
+    "javaTestsPassed":  197,
+    "conditionalTestsSkipped":  4,
+    "webReplayEpochs":  10,
+    "webReplayNavigation":  189,
+    "sha256":  "20DD75840E65BF6761D1B37C4614DC3903E2D8F1A43C5BD695D317760375F586",
+    "liveCapture":  {
+                        "type":  "GNSS_STATUS",
+                        "percent":  0,
+                        "stage":  "WaitingForNavigation",
+                        "message":  "관측값 확보 · GPS LNAV 서브프레임 1·2·3 확보 위성 1개 · 항법정보 추가 수신 대기",
+                        "counters":  {
+                                         "rawxEpochs":  120,
+                                         "ubxFrames":  147,
+                                         "navigationMessages":  26,
+                                         "repeatedEpochs":  0,
+                                         "bytes":  136212,
+                                         "gpsL1Satellites":  6,
+                                         "observations":  8
+                                     }
+                    },
+    "liveCaptureResult":  "수집 실패",
+    "returnedNodeState":  "READY",
+    "browserErrors":  [
+
+                      ],
+    "receiverInterface":  "USB",
+    "windowsPort":  "COM5",
+    "webTestDevice":  "ttyACM0",
+    "finalDeviceMapping":  "none; returned to Windows",
+    "antennaAdjustedCheck":  {
+                                 "location":  "indoor/window",
+                                 "durationSeconds":  120,
+                                 "validPvtEpochs":  0,
+                                 "replacementPerformed":  false,
+                                 "receiverFixOK":  false,
+                                 "gpsEphemerisSatellites":  [
+                                                                29,
+                                                                32
+                                                            ],
+                                 "antennaReportedStatus":  "OK",
+                                 "antennaReportedPower":  "ON",
+                                 "windowsCom5":  "available; probe closed",
+                                 "usbSharing":  "Not shared"
+                             }
+}

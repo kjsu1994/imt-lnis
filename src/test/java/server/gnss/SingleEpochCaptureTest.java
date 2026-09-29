@@ -32,6 +32,7 @@ class SingleEpochCaptureTest {
             }
         }
         assertNotNull(selected);
+        assertNull(capture.accept(epoch), "A completed capture must never emit a second epoch");
         assertEquals(
                 1,
                 selected.stream()

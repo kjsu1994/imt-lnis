@@ -359,7 +359,7 @@ console.log('PASS: trial cancellation, repeat prevention, failed trial cleanup a
 // RAW/AFS always select exactly one valid source epoch.
 vm.runInContext("config.delaySupported=true; selectedType='GNSS_RAW'; job=null; busy=false; inputId='input1';",context);
 assert.equal(elements.has('dtn-comparison-mode'),false,'RAW/AFS always use delay PVT');
-vm.runInContext("delayChoices=[{epoch:{recordIndex:95},reference:{positionValid:false}},{epoch:{recordIndex:96,week:2400,towSeconds:100000},reference:{positionValid:true,velocityValid:false}}]",context);
+vm.runInContext("delayChoices=[{epoch:{recordIndex:95},reference:{positionValid:false}},{epoch:{recordIndex:96,week:2400,towSeconds:100000},reference:{positionValid:true,velocityValid:false}}]; epochIndex=1",context);
 context.updateControls();
 assert.equal(elements.has('dtn-epoch-summary'),false);
 assert.equal(elements.has('dtn-epoch-options'),false);
@@ -370,6 +370,16 @@ assert.equal(lastStartBody.selectedEpoch.recordIndex,96);
 vm.runInContext("job=null; delayChoices=[];",context);
 context.updateControls();
 assert.equal(elements.get('dtn-send').disabled,true,'invalid Reference cannot start');
+
+vm.runInContext("config.sendBusy=false; busy=false; job=null; selectedType='GNSS_RAW'; inputId='real10'; senderMode='DTN'; receiverMode='DTN'; delayChoices=[{epoch:{recordIndex:4},reference:{positionValid:true}},{epoch:{recordIndex:9},reference:{positionValid:false}},{epoch:{recordIndex:15},reference:{positionValid:true}}]; epochIndex=2; updateControls();", context);
+assert.equal(context.selectedDelayEpoch().epoch.recordIndex, 15, 'use selected epoch, not first valid epoch');
+assert.equal(elements.get('dtn-send').disabled, false);
+await elements.get('dtn-send').onclick();
+assert.equal(lastStartBody.selectedEpoch.recordIndex, 15);
+vm.runInContext("busy=false; job=null; epochIndex=1; updateControls();", context);
+assert.equal(elements.get('dtn-send').disabled, true, 'invalid selected epoch cannot silently substitute another epoch');
+assert.match(html, /실측 GNSS 10에폭 불러오기/);
+console.log('PASS: selected real-data epoch reaches request and invalid selection is not substituted');
 
 let clearedHistoryRequests = 0;
 const cleared = vm.createContext({...context, location: {...context.location, pathname: '/lnis/dtntest/sender/clear'},
@@ -405,3 +415,14 @@ vm.runInContext("config.sendBusy=true;", context);
 context.updateControls();
 assert.equal(elements.get('dtn-send').disabled, true, 'other browser send still locks this screen');
 console.log('PASS: multiple sends, busy receiver, ambiguous adapter response and global send lock');
+
+elements.get('dtn-port').value = 'COM5';
+context.showPorts([{name:'COM4', description:'FT232R USB UART'}, {name:'COM5', description:'u-blox GNSS receiver'}]);
+assert.equal(elements.get('dtn-port').value, 'COM5', 'refresh preserves the connected selection');
+assert.match(elements.get('dtn-port-status').textContent, /2개 포트/);
+context.showPorts([{name:'COM4', description:'FT232R USB UART'}]);
+assert.equal(elements.get('dtn-port').value, '', 'unplugged port is no longer selected');
+context.showPorts([]);
+assert.match(elements.get('dtn-port-status').textContent, /0개 포트/);
+assert.match(html, />1에폭 수집<\/button>/);
+console.log('PASS: live serial-port refresh, selection preservation and unplug removal');

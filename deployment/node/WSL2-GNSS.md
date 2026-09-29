@@ -32,7 +32,7 @@ docker compose up -d
 docker compose exec node ls -l /dev/ttyUSB0
 ```
 
-화면에서 COM 포트 → 포트 조회 → ttyUSB0 선택 → 수집 시작.
+화면에서 COM 포트 → 포트 조회 → ttyUSB0 선택 → 1에폭 수집. 장치 설명과 VID/PID도 확인한다.
 유효한 GPS L1 지구 위치·속도를 얻은 첫 시점에서 자동 종료한다(최대 120초).
 보드레이트는 UART 연결 시 수신기 설정에 맞춘다. USB 직렬 연결의 동작은 실장비로 확인한다.
 RAWX/SFRBX가 나오고 안테나가 충분한 위성을 수신해야 한다.
@@ -51,4 +51,16 @@ USB 연결은 Compose 자체가 수행하지 않는다. WSL의 LAN 접속/방화
 - https://docs.docker.com/reference/compose-file/services/#group_add
 
 검증 범위: 자동화된 입력 선택/네이티브 계산/화면 테스트와 실측 장치 검증은 별개다.
-EVK-F9T + 운영 WSL2 USB 연결의 실장비 수집은 장치 확보 후 수행해야 한다.
+2026-09-29 실장비 검증: ZED-F9T-20B USB를 WSL에 전달하여 웹의 실제 장치 조회와 RAWX/SFRBX 수신을 확인했다. 저장된 실측 10에폭의 불러오기·개별 선택도 확인했다. 위성 항법정보 부족으로 해당 실측 자료의 유효 PVT는 확보하지 못했다.
+
+## 유센터에 USB 반환
+
+WSL이 USB를 사용하는 동안 Windows COM5가 사라지는 것은 정상이다. 웹 수집이 끝나고 노드가 READY인지 확인한 뒤 직렬 장치 override를 제외하여 웹서비스를 재기동한다. Windows PowerShell에서 다음을 실행한다. BUSID는 `usbipd list`에서 다시 확인한다.
+
+```powershell
+usbipd detach --busid 2-1
+# 공유 등록도 해제하려면 관리자 PowerShell에서 실행한다.
+usbipd unbind --busid 2-1
+```
+
+Windows 장치 목록에 COM5가 돌아오면 유센터에서 해당 포트를 열 수 있다. 웹은 파일 기반 GRAW 재생을 계속 사용할 수 있다. 동일 USB의 Windows/WSL 동시 직접 사용은 지원하지 않으며, COM 중계 기능은 이번 변경에 포함하지 않는다.

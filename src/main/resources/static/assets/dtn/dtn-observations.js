@@ -44,7 +44,7 @@ export function observationCells(o, receiverTowSeconds) {
     o.carrierToNoiseDbHz, o.lockTimeMilliseconds,
     iq ? '—' : [o.pseudorangeStdDev, o.carrierPhaseStdDev, o.dopplerStdDev].join(' / '),
     iq ? 'PR 유효 · 위상 상대값' : 'PR ' + (prValid ? '유효' : '무효') + ' · CP ' + (cpValid ? '유효' : '무효'),
-    o.constellationId === 0 && o.signalId === 0 && prValid ? '계산 대상' : '제외',
+    o.constellationId === 0 && o.signalId === 0 && prValid && Number.isFinite(o.pseudorangeMeters) && o.pseudorangeMeters > 0 && Number.isFinite(o.dopplerHz) ? '계산 대상' : '제외',
     transmitTime(o, receiverTowSeconds)];
 }
 
@@ -112,9 +112,9 @@ export function createObservationView(container, onSelect = () => {}, role = '')
       : '변환 후 값 표시 불가 · ' + (delayEvidence.error || '원본 Epoch와 계산 근거 불일치')) : '';
     summary.title = '변환 후 의사거리 = 원본 의사거리 + 299,792,458 × 측정 지연(초). 표시값은 저장된 계산 근거이며 원문과 JSON 다운로드는 실제 수신 원본 그대로 유지됩니다. 최종 채택 위성 수는 PVT 결과에서 확인하세요.';
     body.replaceChildren();
-    if (!epoch) {
+    if (!epoch || !epoch.observations?.length) {
       const row = document.createElement('tr'), cell = document.createElement('td');
-      row.className = 'epoch-empty-row'; cell.colSpan = (comparison ? 14 : 12) - (hideTransmitEstimate ? 1 : 0); cell.textContent = '표시할 GNSS 관측값이 없습니다.';
+      row.className = 'epoch-empty-row'; cell.colSpan = (comparison ? 14 : 12) - (hideTransmitEstimate ? 1 : 0); cell.textContent = epoch ? 'RAWX 메시지는 수신했지만 관측 신호가 0개입니다. 안테나와 위성 추적 상태를 확인하세요.' : '표시할 GNSS 관측값이 없습니다.';
       row.append(cell); body.append(row);
     } else {
       for (const [index, observation] of epoch.observations.entries()) {
@@ -164,7 +164,7 @@ export function createObservationView(container, onSelect = () => {}, role = '')
     container.querySelector('[data-nav]').textContent = '항법정보 ' + (data?.navigationCount ?? '—') + '건' +
       (epoch && data?.navigationCount === 0 ? ' · PVT 계산 불가' : '');
     container.querySelector('[data-count]').textContent = '관측 신호 ' + (epoch?.observations?.length ?? '—');
-    container.querySelector('[data-status]').textContent = iq ? '위상은 상대 누적값 · F9T 편차·상태 정보 없음' : epoch ? '윤초 ' + epoch.leapSeconds + ' s · 수신기 상태 0x' + epoch.receiverStatus.toString(16) : '';
+    container.querySelector('[data-status]').textContent = iq ? '위상은 상대 누적값 · F9T 편차·상태 정보 없음' : epoch ? 'RAWX v' + (epoch.rawxVersion ?? '—') + ' · 윤초 ' + ((epoch.receiverStatus & 1) ? epoch.leapSeconds + ' s' : '미확정') + ((epoch.receiverStatus & 2) ? ' · 수신기 시계 재설정' : '') + ' · 수신기 상태 0x' + epoch.receiverStatus.toString(16) : '';
 
     if (notify) onSelect(Number(select.value), epoch);
   }

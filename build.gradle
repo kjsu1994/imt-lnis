@@ -7,6 +7,10 @@ plugins {
 group = 'kr.co.lnis'
 version = '1.0.0'
 
+springBoot {
+    mainClass = 'server.LnisApplication'
+}
+
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(21)
@@ -198,3 +202,13 @@ tasks.named('linuxNativeVerificationZip') { mustRunAfter tasks.named('nativeBuil
 
 
 // Build verifies artifacts only. Deployment is always an explicit task.
+
+tasks.register('captureGraw', JavaExec) {
+    group = 'application'
+    description = '실제 직렬 포트 조회 또는 PVT 가능한 1에폭 GRAW와 원본 UBX 수집'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'server.gnss.CaptureGraw'
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }
+    systemProperty 'lnis.native.candidate', providers.gradleProperty('nativeCandidate').orElse('native/bin/win-x64').get()
+}

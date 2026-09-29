@@ -155,7 +155,7 @@
       <button type="button" class="input-mode" data-input-mode="capture">COM 포트</button>
       <button type="button" class="input-mode active" data-input-mode="upload">capture.graw</button>
     <div id="dtn-development" class="synthetic-tools" hidden>
-      <button type="button" id="dtn-replay">합성 PVT 수집 재생 · 개발용</button>
+      <button type="button" id="dtn-replay">실측 GNSS 10에폭 불러오기 · 개발용</button>
     </div>
     </div>
     <div id="dtn-capture-panel" class="hidden compact-input-row">
@@ -163,6 +163,7 @@
       <button id="dtn-refresh" type="button">포트 조회</button>
       <label class="serial-settings">통신 속도 (baud)<select id="dtn-baud"><option>9600</option><option>38400</option><option>57600</option><option selected>115200</option><option>230400</option><option>460800</option><option>921600</option></select></label>
     </div>
+    <p id="dtn-port-status" role="status">포트 조회는 송신 서비스가 실행되는 PC 기준입니다. Docker/WSL에서는 장치 전달이 필요합니다.</p>
     <div id="dtn-upload-panel" class="compact-input-row">
       <label>capture.graw<input id="dtn-graw-file" type="file" accept=".graw,application/octet-stream"></label>
       <button id="dtn-upload" type="button">파일 적용</button>
@@ -182,10 +183,11 @@
       <span id="dtn-input-summary">데이터 없음</span>
       <span class="sender-connection"><span id="dtn-peer-summary-dot" class="connection-dot unknown" aria-hidden="true"></span>수신 서비스 <strong id="dtn-peer-summary">미확인</strong></span>
       <span class="sender-connection"><span id="dtn-adapter-summary-dot" class="connection-dot unknown" aria-hidden="true"></span>송신 adapter <strong id="dtn-adapter-summary">미확인</strong></span>
-      <button id="dtn-start" type="button" hidden disabled title="유효한 지구 PVT 한 시점 확보 후 자동 종료 · 최대 120초">수집 시작</button>
+      <button id="dtn-start" type="button" hidden disabled title="유효한 지구 PVT 한 시점 확보 후 자동 종료 · 최대 120초">1에폭 수집</button>
       <button id="dtn-send" type="button" class="primary" disabled>전송시험 시작</button>
     </div>
     <p id="dtn-message" role="status"></p>
+    <p id="dtn-capture-status" role="status"></p>
     <div class="receiver-selection" aria-label="시험 기록">
       <label for="dtn-tests">시험 기록</label>
       <select id="dtn-test-filter" aria-label="시험 상태"><option value="">전체</option><option value="WAITING_DTN">수신 대기</option></select>
@@ -227,5 +229,5 @@
   </div>
   </div>
 </main>
-<script type="module" src="/lnis/assets/dtn/dtn.js?v=20260929-clock-precision"></script>
+<script type="module" src="/lnis/assets/dtn/dtn.js?v=20260929-real-gnss"></script>
 </body></html>
