@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param([switch]$NoBrowser)
 $ErrorActionPreference = 'Stop'
 $composeRoot = $PSScriptRoot
@@ -7,8 +7,15 @@ if (!(Test-Path -LiteralPath (Join-Path $composeRoot '.env'))) { throw '.env에 
 $linuxRoot = '/mnt/' + $composeRoot.Substring(0, 1).ToLowerInvariant() + $composeRoot.Substring(2).Replace('\', '/')
 $portSetting = Get-Content -LiteralPath (Join-Path $composeRoot '.env') | Where-Object { $_ -match '^LNIS_SERVER_PORT=\d+$' } | Select-Object -Last 1
 $nodePort = if ($portSetting) { [int]($portSetting.Split('=')[1]) } else { 8088 }
-# 독립 노드는 컨테이너 하나의 JVM에서 실행한다. Windows Agent를 따로 시작하지 않는다.
-& wsl.exe --cd $linuxRoot -- docker compose up -d --build
+# Web/PVT remain in Docker; the sender also starts a Windows Java byte bridge.
+$composeArgs = @('-f', 'docker-compose.yml')
+if (Test-Path (Join-Path $composeRoot 'docker-compose.override.yml')) { $composeArgs += @('-f','docker-compose.override.yml') }
+$roleLine = Get-Content (Join-Path $composeRoot '.env') | Where-Object { $_ -match '^LNIS_NODE_ROLE=' } | Select-Object -Last 1
+if ($roleLine -and $roleLine.Split('=',2)[1].Trim().Trim('"',"'") -ieq 'sender') {
+    & (Join-Path $composeRoot 'start-serial-bridge.ps1')
+    $composeArgs += @('-f','docker-compose.windows-serial.yml')
+}
+& wsl.exe --cd $linuxRoot -- docker compose @composeArgs up -d --build
 if ($LASTEXITCODE -ne 0) { throw '독립 노드 시작에 실패했습니다.' }
 $deadline = (Get-Date).AddMinutes(3)
 do {

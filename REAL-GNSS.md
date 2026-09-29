@@ -45,3 +45,6 @@ RAW 화면은 실측값과 유효성 플래그를 보존한다. 윤초 유효 �
 - `capturedAt`은 원본 UBX 파일의 저장 시각이다. 원시 UBX에는 개별 메시지의 PC 도착 시각이 없으므로 이를 정밀 수집 타임스탬프로 해석하지 않는다. 에폭별 GNSS 시간은 RAWX Week/TOW를 사용한다.
 ### Outdoor capture update (2026-09-29)
 COM5 outdoor capture replaced the earlier indoor fixture. real-gnss-source.ubx contains 24 RAWX epochs. real-gnss-10epochs.graw contains the final 10 consecutive epochs (GPS week 2438, TOW 201738.989 through 201747.989). All 10 passed independent position and velocity calculation with the project's native PVT engine. Earlier statements that the bundled fixture cannot compute PVT describe the superseded indoor capture. The web development replay uses this updated file.
+
+
+현재 Windows COM 수집은 [Windows 중계 방식](deployment/node/WINDOWS-SERIAL-BRIDGE.md)을 기본으로 사용합니다. Windows 송신 노드에서 start.ps1을 실행하면 Java 중계와 Docker 웹서버가 함께 시작됩니다. 기본 통신속도는 38400입니다.

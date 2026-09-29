@@ -64,3 +64,5 @@ usbipd unbind --busid 2-1
 ```
 
 Windows 장치 목록에 COM5가 돌아오면 유센터에서 해당 포트를 열 수 있다. 웹은 파일 기반 GRAW 재생을 계속 사용할 수 있다. 동일 USB의 Windows/WSL 동시 직접 사용은 지원하지 않으며, COM 중계 기능은 이번 변경에 포함하지 않는다.
+
+현재 Windows COM 수집은 [Windows 중계 방식](WINDOWS-SERIAL-BRIDGE.md)을 기본으로 사용합니다. Windows 송신 노드에서 start.ps1을 실행하면 Java 중계와 Docker 웹서버가 함께 시작됩니다. 기본 통신속도는 38400입니다.

@@ -212,3 +212,19 @@ tasks.register('captureGraw', JavaExec) {
     javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }
     systemProperty 'lnis.native.candidate', providers.gradleProperty('nativeCandidate').orElse('native/bin/win-x64').get()
 }
+
+// Standalone Windows byte bridge; no Spring server or native PVT engine required.
+tasks.register('windowsSerialBridgeDist', Sync) {
+    group = 'distribution'
+    dependsOn tasks.named('classes')
+    into layout.buildDirectory.dir('windows-serial-bridge')
+    from(sourceSets.main.output) { into 'classes' }
+    from(configurations.runtimeClasspath.filter {
+        it.name.startsWith('jSerialComm-') || it.name.startsWith('jackson-core-') ||
+        it.name.startsWith('jackson-databind-') || it.name.startsWith('jackson-annotations-')
+    }) { into 'lib' }
+}
+tasks.named('linuxNodeDistZip') {
+    dependsOn tasks.named('windowsSerialBridgeDist')
+    from(layout.buildDirectory.dir('windows-serial-bridge')) { into 'serial-bridge' }
+}

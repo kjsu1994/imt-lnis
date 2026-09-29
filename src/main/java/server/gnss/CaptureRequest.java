@@ -32,7 +32,8 @@ public class CaptureRequest {
     /** GNSS 장비와 통신할 초당 전송 속도다. 허용 범위는 1,200~4,000,000 baud다. */
     @Min(value = 1200, message = "Baud rate는 1200 이상이어야 합니다.")
     @Max(value = 4_000_000, message = "Baud rate는 4000000 이하여야 합니다.")
-    int baudRate;
+    @lombok.Builder.Default
+    int baudRate = 38400;
 
     /** 수신 바이트를 해석할 GNSS 프로토콜 식별자다. 현재 대표 값은 {@code UBX}다. */
     @NotBlank(message = "GNSS 수집 프로토콜을 선택하세요.")

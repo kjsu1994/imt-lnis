@@ -1,0 +1,49 @@
+{
+    "date":  "2026-09-29",
+    "transport":  "Windows Java HTTP serial bridge",
+    "defaultBaud":  38400,
+    "fullCheck":  "passed",
+    "finalChecks":  "GNSS tests, webTest, windowsSerialBridgeDist and bootJar passed",
+    "browser":  {
+                    "baud":  "38400",
+                    "ports":  [
+                                  {
+                                      "name":  "",
+                                      "label":  "포트 선택"
+                                  },
+                                  {
+                                      "name":  "COM4",
+                                      "label":  "COM4 · Windows · USB Serial Port(COM4) · FT232R USB UART · VID:0403 PID:6001"
+                                  },
+                                  {
+                                      "name":  "COM5",
+                                      "label":  "COM5 · Windows · USB 직렬 장치(COM5) · u-blox GNSS receiver · VID:1546 PID:01A9"
+                                  }
+                              ],
+                    "nodeState":  "READY",
+                    "errors":  [
+
+                               ]
+                },
+    "liveCapture":  {
+                        "inputId":  "306e0f8b-937b-4e19-aafc-6d0bcd673584",
+                        "complete":  false,
+                        "nodeState":  "READY",
+                        "counters":  {
+                                         "repeatedEpochs":  0,
+                                         "bytes":  234772,
+                                         "gpsL1Satellites":  3,
+                                         "observations":  10,
+                                         "rawxEpochs":  119,
+                                         "ubxFrames":  181,
+                                         "navigationMessages":  62
+                                     },
+                        "reason":  "Insufficient GPS L1 observations; 120-second timeout",
+                        "com5Released":  true,
+                        "browserErrors":  [
+
+                                          ]
+                    },
+    "startup":  "start.ps1 starts Windows bridge and Docker; tested",
+    "validOutdoorFixturePreserved":  true
+}

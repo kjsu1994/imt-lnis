@@ -1,6 +1,6 @@
 package server.gnss;
 
-import com.fazecast.jSerialComm.SerialPort;
+
 
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
@@ -31,7 +31,8 @@ public final class SerialCaptureService implements AutoCloseable {
         String portName;
 
         /** GNSS 장비와 통신할 전송 속도이며 단위는 baud다. */
-        int baudRate;
+        @lombok.Builder.Default
+    int baudRate = 38400;
 
         /** {@code ubx}, {@code raw-only}, {@code lnis-canonical-v1} 중 수집 해석 방식이다. */
         String protocolId;
@@ -80,7 +81,8 @@ public final class SerialCaptureService implements AutoCloseable {
     }
 
     private final AtomicBoolean running = new AtomicBoolean();
-    private volatile SerialPort port;
+    private volatile SerialConnection port;
+    private final WindowsSerialClient bridge = WindowsSerialClient.configured();
     private volatile Thread worker;
     private UbloxCaptureConfiguration configuration;
     private String detectedModel = "", detectedFirmware = "";
@@ -91,22 +93,12 @@ public final class SerialCaptureService implements AutoCloseable {
 
     /** Enumerate on the OS running this node; enumeration does not open or claim a port. */
     public List<DetectedPort> ports() {
-        return Arrays.stream(SerialPort.getCommPorts())
-                .map(p -> new DetectedPort(p.getSystemPortName(),
-                        p.getDescriptivePortName() + " · " + p.getPortDescription()
-                        + (p.getVendorID() < 0 ? "" : String.format(" · VID:%04X PID:%04X",
-                                p.getVendorID(), p.getProductID()))))
-                .sorted(Comparator.comparing(DetectedPort::name))
-                .toList();
+        return bridge == null ? SerialConnection.localPorts() : bridge.ports();
     }
 
     public List<String> portNames() {
-        return Arrays.stream(SerialPort.getCommPorts())
-                .map(SerialPort::getSystemPortName)
-                .sorted()
-                .toList();
+        return ports().stream().map(DetectedPort::name).toList();
     }
-
     public synchronized void start(
             Settings settings, Consumer<CaptureChunk> chunks, Consumer<Throwable> failure) {
         start(settings, chunks, failure, null, () -> {});
@@ -136,27 +128,7 @@ public final class SerialCaptureService implements AutoCloseable {
         configuration = null;
         // 포트를 완전히 구성한 뒤 worker를 시작해 reader가 반쯤 적용된 직렬 설정을 보지 않게 한다.
         try {
-            port = SerialPort.getCommPort(settings.portName);
-            port.setBaudRate(settings.baudRate);
-            port.setNumDataBits(8);
-            port.setNumStopBits(SerialPort.ONE_STOP_BIT);
-            port.setParity(SerialPort.NO_PARITY);
-            port.setFlowControl(SerialPort.FLOW_CONTROL_DISABLED);
-            port.setComPortTimeouts(SerialPort.TIMEOUT_READ_SEMI_BLOCKING, 1000, 1000);
-            if (!port.openPort()) {
-                running.set(false);
-                throw new IllegalStateException("Unable to open " + settings.portName);
-            }
-            if (settings.dtrEnabled) {
-                port.setDTR();
-            } else {
-                port.clearDTR();
-            }
-            if (settings.rtsEnabled) {
-                port.setRTS();
-            } else {
-                port.clearRTS();
-            }
+            port = bridge == null ? SerialConnection.local(settings) : bridge.open(settings);
             if ("ubx".equalsIgnoreCase(settings.protocolId)) {
                 progress.accept(new CaptureProgress("Configuring", "현재 포트의 RAWX/SFRBX 출력 설정 확인 중", Map.of()));
                 detectedModel = "";
@@ -183,7 +155,7 @@ public final class SerialCaptureService implements AutoCloseable {
             try { restoreUbloxConfiguration(); }
             catch (RuntimeException restoreError) { error.addSuppressed(restoreError); }
             if (port != null) {
-                port.closePort();
+                try { port.closePort(); } catch (RuntimeException closeError) { error.addSuppressed(closeError); }
             }
             running.set(false);
             throw error;
@@ -320,7 +292,7 @@ public final class SerialCaptureService implements AutoCloseable {
                 }
             } finally {
                 if (port != null) {
-                    port.closePort();
+                    try { port.closePort(); } catch (RuntimeException closeError) { if (failed == null) failed = closeError; }
                 }
                 running.set(false);
             }

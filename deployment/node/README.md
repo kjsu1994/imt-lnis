@@ -38,3 +38,6 @@ USB 매핑 없이도 GRAW 파일 업로드 시험은 가능합니다. 기본 구
 관리 연결 실패 시 시험 데이터를 자동 재전송하지 않습니다. 재시작 후 진행 상태와 타임아웃을 확인하고 새 시험으로 다시 시작하세요. 외부 DTN 전달 실패로 수신 대기 항목이 남아도 10분 제한 후 실패로 정리됩니다.
 
 `licenses/native-sources.zip`에는 원본·변경 패치·Linux SO/IQ 및 Windows DLL 빌드 자료와 라이선스가 포함됩니다. 실행에는 외부 오픈소스 폴더가 필요하지 않습니다. 재빌드는 저장소의 `nativeBuild` 작업 또는 소스 ZIP의 `README.md`를 참고하세요.
+
+
+현재 Windows COM 수집은 [Windows 중계 방식](WINDOWS-SERIAL-BRIDGE.md)을 기본으로 사용합니다. Windows 송신 노드에서 start.ps1을 실행하면 Java 중계와 Docker 웹서버가 함께 시작됩니다. 기본 통신속도는 38400입니다.

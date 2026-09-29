@@ -1,0 +1,4 @@
+services:
+  node:
+    env_file:
+      - .serial-bridge.env
