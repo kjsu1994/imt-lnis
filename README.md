@@ -329,3 +329,5 @@ Docker 로그는 서비스별 `100m` 파일 5개로 순환 보관합니다. 한�
 시험 DB·원문 파일 보관 정책에는 영향을 주지 않습니다. 컨테이너 재생성 전 필요한 기존 로그는 별도로 보관합니다.
 
 네이티브 I/Q 파일 수신기는 분석보다 파일 읽기가 앞서면 대기하고, 파일 끝에서도 남은 채널 분석을 완료한 뒤 종료합니다. 기존 20배속 설정은 유지하며, 처리 정지·읽기 오류·취소를 정상 완료와 구분합니다. 자세한 정책과 검증 방법은 `native/README.md`의 파일 재생 설명을 참고하세요.
+### Outdoor capture update (2026-09-29)
+COM5 outdoor capture replaced the earlier indoor fixture. real-gnss-source.ubx contains 24 RAWX epochs. real-gnss-10epochs.graw contains the final 10 consecutive epochs (GPS week 2438, TOW 201738.989 through 201747.989). All 10 passed independent position and velocity calculation with the project's native PVT engine. Earlier statements that the bundled fixture cannot compute PVT describe the superseded indoor capture. The web development replay uses this updated file.

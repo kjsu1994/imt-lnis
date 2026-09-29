@@ -43,3 +43,5 @@ RAW 화면은 실측값과 유효성 플래그를 보존한다. 윤초 유효 �
 - 실제 웹서비스에서 USB 전달 포트 `ttyACM0`와 u-blox VID 1546 / PID 01A9를 조회하고, 숨겨진 실측 재생 버튼으로 10에폭을 불러와 각 에폭의 표 행수·시각을 확인했다.
 - 이 구간의 PVT는 무효다. 현재 GPS L1 계산기에 필요한 위성별 항법정보가 부족하므로 유효한 기준 위치·속도가 필요한 지연 시험은 진행할 수 없다. 합성 항법정보를 보충하지 않았다.
 - `capturedAt`은 원본 UBX 파일의 저장 시각이다. 원시 UBX에는 개별 메시지의 PC 도착 시각이 없으므로 이를 정밀 수집 타임스탬프로 해석하지 않는다. 에폭별 GNSS 시간은 RAWX Week/TOW를 사용한다.
+### Outdoor capture update (2026-09-29)
+COM5 outdoor capture replaced the earlier indoor fixture. real-gnss-source.ubx contains 24 RAWX epochs. real-gnss-10epochs.graw contains the final 10 consecutive epochs (GPS week 2438, TOW 201738.989 through 201747.989). All 10 passed independent position and velocity calculation with the project's native PVT engine. Earlier statements that the bundled fixture cannot compute PVT describe the superseded indoor capture. The web development replay uses this updated file.
