@@ -30,8 +30,11 @@
 .iq-sample-table th { position: sticky; top: 0; background: #f4f7f8; }
 .dtn-payload-controls label { margin: 0; }
 .dtn-payload-header { width: 100%; }
+body[data-page^="dtn-"] .card .dtn-payload-header > h2 { margin: 0 auto 0 0; font-size: 16px; }
+.dtn-payload-header > label { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; white-space: nowrap; }
+.dtn-payload-controls .dtn-payload-download { width: auto; padding: 6px 8px; font-size: 12px; }
 .dtn-payload-header > button { font-size: 16px; }
-.dtn-payload-header .dtn-payload-download { margin-left: auto; }
+
 .dtn-payload-controls a {
   display: inline-flex;
   align-items: center;
@@ -1036,7 +1039,13 @@ body[data-page="dtn-receiver"] .receiver-adapter .adapter-url-controls { grid-te
 .epoch-observation-table .converted-value { color: #b42318; font-weight: 600; }
 #dtn-log-fullscreen { display: inline-flex; align-items: center; justify-content: center; margin-left: auto; }
 .log-scope { font-size: 12px; font-weight: normal; }
-body[data-page^="dtn-"] section.log-expanded { display: flex; flex-direction: column; box-sizing: border-box; width: 100%; height: 100dvh; padding: 18px; border-radius: 0; background: var(--panel, white); }
+body[data-page^="dtn-"] section.card.log-expanded { display: flex; flex-direction: column; box-sizing: border-box; width: 100%; height: 100dvh; padding: 18px; border-radius: 0; background: var(--panel, white); }
 body[data-page^="dtn-"] section.log-maximized { position: fixed; inset: 0; z-index: 10000; }
 body[data-page^="dtn-"] section.log-expanded .log { flex: 1; height: auto; min-height: 0; max-height: none; margin-bottom: 0; }
 .log-expanded .dtn-log-tools { flex-shrink: 0; }
+
+/* 시험 선택과 개별 종료는 전송 버튼과 분리한다. */
+.receiver-selection #dtn-test-filter { flex: 0 1 110px; }
+.receiver-selection #dtn-tests { flex: 1 1 260px; }
+#dtn-test-detail { margin: 8px 0 0; font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+#dtn-tests-page { font-size: 12px; font-variant-numeric: tabular-nums; }

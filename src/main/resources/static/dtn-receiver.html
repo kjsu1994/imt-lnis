@@ -6,11 +6,11 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>LNIS DTN Receiver</title>
   <link rel="stylesheet" href="/lnis/assets/common/app.css?v=20260918-admin-icon">
-  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20260928-logo-v3">
+  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20260929-payload-header">
 </head>
 <body data-page="dtn-receiver">
 <header>
-  <a class="data-management-entry" href="/lnis/data-management" target="_blank" rel="noopener" aria-label="데이터 관리" title="데이터 관리" hidden><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><ellipse cx="12" cy="5" rx="7" ry="3"/><path d="M5 5v14c0 1.7 3.1 3 7 3s7-1.3 7-3V5M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/></svg></a>
+  <a class="data-management-entry" href="/lnis/data-manager" target="_blank" rel="noopener" aria-label="데이터 관리" title="데이터 관리" hidden><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><ellipse cx="12" cy="5" rx="7" ry="3"/><path d="M5 5v14c0 1.7 3.1 3 7 3s7-1.3 7-3V5M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/></svg></a>
   <a class="data-management-entry" style="top: 46px" href="/dtn-intro" target="_blank" rel="noopener" aria-label="시험 구조와 동작 안내" title="시험 구조와 동작 안내">
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="3" width="18" height="14" rx="2"/><path d="m10 7 5 3-5 3ZM8 21h8M12 17v4"/></svg>
   </a>
@@ -58,8 +58,13 @@
     <div>
     <div class="receiver-selection">
       <label for="dtn-tests">시험 기록</label>
+      <select id="dtn-test-filter" aria-label="시험 상태"><option value="">전체</option><option value="WAITING_DTN">수신 대기</option></select>
       <select id="dtn-tests"><option value="">등록된 시험 없음</option></select>
+      <button id="dtn-tests-prev" type="button" disabled aria-label="이전 시험 목록">이전</button>
+      <span id="dtn-tests-page">1</span>
+      <button id="dtn-tests-next" type="button" disabled aria-label="다음 시험 목록">다음</button>
       <button id="dtn-refresh" type="button">새로고침</button>
+      <button id="dtn-cancel" type="button" disabled>대기 종료</button>
     </div>
     <div class="receiver-meta">
       <span>시험 ID <code id="test-id">-</code></span>
@@ -152,6 +157,6 @@
   </section>
   </div>
 </main>
-<script type="module" src="/lnis/assets/dtn/dtn-receiver.js?v=20260928-observation-colors"></script>
+<script type="module" src="/lnis/assets/dtn/dtn-receiver.js?v=20260929-payload-header"></script>
 </body>
 </html>

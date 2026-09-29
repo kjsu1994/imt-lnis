@@ -267,9 +267,9 @@
   </svg>
   <main class="wrap">
     <header class="masthead">
-      <div class="brand">
+      <a class="brand" href="/" aria-label="시험 화면으로 이동" title="시험 화면으로 이동">
         <img src="/lnis/assets/common/logo_v3.png?v=995392000e36" alt="LNIS" width="56" height="56">
-      </div>
+      </a>
       <button class="plain" id="fullscreen" type="button">전체화면</button>
     </header>
     <div class="hero">
@@ -395,7 +395,7 @@
           <table><thead><tr><th>전송 데이터</th><th>송신측에서 하는 일</th><th>수신측에서 하는 일</th></tr></thead><tbody>
             <tr><td>GNSS RAW</td><td>1 Epoch 의사거리를 보정 송신 시각으로 교체해 JSON 전달</td><td>도착 시각과의 차이로 의사거리 계산 → PVT → 원본 별도 조회·비교</td></tr>
             <tr><td>AFS Frame</td><td>보정 송신 시각·1 Epoch 계산 정보를 프레임에 저장 · Metadata 제외</td><td>AFS 복호 → 의사거리·PVT 계산 → 원본 별도 조회·비교</td></tr>
-            <tr><td>I/Q Sample</td><td>기존 I/Q용 AFS 확장 v2로 신호 샘플 생성</td><td>파일 무결성 확인 후 신호 추적·복호를 통해 PVT 계산</td></tr>
+            <tr><td>I/Q Sample</td><td>기존 I/Q용 AFS로 신호 샘플 생성</td><td>파일 무결성 확인 후 신호 추적·복호를 통해 PVT 계산</td></tr>
           </tbody></table>
           <p class="fine">현재 I/Q 기본 생성 예시는 90초·12 MHz·I/Q 각 8 bit로 약 2.16 GB입니다. 파일 재생 배속은 처리 속도 옵션이며, GNSS 시간이나 DTN 전송 속도를 배수로 바꾸지 않습니다.</p>
         </div></details>
@@ -409,10 +409,10 @@
           </div><table><thead><tr><th>구간</th><th>내용</th></tr></thead><tbody>
             <tr><td>SB1</td><td>기존 프레임 식별 구조 유지 · BCH 부호화 후 52 bits</td></tr>
             <tr><td>SB2</td><td>기존 항법정보 · 정보 1,176 + CRC 24 bits → 부호화 후 2,400 bits</td></tr>
-            <tr><td>SB3</td><td>LNIS 확장: PVT 계산에 필요한 GPS LNAV 보충정보 · 정보 846 + CRC 24 bits → 부호화 후 1,740 bits</td></tr>
-            <tr><td>SB4</td><td>LNIS 확장 v3: 보정 송신 시각·시험 시작 시각·Doppler·C/N0·관측 시각·유효성 등 · 670/846 정보 bits 사용 → 부호화 후 1,740 bits</td></tr>
+            <tr><td>SB3</td><td>PVT 계산에 필요한 GPS LNAV 보충정보 · 정보 846 + CRC 24 bits → 부호화 후 1,740 bits</td></tr>
+            <tr><td>SB4</td><td>보정 송신 시각·시험 시작 시각·Doppler·C/N0·관측 시각·유효성 등 · 670/846 정보 bits 사용 → 부호화 후 1,740 bits</td></tr>
           </tbody></table></div>
-          <p class="fine">SB3·SB4의 LNIS 확장 내용은 공식 표준 메시지 할당을 의미하지 않습니다. AFS v5에는 원본 의사거리를 넣지 않습니다. 송신부가 보정 송신 시각을 넣고 수신부가 의사거리를 계산합니다. I/Q는 기존 확장 v2(SB4 506/846 bits)를 유지하며 PVT 관측값은 신호 추적으로 얻습니다. 남는 정보 비트는 0101…로 채웁니다.</p>
+          <p class="fine">SB3·SB4의 LNIS 확장 내용은 공식 표준 메시지 할당을 의미하지 않습니다. AFS에는 원본 의사거리를 넣지 않습니다. 송신부가 보정 송신 시각을 넣고 수신부가 의사거리를 계산합니다. I/Q는 기존 (SB4 506/846 bits)를 유지하며 PVT 관측값은 신호 추적으로 얻습니다. 남는 정보 비트는 0101…로 채웁니다.</p>
         </div></details>
         <details><summary>결과를 해석하기 전에 알아둘 점</summary><div class="detail-body">
           <p><strong>시계 동기화:</strong> 두 PC의 시계 차이가 있으면 측정 지연에 섞입니다. Clock Bias 증가량이 주입값과 같아도 실제 통신 지연의 정확성을 증명하지는 않습니다.</p>
@@ -425,7 +425,7 @@
           <p><strong>비교할 조건:</strong> 같은 입력과 시험 조건을 유지하며 데이터 유형·엔진 조합을 바꿔 비교하세요. 지연 시험은 선택한 1 Epoch를 기준으로 하며, I/Q 신호 추적 결과와 RAW·AFS의 지연 주입 결과는 같은 방식의 측정이 아닙니다.</p>
           <p><strong>남길 결과:</strong> testId, 데이터 유형·크기, 엔진 조합, 송신 접수와 최종 수신 여부, 무결성 검증 근거, 유효한 PVT 여부를 기록하세요. PVT 차이는 수신 − Reference 기준이며 위치는 m, 속도는 m/s, Clock Bias는 s로 읽습니다. 지연 시험은 Δt·Clock Bias 증가량·잔차를 함께 확인하세요.</p>
           <p><strong>지연 결과:</strong> 모든 위성에 같은 거리값을 더하면 주로 Clock Bias가 증가할 것으로 기대합니다. 큰 공통 거리 증가가 곧 큰 위치 이동을 뜻하지 않습니다. Doppler가 같아도 위치·위성 방향·수치 계산으로 속도에 작은 차이가 날 수 있습니다. 해가 유효하지 않거나 일부 항목만 비교 가능하면 해당 제한을 함께 기록하세요.</p>
-          <p><strong>미수신:</strong> 송신 요청·어댑터 접수 → 어댑터·라우터 저장·대기·전달 로그 → 수신 callback 순서로 확인하세요. 송신측 접수 로그만으로 상대 도착을 판단하지 않습니다.</p>
+          <p><strong>미수신:</strong> 송신 요청·어댑터 접수 → 어댑터·라우터 저장·대기·전달 로그 → 수신 callback 순서로 확인하세요. 송신측 접수 로그만으로 상대 도착을 판단하지 않습니다. 여러 시험은 testId별로 관리하며 도착 순서와 관계없이 반영합니다. 수신 대기는 시간 제한이 없고, 선택한 시험만 대기 종료할 수 있습니다.</p>
           <p><strong>검증 실패:</strong> 수신 원문과 송신 원문, 동일 testId, JSON 변경, RAW 시각·레코드 또는 AFS CRC·시험 시각, 비교용 원본에서 재생성한 전달 데이터의 일치 여부, I/Q 파일 존재·크기·SHA-256을 확인하세요. 어댑터 부가 로그는 원본 시험 데이터와 구분합니다.</p>
           <p><strong>PVT 계산 실패:</strong> 무결성 결과와 분리하여 관측·항법정보 및 해의 유효성을 확인하세요. I/Q는 파일 검증 뒤의 신호 획득·추적·프레임 복호 로그도 확인해야 합니다. 무결성 성공만으로 PVT 정확성이나 라우터 전체 동작을 입증하지 않습니다.</p>
         </div></details>
@@ -487,7 +487,7 @@
         frame: [
           '송신측 · 프레임 구성',
           '필요한 정보를 고정 길이 AFS에 담습니다.',
-          iq ? '6,000 bits의 AFS 프레임으로 신호를 생성합니다. I/Q 경로는 기존 확장 v2를 유지하며 수신측은 신호에서 관측값을 측정합니다.' : '6,000 bits 안에 기존 SB1·SB2와 LNIS 확장 SB3·SB4를 유지합니다. SB4에는 원본 의사거리 대신 시험 시작 기준 보정 송신 시각을 넣습니다.',
+          iq ? '6,000 bits의 AFS 프레임으로 신호를 생성합니다. I/Q 경로는 기존을 유지하며 수신측은 신호에서 관측값을 측정합니다.' : '6,000 bits 안에 기존 SB1·SB2와 LNIS 확장 SB3·SB4를 유지합니다. SB4에는 원본 의사거리 대신 시험 시작 기준 보정 송신 시각을 넣습니다.',
           iq ? 'AFS 전송과 물리 부호화는 공통이지만, I/Q용 SB4는 기존 원본 관측값 형식입니다.' : '보정 송신 시각은 송신 서비스가 계산합니다. 수신 서비스는 도착 시각과의 차이로 의사거리를 구합니다.'
         ],
         encode: [
@@ -598,14 +598,14 @@
               ['수신측 사용', 'AFS에서 복원한 관측·항법정보로 계산']
             ],
             iq ? '파일 정보를 전달하는 JSON과, 실제 전송되는 I/Q 파일을 구분하세요.' : '데이터 형식에 따라 건너뛰는 처리 단계가 달라집니다.',
-            raw ? 'GNSS_RAW / LNIS-GRAW-DELAY-v2 / schemaVersion 2\nAFS 인코딩과 I/Q 생성은 생략합니다.' : iq ? 'IQ_SAMPLE / LNIS-IQ-FILE-v2 / schemaVersion 2\n기존 I/Q용 확장 v2 프레임으로 신호를 생성하고 수신측에서 추적·복호합니다.' : 'AFS_METADATA / LNIS-AFS-GNSS-v5 / schemaVersion 5\n위성별 프레임은 satellites 아래에 묶입니다. metadata·referencePvt·원본 RAW는 제외합니다. testId·엔진·설정 등 전달에 필요한 필드는 유지합니다.');
+            raw ? 'GNSS_RAW / LNIS-GRAW-DELAY / schemaVersion 2\nAFS 인코딩과 I/Q 생성은 생략합니다.' : iq ? 'IQ_SAMPLE / LNIS-IQ-FILE / schemaVersion 2\n기존 I/Q용 프레임으로 신호를 생성하고 수신측에서 추적·복호합니다.' : 'AFS_METADATA / LNIS-AFS-GNSS-v5 / schemaVersion 5\n위성별 프레임은 satellites 아래에 묶입니다. metadata·referencePvt·원본 RAW는 제외합니다. testId·엔진·설정 등 전달에 필요한 필드는 유지합니다.');
         case 'frame':
           return make(
             '6,000 bits 안의 역할 분담', '현재 서비스 규격',
             [],
             [['전체 프레임 · 750 bytes', '동기 68 + SB1 52 + SB2 2,400 + SB3 1,740 + SB4 1,740 bits']],
             'SB3·SB4는 LNIS 확장 내용입니다. 공식 표준 메시지 할당을 의미하지 않습니다.',
-            'SB2: 정보 1,176 + CRC 24 bits → 부호화 후 2,400 bits.\nSB3·SB4: 각각 정보 846 + CRC 24 bits → 부호화 후 1,740 bits.\nAFS v5의 LNIS 확장 v3: SB3 517/846 bits, SB4 670/846 bits 사용. SB4에는 보정 송신 시각·시험 시작 시각·Doppler·C/N0·관측 시각·유효성이 들어갑니다. 남은 정보 비트는 0101…로 채웁니다.\nI/Q v2는 기존 확장 v2를 사용하며 SB4 사용량은 506/846 bits입니다.',
+            'SB2: 정보 1,176 + CRC 24 bits → 부호화 후 2,400 bits.\nSB3·SB4: 각각 정보 846 + CRC 24 bits → 부호화 후 1,740 bits.\n SB3 517/846 bits, SB4 670/846 bits 사용. SB4에는 보정 송신 시각·시험 시작 시각·Doppler·C/N0·관측 시각·유효성이 들어갑니다. 남은 정보 비트는 0101…로 채웁니다.\nI/Q는 AFS를 사용하며 SB4 사용량은 506/846 bits입니다.',
             '부호화 전후 크기 보기');
         case 'encode':
           return make(
@@ -618,7 +618,7 @@
               ['샘플 배치', 'I, Q, I, Q… 순서의 IQ_INTERLEAVED_INT8']
             ],
             '90초는 생성 신호의 길이입니다. 전송시간이나 재생 배속과 같은 값이 아닙니다.',
-            '파일 크기 = 90 × 12,000,000 × 2 bytes.\n각 성분은 −3, −1, +1, +3 값으로 양자화되며 저장 공간은 각각 1 byte입니다. 따라서 2비트 양자화라는 이유로 파일 크기를 4분의 1로 계산하면 안 됩니다.\nAFS와 I/Q는 물리 부호화 구조를 공유합니다. SB4의 내용은 AFS 지연 시험용 v3와 I/Q용 v2로 구분됩니다.');
+            '파일 크기 = 90 × 12,000,000 × 2 bytes.\n각 성분은 −3, −1, +1, +3 값으로 양자화되며 저장 공간은 각각 1 byte입니다. 따라서 2비트 양자화라는 이유로 파일 크기를 4분의 1로 계산하면 안 됩니다.\nAFS와 I/Q는 물리 부호화 구조를 공유합니다. SB4의 내용은 AFS 지연 시험용과 I/Q용으로 구분됩니다.');
         case 'send':
           return make(
             '어댑터에 보내는 요청', '축약 예시 · 실제 요청 없음',
@@ -677,7 +677,7 @@
               ['비교 기준', iq ? 'I/Q 요청에 포함된 Reference · 계산 후 비교용' : 'PVT 계산 후 서비스 간 REST로 원본·Reference 조회']
             ],
             iq ? 'I/Q PVT는 프레임 원본 관측값이 아닌 추적 관측값을 사용합니다.' : '수신한 보정 송신 시각과 도착 시각으로 의사거리를 계산합니다. 원본 의사거리를 계산 입력으로 가져오지 않습니다.',
-            raw ? 'RAW v2의 transmitAt은 초와 펨토초로 나누어 전달합니다. 수신한 JSON을 보존하면서 계산용 복사본에 P′ᵢ를 생성합니다.' : iq ? 'I/Q v2는 복호한 AFS에서 항법정보를 복원하고, 관측값은 신호 추적에서 얻습니다. SB4 원본 관측값이나 Metadata로 RF 추적 관측값을 대체하지 않습니다.' : 'AFS v5는 CRC와 시험 시각을 검증한 뒤 SB4의 보정 송신 시각에서 의사거리를 계산합니다. 원본 RAW와 Reference는 이 계산에 사용하지 않습니다.');
+            raw ? 'RAW의 transmitAt은 초와 펨토초로 나누어 전달합니다. 수신한 JSON을 보존하면서 계산용 복사본에 P′ᵢ를 생성합니다.' : iq ? 'I/Q는 복호한 AFS에서 항법정보를 복원하고, 관측값은 신호 추적에서 얻습니다. SB4 원본 관측값이나 Metadata로 RF 추적 관측값을 대체하지 않습니다.' : 'AFS v5는 CRC와 시험 시각을 검증한 뒤 SB4의 보정 송신 시각에서 의사거리를 계산합니다. 원본 RAW와 Reference는 이 계산에 사용하지 않습니다.');
         case 'calculate':
           if (iq) return make(
             '신호 기반 PVT 계산', '계산 입력과 출력',
@@ -733,7 +733,7 @@
         schemaVersion: iq || raw ? 2 : 5,
         testId: '00000000-0000-4000-8000-000000000001',
         testType: iq ? 'IQ_SAMPLE' : raw ? 'GNSS_RAW' : 'AFS_METADATA',
-        format: iq ? 'LNIS-IQ-FILE-v2' : raw ? 'LNIS-GRAW-DELAY-v2' : 'LNIS-AFS-GNSS-v5',
+        format: iq ? 'LNIS-IQ-FILE' : raw ? 'LNIS-GRAW-DELAY' : 'LNIS-AFS-GNSS',
         senderMode: state.tx,
         receiverMode: state.rx
       };
@@ -773,7 +773,7 @@
           sampleFormat: 'IQ_INTERLEAVED_INT8',
           quantizationBits: 2
         };
-        example.metadata = { signal: 'AFSD', pvtMethod: 'AFS_IQ_FRAME_PVT-v2' };
+        example.metadata = { signal: 'AFSD', pvtMethod: 'AFS_IQ_FRAME_PVT' };
       } else {
         example.satellites = [{
           constellationId: 0,
@@ -834,7 +834,7 @@
         1: 'SB1 · 기존 프레임 식별 구조를 유지합니다. BCH 부호화 후 52 bits입니다.',
         2: 'SB2 · 기존 항법정보입니다. 정보 1,176 + CRC 24 bits를 부호화해 2,400 bits로 전달합니다.',
         3: 'SB3 · LNIS 보충 항법정보입니다. GPS LNAV의 나머지 정보를 담아 수신측 PVT 입력 복원에 사용합니다.',
-        4: state.data === 'iq' ? 'SB4 · I/Q용 확장 v2. 원본 관측값을 담지만 RF 추적 결과를 대신하지 않습니다. 506/846 bits 사용.' : 'SB4 · AFS용 확장 v3. 보정 송신 시각·시험 시작 시각·Doppler·C/N0·관측 시각·유효성을 담습니다. 원본 의사거리는 없으며 670/846 bits를 사용합니다.'
+        4: state.data === 'iq' ? 'SB4 · I/Q용. 원본 관측값을 담지만 RF 추적 결과를 대신하지 않습니다. 506/846 bits 사용.' : 'SB4 · 보정 송신 시각·시험 시작 시각·Doppler·C/N0·관측 시각·유효성을 담습니다. 원본 의사거리는 없으며 670/846 bits를 사용합니다.'
       };
       $('frame-description').textContent = descriptions[block];
       document.querySelectorAll('[data-sb]').forEach(button => {
@@ -977,7 +977,7 @@
       $('tx-adapter').classList.toggle('active', active === 'send');
       $('rx-adapter').classList.toggle('active', active === 'receive');
       $('reference-label').hidden = iq;
-      $('reference-label').textContent = '원본·Reference 보관';
+      $('reference-label').textContent = 'Raw · Reference';
       document.querySelector('.management-link').textContent =
         iq ? '서비스 간 REST · 등록 / 결과 확인 ↕' : '서비스 간 REST · 등록 / 원본 조회 ↕';
       $('clock-note').hidden = iq;

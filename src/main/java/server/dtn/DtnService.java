@@ -203,9 +203,17 @@ public class DtnService {
         return !tasks.isEmpty() || agentCommandService.busy();
     }
 
+    public synchronized boolean sendBusy() {
+        return (sendingNode() && managementBusy())
+                || dtnRepository.existsByState("PREPARING")
+                || dtnRepository.existsByStateInAndSendStatusIn(
+                        ACTIVE, List.of("PREPARING", "REQUESTING"));
+    }
+
     public Map<String, Object> configuration() {
         return Map.ofEntries(
                 Map.entry("delaySupported", pvtCalculator != null && nodeLink != null),
+                Map.entry("sendBusy", sendBusy()),
                 Map.entry("exampleEnabled", exampleEnabled),
                 Map.entry("development", development),
                 Map.entry("iqEnabled", iq != null && iq.enabled()),
@@ -384,7 +392,7 @@ public class DtnService {
         if (!sendingNode() && receiveToken.isBlank()) {
             throw new IllegalStateException("DTN 수신 인증 토큰을 설정하세요.");
         }
-        if (!dtnRepository.findByStateIn(ACTIVE).isEmpty()) {
+        if (sendBusy()) {
             throw new IllegalStateException("다른 DTN 시험 진행 중");
         }
         requireAgent(sender, AgentRole.SENDER);
@@ -415,6 +423,7 @@ public class DtnService {
         job.setSenderAgentId(sender);
         job.setReceiverAgentId(receiver);
         job.setCreatedAt(Instant.now());
+        job.setSendStatus("PREPARING");
         return job;
     }
 
@@ -581,6 +590,16 @@ public class DtnService {
         return dtnRepository.findTop50ByOrderByCreatedAtDesc();
     }
 
+    public List<DtnJob> recent(int page, String state) {
+        if (page < 0 || page > 100000) throw new IllegalArgumentException("목록 페이지 오류");
+        var paging = org.springframework.data.domain.PageRequest.of(page, 50);
+        if (state == null || state.isBlank()) {
+            return dtnRepository.findAllByOrderByCreatedAtDescIdDesc(paging);
+        }
+        if (!"WAITING_DTN".equals(state)) throw new IllegalArgumentException("목록 상태 오류");
+        return dtnRepository.findByStateOrderByCreatedAtDescIdDesc(state, paging);
+    }
+
     /* 저장된 시험 조회: 존재하지 않으면 기존 조회 오류를 전달한다. */
     public DtnJob get(UUID id) {
         return dtnRepository
@@ -614,9 +633,6 @@ public class DtnService {
         }
         UUID id = UUID.fromString(received.path("testId").asText());
         DtnJob job = get(id);
-        if ("CANCELLED".equals(job.getState())) {
-            throw new IllegalStateException("중지된 시험에는 수신 데이터를 적용할 수 없습니다.");
-        }
         JsonNode adapterLogs = received.get("dtnLogsBase64");
         JsonNode plainLogs = received.get("dtnLogs");
         ((com.fasterxml.jackson.databind.node.ObjectNode) received)
@@ -638,6 +654,13 @@ public class DtnService {
                         "전송 원본과 수신 JSON 불일치 · 원본 필드·배열·숫자 변경 여부를 확인하세요.");
             }
             throw new IllegalArgumentException("전송 JSON과 수신 JSON이 다릅니다.");
+        }
+        if ("CANCELLED".equals(job.getState())) {
+            if (job.getLateReceivedAt() == null) {
+                job.setLateReceivedAt(receivedAt);
+                update(job, "CANCELLED", "대기 종료 · 이후 수신됨 · 원문만 보관");
+            }
+            return job;
         }
         if (job.getReceivedJson() != null) {
             return job;
@@ -697,14 +720,14 @@ public class DtnService {
         return job;
     }
 
-    /** 검증 실패를 대기로 남기지 않는다. 완료 결과와 처리 중인 최초 수신은 보호한다. */
+    /** 검증 실패를 명시하되 정상 재수신은 허용한다. 최초 정상 수신과 완료 결과는 보호한다. */
     public synchronized void rejectReceipt(UUID id, String reason) {
         if (id == null) {
             return;
         }
         DtnJob job = dtnRepository.findById(id).orElse(null);
         if (job != null && "WAITING_DTN".equals(job.getState()) && job.getReceivedAt() == null) {
-            fail(job, new IllegalArgumentException("수신 검증 실패 · " + reason + " · 수신 원문 기록 확인 필요"));
+            update(job, "WAITING_DTN", "수신 검증 실패 · 정상 데이터 재수신 대기 · " + reason);
         }
     }
 
@@ -917,21 +940,34 @@ public class DtnService {
         for (DtnJob job : dtnRepository.findByCancelPendingTrue()) {
             requestCancellation(job);
         }
-        for (DtnJob job : dtnRepository.findByStateIn(ACTIVE)) {
+        var waiting = new ArrayList<>(dtnRepository.findByStateIn(ACTIVE));
+        waiting.sort(Comparator.comparing(DtnJob::getReceivedAt,
+                Comparator.nullsLast(Comparator.naturalOrder())).thenComparing(DtnJob::getId));
+        if (sendingNode()) {
+            waiting.sort(Comparator.comparing(job ->
+                    nextResultPoll.getOrDefault(job.getId(), Instant.MIN)));
+        }
+        nextResultPoll.keySet().removeIf(id -> waiting.stream().noneMatch(job -> job.getId().equals(id)));
+        for (DtnJob job : waiting) {
             int timeoutMinutes = "IQ_SAMPLE".equals(job.getTestType()) ? 20 : 10;
-            if (Instant.now()
-                    .isAfter(job.getCreatedAt().plus(Duration.ofMinutes(timeoutMinutes)))) {
-                fail(
-                        job,
-                        new IllegalStateException("DTN 시험 제한 시간 " + timeoutMinutes + "분 초과"),
-                        sendingNode() && "WAITING_DTN".equals(job.getState()) ? "상대 결과 확인" : "시험");
+            Instant stageStart = job.getStageStartedAt() == null
+                    ? job.getCreatedAt() : job.getStageStartedAt();
+            if (List.of("PREPARING", "CALCULATING").contains(job.getState())
+                    && stageStart != null
+                    && Instant.now().isAfter(stageStart.plus(Duration.ofMinutes(timeoutMinutes)))) {
+                fail(job, new IllegalStateException("실제 작업 제한 시간 " + timeoutMinutes + "분 초과"));
+                Thread running = tasks.get(job.getId());
+                if (running != null) running.interrupt();
+                agentCommandService.cancel(sendingNode() ? job.getSenderAgentId()
+                        : job.getReceiverAgentId(), job.getId());
                 continue;
             }
             if (sendingNode() && "WAITING_DTN".equals(job.getState())) {
-                pollReceiver(job);
+                scheduleReceiverPoll(job);
                 continue;
             }
             if ("WAITING_RECEIVER".equals(job.getState())
+                    && !managementBusy()
                     && agentConnectionRegistry.online(job.getReceiverAgentId())
                     && agentRepository
                             .find(job.getReceiverAgentId())
@@ -968,7 +1004,10 @@ public class DtnService {
 
     /* 외부 DTN에 JSON 전달: 늦게 도착한 HTTP 실패가 수신 완료를 덮어쓰지 않게 한다. */
     private void sendExternal(UUID id, String packet) {
+        boolean attempted = false;
+        boolean responded = false;
         try {
+            setSendStatus(id, "REQUESTING");
             if (!isActive(id)) {
                 return;
             }
@@ -995,6 +1034,7 @@ public class DtnService {
                     true,
                     "JSON 전달 요청 · " + packet.getBytes(StandardCharsets.UTF_8).length + " bytes");
             long started = System.nanoTime();
+            attempted = true;
             int status =
                     server.common.LoggedHttpClient.send(
                                     httpClient,
@@ -1002,6 +1042,8 @@ public class DtnService {
                                             .build(),
                                     HttpResponse.BodyHandlers.discarding())
                             .statusCode();
+            responded = true;
+            setSendStatus(id, status >= 200 && status < 300 ? "ACCEPTED" : "REJECTED");
             trace(
                     id,
                     "어댑터",
@@ -1014,21 +1056,61 @@ public class DtnService {
         } catch (Exception e) {
             synchronized (this) {
                 DtnJob job = get(id);
+                job.setSendStatus(attempted && !responded ? "UNKNOWN" : "REJECTED");
+                dtnRepository.save(job);
                 // callback이 먼저 도착했다면 전달 성공 상태를 뒤늦은 HTTP 오류로 되돌리지 않는다.
                 if ("WAITING_DTN".equals(job.getState()) && job.getReceivedAt() == null) {
-                    fail(job, e);
+                    if (attempted && !responded) {
+                        update(job, "WAITING_DTN", "어댑터 응답 미확인 · 수신 대기 · "
+                                + e.getClass().getSimpleName());
+                    } else {
+                        fail(job, e);
+                    }
                 }
             }
         }
     }
 
-    /** 관리 연결의 일시 중단은 재전송 없이 다음 상태 조회까지 기다린다. 전체 제한 시간은 유지한다. */
-    private void pollReceiver(DtnJob job) {
-        DtnRemoteResult result;
-        try {
-            result = nodeLink.result(job.getId());
-        } catch (RuntimeException unavailable) {
-            return;
+    private synchronized void setSendStatus(UUID id, String status) {
+        DtnJob job = get(id);
+        job.setSendStatus(status);
+        job.setUpdatedAt(Instant.now());
+        dtnRepository.save(job);
+    }
+
+    private final Map<UUID, Instant> nextResultPoll = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Set<UUID> resultRequests = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /** 네트워크 조회는 시험 잠금 밖에서 수행하고, 결과만 해당 시험에 반영한다. */
+    private void scheduleReceiverPoll(DtnJob job) {
+        UUID id = job.getId();
+        Instant now = Instant.now();
+        if (resultRequests.size() >= 2 || now.isBefore(nextResultPoll.getOrDefault(id, Instant.MIN))
+                || !resultRequests.add(id)) return;
+        nextResultPoll.put(id, now.plusSeconds(10));
+        Thread.ofVirtual().name("dtn-result-poll").start(() -> {
+            try {
+                DtnRemoteResult result = nodeLink.result(id);
+                synchronized (this) {
+                    DtnJob current = dtnRepository.findById(id).orElse(null);
+                    if (current != null && "WAITING_DTN".equals(current.getState())) {
+                        applyReceiverResult(current, result);
+                    }
+                }
+            } catch (RuntimeException unavailable) {
+                // 전달 대기는 만료하지 않는다. 다음 순환에서 같은 시험을 다시 조회한다.
+            } finally {
+                resultRequests.remove(id);
+            }
+        });
+    }
+
+    private void applyReceiverResult(DtnJob job, DtnRemoteResult result) {
+        if (result == null) return;
+        if ("WAITING_DTN".equals(result.getState()) && result.getMessage() != null
+                && result.getMessage().startsWith("수신 검증 실패")
+                && !result.getMessage().equals(job.getMessage())) {
+            update(job, "WAITING_DTN", result.getMessage(), "상대 결과 확인");
         }
         if (result.getReceivedAt() != null && job.getReceivedAt() == null) {
             job.setReceivedAt(result.getReceivedAt());
@@ -1308,6 +1390,9 @@ public class DtnService {
     }
 
     private void update(DtnJob job, String state, String message, String stage) {
+        if (!state.equals(job.getState()) || job.getStageStartedAt() == null) {
+            job.setStageStartedAt(Instant.now());
+        }
         job.setState(state);
         job.setMessage(message);
         job.setUpdatedAt(Instant.now());

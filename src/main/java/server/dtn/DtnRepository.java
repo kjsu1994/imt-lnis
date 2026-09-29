@@ -9,7 +9,16 @@ import java.util.UUID;
 public interface DtnRepository extends JpaRepository<DtnJob, UUID> {
     List<DtnJob> findByStateIn(List<String> states);
 
+    boolean existsByState(String state);
+
+    boolean existsByStateInAndSendStatusIn(List<String> states, List<String> statuses);
+
     List<DtnJob> findTop50ByOrderByCreatedAtDesc();
+
+    List<DtnJob> findAllByOrderByCreatedAtDescIdDesc(org.springframework.data.domain.Pageable page);
+
+    List<DtnJob> findByStateOrderByCreatedAtDescIdDesc(String state,
+            org.springframework.data.domain.Pageable page);
 
     List<DtnJob> findByCancelPendingTrue();
 

@@ -49,6 +49,7 @@ const context = {
   createPayloadViewer: () => ({setJob() {}}),
   createObservationView: () => ({setData(data) { loaded = data; }, select() {}}),
   numeric,
+  URLSearchParams,
   Option: function(text, value) { this.value = value; },
   location: {protocol: 'http:', host: '127.0.0.1:18090'}, WebSocket: class {},
   window: {scrollY: 250, scrollTo({top}) { this.scrollY = top; }},
@@ -65,7 +66,7 @@ const context = {
     else if (url.endsWith('/agents')) body = [tx, rx];
     else if (url.endsWith('/node/connection')) body = {ip: '127.0.0.1', port: 18091, editable: true};
     else if (url.endsWith('/tests') && options.method === 'POST') { starts++; lastStartBody = JSON.parse(options.body); currentJob = {testId: 't1', state: 'PREPARING', updatedAt: '1'}; body = currentJob; }
-    else if (url.endsWith('/tests')) body = [];
+    else if ((url.endsWith('/tests') || url.includes('/tests?'))) body = [];
     else if (url.endsWith('/inputs?dtn=true')) {
       if (failUpload) return {ok: false, json: async () => ({message: 'bad input'})};
       body = {inputId: 'input1'};
@@ -386,3 +387,21 @@ assert.equal(elements.get('dtn-send-url').value, 'http://sender.default:8080');
 assert.equal(vm.runInContext('job', cleared), null);
 assert.equal(vm.runInContext('inputId', cleared), null);
 console.log('PASS: sender clear starts without previous job or input');
+
+// A pending receipt does not block another send, even while the receiver computes.
+vm.runInContext("busy=false; config.sendBusy=false; selectedType='IQ_SAMPLE'; iqJob={state:'READY'}; job={testId:'old',state:'WAITING_DTN',sendStatus:'ACCEPTED'};", context);
+elements.get('dtn-send-url').value = 'http://adapter:8080';
+rx.state = 'BUSY';
+context.updateControls();
+assert.equal(elements.get('dtn-send').disabled, false);
+assert.equal(elements.get('dtn-cancel').textContent, '대기 종료');
+vm.runInContext("job.sendStatus='REQUESTING';", context);
+context.updateControls();
+assert.equal(elements.get('dtn-send').disabled, true);
+vm.runInContext("job.sendStatus='UNKNOWN';", context);
+context.updateControls();
+assert.equal(elements.get('dtn-send').disabled, false);
+vm.runInContext("config.sendBusy=true;", context);
+context.updateControls();
+assert.equal(elements.get('dtn-send').disabled, true, 'other browser send still locks this screen');
+console.log('PASS: multiple sends, busy receiver, ambiguous adapter response and global send lock');

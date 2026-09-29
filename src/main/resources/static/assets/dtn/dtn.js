@@ -1,8 +1,8 @@
 import {initPresetControls, renderTrialSettings} from './dtn-settings.js?v=20260928-delay-transfer';
 import {requestJson} from '../common/http.js?v=20260915-structure';
-import {createDtnLog} from './dtn-log.js?v=20260923-fullscreen';
+import {createDtnLog} from './dtn-log.js?v=20260929-log-view';
 import {initAdapterHealth, validAdapterUrl} from './dtn-adapter-health.js?v=20260922-compact-settings';
-import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20260915-structure';
+import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20260929-payload-header';
 import {createObservationView, numeric} from './dtn-observations.js?v=20260928-observation-colors';
 
 const api = '/lnis/api/v1', $ = id => document.getElementById(id);
@@ -18,7 +18,8 @@ let iqFiles = [];
 let jobVersion = 0;
 const generatingIq = () => iqJob?.state === 'GENERATING';
 const active = () => ['PREPARING', 'WAITING_DTN', 'WAITING_RECEIVER', 'CALCULATING'].includes(job?.state);
-const locked = () => busy || active() || generatingIq();
+const locked = () => busy || config.sendBusy || job?.sendBusy
+  || job?.state === 'PREPARING' || job?.sendStatus === 'REQUESTING' || generatingIq();
 const view = createObservationView($('dtn-observations'), index => { epochIndex = index; renderPvt(); }, '송신 원본');
 view.setData(null);
 
@@ -279,9 +280,10 @@ function updateControls() {
   const rx = agents.find(a => a.agentId === $('dtn-receiver').value);
   $('dtn-start').disabled = locked() || ! $('dtn-port').value || tx?.state !== 'READY';
   $('dtn-port').disabled = $('dtn-baud').disabled = locked();
+  $('dtn-tests').disabled = busy;
   $('dtn-cancel').disabled = busy || !(active() || job?.state === 'FAILED' || job?.cancelPending);
-  $('dtn-cancel').textContent = job?.cancelPending ? '중지 재요청' : '시험 중지';
-  $('dtn-send').disabled = locked() || (selectedType === 'IQ_SAMPLE' ? iqJob?.state !== 'READY' : !inputId) || (delayMode() && !selectedDelayEpoch()?.reference?.positionValid) || !urlValid() || tx?.state !== 'READY' || rx?.state !== 'READY';
+  $('dtn-cancel').textContent = job?.cancelPending ? '종료 전달 중' : job?.state === 'WAITING_DTN' ? '대기 종료' : job?.state === 'CALCULATING' ? '계산 중지' : '시험 중지';
+  $('dtn-send').disabled = locked() || (selectedType === 'IQ_SAMPLE' ? iqJob?.state !== 'READY' : !inputId) || (delayMode() && !selectedDelayEpoch()?.reference?.positionValid) || !urlValid() || tx?.state !== 'READY' || !rx || ['OFFLINE', 'ERROR'].includes(rx.state);
   $('iq-generate').disabled = locked() || !config.iqEnabled || !inputId;
   $('iq-cancel').disabled = !generatingIq();
   $('iq-saved').disabled = locked();
@@ -292,8 +294,8 @@ function updateControls() {
   for (const button of document.querySelectorAll('.test-type-button,.transport-mode-button,.input-mode')) button.disabled = locked();
   for (const id of ['dtn-connection-test', 'dtn-connection-save', 'dtn-receiver-ip', 'dtn-receiver-port']) $(id).disabled = locked() || !peerConfig?.editable;
   $('dtn-message').textContent = selectedType !== 'IQ_SAMPLE'
-    ? active() ? '전송·수신 결과를 기다리는 중입니다.' : !inputId ? 'GNSS 입력을 준비하세요.' : !urlValid() ? '어댑터 전송 URL을 입력하세요.' : ''
-    : active() ? '전송·수신 결과를 기다리는 중입니다.' : generatingIq() ? '90초 I/Q 생성 중입니다.'
+    ? active() ? (locked() ? '송신 준비·어댑터 요청 중입니다.' : '이전 시험 수신 대기 · 다음 시험을 전송할 수 있습니다.') : !inputId ? 'GNSS 입력을 준비하세요.' : !urlValid() ? '어댑터 전송 URL을 입력하세요.' : ''
+    : active() ? (locked() ? '송신 준비·어댑터 요청 중입니다.' : '이전 시험 수신 대기 · 다음 시험을 전송할 수 있습니다.') : generatingIq() ? '90초 I/Q 생성 중입니다.'
       : iqJob?.state === 'READY' ? '선택한 I/Q 파일을 전송합니다.' : 'GNSS 입력 적용 후 90초 I/Q를 생성하세요.';
 }
 function renderIq() {
@@ -476,6 +478,7 @@ $('dtn-send').onclick = async () => {
       receiverAgentId: $('dtn-receiver').value, sendUrl: $('dtn-send-url').value.trim(), testType: selectedType, senderMode, receiverMode, ...delayRequest, ...(hdtnConfig ? {hdtnConfig} : {})});
     log('전송시험 시작 · ' + job.testId);
     renderSummary();
+    historyPage = 0; $('dtn-test-filter').value = ''; await refreshHistory();
   } catch (e) { log('시험 시작 실패 · ' + e.message, 'ERROR'); pill('dtn-test-status', '시작 실패', 'error'); }
   finally { busy = false; updateControls(); }
 };
@@ -499,13 +502,47 @@ function renderSummary() {
   if (!job) return;
   const names = {PREPARING: job.testType === 'IQ_SAMPLE' ? 'I/Q 파일 확인 중' : '입력 준비·기준 PVT 계산 중', WAITING_DTN: '외부 전달·수신 대기', WAITING_RECEIVER: '수신 처리 대기',
     CALCULATING: '복원·PVT 계산 중', COMPLETED: '처리 완료', FAILED: '시험 실패', INCONCLUSIVE: '판정 불가', CANCELLED: '취소'};
-  pill('dtn-test-status', names[job.state] || job.state, active() ? 'warning' : job.verdict === 'PASS' ? 'online' : 'warning');
+  pill('dtn-test-status', job.state === 'WAITING_DTN' && job.message?.startsWith('수신 검증 실패') ? '검증 실패 · 재수신 대기' : names[job.state] || job.state, active() ? 'warning' : job.verdict === 'PASS' ? 'online' : 'warning');
 
+  $('dtn-test-detail').textContent = job.testId + ' · ' + (job.message || '');
   payload.setJob(job);
 
   const key = job.testId + ':' + job.state + ':' + job.updatedAt;
   lastEvent = key;
 }
+let historyPage = 0, historyVersion = 0;
+const trialNames = {PREPARING:'준비 중', WAITING_DTN:'수신 대기', WAITING_RECEIVER:'계산 대기',
+  CALCULATING:'계산 중', COMPLETED:'완료', INCONCLUSIVE:'비교 불가', FAILED:'실패', CANCELLED:'종료'};
+async function refreshHistory() {
+  const version = ++historyVersion;
+  const query = new URLSearchParams({page: historyPage});
+  if ($('dtn-test-filter').value) query.set('state', $('dtn-test-filter').value);
+  const rows = await request('/dtn/tests?' + query);
+  if (version !== historyVersion) return;
+  $('dtn-tests').replaceChildren(new Option('시험 선택', ''), ...rows.map(item => {
+    const wait = item.state === 'WAITING_DTN' ? ' · ' + Math.max(0, Math.floor((Date.now() - Date.parse(item.createdAt)) / 60000)) + '분 대기' : '';
+    return new Option(new Date(item.createdAt).toLocaleString('ko-KR') + ' · '
+      + (trialNames[item.state] || item.state) + wait + ' · ' + item.testId.slice(0, 8), item.testId);
+  }));
+  if (job && rows.some(item => item.testId === job.testId)) $('dtn-tests').value = job.testId;
+  $('dtn-tests-prev').disabled = historyPage === 0;
+  $('dtn-tests-next').disabled = rows.length < 50;
+  $('dtn-tests-page').textContent = String(historyPage + 1);
+}
+$('dtn-test-filter').onchange = () => { historyPage = 0; refreshHistory().catch(error => log(error.message, 'ERROR')); };
+for (const [id, step] of [['dtn-tests-prev', -1], ['dtn-tests-next', 1]]) $(id).onclick = () => {
+  historyPage = Math.max(0, historyPage + step); refreshHistory().catch(error => log(error.message, 'ERROR'));
+};
+$('dtn-tests').onchange = async () => {
+  if (busy || !$('dtn-tests').value) return;
+  const id = $('dtn-tests').value, version = ++jobVersion;
+  try {
+    const selected = await request('/dtn/tests/' + encodeURIComponent(id));
+    if (version !== jobVersion || busy) return;
+    job = selected; reportKey = ''; renderSummary(); updateControls();
+  } catch (error) { log(error.message, 'ERROR'); }
+};
+
 async function poll() {
   if (polling) return;
   polling = true;
@@ -514,6 +551,8 @@ async function poll() {
       iqJob = await request('/dtn/iq/' + iqJob.id); renderIq();
       if (!generatingIq()) { log('I/Q 생성 결과 · ' + iqJob.state + ' · ' + iqJob.message); await loadIqFiles(); }
     }
+    const status = await request('/dtn/config');
+    config.sendBusy = status.sendBusy === true;
     agents = await request('/agents');
     if (peerConfig) {
       const connection = await request('/node/connection');
@@ -532,6 +571,7 @@ async function poll() {
     }
     const agentState = agents.map(a => a.role + ':' + a.state).join(',');
     if (agentState !== lastAgentState) { log('송·수신 처리기 상태 갱신'); lastAgentState = agentState; }
+    await refreshHistory();
     if (job && !busy) {
       const id = job.testId, version = jobVersion;
       const next = await request('/dtn/tests/' + id);

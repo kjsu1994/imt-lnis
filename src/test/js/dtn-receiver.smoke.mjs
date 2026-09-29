@@ -25,16 +25,22 @@ const context = {
   document: {visibilityState:'visible', getElementById(id) { if (removedHealth.has(id)) return null; assert.ok(elements.has(id), 'DOM missing: ' + id); return elements.get(id); }},
   createPayloadViewer(container, options) { assert.equal(options.receivedOnly, true); return {setJob() {},setReceipts() {}}; },
   createObservationView() { return {setData() {}, select() {}}; },
+  URLSearchParams,
   Option: function(text, value) { this.text = text; this.value = value; },
   location: {origin: 'http://localhost:8089'}, navigator: {}, setTimeout() {}, setInterval(fn,ms) { healthIntervals.push({fn,ms}); },
   fetch: async (url, options) => {
+    if (options?.method === 'POST' && url.endsWith('/cancel')) {
+      const id = url.split('/').at(-2);
+      nextTests = nextTests.map(job => job.testId === id ? {...job, state:'CANCELLED'} : job);
+      return {ok:true, json:async()=>nextTests.find(job=>job.testId===id)};
+    }
     assert.ok(!options?.method || options.method === 'GET', 'Receiver screen must not start a test');
     requests.push(url);
     const body = url.includes('/adapter-health?') ? {checkedAt:'2026-09-22T00:00:00Z',adapter:{status:healthState,message:healthState==='ready'?'정상연결':healthState==='busy'?'시험대기':'연결실패',elapsedMillis:5,url:'http://adapter:8080/receiver/health'}}
       : url.endsWith('/node') ? {baseUrl: 'http://192.168.1.72:8089'}
       : url.endsWith('/agents') ? [{role: 'RECEIVER', state: 'BUSY'}, {role: 'SENDER', state: 'READY'}]
       : url.endsWith('/config') ? {receiveConfigured: true}
-      : url.endsWith('/tests') ? nextTests
+      : (url.endsWith('/tests') || url.includes('/tests?')) ? nextTests
       : reportRequest ? await reportRequest : report;
     return {ok: true, json: async () => body};
   }
@@ -212,3 +218,16 @@ elements.get('dtn-send-url').oninput();
 assert.equal(elements.get('dtn-adapter-status').textContent,'확인 대기');
 assert.ok(healthIntervals.some(item=>item.ms===10000),'receiver retains health polling');
 console.log('PASS: receiver compact health status keeps manual checks and polling without details');
+
+nextTests = [{...waiting, testId:'selected'}, {...waiting, testId:'another'}];
+const multi = vm.createContext({...context});
+vm.runInContext(source, multi); await multi.ready;
+elements.get('dtn-tests').value = 'selected';
+await elements.get('dtn-tests').onchange();
+nextTests = [{...done, testId:'new-arrival', receivedAt:new Date().toISOString()}, ...nextTests];
+await multi.poll();
+assert.equal(elements.get('dtn-tests').value, 'selected', 'new receipts never replace explicit selection');
+await elements.get('dtn-cancel').onclick();
+assert.equal(nextTests.find(job=>job.testId==='selected').state, 'CANCELLED');
+assert.equal(nextTests.find(job=>job.testId==='another').state, 'WAITING_DTN');
+console.log('PASS: manual selection preserved and receiver cancellation targets one trial');

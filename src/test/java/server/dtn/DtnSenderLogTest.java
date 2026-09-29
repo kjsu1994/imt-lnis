@@ -29,7 +29,7 @@ class DtnSenderLogTest {
                             new DtnRemoteResult.AdapterLog(
                                     Instant.now(), "INFO", "receiver detail")));
             when(fixture.link.result(fixture.job.getId())).thenReturn(result);
-            ReflectionTestUtils.invokeMethod(fixture.service, "pollReceiver", fixture.job);
+            ReflectionTestUtils.invokeMethod(fixture.service, "applyReceiverResult", fixture.job, result);
             verify(fixture.logs, never()).importAdapter(any(), any());
             verify(fixture.logs)
                     .add(
@@ -61,21 +61,21 @@ class DtnSenderLogTest {
                                 eq("상대 시험 중지 확인"));
             } else {
                 clearInvocations(fixture.logs);
-                ReflectionTestUtils.invokeMethod(fixture.service, "pollReceiver", fixture.job);
+                ReflectionTestUtils.invokeMethod(fixture.service, "applyReceiverResult", fixture.job, result);
                 verifyNoInteractions(fixture.logs);
             }
         }
     }
 
     @Test
-    void waitingTimeoutStillProducesError() {
+    void waitingDoesNotExpireAfterTenMinutes() {
         var fixture = new Fixture();
         fixture.job.setCreatedAt(Instant.now().minusSeconds(601));
         when(fixture.repository.findByStateIn(any())).thenReturn(List.of(fixture.job));
         fixture.service.tick();
-        assertEquals("FAILED", fixture.job.getState());
-        verify(fixture.logs)
-                .add(any(), eq("TEST"), eq("ERROR"), eq("상대 결과 확인"), eq(false), contains("제한 시간"));
+        assertEquals("WAITING_DTN", fixture.job.getState());
+        verify(fixture.logs, never())
+                .add(any(), eq("TEST"), eq("ERROR"), any(), eq(false), contains("제한 시간"));
     }
 
     @Test

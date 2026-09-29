@@ -1,8 +1,8 @@
 import {renderTrialSettings} from './dtn-settings.js?v=20260928-delay-transfer';
 import {requestJson} from '../common/http.js?v=20260915-structure';
-import {createDtnLog} from './dtn-log.js?v=20260923-fullscreen';
+import {createDtnLog} from './dtn-log.js?v=20260929-log-view';
 import {initAdapterHealth} from './dtn-adapter-health.js?v=20260922-compact-structure';
-import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20260918-receiver-original';
+import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20260929-payload-header';
 import {createObservationView, numeric} from './dtn-observations.js?v=20260928-observation-colors';
 
 const $ = id => document.getElementById(id);
@@ -32,6 +32,7 @@ const clearScreen = location.pathname?.endsWith('/clear') === true;
 let tests = [], epochs = [], selectedId = '', renderVersion = 0, polling = false;
 let reportKey = '', lastEvent = '';
 let receivedIds = null;
+let historyPage = 0, selectionPinned = false, cancelling = false;
 let referenceEpochs = [], comparisonEpochs = [], delayComparison = false, delayEvidence = null;
 function setComparison(report = {}) {
   renderReference(report);
@@ -159,6 +160,8 @@ function setEpochs(values, preserve = false) {
 }
 
 function renderSummary(job) {
+  $('dtn-cancel').disabled = cancelling || !['PREPARING', 'WAITING_DTN', 'WAITING_RECEIVER', 'CALCULATING'].includes(job?.state);
+  $('dtn-cancel').textContent = job?.state === 'CALCULATING' ? '계산 중지' : job?.state === 'WAITING_DTN' ? '대기 종료' : '시험 중지';
   renderTrialSettings($('trial-settings'), job);
   $('dtn-observations').hidden = job?.testType === 'IQ_SAMPLE' && !job?.receivedEpochs;
   const types = {GNSS_RAW: 'GNSS RAW', AFS_METADATA: 'AFS Frame', IQ_SAMPLE: 'I/Q Sample'};
@@ -177,7 +180,7 @@ function renderSummary(job) {
     COMPLETED: iq ? 'I/Q 처리 완료' : '수신 계산 완료', FAILED: '처리 실패', CANCELLED: '시험 취소',
     INCONCLUSIVE: '판정 불가'
   };
-  $('receive-state').textContent = job ? (states[job.state] || job.state) : '수신 대기';
+  $('receive-state').textContent = job ? (job.lateReceivedAt ? '대기 종료 · 이후 수신됨' : job.state === 'WAITING_DTN' && job.message?.startsWith('수신 검증 실패') ? '검증 실패 · 재수신 대기' : states[job.state] || job.state) : '수신 대기';
   $('receive-state').className = failed ? 'receiver-error' : '';
   $('receive-message').textContent = job?.message || '송신 측 시험 시작을 기다립니다.';
   $('test-id').textContent = job?.testId || '-';
@@ -242,7 +245,16 @@ async function poll(force = false) {
   polling = true;
   $('dtn-refresh').disabled = true;
   try {
-    const [agents, nextTests] = await Promise.all([get('/agents'), get('/dtn/tests')]);
+    const query = new URLSearchParams({page: historyPage});
+    if ($('dtn-test-filter').value) query.set('state', $('dtn-test-filter').value);
+    const [agents, nextTests] = await Promise.all([get('/agents'), get('/dtn/tests?' + query)]);
+    $('dtn-tests-prev').disabled = historyPage === 0;
+    $('dtn-tests-next').disabled = nextTests.length < 50;
+    $('dtn-tests-page').textContent = String(historyPage + 1);
+    if (selectionPinned && selectedId && !nextTests.some(item => item.testId === selectedId)) {
+      const selectedJob = await get('/dtn/tests/' + encodeURIComponent(selectedId)).catch(() => null);
+      if (selectedJob) nextTests.push(selectedJob);
+    }
     const newlyReceived = nextTests.filter(job => job.dtnReceived &&
       (receivedIds === null ? !clearScreen : !receivedIds.has(job.testId)))
       .sort((a, b) => (Date.parse(b.receivedAt) || 0) - (Date.parse(a.receivedAt) || 0))[0];
@@ -257,7 +269,7 @@ async function poll(force = false) {
     $('dtn-tests').replaceChildren(...(clearScreen ? [new Option('시험 선택 · 화면 초기화됨', '')] : []), ...(tests.length ? tests.map(job =>
       new Option(time(job.createdAt) + ' · ' + job.state + ' · ' + job.testId.slice(0, 8), job.testId))
       : [new Option('등록된 시험 없음', '')]));
-    if (newlyReceived) $('dtn-tests').value = newlyReceived.testId;
+    if (newlyReceived && !selectionPinned && historyPage === 0) $('dtn-tests').value = newlyReceived.testId;
     else if (tests.some(job => job.testId === selected)) $('dtn-tests').value = selected;
     await renderTest(force);
     payloadViewer.setReceipts(await get('/dtn/receipts').catch(() => []));
@@ -285,7 +297,21 @@ async function initialize() {
   setTimeout(repeat, 2000);
 }
 
-$('dtn-tests').onchange = () => renderTest();
+$('dtn-tests').onchange = () => { selectionPinned = true; renderTest(); };
+$('dtn-test-filter').onchange = () => { historyPage = 0; selectionPinned = false; poll(true); };
+for (const [id, step] of [['dtn-tests-prev', -1], ['dtn-tests-next', 1]]) $(id).onclick = () => {
+  historyPage = Math.max(0, historyPage + step); selectionPinned = false; poll(true);
+};
+$('dtn-cancel').onclick = async () => {
+  if (!selectedId || $('dtn-cancel').disabled) return;
+  const id = selectedId;
+  cancelling = true; $('dtn-cancel').disabled = true;
+  try {
+    await requestJson('/lnis/api/v1/dtn/tests/' + encodeURIComponent(id) + '/cancel', {method:'POST'});
+    log('선택 시험 종료 · ' + id); await poll(true);
+  } catch (error) { log(error.message, 'ERROR'); }
+  finally { cancelling = false; renderSummary(tests.find(item => item.testId === selectedId)); }
+};
 $('pvt-epoch').onchange = renderEpoch;
 $('dtn-refresh').onclick = () => poll(true);
 

@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 /** DTN 화면을 제공하고 기존 AFS 북마크는 DTN으로 이동한다. */
 @Controller
 public class WebPageController {
-    @GetMapping("/lnis/data-management")
+    @GetMapping({"/lnis/data-manager", "/lnis/data-management"})
     String dataManagement() {
         return "forward:/data-management.html";
     }

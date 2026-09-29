@@ -5,11 +5,11 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>LNIS DTN Sender</title>
   <link rel="stylesheet" href="/lnis/assets/common/app.css?v=20260918-admin-icon">
-  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20260928-logo-v3">
+  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20260929-payload-header">
 </head>
 <body data-page="dtn-sender">
 <header>
-  <a class="data-management-entry" href="/lnis/data-management" target="_blank" rel="noopener" aria-label="데이터 관리" title="데이터 관리" hidden><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><ellipse cx="12" cy="5" rx="7" ry="3"/><path d="M5 5v14c0 1.7 3.1 3 7 3s7-1.3 7-3V5M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/></svg></a>
+  <a class="data-management-entry" href="/lnis/data-manager" target="_blank" rel="noopener" aria-label="데이터 관리" title="데이터 관리" hidden><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><ellipse cx="12" cy="5" rx="7" ry="3"/><path d="M5 5v14c0 1.7 3.1 3 7 3s7-1.3 7-3V5M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/></svg></a>
   <a class="data-management-entry" style="top: 46px" href="/dtn-intro" target="_blank" rel="noopener" aria-label="시험 구조와 동작 안내" title="시험 구조와 동작 안내">
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="3" width="18" height="14" rx="2"/><path d="m10 7 5 3-5 3ZM8 21h8M12 17v4"/></svg>
   </a>
@@ -184,9 +184,18 @@
       <span class="sender-connection"><span id="dtn-adapter-summary-dot" class="connection-dot unknown" aria-hidden="true"></span>송신 adapter <strong id="dtn-adapter-summary">미확인</strong></span>
       <button id="dtn-start" type="button" hidden disabled title="유효한 지구 PVT 한 시점 확보 후 자동 종료 · 최대 120초">수집 시작</button>
       <button id="dtn-send" type="button" class="primary" disabled>전송시험 시작</button>
-      <button id="dtn-cancel" type="button" disabled title="LNIS 시험 대기·계산과 상대 수신 시험을 중지합니다. 이미 어댑터에 전달된 번들의 회수는 보장하지 않습니다.">시험 중지</button>
     </div>
     <p id="dtn-message" role="status"></p>
+    <div class="receiver-selection" aria-label="시험 기록">
+      <label for="dtn-tests">시험 기록</label>
+      <select id="dtn-test-filter" aria-label="시험 상태"><option value="">전체</option><option value="WAITING_DTN">수신 대기</option></select>
+      <select id="dtn-tests"><option value="">시험 선택</option></select>
+      <button id="dtn-tests-prev" type="button" disabled aria-label="이전 시험 목록">이전</button>
+      <span id="dtn-tests-page">1</span>
+      <button id="dtn-tests-next" type="button" disabled aria-label="다음 시험 목록">다음</button>
+      <button id="dtn-cancel" type="button" disabled title="LNIS 시험 대기·계산과 상대 수신 시험을 중지합니다. 이미 어댑터에 전달된 번들의 회수는 보장하지 않습니다.">시험 중지</button>
+    </div>
+    <p id="dtn-test-detail" role="status"></p>
     <div id="dtn-iq-panel" class="hidden">
       <div class="compact-input-row"><button id="iq-generate" type="button">90초 I/Q 생성</button><button id="iq-cancel" type="button" disabled>생성 취소</button>
         <progress id="iq-progress" max="100" value="0" aria-label="I/Q 파일 생성"></progress></div>
@@ -218,5 +227,5 @@
   </div>
   </div>
 </main>
-<script type="module" src="/lnis/assets/dtn/dtn.js?v=20260928-observation-colors"></script>
+<script type="module" src="/lnis/assets/dtn/dtn.js?v=20260929-payload-header"></script>
 </body></html>

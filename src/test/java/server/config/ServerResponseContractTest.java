@@ -177,7 +177,7 @@ class ServerResponseContractTest {
         job.setState("PREPARING");
         when(dtnService.createDelay(eq(inputId), eq("sender-1"), eq("receiver-1"), isNull(), eq("AFS_METADATA"), eq("DTN"), eq("HDTN"), isNull(), isNull(), any())).thenReturn(job);
         when(dtnService.get(id)).thenReturn(job);
-        when(dtnService.recent()).thenReturn(List.of(job));
+        when(dtnService.recent(0, null)).thenReturn(List.of(job));
         when(dtnService.configuration()).thenReturn(Map.of("configured", false));
 
         mvc.perform(

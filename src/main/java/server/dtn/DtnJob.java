@@ -19,6 +19,11 @@ public class DtnJob {
     private String receiverAgentId;
     private String state;
 
+    /** 어댑터 요청과 최종 수신 대기는 서로 다른 수명으로 관리한다. */
+    private String sendStatus;
+    private Instant stageStartedAt;
+    private Instant lateReceivedAt;
+
     /** 연결이 복구되면 상대 노드에 중지 요청을 다시 전달한다. */
     private Boolean cancelPending;
 

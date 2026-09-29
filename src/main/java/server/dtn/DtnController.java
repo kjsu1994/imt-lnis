@@ -177,9 +177,11 @@ public class DtnController {
 
     /** 원본 데이터와 PVT 전체를 제외한 최근 50개 시험 요약이다. */
     @GetMapping("/tests")
-    public ResponseEntity<List<Map<String, Object>>> recent() throws Exception {
+    public ResponseEntity<List<Map<String, Object>>> recent(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(required = false) String state) throws Exception {
         List<Map<String, Object>> response = new ArrayList<>();
-        for (DtnJob job : dtnService.recent()) {
+        for (DtnJob job : dtnService.recent(page, state)) {
             response.add(summary(job));
         }
 
@@ -431,14 +433,16 @@ public class DtnController {
         }
         try {
             DtnJob job = dtnService.receive(authorization, bytes, receivedAt);
-            receipts.finish(receipt, "ACCEPTED", "검증 통과 · 시험 처리 접수");
+            boolean stopped = "CANCELLED".equals(job.getState());
+            receipts.finish(receipt, stopped ? "AFTER_CANCEL" : "ACCEPTED",
+                    stopped ? "대기 종료 이후 수신 · 원문만 보관" : "검증 통과 · 시험 처리 접수");
             return ResponseEntity.accepted()
                     .body(
                             Map.of(
                                     "testId",
                                     job.getId(),
                                     "accepted",
-                                    true,
+                                    !stopped,
                                     "state",
                                     job.getState(),
                                     "receiptId",
@@ -487,6 +491,9 @@ public class DtnController {
         result.put("senderAgentId", job.getSenderAgentId());
         result.put("receiverAgentId", job.getReceiverAgentId());
         result.put("state", job.getState());
+        result.put("sendStatus", job.getSendStatus());
+        result.put("stageStartedAt", job.getStageStartedAt());
+        result.put("lateReceivedAt", job.getLateReceivedAt());
         result.put("cancelPending", Boolean.TRUE.equals(job.getCancelPending()));
         result.put("sendUrl", job.getSendUrl());
         result.put("message", job.getMessage());

@@ -353,7 +353,7 @@ class IndependentNodeIntegrationTest {
 
     @Test
     @Timeout(120)
-    void cancellingAnUnresponsiveTransferStopsBothNodesAndRejectsLateCallbacks() throws Exception {
+    void cancellingAnUnresponsiveTransferStopsBothNodesAndArchivesLateCallbacks() throws Exception {
         int receiverPort = tcpPort(), senderPort = tcpPort();
         var body = new java.util.concurrent.LinkedBlockingQueue<byte[]>();
         var release = new java.util.concurrent.CountDownLatch(1);
@@ -418,7 +418,10 @@ class IndependentNodeIntegrationTest {
                             .POST(HttpRequest.BodyPublishers.ofByteArray(packet))
                             .build();
             assertEquals(
-                    409, http.send(callback, HttpResponse.BodyHandlers.ofString()).statusCode());
+                    202, http.send(callback, HttpResponse.BodyHandlers.ofString()).statusCode());
+            assertEquals("CANCELLED", rx.get(id).getState());
+            assertNotNull(rx.get(id).getLateReceivedAt());
+            assertNull(rx.get(id).getReceivedAt());
             release.countDown();
             await(() -> ready(sender, "sender-1") && ready(sender, "receiver-1"), 10);
             UUID next = tx.create(input, "sender-1", "receiver-1", url).getId();
@@ -500,8 +503,10 @@ class IndependentNodeIntegrationTest {
                             .build();
             assertEquals(
                     400, http.send(request, HttpResponse.BodyHandlers.ofString()).statusCode());
-            assertEquals("FAILED", receiver.getBean(DtnService.class).get(id).getState());
-            await(() -> "FAILED".equals(sender.getBean(DtnService.class).get(id).getState()), 12);
+            assertEquals("WAITING_DTN", receiver.getBean(DtnService.class).get(id).getState());
+            await(() -> sender.getBean(DtnService.class).get(id).getMessage() != null
+                    && sender.getBean(DtnService.class).get(id).getMessage().startsWith("수신 검증 실패"), 15);
+            assertEquals("WAITING_DTN", sender.getBean(DtnService.class).get(id).getState());
             assertTrue(sender.getBean(DtnService.class).get(id).getMessage().contains("수신 검증 실패"));
             var invalid =
                     HttpRequest.newBuilder(URI.create(base + "/receive"))
@@ -571,6 +576,75 @@ class IndependentNodeIntegrationTest {
                                         HttpResponse.BodyHandlers.ofByteArray())
                                 .body());
             }
+        }
+    }
+
+    @Test
+    @Timeout(180)
+    void multipleTrialsArriveOutOfOrderOverRealHttp() throws Exception {
+        int receiverPort = tcpPort(), senderPort = tcpPort();
+        var packets = new java.util.concurrent.LinkedBlockingQueue<byte[]>();
+        HttpServer adapter = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        adapter.createContext("/transfers", exchange -> {
+            try (exchange) {
+                packets.add(exchange.getRequestBody().readAllBytes());
+                exchange.sendResponseHeaders(202, -1);
+            }
+        });
+        adapter.start();
+        try (var receiver = node("receiver", receiverPort, senderPort);
+                var sender = node("sender", senderPort, receiverPort)) {
+            await(() -> ready(sender, "sender-1") && ready(sender, "receiver-1"), 20);
+            var tx = sender.getBean(DtnService.class);
+            var rx = receiver.getBean(DtnService.class);
+            var inputs = sender.getBean(InputBufferService.class);
+            byte[] source = NativePvtIntegrationTest.validSample();
+            UUID input = inputs.create("multi.graw", source.length, InputKind.GRAW_UPLOAD).inputId();
+            inputs.append(input, 0, source);
+            inputs.complete(input);
+            String url = "http://127.0.0.1:" + adapter.getAddress().getPort() + "/transfers";
+            var ids = new java.util.ArrayList<UUID>();
+            var bodies = new java.util.ArrayList<byte[]>();
+            for (String type : java.util.List.of("AFS_METADATA", "GNSS_RAW", "AFS_METADATA")) {
+                UUID id = tx.createDelay(input, "sender-1", "receiver-1", url, type,
+                        "HDTN", "HDTN", null, null, java.time.Instant.now()).getId();
+                ids.add(id);
+                byte[] body = packets.poll(20, java.util.concurrent.TimeUnit.SECONDS);
+                assertNotNull(body);
+                bodies.add(body);
+                await(() -> !tx.sendBusy(), 10);
+                assertEquals("WAITING_DTN", tx.get(id).getState());
+                assertEquals("ACCEPTED", tx.get(id).getSendStatus());
+                assertEquals("WAITING_DTN", rx.get(id).getState());
+            }
+            assertEquals(3, new java.util.HashSet<>(ids).size());
+            for (var context : java.util.List.of(sender, receiver)) {
+                var repository = context.getBean(server.dtn.DtnRepository.class);
+                for (UUID id : ids) {
+                    DtnJob job = repository.findById(id).orElseThrow();
+                    job.setCreatedAt(java.time.Instant.now().minusSeconds(86400));
+                    repository.saveAndFlush(job);
+                }
+                context.getBean(DtnService.class).tick();
+            }
+            HttpClient http = HttpClient.newHttpClient();
+            for (int index : new int[] {2, 0, 1, 2}) {
+                var request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + receiverPort
+                                + "/lnis/api/v1/dtn/receive"))
+                        .header("Authorization", "Bearer test-dtn-receive")
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofByteArray(bodies.get(index))).build();
+                assertEquals(202, http.send(request, HttpResponse.BodyHandlers.ofString()).statusCode());
+            }
+            await(() -> ids.stream().allMatch(id -> "COMPLETED".equals(tx.get(id).getState())), 65);
+            for (int i = 0; i < ids.size(); i++) {
+                assertEquals("COMPLETED", rx.get(ids.get(i)).getState());
+                assertArrayEquals(bodies.get(i), rx.payload(ids.get(i), "received").getBody());
+                assertNotNull(rx.get(ids.get(i)).getComparisonJson());
+            }
+            assertTrue(rx.get(ids.get(2)).getReceivedAt().isBefore(rx.get(ids.get(0)).getReceivedAt()));
+        } finally {
+            adapter.stop(0);
         }
     }
 

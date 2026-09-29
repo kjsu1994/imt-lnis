@@ -28,6 +28,15 @@ public class NodeRecoveryService {
             job.setUpdatedAt(Instant.now());
             dtnRepository.save(job);
         }
+        for (DtnJob job : dtnRepository.findByStateIn(List.of("WAITING_DTN"))) {
+            if (List.of("PREPARING", "REQUESTING").contains(
+                    job.getSendStatus() == null ? "" : job.getSendStatus())) {
+                job.setSendStatus("UNKNOWN");
+                job.setMessage("재기동으로 어댑터 접수 여부 미확인 · 수신 대기");
+                job.setUpdatedAt(Instant.now());
+                dtnRepository.save(job);
+            }
+        }
         // WAITING_DTN/WAITING_RECEIVER는 영속 본문/등록 정보로 기존 대기를 계속한다.
     }
 }

@@ -68,6 +68,11 @@ class WebPageControllerTest {
                         .andExpect(redirectedUrl("/lnis/dtntest/" + role));
             }
         }
+        for (String url : java.util.List.of("/lnis/data-manager", "/lnis/data-management")) {
+            mvc.perform(get(url))
+                    .andExpect(status().isOk())
+                    .andExpect(forwardedUrl("/data-management.html"));
+        }
         mvc.perform(get("/dtn-intro"))
                 .andExpect(status().isOk())
                 .andExpect(forwardedUrl("/dtn-intro.html"));
