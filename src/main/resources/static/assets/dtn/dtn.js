@@ -3,7 +3,7 @@ import {requestJson} from '../common/http.js?v=20260915-structure';
 import {createDtnLog} from './dtn-log.js?v=20260929-log-view';
 import {initAdapterHealth, validAdapterUrl} from './dtn-adapter-health.js?v=20260922-compact-settings';
 import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20260929-payload-header';
-import {createObservationView, numeric} from './dtn-observations.js?v=20260928-observation-colors';
+import {createObservationView, numeric, renderClockBias} from './dtn-observations.js?v=20260929-clock-precision';
 
 const api = '/lnis/api/v1', $ = id => document.getElementById(id);
 const payload = createPayloadViewer($('dtn-payload'), {sentOnly: true});
@@ -244,7 +244,7 @@ function renderPvt() {
   }
   $('dtn-gnss-time').textContent = value ? 'Week ' + value.week + ' / TOW ' + numeric(value.towSeconds) + ' s' : '—';
   $('pvt-satellites').textContent = value?.satellitesUsed ?? '—';
-  $('pvt-clock').textContent = numeric(value?.positionValid ? value.receiverClockBiasSeconds : null, 9);
+  renderClockBias($('pvt-clock'), value?.positionValid ? value.receiverClockBiasSeconds : null);
   pill('pvt-validity', !value ? '계산 대기' : '위치 ' + (value.positionValid ? '유효' : '무효') + ' · 속도 ' + (value.velocityValid ? '유효' : '무효'),
     !value ? '' : value.positionValid && value.velocityValid ? 'online' : 'warning');
   $('pvt-message').textContent = value?.message || '지구 ECEF · GPS L1 C/A · 전송시험 시작 시 계산';

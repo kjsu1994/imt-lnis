@@ -1,6 +1,21 @@
 // Shared DTN-only observation display. Device values are never inserted as HTML.
 export const numeric = (value, digits = 3, missing = '—') =>
   typeof value === 'number' && Number.isFinite(value) ? value.toFixed(digits) : missing;
+// Preserve tiny nonzero clock biases that fixed decimal places would hide.
+export function clockBias(value, missing = '-') {
+  if (!Number.isFinite(value)) return missing;
+  if (value !== 0 && Math.abs(value) < 1e-9) {
+    const [mantissa, exponent] = value.toExponential(6).split('e');
+    return mantissa + ' × 10^' + Number(exponent);
+  }
+  return value.toFixed(9);
+}
+
+export function renderClockBias(element, value) {
+  element.textContent = clockBias(value);
+  element.title = Number.isFinite(value) ? String(value) + ' s' : '';
+}
+
 const constellation = id => ['GPS', 'SBAS', 'Galileo', 'BeiDou', 'IMES', 'QZSS', 'GLONASS', 'NavIC'][id] || ('GNSS ' + id);
 export function navigationCells(item, iq = false) {
   const n = item.message;

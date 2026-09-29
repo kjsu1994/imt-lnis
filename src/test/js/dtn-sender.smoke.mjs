@@ -1,5 +1,5 @@
 import {pageSource} from './browser-source.mjs';
-import {numeric} from '../../main/resources/static/assets/dtn/dtn-observations.js';
+import {numeric, renderClockBias} from '../../main/resources/static/assets/dtn/dtn-observations.js';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
@@ -48,7 +48,7 @@ const context = {
   document: {visibilityState: 'visible', getElementById: id => { assert.ok(elements.has(id), 'missing ' + id); return elements.get(id); }, querySelectorAll: () => []},
   createPayloadViewer: () => ({setJob() {}}),
   createObservationView: () => ({setData(data) { loaded = data; }, select() {}}),
-  numeric,
+  numeric, renderClockBias,
   URLSearchParams,
   Option: function(text, value) { this.value = value; },
   location: {protocol: 'http:', host: '127.0.0.1:18090'}, WebSocket: class {},

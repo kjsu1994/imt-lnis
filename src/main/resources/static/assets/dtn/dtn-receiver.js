@@ -3,7 +3,7 @@ import {requestJson} from '../common/http.js?v=20260915-structure';
 import {createDtnLog} from './dtn-log.js?v=20260929-log-view';
 import {initAdapterHealth} from './dtn-adapter-health.js?v=20260922-compact-structure';
 import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20260929-payload-header';
-import {createObservationView, numeric} from './dtn-observations.js?v=20260928-observation-colors';
+import {createObservationView, numeric, renderClockBias} from './dtn-observations.js?v=20260929-clock-precision';
 
 const $ = id => document.getElementById(id);
 const payloadViewer = createPayloadViewer($('dtn-payload'), {receivedOnly: true});
@@ -132,7 +132,7 @@ function renderEpoch() {
     $('reference-' + axis).textContent = number(reference?.positionValid ? reference.ecefMeters?.[index] : null);
     $('reference-v' + axis).textContent = number(reference?.velocityValid ? reference.velocityMetersPerSecond?.[index] : null);
   });
-  $('reference-clock').textContent = number(reference?.positionValid ? reference.receiverClockBiasSeconds : null, 9);
+  renderClockBias($('reference-clock'), reference?.positionValid ? reference.receiverClockBiasSeconds : null);
   $('reference-satellites').textContent = reference?.satellitesUsed ?? '-';
   const position = pvt?.positionValid === true;
   const velocity = pvt?.velocityValid === true;
@@ -141,7 +141,7 @@ function renderEpoch() {
     $('pvt-v' + axis).textContent = number(velocity ? pvt.velocityMetersPerSecond?.[index] : null);
   });
   $('pvt-satellites').textContent = pvt?.satellitesUsed ?? '-';
-  $('pvt-clock').textContent = number(position ? pvt.receiverClockBiasSeconds : null, 9);
+  renderClockBias($('pvt-clock'), position ? pvt.receiverClockBiasSeconds : null);
   pill('pvt-validity', !pvt ? '결과 대기' : '위치 ' + (position ? '유효' : '무효') + ' · 속도 ' + (velocity ? '유효' : '무효'),
     !pvt ? '' : position && velocity ? 'online' : 'warning');
   $('pvt-message').textContent = pvt?.message || '지구 ECEF · GPS L1 C/A';

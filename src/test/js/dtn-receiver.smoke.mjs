@@ -1,5 +1,5 @@
 import {pageSource} from './browser-source.mjs';
-import {numeric} from '../../main/resources/static/assets/dtn/dtn-observations.js';
+import {numeric, renderClockBias} from '../../main/resources/static/assets/dtn/dtn-observations.js';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
@@ -19,7 +19,7 @@ const removedHealth = new Set(['dtn-adapter-health-results','dtn-adapter-detail'
 let healthState = 'ready';
 const healthIntervals = [];
 const context = {
-  numeric, URL, AbortSignal,
+  numeric, renderClockBias, URL, AbortSignal,
   renderIqFile() {},
   createDtnLog: () => ({write() {},setContext() {},refresh() {}}),
   document: {visibilityState:'visible', getElementById(id) { if (removedHealth.has(id)) return null; assert.ok(elements.has(id), 'DOM missing: ' + id); return elements.get(id); }},

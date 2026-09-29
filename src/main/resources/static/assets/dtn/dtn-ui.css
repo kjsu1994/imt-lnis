@@ -813,6 +813,34 @@ body[data-page^="dtn-"] .transport-mode-section > button { margin-top: 10px; }
   body[data-page^="dtn-"] .card-title label { width: 100%; min-width: 0; }
 }
 
+/* Compact sender PVT summary; keep the clock exponent readable. */
+body[data-page="dtn-sender"] .pvt-grid {
+  grid-template-columns: repeat(7, minmax(0, 1fr)) minmax(175px, 1.3fr);
+  gap: 6px;
+}
+body[data-page="dtn-sender"] .pvt-value {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 3px;
+  padding: 8px;
+  min-width: 0;
+}
+body[data-page="dtn-sender"] .pvt-value span { grid-column: 1 / -1; }
+body[data-page="dtn-sender"] .pvt-value strong {
+  margin: 0;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+body[data-page="dtn-sender"] .pvt-value small { margin: 0; font-size: 11px; }
+@media (max-width: 1200px) {
+  body[data-page="dtn-sender"] .pvt-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (max-width: 760px) {
+  body[data-page="dtn-sender"] .pvt-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 /* Adapter probes remain available while a transfer is running. */
 body[data-page^="dtn-"] .adapter-url-row { display: block; margin-top: 16px; }
 body[data-page^="dtn-"] .dtn-log-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
@@ -945,8 +973,7 @@ body[data-page="dtn-receiver"] .receiver-adapter .adapter-url-controls { grid-te
 
 .adapter-config-help { color: var(--teal); cursor: help; }
 
-/* Keep the receiver original prominent; receipt history opens only when needed. */
-.receiver-payload .dtn-payload-text { width: 100%; min-height: 420px; height: 55vh; resize: vertical; }
+/* Receipt history opens only when needed; the shared output layout sizes the text area. */
 .dtn-payload-history { position: relative; font-size: 12px; }
 .dtn-payload-history summary { cursor: pointer; white-space: nowrap; }
 .dtn-payload-history select { position: absolute; right: 0; top: 100%; z-index: 2; width: min(520px, 75vw); margin-top: 8px; }

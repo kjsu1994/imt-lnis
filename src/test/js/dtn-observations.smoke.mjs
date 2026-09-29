@@ -1,10 +1,22 @@
 import assert from 'node:assert/strict';
-import {numeric, observationCells, navigationCells, createObservationView, transmitTime} from '../../main/resources/static/assets/dtn/dtn-observations.js';
+import {numeric, clockBias, renderClockBias, observationCells, navigationCells, createObservationView, transmitTime} from '../../main/resources/static/assets/dtn/dtn-observations.js';
 
 assert.equal(numeric(null), '—');
 assert.equal(numeric(NaN), '—');
 assert.equal(numeric(Infinity), '—');
 assert.equal(numeric(0), '0.000');
+assert.equal(clockBias(-2.4781070279303227e-13), '-2.478107 × 10^-13');
+assert.equal(clockBias(2.478107e-13), '2.478107 × 10^-13');
+assert.equal(clockBias(0), '0.000000000');
+assert.equal(clockBias(0.5119249119991983), '0.511924912');
+assert.equal(clockBias(null), '-');
+assert.equal(clockBias(NaN), '-');
+const clockElement = {};
+renderClockBias(clockElement, -2.4781070279303227e-13);
+assert.equal(clockElement.title, '-2.4781070279303227e-13 s');
+renderClockBias(clockElement, null);
+assert.equal(clockElement.title, '');
+
 const raw = {constellationId: 0, satelliteId: 9, signalId: 0,
   pseudorangeMeters: 21234567.123, carrierPhaseCycles: -123456,
   dopplerHz: -987.5, carrierToNoiseDbHz: 44, lockTimeMilliseconds: 4000,
