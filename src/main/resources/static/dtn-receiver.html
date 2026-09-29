@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>LNIS DTN Receiver</title>
   <link rel="stylesheet" href="/lnis/assets/common/app.css?v=20260918-admin-icon">
-  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20260929-trial-controls">
+  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20260929-persistent-gnss">
 </head>
 <body data-page="dtn-receiver">
 <header>
@@ -40,7 +40,12 @@
       <div>
         <div class="receiver-connection-heading"><label for="sender-address">상대 송신 서비스</label>
           <span class="receiver-connection-status" title="수신 → 송신 서비스"><span id="reverse-dot" class="connection-dot unknown" aria-hidden="true"></span><strong id="reverse-state">미확인</strong></span></div>
-        <input id="sender-address" readonly placeholder="주소 정보 없음">
+        <div class="adapter-url-controls">
+          <input id="sender-address" type="url" placeholder="http://송신-PC-IP:포트" autocomplete="off">
+          <button id="sender-address-save" type="button" title="수신 서버에 저장 · 재시작 후 유지">저장·적용</button>
+          <button id="sender-address-test" type="button">연결 확인</button>
+        </div>
+        <small id="sender-address-feedback" role="status"></small>
       </div>
     <div class="receiver-adapter">
       <div class="receiver-connection-heading"><label for="dtn-send-url">수신 어댑터 서버 주소</label>
@@ -52,7 +57,22 @@
       </div>
 
     </div>
+      <div class="receiver-gnss">
+        <div class="receiver-connection-heading"><label for="gnss-port">GNSS 시간 입력</label>
+          <span id="gnss-connection-state" class="pill">미연결</span></div>
+        <div class="adapter-url-controls">
+          <select id="gnss-port"><option value="">포트 선택</option></select>
+          <button id="gnss-refresh" type="button">조회</button>
+          <button id="gnss-connect" type="button">연결</button>
+        </div>
+        <details class="gnss-details"><summary><span id="gnss-time-state">시간 미확인</span> · 상세</summary>
+          <label>통신 속도 (baud)<select id="gnss-baud"><option>9600</option><option selected>38400</option><option>57600</option><option>115200</option><option>230400</option><option>460800</option><option>921600</option></select></label>
+          <label><input id="gnss-dtr" type="checkbox">DTR</label><label><input id="gnss-rts" type="checkbox">RTS</label>
+          <pre id="gnss-time-detail"></pre>
+        </details>
+      </div>
     </div>
+    <small id="gnss-summary" role="status">시스템 시간 사용 · GNSS 시간 미확인</small>
 
     <div class="receiver-trial-grid">
     <div>
@@ -157,6 +177,6 @@
   </section>
   </div>
 </main>
-<script type="module" src="/lnis/assets/dtn/dtn-receiver.js?v=20260929-trial-controls"></script>
+<script type="module" src="/lnis/assets/dtn/dtn-receiver.js?v=20260929-persistent-gnss"></script>
 </body>
 </html>

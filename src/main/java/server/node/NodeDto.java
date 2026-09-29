@@ -23,6 +23,12 @@ public final class NodeDto {
         private int codecAbiVersion;
         private String baseUrl;
         private Boolean peerOnline;
+        private String gnssTimeState;
+
+        public StatusResponse(int protocolVersion, String agentId, AgentRole role, AgentState state,
+                              boolean online, int codecAbiVersion, String baseUrl, Boolean peerOnline) {
+            this(protocolVersion, agentId, role, state, online, codecAbiVersion, baseUrl, peerOnline, null);
+        }
 
         public StatusResponse(
                 int protocolVersion,

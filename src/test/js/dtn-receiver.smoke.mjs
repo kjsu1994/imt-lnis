@@ -8,7 +8,8 @@ import vm from 'node:vm';
 const html = readFileSync(new URL('../../main/resources/static/dtn-receiver.html', import.meta.url), 'utf8');
 const source = pageSource('dtn-receiver.js');
 const elements = new Map([...html.matchAll(/id="([^"]+)"/g)].map(([, id]) => [id, {
-  value: '', textContent: '', hidden: false, disabled: false,
+  value: '', options: [], textContent: '', hidden: false, disabled: false,
+  addEventListener() {}, add(option) { this.options.push(option); },
   setAttribute(key, value) { this[key] = value; },
   replaceChildren(...options) { this.options = options; this.value = options[0]?.value ?? ''; },
   removeAttribute(key) { delete this[key]; }, focus() {}, select() {}
@@ -17,6 +18,7 @@ let nextTests = [], report = {}, reportRequest = null;
 const requests = [];
 const removedHealth = new Set(['dtn-adapter-health-results','dtn-adapter-detail','dtn-adapter-health-time','dtn-adapter-health-json']);
 let healthState = 'ready';
+let peerAddress = 'http://192.168.1.72:8090', peerSaves = 0, peerProbes = 0;
 const healthIntervals = [];
 const context = {
   numeric, renderClockBias, URL, AbortSignal,
@@ -29,6 +31,20 @@ const context = {
   Option: function(text, value) { this.text = text; this.value = value; },
   location: {origin: 'http://localhost:8089'}, navigator: {}, setTimeout() {}, setInterval(fn,ms) { healthIntervals.push({fn,ms}); },
   fetch: async (url, options) => {
+    if (url.endsWith('/node/connection/test')) {
+      peerProbes++;
+      return {ok: true, json: async () => ({connected: true, message: '연결 정상'})};
+    }
+    if (url.endsWith('/node/connection')) {
+      if (options?.method === 'PUT') {
+        peerSaves++;
+        const body = JSON.parse(options.body);
+        peerAddress = body.scheme + '://' + body.ip + ':' + body.port;
+      }
+      return {ok: true, json: async () => ({baseUrl: peerAddress, editable: true, busy: false, peerOnline: true})};
+    }
+    if (url.endsWith('/node/gnss/ports')) return {ok: true, json: async () => []};
+    if (url.endsWith('/node/gnss')) return {ok: true, json: async () => ({state: 'DISCONNECTED', timeState: 'UNAVAILABLE'})};
     if (options?.method === 'POST' && url.endsWith('/cancel')) {
       const id = url.split('/').at(-2);
       nextTests = nextTests.map(job => job.testId === id ? {...job, state:'CANCELLED'} : job);
@@ -48,6 +64,18 @@ const context = {
 vm.createContext(context);
 vm.runInContext(source, context);
 await context.ready;
+elements.get('sender-address').value = 'http://192.168.1.30:8090';
+elements.get('sender-address').oninput();
+await context.poll(true);
+assert.equal(elements.get('sender-address').value, 'http://192.168.1.30:8090', 'poll must not overwrite edited address');
+await elements.get('sender-address-test').onclick();
+assert.equal(peerProbes, 1);
+assert.equal(peerSaves, 0, 'connection check must not save');
+await elements.get('sender-address-save').onclick();
+assert.equal(peerSaves, 1);
+assert.equal(peerAddress, 'http://192.168.1.30:8090');
+assert.match(elements.get('sender-address-feedback').textContent, /저장/);
+console.log('PASS: receiver peer address edit, polling preservation, probe and server save');
 for (const id of ['receive-url', 'copy-receive-url', 'receive-auth', 'receive-help']) assert.equal(elements.has(id), false);
 assert.equal(requests.filter(url => url.endsWith('/dtn/config')).length, 1, 'adapter config is loaded once, not polled for removed authentication UI');
 assert.equal(requests.some(url => url.endsWith('/node')), false, 'removed endpoint display does not request a public URL');

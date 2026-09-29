@@ -1,5 +1,6 @@
 import {renderTrialSettings, trialOption, colorTrialSelection} from './dtn-settings.js?v=20260929-trial-status';
 import {requestJson} from '../common/http.js?v=20260915-structure';
+import {initGnssControls} from './dtn-gnss.js?v=20260929-persistent';
 import {createDtnLog} from './dtn-log.js?v=20260929-log-view';
 import {initAdapterHealth} from './dtn-adapter-health.js?v=20260922-compact-structure';
 import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20260929-payload-header';
@@ -61,6 +62,42 @@ function get(path) {
 
 const logView=createDtnLog($('dtn-log'));
 function log(message,level='INFO') { logView.write(message,level); }
+const gnss = initGnssControls({port: 'gnss-port', baud: 'gnss-baud', refresh: 'gnss-refresh', log});
+let peerAddressDirty = false, peerSaving = false;
+$('sender-address').oninput = () => {
+  peerAddressDirty = true;
+  $('reverse-state').textContent = '주소 변경 · 미확인';
+  $('reverse-dot').className = 'connection-dot unknown';
+  $('sender-address-feedback').textContent = '';
+};
+async function saveSenderAddress(save) {
+  if (peerSaving) return;
+  peerSaving = true;
+  $('sender-address-save').disabled = $('sender-address-test').disabled = true;
+  try {
+    const url = new URL($('sender-address').value.trim());
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password
+        || url.search || url.hash || url.pathname !== '/') throw new Error('http(s)://IPv4:포트 형식으로 입력하세요.');
+    const result = await requestJson('/node/connection' + (save ? '' : '/test'), {
+      method: save ? 'PUT' : 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ip: url.hostname, port: Number(url.port || (url.protocol === 'https:' ? 443 : 80)), scheme: url.protocol.slice(0, -1)})});
+    $('sender-address-feedback').textContent = save ? '수신 서버에 저장·적용됨' : result.message;
+    log(save ? '상대 송신 서비스 주소 저장·적용' : result.message, !save && !result.connected ? 'WARN' : 'INFO');
+    if (save) {
+      peerAddressDirty = false;
+      $('sender-address').value = result.baseUrl;
+      reportKey = '';
+    }
+  } catch (error) {
+    $('sender-address-feedback').textContent = error.message;
+    log(error.message, 'ERROR');
+  } finally {
+    peerSaving = false;
+    await poll(true);
+  }
+}
+$('sender-address-save').onclick = () => saveSenderAddress(true);
+$('sender-address-test').onclick = () => saveSenderAddress(false);
 
 function pill(id, text, state = '') {
   $(id).textContent = text;
@@ -243,6 +280,7 @@ function renderAgents(agents) {
 async function poll(force = false) {
   if (polling) return;
   polling = true;
+  await gnss.poll();
   $('dtn-refresh').disabled = true;
   try {
     const query = new URLSearchParams({page: historyPage});
@@ -261,8 +299,15 @@ async function poll(force = false) {
     receivedIds = new Set(nextTests.filter(job => job.dtnReceived).map(job => job.testId));
     tests = nextTests;
     const connection = await get('/node/connection').catch(() => ({}));
-    $('reverse-state').textContent = connection.peerOnline == null ? '미확인' : connection.peerOnline ? '연결됨' : '연결 끊김';
-    $('reverse-dot').className = 'connection-dot ' + (connection.peerOnline == null ? 'unknown' : connection.peerOnline ? 'online' : 'offline');
+    gnss.setPeerTime(connection.peerGnssTimeState);
+    if (!peerAddressDirty) {
+      $('sender-address').value = connection.baseUrl || '';
+      $('reverse-state').textContent = connection.peerOnline == null ? '미확인' : connection.peerOnline ? '연결됨' : '연결 끊김';
+      $('reverse-dot').className = 'connection-dot ' + (connection.peerOnline == null ? 'unknown' : connection.peerOnline ? 'online' : 'offline');
+    }
+    $('sender-address-save').disabled = peerSaving || !!connection.busy || !connection.editable;
+    $('sender-address-test').disabled = peerSaving || !connection.editable;
+    $('sender-address').disabled = peerSaving || !!connection.busy || !connection.editable;
     pill('dtn-server-status', '서버 연결됨', 'online');
     renderAgents(agents);
     const selected = $('dtn-tests').value;
@@ -287,6 +332,8 @@ async function poll(force = false) {
 }
 
 async function initialize() {
+  await gnss.poll();
+  void gnss.listPorts();
   try { const config = await get('/dtn/config'); initAdapterHealth(config.adapterUrl || '', log); }
   catch (error) { initAdapterHealth('', log); log(error.message); }
   try {

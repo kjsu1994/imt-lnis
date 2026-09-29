@@ -28,8 +28,10 @@ for (const key of ['maxNumberOfBundlesInPipeline', 'maxSumOfBundleBytesInPipelin
 }
 const source = pageSource('dtn.js');
 class Element {
-  constructor() { this.value = ''; this.files = []; this.textContent = ''; this.classList = {toggle() {}}; }
-  replaceChildren(...children) { this.value = children[0]?.value ?? ''; }
+  constructor() { this.value = ''; this.options = []; this.files = []; this.textContent = ''; this.classList = {toggle() {}}; }
+  replaceChildren(...children) { this.options = children; this.value = children[0]?.value ?? ''; }
+  add(option) { this.options.push(option); }
+  addEventListener() {}
   setAttribute() {} removeAttribute(key) { delete this[key]; } reportValidity() { return true; }
   focus() { this.focused = true; }
 }
@@ -39,6 +41,7 @@ elements.get('dtn-development').hidden = true;
 elements.get('dtn-settings-view').hidden = true;
 let loaded = null, currentJob = null, failUpload = false, starts = 0, lastStartBody, cancels = 0;
 let healthFetch, healthCalls = 0, healthUrl;
+let gnssStatus = {state: 'DISCONNECTED', timeState: 'UNAVAILABLE'};
 const intervals = [];
 const tx = {agentId: 'sender-1', role: 'SENDER', state: 'READY'}, rx = {agentId: 'receiver-1', role: 'RECEIVER', state: 'READY'};
 const observations = {epochs: [{observation: {week: 2400, receiverTowSeconds: 1, observations: []}}]};
@@ -61,6 +64,8 @@ const context = {
       return healthFetch();
     }
     let body = {};
+    if (url.endsWith('/node/gnss/ports')) return {ok: true, json: async () => []};
+    if (url.endsWith('/node/gnss')) return {ok: true, json: async () => gnssStatus};
     if (url.endsWith('/config')) body = {maximumInputBytes: 1048576, exampleEnabled: true, delaySupported:true,
       defaultSendUrl: 'http://sender.default:8080', defaultReceiveUrl: 'http://receiver.default:8080'};
     else if (url.endsWith('/agents')) body = [tx, rx];
@@ -146,6 +151,9 @@ assert.equal(elements.get('dtn-send').disabled, true);
 console.log('PASS: sender upload, preview, disabled example/capture, duplicate start, invalid PVT and input failure reset');
 elements.get('dtn-port').value = '/dev/ttyACM0';
 elements.get('dtn-port').onchange();
+assert.equal(elements.get('dtn-start').disabled, true, 'selecting a port does not connect it');
+gnssStatus = {state: 'CONNECTED', timeState: 'ACQUIRING', portName: '/dev/ttyACM0', baudRate: 38400};
+await vm.runInContext('gnss.poll()', context);
 assert.equal(elements.get('dtn-start').disabled, false);
 const capturing = elements.get('dtn-start').onclick();
 assert.equal(elements.get('dtn-settings-lock').hidden, false);
@@ -153,7 +161,7 @@ assert.equal(elements.get('dtn-port').disabled, true);
 await capturing;
 assert.equal(elements.get('pvt-x').textContent, '1.000');
 assert.equal(elements.get('dtn-send').disabled, false);
-assert.equal(elements.get('dtn-port').disabled, false);
+assert.equal(elements.get('dtn-port').disabled, true, 'capture completion keeps the physical connection');
 console.log('PASS: serial one-shot completion, PVT preview and transfer readiness');
 
 await elements.get('dtn-send').onclick();

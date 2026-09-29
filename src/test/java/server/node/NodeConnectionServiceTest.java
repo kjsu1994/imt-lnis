@@ -113,10 +113,34 @@ class NodeConnectionServiceTest {
     }
 
     private static NodeDto.StatusResponse ready() {
+        return ready(AgentRole.RECEIVER);
+    }
+
+    @Test
+    void receiverCanTestSaveAndRestoreSenderAddress() {
+        var receiver = new NodeProperties(new MockEnvironment()
+                .withProperty("lnis.node.role", "receiver")
+                .withProperty("lnis.node.peer-url", "http://192.168.1.20:8090"));
+        var receiverService = new NodeConnectionService(receiver, client, settings, connection,
+                mock(DtnService.class), jobs);
+        when(client.statusAt(any())).thenReturn(ready(AgentRole.SENDER));
+        assertTrue(receiverService.configuration().isEditable());
+        assertTrue(receiverService.test(request("192.168.1.30", 8090)).isConnected());
+        verifyNoInteractions(settings);
+        receiverService.save(request("192.168.1.30", 8090));
+        verify(connection).applyAddress(URI.create("http://192.168.1.30:8090"));
+        var saved = org.mockito.ArgumentCaptor.forClass(NodePeerSetting.class);
+        verify(settings).saveAndFlush(saved.capture());
+        when(settings.findById(1)).thenReturn(Optional.of(saved.getValue()));
+        receiverService.restore();
+        assertEquals("http://192.168.1.30:8090", receiver.getPeerBaseUrl().toString());
+    }
+
+    private static NodeDto.StatusResponse ready(AgentRole role) {
         return new NodeDto.StatusResponse(
                 1,
                 "receiver-1",
-                AgentRole.RECEIVER,
+                role,
                 AgentState.READY,
                 true,
                 1,

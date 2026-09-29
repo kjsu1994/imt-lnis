@@ -1,14 +1,18 @@
 ﻿[CmdletBinding()]
-param([string]$JavaHome)
+param([string]$JavaHome, [switch]$DockerDesktop)
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
 $dist = Join-Path $root 'serial-bridge'
 if (!(Test-Path (Join-Path $dist 'classes\server\gnss\WindowsSerialBridge.class'))) { throw 'Build and install windowsSerialBridgeDist first.' }
-$route = (& wsl.exe -- sh -c 'ip -4 route show default') -join ' '
 $bindAddress = '127.0.0.1'
-if ($route -match 'default via ([0-9.]+)') { $bindAddress = $Matches[1] }
+if (!$DockerDesktop) {
+    $route = (& wsl.exe -- sh -c 'ip -4 route show default') -join ' '
+    if ($route -match 'default via ([0-9.]+)') { $bindAddress = $Matches[1] }
+}
 if (!(Get-NetIPAddress -AddressFamily IPv4 | Where-Object IPAddress -eq $bindAddress)) { throw 'Cannot identify Windows address reachable from WSL.' }
 $config = Join-Path $dist 'bridge.properties'
+$roleLine = Get-Content (Join-Path $root '.env') | Where-Object { $_ -match '^LNIS_NODE_ROLE=' } | Select-Object -Last 1
+$bridgePort = if ($roleLine -and $roleLine.Split('=',2)[1].Trim().Trim('"',"'") -ieq 'receiver') { 18766 } else { 18765 }
 $token = $null
 if (Test-Path $config) {
     foreach ($line in Get-Content $config) { if ($line.StartsWith('token=')) { $token=$line.Substring(6) } }
@@ -20,10 +24,11 @@ if (!$token) {
     $token = [Convert]::ToBase64String($random)
 }
 $utf8 = New-Object Text.UTF8Encoding $false
-[IO.File]::WriteAllText((Join-Path $root '.serial-bridge.env'), "LNIS_SERIAL_BRIDGE_URL=http://${bindAddress}:18765`nLNIS_SERIAL_BRIDGE_TOKEN=$token`n", $utf8)
+$containerHost = if ($DockerDesktop) { 'host.docker.internal' } else { $bindAddress }
+[IO.File]::WriteAllText((Join-Path $root '.serial-bridge.env'), "LNIS_SERIAL_BRIDGE_URL=http://${containerHost}:${bridgePort}`nLNIS_SERIAL_BRIDGE_TOKEN=$token`n", $utf8)
 $headers = @{Authorization="Bearer $token"}
 try {
-    $health=Invoke-RestMethod -Uri "http://${bindAddress}:18765/health" -Method Post -Headers $headers -ContentType application/json -Body '{}' -TimeoutSec 2
+    $health=Invoke-RestMethod -Uri "http://${bindAddress}:${bridgePort}/health" -Method Post -Headers $headers -ContentType application/json -Body '{}' -TimeoutSec 2
     if ($health.status -eq 'UP') { Write-Host "Windows COM bridge already running ($bindAddress)."; return }
 } catch {}
 $pidFile=Join-Path $dist 'bridge.pid'
@@ -36,7 +41,7 @@ if (Test-Path $pidFile) {
         }
     }
 }
-[IO.File]::WriteAllText($config,"bind=$bindAddress`nport=18765`ntoken=$token`n",$utf8)
+[IO.File]::WriteAllText($config,"bind=$bindAddress`nport=$bridgePort`ntoken=$token`n",$utf8)
 if (!$JavaHome) {
     $installed = Get-ChildItem (Join-Path $env:USERPROFILE '.jdks') -Directory -ErrorAction SilentlyContinue | Where-Object Name -Match '21' | Select-Object -First 1
     if ($installed) { $JavaHome=$installed.FullName }
@@ -49,7 +54,7 @@ $process = Start-Process -FilePath $java -ArgumentList @('-cp',('"'+$dist+'\clas
 for ($attempt=0;$attempt -lt 20;$attempt++) {
     Start-Sleep -Milliseconds 500
     try {
-        $health=Invoke-RestMethod -Uri "http://${bindAddress}:18765/health" -Method Post -Headers $headers -ContentType application/json -Body '{}' -TimeoutSec 2
+        $health=Invoke-RestMethod -Uri "http://${bindAddress}:${bridgePort}/health" -Method Post -Headers $headers -ContentType application/json -Body '{}' -TimeoutSec 2
         if ($health.status -eq 'UP') { Write-Host "Windows COM bridge ready ($bindAddress)."; return }
     } catch {}
     if ($process.HasExited) { throw "COM bridge exited. See $dist\bridge-error.log" }

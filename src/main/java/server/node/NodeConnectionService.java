@@ -7,7 +7,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
-import server.common.LnisModels.AgentRole;
 import server.common.LnisModels.AgentState;
 import server.dtn.DtnRepository;
 import server.dtn.DtnService;
@@ -49,15 +48,15 @@ public class NodeConnectionService {
         result.setBaseUrl(address == null ? "" : address.toString());
         result.setPeerAgentId(properties.getPeerAgentId());
         result.setTokenConfigured(!properties.getManagementToken().isBlank());
-        result.setEditable(properties.getRole() == AgentRole.SENDER);
+        result.setEditable(true);
         result.setBusy(busy());
         result.setPeerOnline(connection.online());
         result.setReverseOnline(connection.reverseOnline());
+        result.setPeerGnssTimeState(connection.gnssTimeState());
         return result;
     }
 
     public NodeConnectionDto.ProbeResult test(NodeConnectionDto.AddressRequest request) {
-        requireSender();
         URI address = address(request);
         long started = System.nanoTime();
         NodeConnectionDto.ProbeResult result = new NodeConnectionDto.ProbeResult();
@@ -68,8 +67,8 @@ public class NodeConnectionService {
             result.setReady(status.isOnline() && status.getState() == AgentState.READY);
             result.setMessage(
                     result.isReady()
-                            ? "수신 서비스 및 실행기 연결 정상 (READY)"
-                            : "수신 서비스 연결 정상 / 실행기 상태: "
+                            ? "상대 서비스 및 실행기 연결 정상 (READY)"
+                            : "상대 서비스 연결 정상 / 실행기 상태: "
                                     + status.getState()
                                     + (status.isOnline() ? "" : " (오프라인)"));
         } catch (IllegalStateException error) {
@@ -81,16 +80,15 @@ public class NodeConnectionService {
     }
 
     public NodeConnectionDto.Configuration save(NodeConnectionDto.AddressRequest request) {
-        requireSender();
         URI address = address(request);
         // DTN 시작과 주소 변경이 겹치지 않게 같은 모니터를 사용한다.
         synchronized (dtn) {
             if (busy()) {
-                throw new IllegalStateException("시험 진행 중에는 수신 노드 주소를 변경할 수 없습니다.");
+                throw new IllegalStateException("시험 진행 중에는 상대 노드 주소를 변경할 수 없습니다.");
             }
             NodeDto.StatusResponse status = client.statusAt(address);
             if (!status.isOnline() || status.getState() != AgentState.READY) {
-                throw new IllegalStateException("수신 실행기가 READY인 경우에만 저장·적용할 수 있습니다.");
+                throw new IllegalStateException("상대 실행기가 READY인 경우에만 저장·적용할 수 있습니다.");
             }
             NodePeerSetting setting = new NodePeerSetting();
             setting.setId(1);
@@ -107,12 +105,6 @@ public class NodeConnectionService {
                 .isEmpty();
     }
 
-    private void requireSender() {
-        if (properties.getRole() != AgentRole.SENDER) {
-            throw new IllegalStateException("송신 노드에서 수신 연결을 설정하세요.");
-        }
-    }
-
     URI address(NodeConnectionDto.AddressRequest request) {
         if (request == null
                 || request.getIp() == null
@@ -123,7 +115,7 @@ public class NodeConnectionService {
         }
         String ip = request.getIp().trim();
         if (!ip.matches("(?:0|[1-9][0-9]{0,2})(?:\\.(?:0|[1-9][0-9]{0,2})){3}")) {
-            throw new IllegalArgumentException("수신 PC의 IPv4 주소만 입력하세요. URL이나 경로는 입력하지 않습니다.");
+            throw new IllegalArgumentException("상대 PC의 IPv4 주소만 입력하세요. URL이나 경로는 입력하지 않습니다.");
         }
         String[] parts = ip.split("\\.");
         for (String part : parts) {

@@ -5,7 +5,7 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>LNIS DTN Sender</title>
   <link rel="stylesheet" href="/lnis/assets/common/app.css?v=20260918-admin-icon">
-  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20260929-trial-controls">
+  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20260929-persistent-gnss">
 </head>
 <body data-page="dtn-sender">
 <header>
@@ -22,6 +22,7 @@
 </header>
 <main>
   <section class="status-strip">
+    <small id="gnss-summary" role="status">시스템 시간 사용 · GNSS 시간 미확인</small>
     <span id="dtn-server-status" class="pill warning">서버 확인 중</span>
     <span id="dtn-sender-status" class="pill">송신 처리기 확인 중</span>
     <span id="dtn-receiver-status" class="pill">수신 처리기 확인 중</span>
@@ -160,10 +161,16 @@
     </div>
     <div id="dtn-capture-panel" class="hidden compact-input-row">
       <label>COM 포트<select id="dtn-port"><option value="">포트 선택</option></select></label>
-      <button id="dtn-refresh" type="button">포트 조회</button>
+        <button id="dtn-refresh" type="button">포트 조회</button>
+        <button id="gnss-connect" type="button">연결</button>
+        <span id="gnss-connection-state" class="pill">미연결</span>
+        <span id="gnss-time-state">시간 미확인</span>
+        <label><input id="gnss-dtr" type="checkbox">DTR</label>
+        <label><input id="gnss-rts" type="checkbox">RTS</label>
       <label class="serial-settings">통신 속도 (baud)<select id="dtn-baud"><option>9600</option><option selected>38400</option><option>57600</option><option>115200</option><option>230400</option><option>460800</option><option>921600</option></select></label>
     </div>
-    <p id="dtn-port-status" role="status">포트 조회는 송신 서비스가 실행되는 PC 기준입니다. Docker/WSL에서는 장치 전달이 필요합니다.</p>
+    <p id="dtn-port-status" role="status" hidden></p>
+    <details class="gnss-details"><summary>GNSS 시간 상세</summary><pre id="gnss-time-detail"></pre></details>
     <div id="dtn-upload-panel" class="compact-input-row">
       <label>GNSS 파일<input id="dtn-graw-file" type="file" accept=".ubx,.graw,application/octet-stream"></label>
       <button id="dtn-upload" type="button">파일 적용</button>
@@ -243,5 +250,5 @@
   </div>
   </div>
 </main>
-<script type="module" src="/lnis/assets/dtn/dtn.js?v=20260929-ubx-upload"></script>
+<script type="module" src="/lnis/assets/dtn/dtn.js?v=20260929-persistent-gnss"></script>
 </body></html>

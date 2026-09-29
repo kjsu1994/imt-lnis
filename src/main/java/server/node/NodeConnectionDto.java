@@ -37,6 +37,7 @@ public final class NodeConnectionDto {
         private boolean busy;
         private boolean peerOnline;
         private Boolean reverseOnline;
+        private String peerGnssTimeState;
     }
 
     @Data

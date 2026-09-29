@@ -30,6 +30,25 @@ JSON 응답에서는 값이 `null`인 속성이 생략될 수 있습니다.
 
 노드 간 관리 요청과 어댑터 수신 요청은 각 REST 인증 설정을 사용합니다. 별도 Agent 인증·제어 WebSocket은 제거되었습니다.
 
+### 로컬 GNSS 연결 및 상대 서비스 설정
+
+송신·수신 양쪽 화면에서 사용하며 **외부 DTN/HDTN 어댑터 계약이 아닙니다.** 아래 경로 앞에 `/lnis/api/v1`을 붙입니다.
+
+| 메서드 | 경로 | 동작 |
+|---|---|---|
+| GET | `/node/gnss/ports` | 로컬 또는 Windows 중계의 포트 목록 |
+| GET | `/node/gnss` | 연결·수집·GNSS UTC 상태 |
+| POST | `/node/gnss/connect` | 수동 연결. `portName`, `baudRate`, `protocolId:"UBX"`, `dtrEnabled`, `rtsEnabled` |
+| POST | `/node/gnss/disconnect?stopCapture=false` | 연결 해제. 수집 중이면 거부; 사용자 확인 후 `true`로 수집도 중단 |
+| GET | `/node/connection` | 현재 상대 주소·편집 가능 여부·연결 상태 |
+| POST | `/node/connection/test` | 입력 주소 연결 검사만 수행 |
+| PUT | `/node/connection` | 상대 주소 검사 후 서버 DB 저장·즉시 적용 |
+
+주소 요청은 `{ "ip":"192.168.219.100", "port":8090, "scheme":"http" }`이며 IPv4를 사용합니다. 인증·상대 ID·반대 역할을 검사하고, 진행 중 시험이 있거나 상대 실행기가 READY가 아니면 저장하지 않습니다. 재시작 시 저장값을 복구합니다.
+
+GNSS `state`: `DISCONNECTED/CONNECTING/CONNECTED/RECONNECTING/ERROR`.
+`timeState`: `UNAVAILABLE/ACQUIRING/VALID/STALE`; `utc`, `updatedAt`, `accuracyNanos`는 GNSS 메시지와 그 수신 시각입니다. `VALID`는 **PC 동기화 완료를 뜻하지 않습니다**. 한쪽/양쪽 GNSS 부재 시에도 기존 시스템 시간으로 파일·REST 시험을 계속합니다. 포트 연결만으로 시험 실행기를 BUSY로 만들지 않으며 수집 종료 후 연결은 유지합니다.
+
 ### HTTP 상태 코드
 
 | 상태 | 의미 |

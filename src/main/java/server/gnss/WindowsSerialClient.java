@@ -47,7 +47,7 @@ final class WindowsSerialClient {
     List<SerialCaptureService.DetectedPort> ports() {
         var result = new ArrayList<SerialCaptureService.DetectedPort>();
         request("/ports", Map.of()).forEach(p -> result.add(new SerialCaptureService.DetectedPort(
-            p.path("name").asText(), "Windows · " + p.path("description").asText())));
+            p.path("name").asText(), "Windows · " + p.path("description").asText(), p.path("identity").asText())));
         return result;
     }
 

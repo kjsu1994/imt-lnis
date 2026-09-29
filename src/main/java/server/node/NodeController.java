@@ -18,10 +18,39 @@ import org.springframework.web.bind.annotation.RestController;
 public class NodeController {
     private final NodeStatusService nodeStatusService;
     private final NodeAuthenticationService authenticationService;
+    private final LocalNodeLifecycle lifecycle;
+    private final NodeProperties properties;
+
+    private AgentRuntime runtime() {
+        return lifecycle.runtime(properties.getAgentId());
+    }
+
+    @GetMapping("/gnss/ports")
+    public Object gnssPorts() {
+        return runtime().gnss().ports();
+    }
+
+    @GetMapping("/gnss")
+    public Object gnssStatus() {
+        return runtime().gnss().status();
+    }
+
+    @org.springframework.web.bind.annotation.PostMapping("/gnss/connect")
+    public Object connectGnss(@org.springframework.web.bind.annotation.RequestBody server.gnss.SerialCaptureService.Settings settings) {
+        return runtime().gnss().connect(settings);
+    }
+
+    @org.springframework.web.bind.annotation.PostMapping("/gnss/disconnect")
+    public Object disconnectGnss(@org.springframework.web.bind.annotation.RequestParam(defaultValue = "false") boolean stopCapture)
+            throws InterruptedException {
+        runtime().disconnectGnss(stopCapture);
+        return runtime().gnss().status();
+    }
 
     @GetMapping
     public ResponseEntity<NodeDto.StatusResponse> localStatus() {
         NodeDto.StatusResponse response = nodeStatusService.status();
+        addTimeState(response);
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
@@ -30,6 +59,15 @@ public class NodeController {
             @RequestHeader(value = "Authorization", required = false) String authorization) {
         authenticationService.authenticate(authorization);
         NodeDto.StatusResponse response = nodeStatusService.status();
+        addTimeState(response);
         return new ResponseEntity<>(response, HttpStatus.OK);
+    }
+
+    private void addTimeState(NodeDto.StatusResponse response) {
+        try {
+            response.setGnssTimeState(runtime().gnss().status().timeState());
+        } catch (IllegalStateException unavailable) {
+            response.setGnssTimeState("UNAVAILABLE");
+        }
     }
 }

@@ -18,7 +18,8 @@ public final class AgentRuntime implements AutoCloseable {
     private final AgentConfig config;
     private final NativeAfsCodec codec;
     private final AgentMessageService messages;
-    private final SerialCaptureService capture = new SerialCaptureService();
+    private final server.gnss.GnssConnection gnss;
+    private final SerialCaptureService capture;
     private final ObjectMapper json = new ObjectMapper().findAndRegisterModules();
     private final AtomicReference<AgentState> state = new AtomicReference<>(AgentState.READY);
     private final DtnWorker dtn;
@@ -28,6 +29,8 @@ public final class AgentRuntime implements AutoCloseable {
         this.config = config;
         this.codec = codec;
         this.messages = messages;
+        this.gnss = new server.gnss.GnssConnection(config.role() == server.common.LnisModels.AgentRole.SENDER);
+        this.capture = new SerialCaptureService(gnss);
         this.dtn =
                 new DtnWorker(
                         new DtnProcessor(codec, config.nativeDirectory()),
@@ -39,6 +42,20 @@ public final class AgentRuntime implements AutoCloseable {
 
     public AgentState state() {
         return closed ? AgentState.OFFLINE : state.get();
+    }
+
+    public server.gnss.GnssConnection gnss() {
+        return gnss;
+    }
+
+    public void disconnectGnss(boolean stopCapture) throws InterruptedException {
+        if (gnss.status().capturing()) {
+            if (!stopCapture) {
+                throw new IllegalStateException("수집 중입니다. 수집 중단을 확인한 후 연결을 해제하세요.");
+            }
+            capture.stopAndAwait();
+        }
+        gnss.disconnect();
     }
 
     public int codecAbiVersion() {
@@ -211,6 +228,7 @@ public final class AgentRuntime implements AutoCloseable {
             closed = true;
         }
         capture.close();
+        gnss.close();
         dtn.close();
         codec.close();
     }

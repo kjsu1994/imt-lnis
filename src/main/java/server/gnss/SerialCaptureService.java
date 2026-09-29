@@ -32,7 +32,7 @@ public final class SerialCaptureService implements AutoCloseable {
 
         /** GNSS 장비와 통신할 전송 속도이며 단위는 baud다. */
         @lombok.Builder.Default
-    int baudRate = 38400;
+        int baudRate = 38400;
 
         /** {@code ubx}, {@code raw-only}, {@code lnis-canonical-v1} 중 수집 해석 방식이다. */
         String protocolId;
@@ -87,9 +87,23 @@ public final class SerialCaptureService implements AutoCloseable {
     private UbloxCaptureConfiguration configuration;
     private String detectedModel = "", detectedFirmware = "";
     private Consumer<byte[]> rawObserver = bytes -> {};
+    private final GnssConnection connection;
+
+    /** 독립 CLI 수집은 기존 포트 수명주기를 유지한다. 웹 노드는 상시 연결을 전달한다. */
+    public SerialCaptureService() {
+        this(null);
+    }
+
+    public SerialCaptureService(GnssConnection connection) {
+        this.connection = connection;
+    }
 
     public record CaptureProgress(String stage, String message, Map<String, Object> counters) {}
-    public record DetectedPort(String name, String description) {}
+    public record DetectedPort(String name, String description, String identity) {
+        public DetectedPort(String name, String description) {
+            this(name, description, "");
+        }
+    }
 
     /** Enumerate on the OS running this node; enumeration does not open or claim a port. */
     public List<DetectedPort> ports() {
@@ -128,7 +142,8 @@ public final class SerialCaptureService implements AutoCloseable {
         configuration = null;
         // 포트를 완전히 구성한 뒤 worker를 시작해 reader가 반쯤 적용된 직렬 설정을 보지 않게 한다.
         try {
-            port = bridge == null ? SerialConnection.local(settings) : bridge.open(settings);
+            port = connection != null ? connection.acquire(settings)
+                    : bridge == null ? SerialConnection.local(settings) : bridge.open(settings);
             if ("ubx".equalsIgnoreCase(settings.protocolId)) {
                 progress.accept(new CaptureProgress("Configuring", "현재 포트의 RAWX/SFRBX 출력 설정 확인 중", Map.of()));
                 detectedModel = "";
@@ -144,8 +159,10 @@ public final class SerialCaptureService implements AutoCloseable {
                         if (extension.startsWith("FWVER=")) detectedFirmware = extension.substring(6);
                     }
                 }
-                configuration = new UbloxCaptureConfiguration(this::exchange);
-                configuration.configure();
+                if (connection == null) {
+                    configuration = new UbloxCaptureConfiguration(this::exchange);
+                    configuration.configure();
+                }
             }
             worker =
                     Thread.ofPlatform()
@@ -200,6 +217,13 @@ public final class SerialCaptureService implements AutoCloseable {
                     writeRecord(canonicalChunk, metadata);
                 }
                 records++;
+            }
+            if (connection != null && selection != null) {
+                for (byte[] record : connection.seed(testId, sequence)) {
+                    selection.accept(record);
+                    sequence++;
+                    records++;
+                }
             }
             byte[] buffer = new byte[8192];
             while (running.get()) {
@@ -398,6 +422,10 @@ public final class SerialCaptureService implements AutoCloseable {
 
     @Override
     public void close() {
-        stop();
+        try {
+            stopAndAwait();
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        }
     }
 }

@@ -940,7 +940,18 @@ body[data-page="dtn-receiver"] .destination-status > div { display: flex; align-
 .receiver-result-line { display: flex; flex-wrap: wrap; gap: 4px 10px; overflow-wrap: anywhere; font-size: 13px; }
 .receiver-error { color: var(--red); }
 .receiver-meta { display: flex; flex-wrap: wrap; gap: 3px 12px; font-size: 11px; color: var(--muted); margin-top: 6px; overflow-wrap: anywhere; }
-.receiver-connections { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 24px; }
+.receiver-connections { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.1fr) minmax(0, 1fr); gap: 12px 16px; }
+.receiver-connections select { min-width: 0; width: 100%; padding: 8px; font-size: 13px; }
+.receiver-connections .adapter-url-controls { flex-wrap: wrap; }
+.receiver-connections .adapter-url-controls input, .receiver-connections .adapter-url-controls select { flex: 1 1 140px; width: 140px; }
+.gnss-details { margin: 6px 0; font-size: 12px; }
+.gnss-details pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
+#gnss-summary { display: block; color: var(--muted); font-size: 12px; }
+.gnss-details label { display: inline-flex; align-items: center; gap: 5px; margin-right: 8px; }
+@media (min-width: 901px) and (max-width: 1200px) {
+  .receiver-connections { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .receiver-gnss { grid-column: 1 / -1; }
+}
 .receiver-connections > div { min-width: 0; }
 .receiver-connection-heading { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px 12px; margin-bottom: 6px; }
 .receiver-connection-status { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; }

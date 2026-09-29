@@ -14,8 +14,20 @@ interface SerialConnection {
         return Arrays.stream(SerialPort.getCommPorts()).map(p ->
             new SerialCaptureService.DetectedPort(p.getSystemPortName(), p.getDescriptivePortName()
                 + " · " + p.getPortDescription() + (p.getVendorID() < 0 ? "" :
-                String.format(" · VID:%04X PID:%04X", p.getVendorID(), p.getProductID()))))
+                String.format(" · VID:%04X PID:%04X", p.getVendorID(), p.getProductID())), identity(p)))
             .sorted(Comparator.comparing(SerialCaptureService.DetectedPort::name)).toList();
+    }
+
+    private static String identity(SerialPort port) {
+        String serial = port.getSerialNumber();
+        if (serial == null || serial.isBlank() || serial.equalsIgnoreCase("Unknown")
+                || serial.matches("[0-9]+&.*")) {
+            // Windows가 USB 위치로 생성한 인스턴스 ID는 장치 고유 serial이 아니다.
+            // 같은 소켓에 다른 수신기를 꽂았을 때 자동 연결하지 않도록 제외한다.
+            return "";
+        }
+        // 다중 인터페이스 장치의 같은 USB serial을 구분한다. 설명이 달라지면 안전하게 수동 확인한다.
+        return port.getVendorID() + ":" + port.getProductID() + ":" + serial + ":" + port.getPortDescription();
     }
 
     static SerialConnection local(SerialCaptureService.Settings settings) {
