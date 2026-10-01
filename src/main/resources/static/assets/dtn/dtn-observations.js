@@ -79,19 +79,154 @@ export function createObservationView(container, onSelect = () => {}, role = '')
         </tr></thead><tbody data-frame-values></tbody></table>
       </div>
     </details>
-    <h3 data-navigation-title>항법정보 · SFRBX</h3>
+    <div class="navigation-heading"><h3 data-navigation-title>항법정보 · SFRBX</h3>
+      <div data-association hidden><button type="button" data-navigation-all>전체 보기</button>
+        <span data-navigation-summary></span></div></div>
     <div class="epoch-table-viewport" tabindex="0" aria-label="GNSS 항법정보 표">
-      <table class="epoch-observation-table"><caption data-navigation-caption>항법정보 · SFRBX · 수집된 전체 메시지</caption><thead><tr>
+      <table class="epoch-observation-table" data-navigation-table><caption data-navigation-caption>항법정보 · SFRBX · 수집된 전체 메시지</caption><thead><tr data-navigation-head>
         <th title="원본 레코드의 수집 순번이며 총 건수가 아닙니다. 0~95는 96건입니다.">수집 순번</th><th>수집 시각 <small>UTC</small></th><th>GNSS</th><th>위성</th>
         <th>신호 ID</th><th>주파수 ID</th><th>버전</th><th>워드 수</th><th>수신 워드 <small data-word-width>HEX · 32 bit</small></th>
       </tr></thead><tbody data-navigation></tbody></table></div>
+    <details data-common-navigation hidden><summary data-common-title></summary>
+      <div class="epoch-table-viewport"><table class="epoch-observation-table navigation-linked">
+        <thead><tr><th>방송 위성</th><th>내용</th><th>관측 기준</th><th>원문</th></tr></thead>
+        <tbody data-common-body></tbody></table></div></details>
     <details data-record-details><summary>저장된 전체 필드 보기 · JSON</summary><pre data-records class="log"></pre></details>
     `;
-  const hideTransmitEstimate = role === '송신 원본';
+  const hideTransmitEstimate = role === '송신 원본' || role === '송신 비교원본';
   container.querySelector('[data-transmit-heading]').hidden = hideTransmitEstimate;
   const select = container.querySelector('[data-epoch]');
   const body = container.querySelector('[data-observations]');
   let data = null, delayEvidence = null, report = null;
+
+  const linkedNavigation = role === '수신 원본' || hideTransmitEstimate;
+  let selectedSatellite = null, showAllNavigation = false;
+  const satelliteKey = observation => observation.constellationId + ':' + observation.satelliteId;
+  const satelliteName = observation => constellation(observation.constellationId) + ' '
+    + (observation.constellationId === 0 ? 'G' + String(observation.satelliteId).padStart(2, '0') : observation.satelliteId);
+  const ordered = observations => {
+    const rows = (observations || []).map((observation, index) => ({observation, index}));
+    return linkedNavigation ? rows.sort((a, b) =>
+      a.observation.constellationId - b.observation.constellationId
+      || a.observation.satelliteId - b.observation.satelliteId
+      || a.observation.signalId - b.observation.signalId) : rows;
+  };
+  const association = container.querySelector('[data-association]');
+  association.hidden = !linkedNavigation;
+  const allNavigation = container.querySelector('[data-navigation-all]');
+  allNavigation.onclick = () => {
+    showAllNavigation = !showAllNavigation;
+    render(false);
+  };
+
+  function selectSatellite(observations) {
+    if (!linkedNavigation) return;
+    if (!observations.some(o => satelliteKey(o) === selectedSatellite)) {
+      const first = observations.find(o => o.constellationId === 0 && o.signalId === 0) || observations[0];
+      selectedSatellite = first ? satelliteKey(first) : null;
+    }
+  }
+
+  function linkSatellite(row, observation) {
+    if (!linkedNavigation) return;
+    const selected = satelliteKey(observation) === selectedSatellite;
+    row.className = selected ? 'satellite-selected' : '';
+    const cell = row.children[1];
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'satellite-select';
+    button.textContent = observation.constellationId === 0
+      ? 'G' + String(observation.satelliteId).padStart(2, '0') : String(observation.satelliteId);
+    button.setAttribute('aria-pressed', String(selected));
+    button.setAttribute('aria-label', satelliteName(observation) + ' 항법정보 보기');
+    button.onclick = () => {
+      selectedSatellite = satelliteKey(observation);
+      showAllNavigation = false;
+      const rowIndex = [...body.children].indexOf(row);
+      render(false);
+      // Keep focus on the same signal row when a satellite has multiple signals.
+      body.children[rowIndex]?.querySelector('.satellite-select')?.focus();
+    };
+    cell.replaceChildren(button);
+  }
+
+  function renderAssociation(observations) {
+    if (!linkedNavigation) return;
+    const navigation = data?.navigation || [];
+    const iq = data?.source === 'IQ_TRACKING';
+    const frame = !!data?.receivedValues && !data.receivedValues.records;
+    const selected = observations.find(o => satelliteKey(o) === selectedSatellite);
+    const matching = navigation.filter(item => satelliteKey(item.message) === selectedSatellite);
+    const shown = !selected || showAllNavigation ? navigation : matching;
+    container.querySelector('[data-navigation-title]').textContent =
+      selected && !showAllNavigation ? satelliteName(selected) + '에서 받은 항법정보 · ' + shown.length + '건'
+        : '전체 항법정보 · ' + shown.length + '건';
+    allNavigation.textContent = showAllNavigation ? '선택 위성만' : '전체 보기';
+    allNavigation.disabled = !selected;
+    allNavigation.setAttribute('aria-pressed', String(showAllNavigation));
+    const counts = [1, 2, 3].map(sf => 'SF' + sf + ' ' + matching.filter(n => n.display?.subframeId === sf).length + '건');
+    const summary = container.querySelector('[data-navigation-summary]');
+    summary.textContent = selected ? (selected.constellationId === 0 ? counts.join(' · ') + ' · 메시지 보유 현황' : 'GPS LNAV 분류 대상 아님') : '관측 위성을 선택하면 해당 위성의 항법정보를 모아 봅니다.';
+    summary.title = 'SF1~3이 모두 있어도 시각·궤도 유효성과 PVT 채택은 별도입니다. GPS SF는 AFS SB와 다른 구분입니다.';
+    container.querySelector('[data-navigation-caption]').textContent = iq ? (data.assistance || 'I/Q 복호 항법정보')
+      : frame ? 'AFS 프레임 복원 · 원본 수집 순번·시각 없음' : '원본 레코드 순서 기준 · 관측 이후 메시지는 해당 시점 계산과 구분';
+
+    // Raw processing order, not UTC or a sorted sequence number, determines availability.
+    const records = data?.records || [];
+    const epochPositions = [], navigationPositions = [];
+    records.forEach((record, index) => {
+      if (record.type === 'OBSERVATION_EPOCH') epochPositions.push(index);
+      if (record.type === 'NAVIGATION_UPDATE') navigationPositions.push(index);
+    });
+    const epochPosition = epochPositions[Number(select.value)];
+    const navigationBody = container.querySelector('[data-navigation]');
+    const headings = container.querySelector('[data-navigation-head]');
+    headings.innerHTML = '<th>방송 위성</th><th>내용</th><th>관측 기준</th><th>원문</th>';
+    container.querySelector('[data-navigation-table]').classList.add('navigation-linked');
+    navigationBody.replaceChildren();
+
+    function appendMessage(target, item) {
+      const row = document.createElement('tr');
+      const header = item.display;
+      const sf = header?.subframeId;
+      const labels = {1: '위성 시계·상태', 2: '궤도정보 ①', 3: '궤도정보 ②', 4: '보정·위성군 정보', 5: '위성군 정보'};
+      const label = header?.commonCorrection ? 'SF4 · 전리층·UTC 공통 보정'
+        : labels[sf] ? 'SF' + sf + ' · ' + labels[sf] + (header.pageId == null ? '' : ' · Page ' + header.pageId)
+        : '종류 미분류';
+      const position = navigationPositions[navigation.indexOf(item)];
+      const timing = frame ? '프레임 복원' : iq ? '복호·보조 정보'
+        : position == null || epochPosition == null ? '순서 확인 불가'
+        : position < epochPosition ? '관측 이전' : '관측 이후';
+      for (const text of [satelliteName(item.message), label, timing]) {
+        const cell = document.createElement('td');
+        cell.textContent = text;
+        row.append(cell);
+      }
+      const cell = document.createElement('td');
+      const content = document.createElement('pre');
+      const values = navigationCells(item, iq);
+      content.textContent = (frame || iq ? '' : '수집 순번 ' + (item.sequence ?? '—')
+        + ' · ' + (item.capturedAt ?? '시각 없음') + '\n신호 ID ' + (item.message.signalId ?? '—')
+        + ' · 주파수 ID ' + (item.message.frequencyId ?? '—') + ' · 버전 ' + (item.message.sfrbxVersion ?? '—') + '\n')
+        + values[7] + ' words · HEX ' + (iq ? '24 bit (패리티 제외)' : '32 bit') + '\n' + values[8];
+      cell.append(content); row.append(cell); target.append(row);
+    }
+    shown.forEach(item => appendMessage(navigationBody, item));
+    if (!shown.length) {
+      const row = document.createElement('tr'), cell = document.createElement('td');
+      cell.colSpan = 4;
+      cell.textContent = selected ? '이 위성에서 받은 항법 메시지가 없습니다.' : '표시할 항법정보가 없습니다.';
+      row.append(cell); navigationBody.append(row);
+    }
+    const common = navigation.filter(item => item.display?.commonCorrection && !shown.includes(item));
+    const commonDetails = container.querySelector('[data-common-navigation]');
+    commonDetails.hidden = !common.length;
+    container.querySelector('[data-common-title]').textContent = '다른 위성에서 받은 공통 보정 · ' + common.length + '건';
+    const commonBody = container.querySelector('[data-common-body]');
+    commonBody.replaceChildren();
+    common.forEach(item => appendMessage(commonBody, item));
+  }
+
   function render(notify = true) {
     if (data?.receivedValues) { renderWire(notify); return; }
     container.querySelector('[data-integrity]').hidden = true;
@@ -111,13 +246,14 @@ export function createObservationView(container, onSelect = () => {}, role = '')
         + ' s · Doppler·C/N₀·반송파·항법정보 원본 유지'
       : '변환 후 값 표시 불가 · ' + (delayEvidence.error || '원본 Epoch와 계산 근거 불일치')) : '';
     summary.title = '변환 후 의사거리 = 원본 의사거리 + 299,792,458 × 측정 지연(초). 표시값은 저장된 계산 근거이며 원문과 JSON 다운로드는 실제 수신 원본 그대로 유지됩니다. 최종 채택 위성 수는 PVT 결과에서 확인하세요.';
+    selectSatellite(epoch?.observations || []);
     body.replaceChildren();
     if (!epoch || !epoch.observations?.length) {
       const row = document.createElement('tr'), cell = document.createElement('td');
       row.className = 'epoch-empty-row'; cell.colSpan = (comparison ? 14 : 12) - (hideTransmitEstimate ? 1 : 0); cell.textContent = epoch ? 'RAWX 메시지는 수신했지만 관측 신호가 0개입니다. 안테나와 위성 추적 상태를 확인하세요.' : '표시할 GNSS 관측값이 없습니다.';
       row.append(cell); body.append(row);
     } else {
-      for (const [index, observation] of epoch.observations.entries()) {
+      for (const {index, observation} of ordered(epoch.observations)) {
         const row = document.createElement('tr');
         const values = observationCells(observation, epoch.receiverTowSeconds);
         if (hideTransmitEstimate) values.pop();
@@ -133,6 +269,7 @@ export function createObservationView(container, onSelect = () => {}, role = '')
         for (const value of values) {
           const cell = document.createElement('td'); cell.textContent = String(value ?? '—'); row.append(cell);
         }
+        linkSatellite(row, observation);
         body.append(row);
       }
     }
@@ -159,13 +296,15 @@ export function createObservationView(container, onSelect = () => {}, role = '')
     container.querySelector('[data-observation-title]').textContent = comparison ? '수신 관측값 · RAWX 원본 / 지연 변환 후' : iq ? '관측값 · I/Q 추적 (RAWX 원본 아님)' : role ? role+' 관측값 · RAWX (변환 전)' : '관측값 · RAWX';
     container.querySelector('[data-navigation-title]').textContent = iq ? (frameNavigation ? '프레임 복원 항법정보 · GPS LNAV' : '보조 항법정보 · GPS LNAV') : '항법정보 · SFRBX';
     container.querySelector('[data-navigation-caption]').textContent = iq ? data.assistance : '항법정보 · SFRBX · 수집된 전체 메시지';
-    container.querySelector('[data-word-width]').textContent = iq ? 'HEX · 24 bit (패리티 제외)' : 'HEX · 32 bit';
+    const wordWidth = container.querySelector('[data-word-width]');
+    if (wordWidth) wordWidth.textContent = iq ? 'HEX · 24 bit (패리티 제외)' : 'HEX · 32 bit';
     container.querySelector('[data-source]').textContent = iq ? 'PocketSDR AFS 추적' : data?.receiver?.receiverModel || (epoch ? 'GRAW 관측값' : '데이터 없음');
     container.querySelector('[data-nav]').textContent = '항법정보 ' + (data?.navigationCount ?? '—') + '건' +
       (epoch && data?.navigationCount === 0 ? ' · PVT 계산 불가' : '');
     container.querySelector('[data-count]').textContent = '관측 신호 ' + (epoch?.observations?.length ?? '—');
     container.querySelector('[data-status]').textContent = iq ? '위상은 상대 누적값 · F9T 편차·상태 정보 없음' : epoch ? 'RAWX v' + (epoch.rawxVersion ?? '—') + ' · 윤초 ' + ((epoch.receiverStatus & 1) ? epoch.leapSeconds + ' s' : '미확정') + ((epoch.receiverStatus & 2) ? ' · 수신기 시계 재설정' : '') + ' · 수신기 상태 0x' + epoch.receiverStatus.toString(16) : '';
 
+    renderAssociation(epoch?.observations || []);
     if (notify) onSelect(Number(select.value), epoch);
   }
 
@@ -209,12 +348,17 @@ export function createObservationView(container, onSelect = () => {}, role = '')
     select.replaceChildren(new Option('Week ' + (week ?? '—') + ' / TOW ' + numeric(tow) + ' s', '0'));
     select.disabled = true;
     body.replaceChildren();
-    for (const observation of values) {
+    selectSatellite(values);
+    for (const {observation} of ordered(values)) {
       const originals = reference?.observations?.filter(o => matchSignal(o, observation)) || [];
       const original = originals.length === 1 ? originals[0] : null;
-      const converted = calculated?.observations?.find(o => matchSignal(o, observation));
+      const conversions = calculated?.observations?.filter(o => matchSignal(o, observation)) || [];
+      const converted = conversions.length === 1 ? conversions[0] : null;
       const cells = observationCells(observation, tow);
       cells[3] = numeric(original?.pseudorangeMeters);
+      // Eligibility uses the calculated received observation, never Reference pseudorange.
+      cells[10] = delayEvidence?.error ? '계산 불가' : conversions.length > 1 ? '확인 불가'
+        : converted ? observationCells(converted, tow)[10] : '계산값 없음';
       if (!rawEpoch) cells[8] = '—';
       const stamp = observation.transmitAt;
       cells[11] = stamp ? String(stamp.seconds) + '.' + String(stamp.femtoseconds).padStart(15, '0') : '—';
@@ -227,8 +371,10 @@ export function createObservationView(container, onSelect = () => {}, role = '')
         if (index === cells.length - 1 && stamp) cell.className = 'converted-value';
         row.append(cell);
       });
+      linkSatellite(row, observation);
       body.append(row);
     }
+    renderAssociation(values);
     if (notify) onSelect(0, calculated);
   }
 
@@ -236,6 +382,10 @@ export function createObservationView(container, onSelect = () => {}, role = '')
   return {
     setData(next, preserve = false, evidence = null, comparisonReport = null) {
       report = comparisonReport;
+      if (!preserve) {
+        selectedSatellite = null;
+        showAllNavigation = false;
+      }
       const selected = preserve ? Number(select.value) : 0;
       data = next;
       delayEvidence = evidence;

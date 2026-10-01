@@ -29,7 +29,7 @@ public class DtnInputViewController {
     private DtnLogService logs;
 
     @GetMapping("/{id}/observations")
-    public DtnObservationView observations(@PathVariable UUID id) {
+    public com.fasterxml.jackson.databind.JsonNode observations(@PathVariable UUID id) {
         var view = DtnObservationView.fromRecords(records(id));
         if (logs != null && !logs.hasStage(id, "관측 요약")) {
             logs.add(
@@ -47,7 +47,7 @@ public class DtnInputViewController {
                                     .sum()
                             + "개");
         }
-        return view;
+        return DtnController.navigationView(json.valueToTree(view));
     }
 
     @GetMapping("/{id}/pvt")

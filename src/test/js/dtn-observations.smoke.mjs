@@ -63,7 +63,7 @@ assert.equal(iq[9],'PR 유효 · 위상 상대값');
 assert.equal(iq[7],undefined); // Never invent F9T lock-time or deviation codes for SDR observations.
 
 // Exercise the complete view update, including navigation rendering and epoch selection.
-const element = () => ({value: '0', children: [], append(child) { this.children.push(child); },
+const element = () => ({value: '0', children: [], classList: {add() {}}, setAttribute(key, value) { this[key] = value; }, append(child) { this.children.push(child); },
   replaceChildren(...children) { this.children = children; }});
 globalThis.document = {createElement: element};
 globalThis.Option = function(text, value) { this.text = text; this.value = value; };
@@ -126,6 +126,61 @@ assert.equal(nodes.get('[data-frame-input]').hidden, true);
 assert.equal(nodes.get('[data-frame-values]').children.length, 0);
 assert.equal(JSON.stringify(original), originalJson);
 console.log('PASS: separate AFS frame calculation inputs and legacy view reset');
+
+// Wire omits original pseudorange. Eligibility must come from received calculation,
+// including before Reference arrives; duplicate signal matches must not be guessed.
+const wireObservation = {...raw, transmitAt:{seconds:1790000000,femtoseconds:0}};
+delete wireObservation.pseudorangeMeters;
+const wireView = {...original, receivedValues:{observations:[wireObservation]}};
+receiverView.setData(wireView);
+assert.equal(nodes.get('[data-observations]').children[0].children[11].textContent, '계산 대상');
+assert.equal(nodes.get('[data-observations]').children[0].children[3].textContent, '—');
+receiverView.setData(wireView, false, {error:'음수 지연'});
+assert.equal(nodes.get('[data-observations]').children[0].children[11].textContent, '계산 불가');
+receiverView.setData({...wireView, epochs:[{observation:{...epochs[0].observation,observations:[raw,raw]}}]});
+assert.equal(nodes.get('[data-observations]').children[0].children[11].textContent, '확인 불가');
+assert.equal(nodes.get('[data-observations]').children[0].children[4].textContent, '—');
+
+// Sorting the view must preserve evidence's original index and source order.
+const unsorted = {...original, epochs:[{observation:{...epochs[0].observation,
+  observations:[{...raw,satelliteId:20},raw]}}]};
+const savedOrder = JSON.stringify(unsorted);
+receiverView.setData(unsorted, false, {...evidence,satellites:[
+  {...evidence.satellites[0],satelliteId:20,recalculatedMeters:12345678},evidence.satellites[0]]});
+assert.equal(nodes.get('[data-observations]').children[0].children[4].textContent,
+  numeric(evidence.satellites[0].recalculatedMeters));
+assert.equal(nodes.get('[data-observations]').children[1].children[4].textContent,'12345678.000');
+assert.equal(JSON.stringify(unsorted),savedOrder);
+console.log('PASS: received eligibility without Reference, ambiguous signals, sorting/evidence isolation');
+
+const multiEpoch = {...original, epochs:[...epochs,{observation:{...epochs[0].observation,
+  observations:[{...raw,constellationId:2}]}}]};
+receiverView.setData(multiEpoch);
+receiverView.select(1);
+assert.match(nodes.get('[data-navigation-title]').textContent,/Galileo 9/);
+receiverView.setData({...multiEpoch,epochs:[{observation:{...epochs[0].observation,observations:[]}}]});
+assert.match(nodes.get('[data-navigation-title]').textContent,/전체 항법정보/);
+assert.equal(nodes.get('[data-navigation-all]').disabled,true);
+assert.equal(nodes.get('[data-navigation]').children.length,1);
+console.log('PASS: epoch selection fallback and navigation without observations');
+
+const senderView = createObservationView(container, () => {}, '송신 원본');
+senderView.setData(original);
+assert.equal(nodes.get('[data-association]').hidden,false);
+assert.equal(nodes.get('[data-transmit-heading]').hidden,true);
+assert.equal(nodes.get('[data-observations]').children[0].children.length,11);
+assert.equal(nodes.get('[data-observations]').children[0].children[3].textContent,numeric(raw.pseudorangeMeters));
+assert.match(nodes.get('[data-navigation-title]').textContent,/GPS G09/);
+assert.equal(JSON.stringify(original),originalJson);
+console.log('PASS: sender association retains original values and hidden transmit estimate');
+
+const referenceView = createObservationView(container, () => {}, '송신 비교원본');
+referenceView.setData(original);
+assert.equal(nodes.get('[data-association]').hidden,false);
+assert.equal(nodes.get('[data-transmit-heading]').hidden,true);
+assert.equal(nodes.get('[data-observations]').children[0].children.length,11);
+assert.match(nodes.get('[data-navigation-title]').textContent,/GPS G09/);
+assert.equal(JSON.stringify(original),originalJson);
 
 delete globalThis.document;
 delete globalThis.Option;

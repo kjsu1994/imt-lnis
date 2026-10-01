@@ -127,6 +127,109 @@ const server=createServer((req,res)=>{
  reportFixture.referenceStatus='MISMATCH';
  await page.reload();
  await page.waitForFunction(()=>document.querySelector('#dtn-observations [data-integrity]')?.textContent==='데이터 불일치');
+
+ // Satellite association: same PRN in another constellation and multiple signals.
+ const nav = (gnss, sv, sf, common=false) => ({sequence:100+sf,
+   capturedAt:'2026-10-01T00:00:00Z',
+   message:{constellationId:gnss,satelliteId:sv,signalId:0,frequencyId:0,sfrbxVersion:2,words:[0x22c00000,0,0,0,0,0,0,0,0,0]},
+   display:gnss===0?{subframeId:sf,commonCorrection:common}:undefined});
+ const navRows=[nav(0,19,1),nav(0,19,2),nav(0,19,3),nav(2,19,1),nav(0,4,4,true),nav(0,19,1)];
+ const records=[{type:'NAVIGATION_UPDATE'},{type:'NAVIGATION_UPDATE'},{type:'NAVIGATION_UPDATE'},
+   {type:'NAVIGATION_UPDATE'},{type:'NAVIGATION_UPDATE'},{type:'OBSERVATION_EPOCH'},{type:'NAVIGATION_UPDATE'}];
+ const receivedSignals=[{...received,constellationId:2},received,{...received,signalId:3}];
+ reportFixture.observations.navigation=navRows;
+ reportFixture.observations.navigationCount=navRows.length;
+ reportFixture.observations.records=records;
+ reportFixture.observations.receivedValues.records[0].observation.observations=receivedSignals;
+ await page.reload();
+ await page.waitForFunction(()=>document.querySelector('#dtn-observations [data-navigation-title]')?.textContent.includes('GPS G19'));
+ assert.equal(await observationPanel.locator('[data-observations] tr.satellite-selected').count(),2);
+ assert.equal(await observationPanel.locator('[data-navigation] tr').count(),4);
+ assert.match(await observationPanel.locator('[data-navigation]').innerText(),/관측 이후/);
+ assert.match(await observationPanel.locator('[data-navigation-summary]').innerText(),/SF1 2건 · SF2 1건 · SF3 1건/);
+ assert.equal(await observationPanel.locator('[data-common-navigation]').isVisible(),true);
+ await observationPanel.locator('[data-common-title]').click();
+ assert.match(await observationPanel.locator('[data-common-body]').innerText(),/GPS G04/);
+ await observationPanel.getByRole('button',{name:'Galileo 19 항법정보 보기'}).click();
+ assert.equal(await observationPanel.locator('[data-navigation] tr').count(),1);
+ assert.match(await observationPanel.locator('[data-navigation]').innerText(),/종류 미분류/);
+ await observationPanel.locator('[data-navigation-all]').click();
+ assert.equal(await observationPanel.locator('[data-navigation] tr').count(),6);
+ assert.equal(await observationPanel.locator('[data-common-navigation]').isVisible(),false);
+ await observationPanel.getByRole('button',{name:'GPS G19 항법정보 보기'}).first().focus();
+ await page.keyboard.press('Enter');
+ assert.equal(await observationPanel.locator('[data-navigation] tr').count(),4);
+ assert.equal(await observationPanel.getByRole('button',{name:'GPS G19 항법정보 보기'}).first().evaluate(el=>el===document.activeElement),true);
+ assert.equal(await observationPanel.locator('[data-navigation] details').count(),0);
+ assert.equal(await observationPanel.locator('[data-navigation] pre').first().isVisible(),true);
+ assert.match(await observationPanel.locator('[data-navigation]').innerText(),/수집 순번 101/);
+ for(const width of [1366,390]){
+   await page.setViewportSize({width,height:900});
+   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+   await observationPanel.screenshot({path:'build/receiver-navigation-'+width+'.png'});
+ }
+ // Refresh preserves selection; a different trial resets via setData(null).
+ await page.evaluate(async()=>{
+   const {createObservationView}=await import('/assets/dtn/dtn-observations.js?v=20261001-navigation-plain');
+   const host=document.createElement('div');host.id='association-test';document.body.append(host);
+   window.associationView=createObservationView(host,()=>{},'수신 원본');
+ });
+ const fixture=structuredClone(reportFixture.observations);
+ await page.evaluate(fixture=>associationView.setData(fixture),fixture);
+ const isolated=page.locator('#association-test');
+ await isolated.getByRole('button',{name:'Galileo 19 항법정보 보기'}).click();
+ await page.evaluate(fixture=>associationView.setData(fixture,true),fixture);
+ assert.match(await isolated.locator('[data-navigation-title]').innerText(),/Galileo/);
+ await page.evaluate(fixture=>{associationView.setData(null);associationView.setData(fixture);},fixture);
+ assert.match(await isolated.locator('[data-navigation-title]').innerText(),/GPS G19/);
+ // Sender uses the same association with source values and its own column layout.
+ await page.evaluate(async fixture=>{
+   const {createObservationView}=await import('/assets/dtn/dtn-observations.js?v=20261001-navigation-plain');
+   const host=document.createElement('div');host.id='sender-association-test';document.body.append(host);
+   const source=structuredClone(fixture);delete source.receivedValues;
+   source.epochs[0].observation.observations.push({...source.epochs[0].observation.observations[0],constellationId:2});
+   createObservationView(host,()=>{},'송신 원본').setData(source);
+ },fixture);
+ const senderAssociation=page.locator('#sender-association-test');
+ assert.equal(await senderAssociation.locator('[data-association]').isVisible(),true);
+ assert.equal(await senderAssociation.locator('[data-transmit-heading]').isVisible(),false);
+ assert.equal(await senderAssociation.locator('[data-observations] tr').first().locator('td').count(),11);
+ await senderAssociation.getByRole('button',{name:'Galileo 19 항법정보 보기'}).click();
+ assert.match(await senderAssociation.locator('[data-navigation]').innerText(),/종류 미분류/);
+ await senderAssociation.locator('[data-navigation-all]').click();
+ assert.equal(await senderAssociation.locator('[data-navigation] tr').count(),6);
+ await senderAssociation.screenshot({path:'build/sender-navigation.png'});
+ await page.evaluate(async fixture=>{
+   const {createObservationView}=await import('/assets/dtn/dtn-observations.js?v=20261001-navigation-plain');
+   const host=document.getElementById('sender-association-test');
+   const source=structuredClone(fixture);delete source.receivedValues;
+   createObservationView(host,()=>{},'송신 비교원본').setData(source);
+ },fixture);
+ assert.equal(await senderAssociation.locator('[data-transmit-heading]').isVisible(),false);
+ assert.equal(await senderAssociation.locator('[data-observations] tr').first().locator('td').count(),11);
+ assert.equal(await senderAssociation.locator('[data-navigation] details').count(),0);
+ assert.equal(await senderAssociation.locator('[data-navigation] pre').first().isVisible(),true);
+ assert.match(await senderAssociation.locator('[data-navigation]').innerText(),/SF1/);
+ await page.evaluate(()=>document.getElementById('sender-association-test').remove());
+ // AFS restored data must never show synthetic collection times/order as real.
+ fixture.receivedValues={observations:receivedSignals};
+ await page.evaluate(fixture=>associationView.setData(fixture),fixture);
+ assert.match(await isolated.locator('[data-navigation]').innerText(),/프레임 복원/);
+ assert.equal(await isolated.locator('[data-navigation] details').count(),0);
+ assert.equal(await isolated.locator('[data-navigation] pre').first().isVisible(),true);
+ assert.doesNotMatch(await isolated.locator('[data-navigation]').innerText(),/수집 순번|2026-10-01/);
+ // IQ words remain 24-bit; non-GPS rows remain unclassified.
+ delete fixture.receivedValues;
+ fixture.source='IQ_TRACKING';fixture.assistance='AFS SB2 · 복원';
+ fixture.navigation[0].message.words=[0x8b0000,0];
+ await page.evaluate(fixture=>associationView.setData(fixture),fixture);
+ assert.equal(await isolated.locator('[data-navigation] details').count(),0);
+ assert.equal(await isolated.locator('[data-navigation] pre').first().isVisible(),true);
+ assert.match(await isolated.locator('[data-navigation]').innerText(),/24 bit/);
+ assert.match(await isolated.locator('[data-navigation]').innerText(),/8B0000 000000/);
+ await page.evaluate(()=>document.getElementById('association-test').remove());
+ await page.setViewportSize({width:1600,height:1000});
+
  reportFixture={referencePvt:[],receivedPvt:[]};
 
 

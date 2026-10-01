@@ -19,6 +19,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import server.common.DtnModels;
+import server.afs.AfsMetadataCodec;
+import server.gnss.GrawCodec;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import server.pvt.DtnComparison;
 import server.pvt.DtnDelay;
 
@@ -40,6 +43,52 @@ public class DtnController {
     @org.springframework.beans.factory.annotation.Autowired private DtnReceiptService receipts;
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private server.common.ServiceClock clock = new server.common.ServiceClock();
+
+    /** 저장 원문은 유지하고 과거 보고서에도 화면용 LNAV 분류를 덧붙인다. */
+    static JsonNode navigationView(JsonNode observations) {
+        JsonNode view = observations.deepCopy();
+        boolean iq = "IQ_TRACKING".equals(view.path("source").asText());
+        for (JsonNode item : view.path("navigation")) {
+            if (!(item instanceof ObjectNode row)) {
+                continue;
+            }
+            row.remove("display");
+            JsonNode message = item.path("message");
+            JsonNode words = message.path("words");
+            if (!words.isArray() || words.size() != 10) {
+                continue;
+            }
+            List<Long> normalized = new ArrayList<>();
+            for (JsonNode word : words) {
+                if (!word.isIntegralNumber() || !word.canConvertToLong()
+                        || word.longValue() < 0
+                        || word.longValue() > (iq ? 0xffffffL : 0xffffffffL)) {
+                    break;
+                }
+                normalized.add(iq ? word.longValue() << 6 : word.longValue());
+            }
+            if (normalized.size() != 10) {
+                continue;
+            }
+            var navigation = new GrawCodec.NavigationUpdate(
+                    message.path("constellationId").asInt(-1),
+                    message.path("satelliteId").asInt(-1),
+                    iq ? 0 : message.path("signalId").asInt(-1),
+                    message.path("frequencyId").asInt(0),
+                    message.path("sfrbxVersion").asInt(0),
+                    normalized);
+            var header = AfsMetadataCodec.navigationHeader(navigation);
+            if (header != null) {
+                ObjectNode display = row.putObject("display");
+                display.put("subframeId", header.subframeId());
+                if (header.pageId() != null) {
+                    display.put("pageId", header.pageId());
+                }
+                display.put("commonCorrection", header.commonCorrection());
+            }
+        }
+        return view;
+    }
 
     @GetMapping("/receipts")
     public ResponseEntity<?> receipts(@RequestParam(required = false) UUID testId) {
@@ -342,14 +391,15 @@ public class DtnController {
         report.put("referenceStatus", job.getReferenceStatus());
         report.put("referenceMessage", job.getReferenceMessage());
         report.put("referenceObservations", job.getReferenceSourceBase64() == null ? null
-                : server.common.DtnObservationView.fromRecords(server.gnss.GrawCodec.splitLengthPrefixed(
-                        Base64.getDecoder().decode(job.getReferenceSourceBase64()))));
+                : navigationView(objectMapper.valueToTree(
+                        server.common.DtnObservationView.fromRecords(server.gnss.GrawCodec.splitLengthPrefixed(
+                                Base64.getDecoder().decode(job.getReferenceSourceBase64()))))));
         report.put("delayTimeAlignment", DtnDelay.alignment(evidence));
         report.put(
                 "observations",
                 job.getObservationsJson() == null
                         ? null
-                        : objectMapper.readTree(job.getObservationsJson()));
+                        : navigationView(objectMapper.readTree(job.getObservationsJson())));
         report.put(
                 "fileResult",
                 job.getFileResultJson() == null

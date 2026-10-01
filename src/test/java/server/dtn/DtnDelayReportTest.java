@@ -19,6 +19,76 @@ class DtnDelayReportTest {
     private final ObjectMapper json = new ObjectMapper().findAndRegisterModules();
 
     @Test
+    void referenceNavigationUsesSameClassificationAsSenderWithoutChangingSavedReference() throws Exception {
+        var service = mock(DtnService.class);
+        var job = new DtnJob();
+        job.setId(UUID.randomUUID());
+        var words = List.of(0x8bL << 22, 2L << 8, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L);
+        byte[] record = server.gnss.GrawCodec.encode(new server.gnss.GrawCodec.Envelope(
+                job.getId(), UUID.randomUUID(), 25, Instant.parse("2026-10-01T00:00:00Z"),
+                new server.gnss.GrawCodec.NavigationUpdate(0, 4, 0, 0, 2, words)));
+        String saved = java.util.Base64.getEncoder().encodeToString(
+                java.nio.ByteBuffer.allocate(record.length + 4).putInt(record.length).put(record).array());
+        job.setReferenceSourceBase64(saved);
+        when(service.get(job.getId())).thenReturn(job);
+        var report = new DtnController(service, json).report(job.getId()).getBody();
+        var reference = (JsonNode) report.get("referenceObservations");
+        assertEquals(2, reference.path("navigation").get(0).path("display").path("subframeId").asInt());
+        assertEquals(json.valueToTree(words), reference.path("navigation").get(0).path("message").path("words"));
+        assertEquals(25, reference.path("navigation").get(0).path("sequence").asInt());
+        assertFalse(reference.path("records").get(0).has("display"));
+        assertEquals(saved, job.getReferenceSourceBase64());
+    }
+
+    @Test
+    void navigationHeadersUseLnavWordsWithoutChangingSource() throws Exception {
+        var original = json.createObjectNode();
+        var navigation = original.putArray("navigation");
+        for (int sf = 1; sf <= 5; sf++) {
+            var row = navigation.addObject();
+            row.put("sequence", 100 + sf);
+            var message = row.putObject("message");
+            message.put("constellationId", 0);
+            message.put("satelliteId", 4);
+            message.put("signalId", 0);
+            var words = message.putArray("words");
+            words.add(0x8bL << 22);
+            words.add((long) sf << 8);
+            words.add((1L << 28) | (56L << 22));
+            for (int word = 3; word < 10; word++) {
+                words.add(0);
+            }
+        }
+        String saved = original.toString();
+        var view = DtnController.navigationView(original);
+        for (int sf = 1; sf <= 5; sf++) {
+            assertEquals(sf, view.path("navigation").get(sf - 1).path("display").path("subframeId").asInt());
+        }
+        assertTrue(view.path("navigation").get(3).path("display").path("commonCorrection").asBoolean());
+        assertFalse(view.path("navigation").get(4).path("display").path("commonCorrection").asBoolean());
+        assertEquals(saved, original.toString());
+        assertEquals(101, view.path("navigation").get(0).path("sequence").asInt());
+
+        // IQ contains parity-stripped 24-bit words, not receiver 32-bit words.
+        original.put("source", "IQ_TRACKING");
+        for (var row : navigation) {
+            var words = (com.fasterxml.jackson.databind.node.ArrayNode) row.path("message").path("words");
+            for (int i = 0; i < words.size(); i++) {
+                words.set(i, json.getNodeFactory().numberNode(words.get(i).longValue() >>> 6));
+            }
+        }
+        assertEquals(4, DtnController.navigationView(original).path("navigation").get(3)
+                .path("display").path("subframeId").asInt());
+
+        var message = (com.fasterxml.jackson.databind.node.ObjectNode) navigation.get(0).path("message");
+        message.put("constellationId", 2);
+        assertFalse(DtnController.navigationView(original).path("navigation").get(0).has("display"));
+        message.put("constellationId", 0);
+        ((com.fasterxml.jackson.databind.node.ArrayNode) message.path("words")).set(0, json.getNodeFactory().numberNode(-1));
+        assertFalse(DtnController.navigationView(original).path("navigation").get(0).has("display"));
+    }
+
+    @Test
     void historicalReportAddsSignedResidualAndAlignmentWithoutChangingStoredData()
             throws Exception {
         var service = mock(DtnService.class);

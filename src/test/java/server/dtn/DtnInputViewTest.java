@@ -13,6 +13,33 @@ import java.util.UUID;
 
 class DtnInputViewTest {
     @Test
+    void senderObservationViewClassifiesNavigationWithoutRewritingRawRecords() {
+        var inputs = mock(InputBufferService.class);
+        var entity = mock(InputBufferEntity.class);
+        UUID id = UUID.randomUUID();
+        var words = java.util.List.of(0x8bL << 22, 1L << 8, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L);
+        byte[] record = server.gnss.GrawCodec.encode(new server.gnss.GrawCodec.Envelope(
+                id, UUID.randomUUID(), 17, java.time.Instant.parse("2026-10-01T00:00:00Z"),
+                new server.gnss.GrawCodec.NavigationUpdate(0, 4, 0, 0, 2, words)));
+        byte[] raw = java.nio.ByteBuffer.allocate(record.length + 4).putInt(record.length).put(record).array();
+        when(inputs.get(id)).thenReturn(entity);
+        when(entity.complete()).thenReturn(true);
+        when(entity.receivedSize()).thenReturn((long) raw.length);
+        when(inputs.readChunks(entity, server.common.DtnModels.MAX_INPUT_BYTES)).thenReturn(raw);
+        var json = new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules();
+        var controller = new DtnInputViewController(inputs, json);
+        var result = controller.observations(id);
+        assertEquals(1, result.path("navigation").get(0).path("display").path("subframeId").asInt());
+        assertEquals(17, result.path("navigation").get(0).path("sequence").asInt());
+        assertEquals(json.valueToTree(words), result.path("navigation").get(0).path("message").path("words"));
+        assertFalse(result.path("records").get(0).has("display"));
+        assertEquals(1, result.path("navigationCount").asInt());
+        verify(inputs).get(id);
+        verify(inputs).readChunks(entity, server.common.DtnModels.MAX_INPUT_BYTES);
+        verifyNoMoreInteractions(inputs);
+    }
+
+    @Test
     void refusesIncompleteAndOversizedInputsBeforeReadingChunks() {
         var inputs = mock(InputBufferService.class);
         var entity = mock(InputBufferEntity.class);

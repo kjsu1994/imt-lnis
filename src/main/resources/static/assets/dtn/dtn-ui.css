@@ -926,3 +926,22 @@ body[data-page^="dtn-"] section.log-expanded .log { flex: 1; height: auto; min-h
 #dtn-tests option { background: #fff; color: #52606d; }
 #dtn-test-detail { margin: 8px 0 0; font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
 #dtn-tests-page { font-size: 12px; font-variant-numeric: tabular-nums; }
+
+/* Receiver observation/navigation association: compact, without changing source tables. */
+.navigation-heading { display:flex; align-items:baseline; flex-wrap:wrap; gap:8px 16px; margin-top:16px; }
+.navigation-heading h3 { margin:0; }
+[data-association]:not([hidden]) { display:flex; align-items:center; flex-wrap:wrap; gap:10px; }
+[data-navigation-summary] { font-size:12px; color:#526479; }
+.satellite-select { padding:3px 8px; min-height:28px; border:1px solid #b6c8dc; border-radius:5px; background:white; color:#245787; cursor:pointer; }
+.satellite-select[aria-pressed="true"] { background:#245787; color:white; border-color:#245787; }
+.satellite-select:focus-visible { outline:2px solid #146cc1; outline-offset:2px; }
+.epoch-observation-table tr.satellite-selected { background:#edf5fc; }
+.epoch-observation-table.navigation-linked { table-layout:fixed; width:100%; min-width:720px; }
+.epoch-observation-table.navigation-linked th,
+.epoch-observation-table.navigation-linked td { text-align:left; white-space:normal; vertical-align:top; }
+.navigation-linked th:nth-child(1) { width:100px; }
+.navigation-linked th:nth-child(2) { width:32%; }
+.navigation-linked th:nth-child(3) { width:110px; }
+.navigation-linked summary { cursor:pointer; color:#245787; }
+.navigation-linked pre { margin:6px 0; white-space:pre-wrap; overflow-wrap:anywhere; font-size:11px; }
+[data-common-navigation] { margin-top:8px; font-size:12px; }

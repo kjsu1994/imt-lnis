@@ -507,6 +507,19 @@ public final class AfsMetadataCodec {
                 null);
     }
 
+    /** 화면 분류용 헤더. SF1~3 존재만으로 궤도 유효성이나 PVT 채택을 판단하지 않는다. */
+    public record NavigationHeader(int subframeId, Integer pageId, boolean commonCorrection) {}
+
+    public static NavigationHeader navigationHeader(NavigationUpdate navigation) {
+        int sf = subframe(navigation);
+        if (sf < 1 || sf > 5) {
+            return null;
+        }
+        Integer page = sf >= 4 && read(navigation.words(), 48, 2) == 1
+                ? (int) read(navigation.words(), 50, 6) : null;
+        return new NavigationHeader(sf, page, sf == 4 && Integer.valueOf(56).equals(page));
+    }
+
     private static int subframe(NavigationUpdate n) {
         if (n.constellationId() != 0
                 || n.signalId() != 0
