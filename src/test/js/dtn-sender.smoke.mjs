@@ -36,6 +36,8 @@ class Element {
   focus() { this.focused = true; }
 }
 const elements = new Map([...html.matchAll(/id="([^"]+)"/g)].map(([, id]) => [id, new Element()]));
+// The observation view creates these controls inside its header at runtime.
+for (const id of ['dtn-receiver-info', 'dtn-receiver-info-body']) elements.set(id, new Element());
 assert.match(html, /id="dtn-development"[^>]*\bhidden\b/);
 elements.get('dtn-development').hidden = true;
 elements.get('dtn-settings-view').hidden = true;

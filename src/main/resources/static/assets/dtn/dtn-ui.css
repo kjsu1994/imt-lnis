@@ -978,7 +978,8 @@ body[data-page^="dtn-"] [data-navigation-all] { min-height:24px; padding:3px 8px
 
 .navigation-linked td:last-child pre { width:100%; max-width:none; margin:0; line-height:1.5; }
 
-.sender-summary { position:relative; }
-.receiver-file-info { position:static; font-size:11px; }
+body[data-page="dtn-sender"] .gnss-data-header .observation-summary { margin-left: 0; }
+.receiver-file-info { position:relative; flex:0 0 auto; margin-left:auto; font-size:11px; }
+.receiver-file-info[hidden] { display:none; }
 .receiver-file-info summary { cursor:pointer; color:#245787; }
-.receiver-file-info pre { position:absolute; z-index:8; top:100%; left:0; margin:6px 0 0; padding:12px; width:min(330px,calc(100vw - 60px)); box-sizing:border-box; border:1px solid #c8d5df; border-radius:6px; background:white; color:#34465a; white-space:pre-wrap; overflow-wrap:anywhere; font-size:12px; line-height:1.7; font-family:inherit; box-shadow:0 3px 10px #0002; }
+.receiver-file-info pre { position:absolute; z-index:8; top:100%; right:0; margin:6px 0 0; padding:12px; width:min(330px,calc(100vw - 60px)); box-sizing:border-box; border:1px solid #c8d5df; border-radius:6px; background:white; color:#34465a; white-space:pre-wrap; overflow-wrap:anywhere; font-size:12px; line-height:1.7; font-family:inherit; box-shadow:0 3px 10px #0002; }

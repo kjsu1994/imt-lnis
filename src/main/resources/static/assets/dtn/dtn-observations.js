@@ -182,7 +182,12 @@ export function createObservationView(container, onSelect = () => {}, role = '')
         <ul data-pvt-status-reasons></ul>
       </details>
     <div class="observation-summary"><span data-source>데이터 없음</span><span data-nav>항법정보 —</span>
-      <span data-count>관측 신호 —</span><span data-pvt-counts title="입력 조건·메시지 보유·계산기 채택은 서로 다른 지표입니다. SF1~3 확인은 유효한 Ephemeris 보장이 아닙니다."></span><span data-status></span></div></div>
+      <span data-count>관측 신호 —</span><span data-pvt-counts title="입력 조건·메시지 보유·계산기 채택은 서로 다른 지표입니다. SF1~3 확인은 유효한 Ephemeris 보장이 아닙니다."></span><span data-status></span></div>
+    ${role === '송신 원본' ? `
+      <details id="dtn-receiver-info" class="receiver-file-info" hidden>
+        <summary>수신기 정보</summary>
+        <pre id="dtn-receiver-info-body"></pre>
+      </details>` : ''}</div>
     <h3 data-observation-title>관측값 · RAWX</h3>
     <p data-delay-summary hidden></p>
     <div class="epoch-table-viewport" tabindex="0" aria-label="GNSS 관측값 표">

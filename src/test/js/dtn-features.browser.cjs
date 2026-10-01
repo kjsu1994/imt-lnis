@@ -58,6 +58,7 @@ const server=createServer((req,res)=>{
  await context.addInitScript(()=>{window.WebSocket=class {};});
  const page=await context.newPage();page.setDefaultTimeout(15000);const errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.goto(base+'/sender');
+ await page.waitForFunction(()=>!!document.querySelector('#dtn-observations .gnss-data-header #dtn-receiver-info'));
  assert.equal(await page.locator('#dtn-receiver-info').isVisible(),false);
  await page.evaluate(async()=>{
    const {receiverInformation}=await import('/assets/dtn/dtn-observations.js?v=20261001-gnss-info');
@@ -73,6 +74,10 @@ const server=createServer((req,res)=>{
  for(const width of [1366,390]){
    await page.setViewportSize({width,height:900});
    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'device info fits');
+   const header=await page.locator('#dtn-observations .gnss-data-header').boundingBox();
+   const receiverInfo=await page.locator('#dtn-receiver-info').boundingBox();
+   assert.ok(receiverInfo.x+receiverInfo.width<=header.x+header.width+1,'receiver info stays in header');
+   await page.locator('#dtn-observations .gnss-data-header').screenshot({path:'build/sender-observation-header-'+width+'.png'});
  }
  await page.setViewportSize({width:1366,height:900});
  await page.locator('#dtn-receiver-info').screenshot({path:'build/sender-device-info.png'});
