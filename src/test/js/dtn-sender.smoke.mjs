@@ -1,5 +1,5 @@
 import {pageSource} from './browser-source.mjs';
-import {numeric, renderClockBias} from '../../main/resources/static/assets/dtn/dtn-observations.js';
+import {numeric, renderClockBias, receiverInformation} from '../../main/resources/static/assets/dtn/dtn-observations.js';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
@@ -45,7 +45,7 @@ let healthFetch, healthCalls = 0, healthUrl;
 let gnssStatus = {state: 'DISCONNECTED', timeState: 'UNAVAILABLE'};
 const intervals = [];
 const tx = {agentId: 'sender-1', role: 'SENDER', state: 'READY'}, rx = {agentId: 'receiver-1', role: 'RECEIVER', state: 'READY'};
-const observations = {epochs: [{observation: {week: 2400, receiverTowSeconds: 1, observations: []}}]};
+const observations = {receiverInfo:{model:'ZED-F9T-20B',firmware:'TIM 2.25',protocol:'29.25',supportedConstellations:['GPS','BeiDou']},epochs: [{observation: {week: 2400, receiverTowSeconds: 1, observations: []}}]};
 const context = {
   renderIqFile() {},
   createDtnLog: () => ({write() {},setContext() {},refresh() {}}),
@@ -55,7 +55,7 @@ const context = {
     observationSelection = onSelect;
     return {setData(data) { loaded = data; }, select() {}, setPvt(values) { displayedPvt = values; }};
   },
-  numeric, renderClockBias,
+  numeric, renderClockBias, receiverInformation,
   URLSearchParams,
   Option: function(text, value) { this.value = value; },
   location: {protocol: 'http:', host: '127.0.0.1:18090'}, WebSocket: class {},
@@ -131,6 +131,8 @@ assert.equal(elements.get('dtn-graw-file').files[0], file, 'selected file surviv
 assert.equal(intervals.length, timerCount, 'navigation does not start extra polling');
 assert.equal(elements.get('dtn-development').hidden, true);
 assert.equal(loaded, observations);
+assert.equal(elements.get('dtn-receiver-info').hidden,false);
+assert.match(elements.get('dtn-receiver-info-body').textContent,/29.25/);
 assert.equal(displayedPvt[0].positionValid, true);
 assert.equal(elements.get('dtn-send').disabled, false);
 await elements.get('dtn-send').onclick();

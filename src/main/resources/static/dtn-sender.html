@@ -5,7 +5,7 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>LNIS DTN Sender</title>
   <link rel="stylesheet" href="/lnis/assets/common/app.css?v=20260918-admin-icon">
-  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20261001-pvt-status">
+  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20261001-gnss-info">
 </head>
 <body data-page="dtn-sender">
 <header>
@@ -189,6 +189,10 @@
     <div class="sender-summary">
       <strong id="dtn-condition-summary">AFS Frame · DTN → HDTN</strong>
       <span id="dtn-input-summary">데이터 없음</span>
+      <details id="dtn-receiver-info" class="receiver-file-info" hidden>
+        <summary>수신기 정보</summary>
+        <pre id="dtn-receiver-info-body"></pre>
+      </details>
       <span class="sender-connection"><span id="dtn-peer-summary-dot" class="connection-dot unknown" aria-hidden="true"></span>수신 서비스 <strong id="dtn-peer-summary">미확인</strong></span>
       <span class="sender-connection"><span id="dtn-adapter-summary-dot" class="connection-dot unknown" aria-hidden="true"></span>송신 adapter <strong id="dtn-adapter-summary">미확인</strong></span>
     </div>
@@ -259,5 +263,5 @@
   </div>
   </div>
 </main>
-<script type="module" src="/lnis/assets/dtn/dtn.js?v=20261001-pvt-status"></script>
+<script type="module" src="/lnis/assets/dtn/dtn.js?v=20261001-gnss-info"></script>
 </body></html>

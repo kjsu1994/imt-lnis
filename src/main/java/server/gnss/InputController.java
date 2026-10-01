@@ -48,7 +48,10 @@ public class InputController {
                         "UBX RAWX·SFRBX 해석 완료 · " + raw.length + " bytes → " + data.length + " bytes · " + fileName);
             }
             inputBufferService.append(input.inputId(), 0, data);
-            return inputBufferService.complete(input.inputId());
+            var completed = inputBufferService.complete(input.inputId());
+            inputBufferService.receiverInfo(input.inputId(),
+                    new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(UbxGrawImport.receiverInfo(raw)));
+            return completed;
         } catch (RuntimeException error) {
             try {
                 inputBufferService.remove(input.inputId());

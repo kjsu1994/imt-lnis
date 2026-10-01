@@ -28,13 +28,15 @@ class DtnInputViewTest {
         when(inputs.readChunks(entity, server.common.DtnModels.MAX_INPUT_BYTES)).thenReturn(raw);
         var json = new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules();
         var controller = new DtnInputViewController(inputs, json);
+        when(entity.receiverInfoJson()).thenReturn("{\"model\":\"ZED-F9T-20B\",\"protocol\":\"29.25\"}");
         var result = controller.observations(id);
+        assertEquals("29.25", result.path("receiverInfo").path("protocol").asText());
         assertEquals(1, result.path("navigation").get(0).path("display").path("subframeId").asInt());
         assertEquals(17, result.path("navigation").get(0).path("sequence").asInt());
         assertEquals(json.valueToTree(words), result.path("navigation").get(0).path("message").path("words"));
         assertFalse(result.path("records").get(0).has("display"));
         assertEquals(1, result.path("navigationCount").asInt());
-        verify(inputs).get(id);
+        verify(inputs, times(2)).get(id);
         verify(inputs).readChunks(entity, server.common.DtnModels.MAX_INPUT_BYTES);
         verifyNoMoreInteractions(inputs);
     }

@@ -47,7 +47,17 @@ public class DtnInputViewController {
                                     .sum()
                             + "개");
         }
-        return DtnController.navigationView(json.valueToTree(view));
+        var result = (com.fasterxml.jackson.databind.node.ObjectNode)
+                DtnController.navigationView(json.valueToTree(view));
+        String receiverInfo = inputs.get(id).receiverInfoJson();
+        if (receiverInfo != null) {
+            try {
+                result.set("receiverInfo", json.readTree(receiverInfo));
+            } catch (com.fasterxml.jackson.core.JsonProcessingException invalid) {
+                log.warn("수신기 정보 표시 불가 · inputId={}", id);
+            }
+        }
+        return result;
     }
 
     @GetMapping("/{id}/pvt")

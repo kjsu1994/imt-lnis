@@ -57,7 +57,28 @@ const server=createServer((req,res)=>{
  browser=await chromium.launch();const context=await browser.newContext();
  await context.addInitScript(()=>{window.WebSocket=class {};});
  const page=await context.newPage();page.setDefaultTimeout(15000);const errors=[];page.on('pageerror',e=>errors.push(e.message));
- await page.goto(base+'/sender');await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>!document.getElementById('preset-save').disabled);
+ await page.goto(base+'/sender');
+ assert.equal(await page.locator('#dtn-receiver-info').isVisible(),false);
+ await page.evaluate(async()=>{
+   const {receiverInformation}=await import('/assets/dtn/dtn-observations.js?v=20261001-gnss-info');
+   const sample={receiverInfo:{model:'ZED-F9T-20B',firmware:'TIM 2.25',protocol:'29.25',
+     supportedConstellations:['GPS','Galileo','BeiDou','SBAS','QZSS','NavIC']},
+     epochs:Array.from({length:24},(_,i)=>({observation:{week:2438,receiverTowSeconds:201724.989+i}}))};
+   document.getElementById('dtn-receiver-info-body').textContent=receiverInformation(sample);
+   document.getElementById('dtn-receiver-info').hidden=false;
+ });
+ assert.equal(await page.locator('#dtn-receiver-info-body').isVisible(),false);
+ await page.locator('#dtn-receiver-info summary').click();
+ assert.match(await page.locator('#dtn-receiver-info-body').innerText(),/23.000초/);
+ for(const width of [1366,390]){
+   await page.setViewportSize({width,height:900});
+   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'device info fits');
+ }
+ await page.setViewportSize({width:1366,height:900});
+ await page.locator('#dtn-receiver-info').screenshot({path:'build/sender-device-info.png'});
+ await page.locator('#dtn-receiver-info summary').click();
+ await page.setViewportSize({width:1600,height:1000});
+await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>!document.getElementById('preset-save').disabled);
  await page.locator('#preset-save').click();await page.locator('#preset-name').fill('기본');await page.locator('#preset-confirm').click();await page.waitForFunction(()=>document.getElementById('preset-status').textContent==='저장했습니다.');
  assert.equal(rows.length,1);assert.equal(rows[0].settings.hdtnConfig.maxNumberOfBundlesInPipeline,50);
  await page.locator('#hdtn-maxNumberOfBundlesInPipeline').fill('60');await page.locator('#preset-load').click();assert.equal(await page.locator('#hdtn-maxNumberOfBundlesInPipeline').inputValue(),'50');
@@ -149,14 +170,14 @@ const server=createServer((req,res)=>{
  await observationPanel.getByRole('button',{name:'GPS G19 항법정보 보기'}).first().click();
  assert.equal(await observationPanel.locator('[data-observations] tr.satellite-selected').count(),2);
  assert.equal(await observationPanel.locator('[data-navigation] tr').count(),4);
- assert.match(await observationPanel.locator('[data-navigation]').innerText(),/관측 이후/);
+ assert.match(await observationPanel.locator('[data-navigation]').innerText(),/선택 Epoch 이후 수신/);
  assert.match(await observationPanel.locator('[data-navigation-summary]').innerText(),/SF1 2건 · SF2 1건 · SF3 1건/);
  assert.equal(await observationPanel.locator('[data-common-navigation]').isVisible(),true);
  await observationPanel.locator('[data-common-title]').click();
  assert.match(await observationPanel.locator('[data-common-body]').innerText(),/GPS G04/);
  await observationPanel.getByRole('button',{name:'Galileo 19 항법정보 보기'}).click();
  assert.equal(await observationPanel.locator('[data-navigation] tr').count(),1);
- assert.match(await observationPanel.locator('[data-navigation]').innerText(),/종류 미분류/);
+ assert.match(await observationPanel.locator('[data-navigation]').innerText(),/현재 PVT 계산 대상 아님/);
  await observationPanel.locator('[data-navigation-all]').click();
  assert.equal(await observationPanel.locator('[data-navigation] tr').count(),6);
  assert.equal(await observationPanel.locator('[data-common-navigation]').isVisible(),false);
@@ -177,7 +198,7 @@ const server=createServer((req,res)=>{
  await observationPanel.locator('[data-pvt-status-label]').click();
  // Refresh preserves selection; a different trial resets via setData(null).
  await page.evaluate(async()=>{
-   const {createObservationView}=await import('/assets/dtn/dtn-observations.js?v=20261001-pvt-status');
+   const {createObservationView}=await import('/assets/dtn/dtn-observations.js?v=20261001-gnss-info');
    const host=document.createElement('div');host.id='association-test';document.body.append(host);
    window.associationView=createObservationView(host,()=>{},'수신 원본');
  });
@@ -191,7 +212,7 @@ const server=createServer((req,res)=>{
  assert.match(await isolated.locator('[data-navigation-title]').innerText(),/전체 항법정보/);
  // Sender uses the same association with source values and its own column layout.
  await page.evaluate(async fixture=>{
-   const {createObservationView}=await import('/assets/dtn/dtn-observations.js?v=20261001-pvt-status');
+   const {createObservationView}=await import('/assets/dtn/dtn-observations.js?v=20261001-gnss-info');
    const host=document.createElement('div');host.id='sender-association-test';document.body.append(host);
    const source=structuredClone(fixture);delete source.receivedValues;
    source.epochs[0].observation.observations.push({...source.epochs[0].observation.observations[0],constellationId:2});
@@ -202,12 +223,12 @@ const server=createServer((req,res)=>{
  assert.equal(await senderAssociation.locator('[data-transmit-heading]').isVisible(),false);
  assert.equal(await senderAssociation.locator('[data-observations] tr').first().locator('td').count(),11);
  await senderAssociation.getByRole('button',{name:'Galileo 19 항법정보 보기'}).click();
- assert.match(await senderAssociation.locator('[data-navigation]').innerText(),/종류 미분류/);
+ assert.match(await senderAssociation.locator('[data-navigation]').innerText(),/현재 PVT 계산 대상 아님/);
  await senderAssociation.locator('[data-navigation-all]').click();
  assert.equal(await senderAssociation.locator('[data-navigation] tr').count(),6);
  await senderAssociation.screenshot({path:'build/sender-navigation.png'});
  await page.evaluate(async fixture=>{
-   const {createObservationView}=await import('/assets/dtn/dtn-observations.js?v=20261001-pvt-status');
+   const {createObservationView}=await import('/assets/dtn/dtn-observations.js?v=20261001-gnss-info');
    const host=document.getElementById('sender-association-test');
    const source=structuredClone(fixture);delete source.receivedValues;
    createObservationView(host,()=>{},'송신 비교원본').setData(source);

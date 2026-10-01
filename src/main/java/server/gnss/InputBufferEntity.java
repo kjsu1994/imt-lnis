@@ -65,6 +65,9 @@ public class InputBufferEntity {
     /** null은 기존 입력, 나머지는 시간 초과 관측 데이터의 명시적 사용 결정이다. */
     String captureDecision;
 
+    /** 화면용 MON-VER 정보. GRAW·어댑터 전송 원문에는 추가하지 않는다. */
+    @Lob @com.fasterxml.jackson.annotation.JsonIgnore String receiverInfoJson;
+
     public InputBufferEntity(
             UUID inputId,
             InputKind kind,
@@ -89,6 +92,7 @@ public class InputBufferEntity {
                 complete,
                 createdAt,
                 completedAt,
+                null,
                 null,
                 null);
     }

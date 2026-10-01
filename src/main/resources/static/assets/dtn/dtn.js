@@ -4,7 +4,7 @@ import {initGnssControls} from './dtn-gnss.js?v=20261001-review';
 import {createDtnLog} from './dtn-log.js?v=20261001-review';
 import {initAdapterHealth, validAdapterUrl} from './dtn-adapter-health.js?v=20260922-compact-settings';
 import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20261001-review';
-import {createObservationView, numeric, renderClockBias} from './dtn-observations.js?v=20261001-pvt-status';
+import {createObservationView, numeric, renderClockBias, receiverInformation} from './dtn-observations.js?v=20261001-gnss-info';
 
 const $ = id => document.getElementById(id);
 const payload = createPayloadViewer($('dtn-payload'), {sentOnly: true});
@@ -272,6 +272,8 @@ function selectedDelayEpoch() {
   return preparedEpoch?.inputId === inputId ? preparedEpoch.choice : null;
 }
 function showInputObservations(data) {
+  $('dtn-receiver-info').hidden = !data;
+  $('dtn-receiver-info-body').textContent = receiverInformation(data);
   inputView = true;
   inputPvt = pvt;
   view.setData(data);
@@ -367,6 +369,9 @@ $('iq-cancel').onclick = async () => {
   updateControls();
 };
 function resetInputSelection() {
+  $('dtn-receiver-info').hidden = true;
+  $('dtn-receiver-info').open = false;
+  $('dtn-receiver-info-body').textContent = '';
   preparedEpoch = null;
   delayChoices = [];
   inputPvt = [];

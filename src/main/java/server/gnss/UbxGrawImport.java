@@ -15,6 +15,37 @@ import java.util.UUID;
 public final class UbxGrawImport {
     private UbxGrawImport() {}
 
+    /** MON-VER의 장비 정보. 관측 위성이나 PVT 지원 범위와는 별개다. */
+    public record ReceiverInfo(String model, String firmware, String protocol,
+                               List<String> supportedConstellations) {}
+
+    public static ReceiverInfo receiverInfo(byte[] raw) {
+        var parser = new UbloxParser();
+        String model = "", firmware = "", protocol = "";
+        var supported = new java.util.LinkedHashSet<String>();
+        var names = java.util.Map.of("GPS", "GPS", "GAL", "Galileo", "BDS", "BeiDou",
+                "SBAS", "SBAS", "QZSS", "QZSS", "NAVIC", "NavIC", "GLO", "GLONASS");
+        for (int offset = 0; offset < raw.length; offset += 8192) {
+            byte[] block = java.util.Arrays.copyOfRange(raw, offset, Math.min(raw.length, offset + 8192));
+            for (var frame : parser.push(block, block.length)) {
+                if (frame.messageClass() != 10 || frame.messageId() != 4 || frame.payload().length < 40) {
+                    continue;
+                }
+                for (int pos = 40; pos + 30 <= frame.payload().length; pos += 30) {
+                    String value = new String(frame.payload(), pos, 30, StandardCharsets.US_ASCII)
+                            .split("\\u0000", 2)[0].trim();
+                    if (value.startsWith("MOD=")) model = value.substring(4);
+                    if (value.startsWith("FWVER=")) firmware = value.substring(6);
+                    if (value.startsWith("PROTVER=")) protocol = value.substring(8);
+                    for (String token : value.split(";")) {
+                        if (names.containsKey(token.trim())) supported.add(names.get(token.trim()));
+                    }
+                }
+            }
+        }
+        return new ReceiverInfo(model, firmware, protocol, List.copyOf(supported));
+    }
+
     /** 웹 업로드는 사용자가 선택하지 않은 에폭을 임의로 잘라내지 않는다. */
     public static byte[] convertAll(byte[] raw, Instant archiveTime, String source) {
         return convert(raw, 0, archiveTime, source);

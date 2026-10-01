@@ -36,6 +36,14 @@ public class InputBufferService {
         this.dtnRepository = dtnRepository;
     }
 
+    @Transactional
+    public synchronized void receiverInfo(UUID id, String receiverInfoJson) {
+        var input = get(id);
+        if (!input.complete()) throw new IllegalStateException("Complete input first");
+        input.receiverInfoJson = receiverInfoJson;
+        inputBufferRepository.save(input);
+    }
+
     /** 메타데이터만 먼저 생성하며 미완성 보존 기간은 정리 작업에서 적용한다. */
     @Transactional
     public synchronized InputBufferEntity create(String fileName, long declaredSize, InputKind kind) {

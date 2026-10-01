@@ -34,6 +34,23 @@ export function transmitTime(o, receiverTowSeconds) {
   return numeric(seconds - weekOffset * 604800, 9) + (weekOffset ? ' (이전 주)' : '');
 }
 
+// RAWX lock counter saturates at 64500 ms; preserve missing values as missing.
+export function lockTime(milliseconds) {
+  if (!Number.isFinite(milliseconds) || milliseconds < 0) return '—';
+  if (milliseconds === 64500) return '64.5 이상 (64500 ms)';
+  return ((milliseconds / 1000).toFixed(3).replace(/\.?0+$/, '') || '0') + ' (' + milliseconds + ' ms)';
+}
+
+export function unclassifiedNavigation(message) {
+  if ([1, 2, 3, 4, 5, 6, 7].includes(message.constellationId)) {
+    return '항법정보 수신 · 현재 PVT 계산 대상 아님';
+  }
+  if (message.constellationId === 0 && Number.isInteger(message.signalId) && message.signalId !== 0) {
+    return '항법정보 수신 · GPS L1 C/A 전용 계산';
+  }
+  return '메시지 종류 확인 불가';
+}
+
 export function observationCells(o, receiverTowSeconds) {
   const iq = o.source === 'IQ_TRACKING';
   const gnss = constellation(o.constellationId);
@@ -41,10 +58,10 @@ export function observationCells(o, receiverTowSeconds) {
   const cpValid = (o.trackingStatus & 2) !== 0;
   return [gnss, o.satelliteId, iq ? 'AFS Data · L1' : o.constellationId === 0 && o.signalId === 0 ? 'L1 C/A (0)' : 'ID ' + o.signalId,
     numeric(o.pseudorangeMeters), numeric(o.carrierPhaseCycles), numeric(o.dopplerHz),
-    o.carrierToNoiseDbHz, o.lockTimeMilliseconds,
-    iq ? '—' : [o.pseudorangeStdDev, o.carrierPhaseStdDev, o.dopplerStdDev].join(' / '),
+    o.carrierToNoiseDbHz, lockTime(o.lockTimeMilliseconds),
+    iq ? '—' : ['PR ' + (o.pseudorangeStdDev ?? '—'), 'CP ' + (o.carrierPhaseStdDev ?? '—'), 'D ' + (o.dopplerStdDev ?? '—')].join(' / '),
     iq ? 'PR 유효 · 위상 상대값' : 'PR ' + (prValid ? '유효' : '무효') + ' · CP ' + (cpValid ? '유효' : '무효'),
-    o.constellationId === 0 && o.signalId === 0 && prValid && Number.isFinite(o.pseudorangeMeters) && o.pseudorangeMeters > 0 && Number.isFinite(o.dopplerHz) ? '계산 대상' : '제외',
+    o.constellationId === 0 && o.signalId === 0 && prValid && Number.isFinite(o.pseudorangeMeters) && o.pseudorangeMeters > 0 && Number.isFinite(o.dopplerHz) ? '입력 대상' : '제외',
     transmitTime(o, receiverTowSeconds)];
 }
 
@@ -100,6 +117,59 @@ export function pvtInputStatus(data, index = 0, results = [], evidence = null) {
       : ['기본 관측·항법 메시지를 확인했습니다. 궤도 유효성·정합성과 실제 사용 위성은 계산 결과로 확인합니다.']};
 }
 
+
+export function receiverInformation(data) {
+  if (!data) return '';
+  const info = data.receiverInfo || {};
+  const epochs = data.epochs || [];
+  const times = epochs.map(e => e.observation).filter(e => Number.isInteger(e.week)
+    && Number.isFinite(e.receiverTowSeconds) && e.receiverTowSeconds >= 0 && e.receiverTowSeconds < 604800)
+    .map(e => e.week * 604800 + e.receiverTowSeconds);
+  const span = times.length === epochs.length && times.length
+    ? numeric(Math.max(...times) - Math.min(...times), 3) + '초 (첫 관측~마지막 관측)' : '확인 불가';
+  return [
+    '모델  ' + (info.model || data.receiver?.receiverModel || '미기록'),
+    '펌웨어  ' + (info.firmware || data.receiver?.firmwareVersion || '미기록'),
+    '프로토콜  ' + (info.protocol || '미기록'),
+    '지원 위성군  ' + (info.supportedConstellations?.join(' · ') || '미기록'),
+    '관측 Epoch  ' + epochs.length + '개',
+    '관측 구간  ' + span,
+    '지원 위성군은 장비 정보이며 현재 관측·PVT 계산 대상과 다릅니다.'
+  ].join('\n');
+}
+
+function precedingNavigation(data, index) {
+  const restored = data?.source === 'IQ_TRACKING' || !!data?.receivedValues && !data.receivedValues.records;
+  const records = data?.records || [];
+  const epochs = records.flatMap((r, i) => r.type === 'OBSERVATION_EPOCH' ? [i] : []);
+  const nav = records.flatMap((r, i) => r.type === 'NAVIGATION_UPDATE' ? [i] : []);
+  if (!restored && epochs[index] == null) return null;
+  return (data.navigation || []).filter((_, i) => restored || nav[i] != null && nav[i] < epochs[index]);
+}
+
+export function observationCounts(data, index = 0, results = [], evidence = null) {
+  const epoch = data?.epochs?.[index]?.observation;
+  const wire = data?.receivedValues;
+  const displayed = wire?.records?.find(r => r.observation)?.observation?.observations
+    || wire?.observations || epoch?.observations || [];
+  const eligible = evidence?.error ? [] : (epoch?.observations || []).filter(o =>
+    o.constellationId === 0 && o.signalId === 0 && (o.trackingStatus & 1)
+    && Number.isFinite(o.pseudorangeMeters) && o.pseudorangeMeters > 0 && Number.isFinite(o.dopplerHz));
+  const gps = new Set(displayed.filter(o => o.constellationId === 0 && o.signalId === 0).map(o => o.satelliteId));
+  const nav = precedingNavigation(data, index);
+  const complete = nav == null ? null : [...gps].filter(sv => [1, 2, 3].every(sf =>
+    nav.some(n => n.message.constellationId === 0 && n.message.satelliteId === sv && n.display?.subframeId === sf))).length;
+  const result = results[index];
+  return {
+    satellites: new Set(displayed.map(o => o.constellationId + ':' + o.satelliteId)).size,
+    signals: displayed.length,
+    gps: gps.size,
+    eligible: new Set(eligible.map(o => o.satelliteId)).size,
+    complete,
+    used: result?.positionValid && Number.isInteger(result.satellitesUsed) ? result.satellitesUsed : null
+  };
+}
+
 export function createObservationView(container, onSelect = () => {}, role = '') {
   if (!container) return {setData() {}, select() {}, setPvt() {}};
   container.innerHTML = `
@@ -112,7 +182,7 @@ export function createObservationView(container, onSelect = () => {}, role = '')
         <ul data-pvt-status-reasons></ul>
       </details>
     <div class="observation-summary"><span data-source>데이터 없음</span><span data-nav>항법정보 —</span>
-      <span data-count>관측 신호 —</span><span data-status></span></div></div>
+      <span data-count>관측 신호 —</span><span data-pvt-counts title="입력 조건·메시지 보유·계산기 채택은 서로 다른 지표입니다. SF1~3 확인은 유효한 Ephemeris 보장이 아닙니다."></span><span data-status></span></div></div>
     <h3 data-observation-title>관측값 · RAWX</h3>
     <p data-delay-summary hidden></p>
     <div class="epoch-table-viewport" tabindex="0" aria-label="GNSS 관측값 표">
@@ -121,9 +191,9 @@ export function createObservationView(container, onSelect = () => {}, role = '')
         <th data-range-after hidden>변환 후 의사거리 <small>m</small></th>
         <th data-range-added hidden>증가량 <small>m</small></th>
         <th>반송파 위상 <small>cycle</small></th><th>도플러 <small>Hz</small></th>
-        <th>C/N₀ <small>dB-Hz</small></th><th>추적시간 <small>ms</small></th>
-        <th title="수신기가 출력한 표준편차 코드. SI 단위의 표준편차가 아닙니다.">편차 코드 <small>PR / CP / DO</small></th>
-        <th>측정 유효성</th><th title="GPS L1·의사거리 유효 조건. 최종 계산에서 사용한 위성 수는 PVT 결과에 표시됩니다.">PVT 입력</th>
+        <th>C/N₀ <small>dB-Hz</small></th><th title="반송파 위상 추적 유지시간. RAWX 카운터가 64500 ms이면 64.5초 이상입니다.">추적 유지 <small>초</small></th>
+        <th title="PR: 의사거리, CP: 반송파 위상, D: Doppler. 단위·환산 방식이 서로 다른 수신기 코드이며 공통 오차등급이 아닙니다.">표준편차 코드 <small>PR / CP / D</small></th>
+        <th>측정 유효성</th><th title="GPS L1·유효 의사거리·Doppler의 입력 조건입니다. 실제 계산 채택 여부는 아니며, 최종 사용 위성 수는 PVT 결과에 표시됩니다.">PVT 입력</th>
         <th data-transmit-heading title="관측 수신 시각 − 의사거리 / 299,792,458. 위성 시계·시스템 간 시간 보정 전 추정값이며 실제 정확도를 의미하지 않습니다. 주 경계를 넘으면 이전 주로 표시합니다.">위성 송신 시각 추정 <small>TOW(s) · 보정 전</small></th>
       </tr></thead><tbody data-observations></tbody></table></div>
     <details data-frame-input hidden>
@@ -255,11 +325,11 @@ export function createObservationView(container, onSelect = () => {}, role = '')
       const labels = {1: '위성 시계·상태', 2: '궤도정보 ①', 3: '궤도정보 ②', 4: '보정·위성군 정보', 5: '위성군 정보'};
       const label = header?.commonCorrection ? 'SF4 · 전리층·UTC 공통 보정'
         : labels[sf] ? 'SF' + sf + ' · ' + labels[sf] + (header.pageId == null ? '' : ' · Page ' + header.pageId)
-        : '종류 미분류';
+        : unclassifiedNavigation(item.message);
       const position = navigationPositions[navigation.indexOf(item)];
       const timing = frame ? '프레임 복원' : iq ? '복호·보조 정보'
         : position == null || epochPosition == null ? '순서 확인 불가'
-        : position < epochPosition ? '관측 이전' : '관측 이후';
+        : position < epochPosition ? '선택 Epoch 이전 수신' : '선택 Epoch 이후 수신';
       for (const text of [satelliteName(item.message), label, timing]) {
         const cell = document.createElement('td');
         cell.textContent = text;
@@ -293,6 +363,13 @@ export function createObservationView(container, onSelect = () => {}, role = '')
   function renderPvtStatus() {
     const state = pvtInputStatus(data, Number(select.value) || 0, pvtResults,
       role === '수신 원본' ? delayEvidence : null);
+    const counts = observationCounts(data, Number(select.value) || 0, pvtResults,
+      role === '수신 원본' ? delayEvidence : null);
+    container.querySelector('[data-count]').textContent = data
+      ? '관측 ' + counts.satellites + '위성 · ' + counts.signals + '신호' : '관측 신호 —';
+    container.querySelector('[data-pvt-counts]').textContent = data
+      ? 'GPS L1 ' + counts.gps + ' · 입력 대상 ' + counts.eligible
+        + ' · SF1~3 확인 ' + (counts.complete ?? '—') + ' · 실제 사용 ' + (counts.used ?? '—') : '';
     const label = container.querySelector('[data-pvt-status-label]');
     label.textContent = '계산 상태 · ' + state.label;
     label.className = 'pill ' + state.level;

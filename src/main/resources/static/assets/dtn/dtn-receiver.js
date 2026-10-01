@@ -4,7 +4,7 @@ import {initGnssControls} from './dtn-gnss.js?v=20261001-review';
 import {createDtnLog} from './dtn-log.js?v=20261001-review';
 import {initAdapterHealth} from './dtn-adapter-health.js?v=20260922-compact-structure';
 import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20261001-review';
-import {createObservationView, numeric, renderClockBias} from './dtn-observations.js?v=20261001-pvt-status';
+import {createObservationView, numeric, renderClockBias} from './dtn-observations.js?v=20261001-gnss-info';
 
 const $ = id => document.getElementById(id);
 const payloadViewer = createPayloadViewer($('dtn-payload'), {receivedOnly: true});

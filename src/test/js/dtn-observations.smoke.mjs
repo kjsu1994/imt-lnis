@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {numeric, clockBias, renderClockBias, observationCells, navigationCells, createObservationView, transmitTime, pvtInputStatus} from '../../main/resources/static/assets/dtn/dtn-observations.js';
+import {numeric, clockBias, renderClockBias, observationCells, navigationCells, createObservationView, transmitTime, pvtInputStatus, lockTime, unclassifiedNavigation, receiverInformation, observationCounts} from '../../main/resources/static/assets/dtn/dtn-observations.js';
 
 assert.equal(numeric(null), '—');
 assert.equal(numeric(NaN), '—');
@@ -24,8 +24,8 @@ const raw = {constellationId: 0, satelliteId: 9, signalId: 0,
 const cells = observationCells(raw);
 assert.equal(cells[3], '21234567.123');
 assert.equal(cells[5], '-987.500');
-assert.equal(cells[8], '3 / 4 / 5');
-assert.equal(cells[10], '계산 대상');
+assert.equal(cells[8], 'PR 3 / CP 4 / D 5');
+assert.equal(cells[10], '입력 대상');
 assert.equal(cells.length, 12);
 assert.equal(cells[11], '—');
 assert.equal(transmitTime({...raw, pseudorangeMeters: 29979245.8}, 100000), '99999.900000000');
@@ -60,7 +60,7 @@ const iq=observationCells({source:'IQ_TRACKING',constellationId:0,satelliteId:19
 assert.equal(iq[2],'AFS Data · L1');
 assert.equal(iq[8],'—');
 assert.equal(iq[9],'PR 유효 · 위상 상대값');
-assert.equal(iq[7],undefined); // Never invent F9T lock-time or deviation codes for SDR observations.
+assert.equal(iq[7],'—'); // Never invent F9T lock-time or deviation codes for SDR observations.
 
 // Exercise the complete view update, including navigation rendering and epoch selection.
 const element = () => ({value: '0', children: [], classList: {add() {}}, setAttribute(key, value) { this[key] = value; }, append(child) { this.children.push(child); },
@@ -133,7 +133,7 @@ const wireObservation = {...raw, transmitAt:{seconds:1790000000,femtoseconds:0}}
 delete wireObservation.pseudorangeMeters;
 const wireView = {...original, receivedValues:{observations:[wireObservation]}};
 receiverView.setData(wireView);
-assert.equal(nodes.get('[data-observations]').children[0].children[11].textContent, '계산 대상');
+assert.equal(nodes.get('[data-observations]').children[0].children[11].textContent, '입력 대상');
 assert.equal(nodes.get('[data-observations]').children[0].children[3].textContent, '—');
 receiverView.setData(wireView, false, {error:'음수 지연'});
 assert.equal(nodes.get('[data-observations]').children[0].children[11].textContent, '계산 불가');
@@ -210,3 +210,31 @@ console.log('PASS: all navigation default, basic input checks versus solver resu
 delete globalThis.document;
 delete globalThis.Option;
 console.log('PASS: full I/Q and GRAW view updates, navigation HEX widths and empty state');
+
+assert.equal(lockTime(64500),'64.5 이상 (64500 ms)');
+assert.equal(lockTime(64501),'64.501 (64501 ms)');
+assert.equal(lockTime(4000),'4 (4000 ms)');
+assert.equal(lockTime(1),'0.001 (1 ms)');
+assert.equal(lockTime(0),'0 (0 ms)');
+for (const missing of [null,undefined,NaN,-1]) assert.equal(lockTime(missing),'—');
+for (const constellationId of [1,2,3,4,5,6,7]) {
+  assert.match(unclassifiedNavigation({constellationId}),/항법정보 수신.*계산 대상 아님/);
+}
+assert.equal(unclassifiedNavigation({constellationId:0,signalId:0}),'메시지 종류 확인 불가');
+assert.equal(unclassifiedNavigation({constellationId:99}),'메시지 종류 확인 불가');
+assert.match(unclassifiedNavigation({constellationId:0,signalId:3}),/GPS L1 C\/A 전용/);
+console.log('PASS: unsupported constellations versus unknown messages, RAWX lock saturation and missing values');
+
+const stats = observationCounts(ready,0,[{positionValid:true,satellitesUsed:3}]);
+assert.deepEqual(stats,{satellites:4,signals:4,gps:4,eligible:4,complete:4,used:3});
+assert.equal(observationCounts(rawOrder).complete,0);
+assert.equal(observationCounts(ready,0,[],{error:'음수'}).eligible,0);
+const device = {receiverInfo:{model:'ZED-F9T-20B',firmware:'TIM 2.25',protocol:'29.25',
+  supportedConstellations:['GPS','BeiDou']},epochs:[{observation:{week:2400,receiverTowSeconds:604799}},
+  {observation:{week:2401,receiverTowSeconds:1}}]};
+assert.match(receiverInformation(device),/29.25/);
+assert.match(receiverInformation(device),/2.000초/);
+assert.match(receiverInformation(device),/2개/);
+assert.match(receiverInformation({epochs:[]}),/미기록/);
+assert.equal(receiverInformation(null),'');
+console.log('PASS: counts do not conflate input/nav presence/solver use, device metadata and week rollover span');

@@ -8,6 +8,42 @@ import java.time.Instant;
 import static org.junit.jupiter.api.Assertions.*;
 
 class UbxGrawImportTest {
+    @Test void readsRealReceiverArchiveWhenAvailable() throws Exception {
+        var file = java.nio.file.Path.of("real-gnss-source.ubx");
+        org.junit.jupiter.api.Assumptions.assumeTrue(java.nio.file.Files.isRegularFile(file));
+        byte[] raw = java.nio.file.Files.readAllBytes(file);
+        var info = UbxGrawImport.receiverInfo(raw);
+        assertEquals("ZED-F9T-20B", info.model());
+        assertEquals("TIM 2.25", info.firmware());
+        assertEquals("29.25", info.protocol());
+        var epochs = GrawCodec.splitLengthPrefixed(UbxGrawImport.convertAll(raw, Instant.EPOCH, file.toString()))
+                .stream().map(GrawCodec::decode).map(GrawCodec.Envelope::message)
+                .filter(GrawCodec.ObservationEpoch.class::isInstance)
+                .map(GrawCodec.ObservationEpoch.class::cast).toList();
+        assertEquals(24, epochs.size());
+        assertEquals(23, epochs.getLast().receiverTowSeconds() - epochs.getFirst().receiverTowSeconds(), 1e-6);
+    }
+
+    @Test void readsOnlyChecksumValidatedMonVerAndSeparatesSupportedSystems() {
+        var fields = new String[]{"MOD=ZED-F9T-20B", "FWVER=TIM 2.25", "PROTVER=29.25",
+                "GPS;GAL;BDS", "SBAS;QZSS", "NAVIC", "BD=1E01C"};
+        byte[] payload = new byte[40 + 30 * fields.length];
+        for (int i = 0; i < fields.length; i++) {
+            byte[] text = fields[i].getBytes(java.nio.charset.StandardCharsets.US_ASCII);
+            System.arraycopy(text, 0, payload, 40 + 30 * i, text.length);
+        }
+        byte[] frame = UbloxParser.command(10, 4, payload);
+        var info = UbxGrawImport.receiverInfo(frame);
+        assertEquals("ZED-F9T-20B", info.model());
+        assertEquals("TIM 2.25", info.firmware());
+        assertEquals("29.25", info.protocol());
+        assertEquals(java.util.List.of("GPS", "Galileo", "BeiDou", "SBAS", "QZSS", "NavIC"),
+                info.supportedConstellations());
+        frame[frame.length - 1] ^= 1;
+        assertEquals("", UbxGrawImport.receiverInfo(frame).model());
+        assertEquals("", UbxGrawImport.receiverInfo(new byte[0]).protocol());
+    }
+
     @Test void retainsLastTenDistinctEpochsAndEarlierNavigationWithoutInventingFields() {
         var raw = new ByteArrayOutputStream();
         byte[] nav = new byte[12]; nav[0] = 0; nav[1] = 29; nav[4] = 1; nav[6] = 2;
