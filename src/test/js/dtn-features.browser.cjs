@@ -142,7 +142,11 @@ const server=createServer((req,res)=>{
  reportFixture.observations.records=records;
  reportFixture.observations.receivedValues.records[0].observation.observations=receivedSignals;
  await page.reload();
- await page.waitForFunction(()=>document.querySelector('#dtn-observations [data-navigation-title]')?.textContent.includes('GPS G19'));
+ await page.waitForFunction(()=>document.querySelector('#dtn-observations [data-navigation-title]')?.textContent.includes('전체 항법정보 · 6건'));
+ assert.equal(await observationPanel.locator('[data-navigation] tr').count(),6);
+ assert.equal(await observationPanel.locator('[data-navigation-all]').isVisible(),false);
+ assert.equal(await observationPanel.locator('[data-observations] tr.satellite-selected').count(),0);
+ await observationPanel.getByRole('button',{name:'GPS G19 항법정보 보기'}).first().click();
  assert.equal(await observationPanel.locator('[data-observations] tr.satellite-selected').count(),2);
  assert.equal(await observationPanel.locator('[data-navigation] tr').count(),4);
  assert.match(await observationPanel.locator('[data-navigation]').innerText(),/관측 이후/);
@@ -168,9 +172,12 @@ const server=createServer((req,res)=>{
    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
    await observationPanel.screenshot({path:'build/receiver-navigation-'+width+'.png'});
  }
+ await observationPanel.locator('[data-pvt-status-label]').click();
+ assert.equal(await observationPanel.locator('[data-pvt-status-reasons]').isVisible(),true);
+ await observationPanel.locator('[data-pvt-status-label]').click();
  // Refresh preserves selection; a different trial resets via setData(null).
  await page.evaluate(async()=>{
-   const {createObservationView}=await import('/assets/dtn/dtn-observations.js?v=20261001-navigation-plain');
+   const {createObservationView}=await import('/assets/dtn/dtn-observations.js?v=20261001-pvt-status');
    const host=document.createElement('div');host.id='association-test';document.body.append(host);
    window.associationView=createObservationView(host,()=>{},'수신 원본');
  });
@@ -181,17 +188,17 @@ const server=createServer((req,res)=>{
  await page.evaluate(fixture=>associationView.setData(fixture,true),fixture);
  assert.match(await isolated.locator('[data-navigation-title]').innerText(),/Galileo/);
  await page.evaluate(fixture=>{associationView.setData(null);associationView.setData(fixture);},fixture);
- assert.match(await isolated.locator('[data-navigation-title]').innerText(),/GPS G19/);
+ assert.match(await isolated.locator('[data-navigation-title]').innerText(),/전체 항법정보/);
  // Sender uses the same association with source values and its own column layout.
  await page.evaluate(async fixture=>{
-   const {createObservationView}=await import('/assets/dtn/dtn-observations.js?v=20261001-navigation-plain');
+   const {createObservationView}=await import('/assets/dtn/dtn-observations.js?v=20261001-pvt-status');
    const host=document.createElement('div');host.id='sender-association-test';document.body.append(host);
    const source=structuredClone(fixture);delete source.receivedValues;
    source.epochs[0].observation.observations.push({...source.epochs[0].observation.observations[0],constellationId:2});
    createObservationView(host,()=>{},'송신 원본').setData(source);
  },fixture);
  const senderAssociation=page.locator('#sender-association-test');
- assert.equal(await senderAssociation.locator('[data-association]').isVisible(),true);
+ assert.equal(await senderAssociation.locator('[data-navigation-all]').isVisible(),false);
  assert.equal(await senderAssociation.locator('[data-transmit-heading]').isVisible(),false);
  assert.equal(await senderAssociation.locator('[data-observations] tr').first().locator('td').count(),11);
  await senderAssociation.getByRole('button',{name:'Galileo 19 항법정보 보기'}).click();
@@ -200,7 +207,7 @@ const server=createServer((req,res)=>{
  assert.equal(await senderAssociation.locator('[data-navigation] tr').count(),6);
  await senderAssociation.screenshot({path:'build/sender-navigation.png'});
  await page.evaluate(async fixture=>{
-   const {createObservationView}=await import('/assets/dtn/dtn-observations.js?v=20261001-navigation-plain');
+   const {createObservationView}=await import('/assets/dtn/dtn-observations.js?v=20261001-pvt-status');
    const host=document.getElementById('sender-association-test');
    const source=structuredClone(fixture);delete source.receivedValues;
    createObservationView(host,()=>{},'송신 비교원본').setData(source);

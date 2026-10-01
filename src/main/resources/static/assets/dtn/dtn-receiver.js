@@ -4,7 +4,7 @@ import {initGnssControls} from './dtn-gnss.js?v=20261001-review';
 import {createDtnLog} from './dtn-log.js?v=20261001-review';
 import {initAdapterHealth} from './dtn-adapter-health.js?v=20260922-compact-structure';
 import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20261001-review';
-import {createObservationView, numeric, renderClockBias} from './dtn-observations.js?v=20261001-navigation-plain';
+import {createObservationView, numeric, renderClockBias} from './dtn-observations.js?v=20261001-pvt-status';
 
 const $ = id => document.getElementById(id);
 const payloadViewer = createPayloadViewer($('dtn-payload'), {receivedOnly: true});
@@ -22,7 +22,7 @@ function renderReference(report = {}) {
     $('reference-details').hidden = true;
     $('reference-toggle').setAttribute('aria-expanded', 'false');
   }
-  referenceView.setData(report.referenceObservations || null);
+  referenceView.setData(report.referenceObservations || null, false, null, report);
 }
 $('reference-retry').onclick = async () => {
   if (!selectedId) return;

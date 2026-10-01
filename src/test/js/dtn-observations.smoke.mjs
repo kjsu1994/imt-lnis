@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {numeric, clockBias, renderClockBias, observationCells, navigationCells, createObservationView, transmitTime} from '../../main/resources/static/assets/dtn/dtn-observations.js';
+import {numeric, clockBias, renderClockBias, observationCells, navigationCells, createObservationView, transmitTime, pvtInputStatus} from '../../main/resources/static/assets/dtn/dtn-observations.js';
 
 assert.equal(numeric(null), '—');
 assert.equal(numeric(NaN), '—');
@@ -157,7 +157,7 @@ const multiEpoch = {...original, epochs:[...epochs,{observation:{...epochs[0].ob
   observations:[{...raw,constellationId:2}]}}]};
 receiverView.setData(multiEpoch);
 receiverView.select(1);
-assert.match(nodes.get('[data-navigation-title]').textContent,/Galileo 9/);
+assert.match(nodes.get('[data-navigation-title]').textContent,/전체 항법정보/);
 receiverView.setData({...multiEpoch,epochs:[{observation:{...epochs[0].observation,observations:[]}}]});
 assert.match(nodes.get('[data-navigation-title]').textContent,/전체 항법정보/);
 assert.equal(nodes.get('[data-navigation-all]').disabled,true);
@@ -170,7 +170,7 @@ assert.equal(nodes.get('[data-association]').hidden,false);
 assert.equal(nodes.get('[data-transmit-heading]').hidden,true);
 assert.equal(nodes.get('[data-observations]').children[0].children.length,11);
 assert.equal(nodes.get('[data-observations]').children[0].children[3].textContent,numeric(raw.pseudorangeMeters));
-assert.match(nodes.get('[data-navigation-title]').textContent,/GPS G09/);
+assert.match(nodes.get('[data-navigation-title]').textContent,/전체 항법정보/);
 assert.equal(JSON.stringify(original),originalJson);
 console.log('PASS: sender association retains original values and hidden transmit estimate');
 
@@ -179,8 +179,33 @@ referenceView.setData(original);
 assert.equal(nodes.get('[data-association]').hidden,false);
 assert.equal(nodes.get('[data-transmit-heading]').hidden,true);
 assert.equal(nodes.get('[data-observations]').children[0].children.length,11);
-assert.match(nodes.get('[data-navigation-title]').textContent,/GPS G09/);
+assert.match(nodes.get('[data-navigation-title]').textContent,/전체 항법정보/);
 assert.equal(JSON.stringify(original),originalJson);
+
+assert.equal(nodes.get('[data-navigation-all]').hidden,true);
+assert.equal(nodes.get('[data-observations]').children[0].className,'');
+assert.equal(pvtInputStatus(null).label,'입력 대기');
+assert.equal(pvtInputStatus(original,0,[],{error:'음수 지연'}).label,'계산 불가');
+assert.match(pvtInputStatus(original).reasons.join(' '),/최소 4위성/);
+assert.equal(pvtInputStatus(original,0,[{positionValid:true,velocityValid:true,satellitesUsed:6}]).label,'PVT 계산 완료');
+assert.equal(pvtInputStatus(original,0,[{positionValid:true,velocityValid:false}]).level,'warning');
+assert.match(pvtInputStatus(original,0,[{positionValid:false,message:'궤도 유효기간 초과'}]).reasons[0],/궤도/);
+const ready = {source:'IQ_TRACKING',epochs:[{observation:{...epochs[0].observation,
+  observations:[1,2,3,4].map(satelliteId=>({...raw,satelliteId}))}}],
+  navigation:[1,2,3,4].flatMap(satelliteId=>[1,2,3].map(subframeId=>({
+    message:{constellationId:0,satelliteId},display:{subframeId}})))};
+assert.equal(pvtInputStatus(ready).label,'계산 결과 대기'); // Presence never claims solver success.
+const missing = structuredClone(ready);missing.navigation.pop();
+assert.match(pvtInputStatus(missing).reasons.join(' '),/G04: SF3 미확인/);
+const rawOrder = {...ready,source:undefined,records:[{type:'OBSERVATION_EPOCH'},
+  ...ready.navigation.map(()=>({type:'NAVIGATION_UPDATE'}))]};
+assert.match(pvtInputStatus(rawOrder).reasons.join(' '),/관측 이전/);
+senderView.setData(original);
+senderView.setPvt([{positionValid:true,velocityValid:true,satellitesUsed:6}]);
+assert.match(nodes.get('[data-pvt-status-label]').textContent,/PVT 계산 완료/);
+senderView.setData(null);
+assert.equal(nodes.get('[data-pvt-status]').hidden,true);
+console.log('PASS: all navigation default, basic input checks versus solver result, late navigation and state reset');
 
 delete globalThis.document;
 delete globalThis.Option;

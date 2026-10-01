@@ -48,12 +48,69 @@ export function observationCells(o, receiverTowSeconds) {
     transmitTime(o, receiverTowSeconds)];
 }
 
+
+// Basic input checks are separate from the solver's actual result.
+export function pvtInputStatus(data, index = 0, results = [], evidence = null) {
+  const epoch = data?.epochs?.[index]?.observation;
+  if (!epoch) return {label: '입력 대기', level: '', reasons: []};
+  if (evidence?.error) {
+    return {label: '계산 불가', level: 'error', reasons: [evidence.error]};
+  }
+  const result = results[index];
+  if (result?.positionValid) {
+    return {label: result.velocityValid ? 'PVT 계산 완료' : '위치 계산 완료 · 속도 미확정',
+      level: result.velocityValid ? 'online' : 'warning',
+      reasons: ['실제 계산 결과 · 사용 위성 ' + (result.satellitesUsed ?? '—') + '개',
+        ...(!result.velocityValid ? [result.message || '속도 해가 유효하지 않습니다.'] : [])]};
+  }
+  const reasons = [];
+  const gps = (epoch.observations || []).filter(o => o.constellationId === 0 && o.signalId === 0);
+  const valid = gps.filter(o => (o.trackingStatus & 1) && Number.isFinite(o.pseudorangeMeters) && o.pseudorangeMeters > 0);
+  const satellites = [...new Set(valid.map(o => o.satelliteId))];
+  if (satellites.length < 4) reasons.push('유효 GPS L1 의사거리 ' + satellites.length + '위성 · 위치 계산에는 최소 4위성이 필요합니다.');
+  if (valid.some(o => !Number.isFinite(o.dopplerHz))) reasons.push('Doppler가 없는 관측이 있습니다. 속도 계산 입력을 확인하세요.');
+
+  const iq = data.source === 'IQ_TRACKING';
+  const frame = !!data.receivedValues && !data.receivedValues.records;
+  const records = data.records || [];
+  const epochPositions = records.flatMap((r, i) => r.type === 'OBSERVATION_EPOCH' ? [i] : []);
+  const navPositions = records.flatMap((r, i) => r.type === 'NAVIGATION_UPDATE' ? [i] : []);
+  const epochPosition = epochPositions[index];
+  const nav = (data.navigation || []).filter((item, i) => {
+    if (iq || frame) return true;
+    return epochPosition != null && navPositions[i] != null && navPositions[i] < epochPosition;
+  });
+  if (!iq && !frame && epochPosition == null) {
+    reasons.push('항법정보의 관측 이전 수신 여부를 확인할 수 없습니다.');
+  } else {
+    for (const satellite of satellites) {
+      const messages = nav.filter(n => n.message.constellationId === 0 && n.message.satelliteId === satellite);
+      const missing = [1, 2, 3].filter(sf => !messages.some(n => n.display?.subframeId === sf));
+      if (missing.length) reasons.push('GPS G' + String(satellite).padStart(2, '0') + ': '
+        + missing.map(sf => 'SF' + sf).join('·') + ' 미확인'
+        + (iq || frame ? '' : ' (관측 이전 기준)'));
+    }
+  }
+  if (result && !result.positionValid) {
+    reasons.unshift(result.message || '계산기가 유효한 위치 해를 구하지 못했습니다.');
+    return {label: 'PVT 계산 불가', level: 'warning', reasons};
+  }
+  return {label: reasons.length ? '입력 확인 필요' : '계산 결과 대기',
+    level: reasons.length ? 'warning' : '', reasons: reasons.length ? reasons
+      : ['기본 관측·항법 메시지를 확인했습니다. 궤도 유효성·정합성과 실제 사용 위성은 계산 결과로 확인합니다.']};
+}
+
 export function createObservationView(container, onSelect = () => {}, role = '') {
-  if (!container) return {setData() {}, select() {}};
+  if (!container) return {setData() {}, select() {}, setPvt() {}};
   container.innerHTML = `
     <div class="gnss-data-header"><h2 data-title>GNSS 수집 데이터</h2>
       <label>GNSS 기준시간 <select data-epoch aria-label="관측 시점"></select></label>
       <span data-integrity class="pill" role="status" hidden></span>
+
+      <details class="pvt-input-status" data-pvt-status>
+        <summary class="pill" data-pvt-status-label>계산 상태 · 입력 대기</summary>
+        <ul data-pvt-status-reasons></ul>
+      </details>
     <div class="observation-summary"><span data-source>데이터 없음</span><span data-nav>항법정보 —</span>
       <span data-count>관측 신호 —</span><span data-status></span></div></div>
     <h3 data-observation-title>관측값 · RAWX</h3>
@@ -97,10 +154,10 @@ export function createObservationView(container, onSelect = () => {}, role = '')
   container.querySelector('[data-transmit-heading]').hidden = hideTransmitEstimate;
   const select = container.querySelector('[data-epoch]');
   const body = container.querySelector('[data-observations]');
-  let data = null, delayEvidence = null, report = null;
+  let data = null, delayEvidence = null, report = null, pvtResults = [];
 
   const linkedNavigation = role === '수신 원본' || hideTransmitEstimate;
-  let selectedSatellite = null, showAllNavigation = false;
+  let selectedSatellite = null, showAllNavigation = true;
   const satelliteKey = observation => observation.constellationId + ':' + observation.satelliteId;
   const satelliteName = observation => constellation(observation.constellationId) + ' '
     + (observation.constellationId === 0 ? 'G' + String(observation.satelliteId).padStart(2, '0') : observation.satelliteId);
@@ -115,7 +172,7 @@ export function createObservationView(container, onSelect = () => {}, role = '')
   association.hidden = !linkedNavigation;
   const allNavigation = container.querySelector('[data-navigation-all]');
   allNavigation.onclick = () => {
-    showAllNavigation = !showAllNavigation;
+    showAllNavigation = true;
     render(false);
   };
 
@@ -129,7 +186,7 @@ export function createObservationView(container, onSelect = () => {}, role = '')
 
   function linkSatellite(row, observation) {
     if (!linkedNavigation) return;
-    const selected = satelliteKey(observation) === selectedSatellite;
+    const selected = !showAllNavigation && satelliteKey(observation) === selectedSatellite;
     row.className = selected ? 'satellite-selected' : '';
     const cell = row.children[1];
     const button = document.createElement('button');
@@ -137,6 +194,9 @@ export function createObservationView(container, onSelect = () => {}, role = '')
     button.className = 'satellite-select';
     button.textContent = observation.constellationId === 0
       ? 'G' + String(observation.satelliteId).padStart(2, '0') : String(observation.satelliteId);
+    button.title = observation.constellationId === 0
+      ? 'GPS PRN ' + observation.satelliteId + ' · 클릭하면 이 위성의 항법정보 표시'
+      : satelliteName(observation) + ' · 클릭하면 이 위성의 항법정보 표시';
     button.setAttribute('aria-pressed', String(selected));
     button.setAttribute('aria-label', satelliteName(observation) + ' 항법정보 보기');
     button.onclick = () => {
@@ -151,6 +211,8 @@ export function createObservationView(container, onSelect = () => {}, role = '')
   }
 
   function renderAssociation(observations) {
+    renderPvtStatus();
+    renderPvtStatus();
     if (!linkedNavigation) return;
     const navigation = data?.navigation || [];
     const iq = data?.source === 'IQ_TRACKING';
@@ -161,12 +223,13 @@ export function createObservationView(container, onSelect = () => {}, role = '')
     container.querySelector('[data-navigation-title]').textContent =
       selected && !showAllNavigation ? satelliteName(selected) + '에서 받은 항법정보 · ' + shown.length + '건'
         : '전체 항법정보 · ' + shown.length + '건';
-    allNavigation.textContent = showAllNavigation ? '선택 위성만' : '전체 보기';
+    allNavigation.textContent = '전체 보기';
+    allNavigation.hidden = showAllNavigation || !selected;
     allNavigation.disabled = !selected;
     allNavigation.setAttribute('aria-pressed', String(showAllNavigation));
     const counts = [1, 2, 3].map(sf => 'SF' + sf + ' ' + matching.filter(n => n.display?.subframeId === sf).length + '건');
     const summary = container.querySelector('[data-navigation-summary]');
-    summary.textContent = selected ? (selected.constellationId === 0 ? counts.join(' · ') + ' · 메시지 보유 현황' : 'GPS LNAV 분류 대상 아님') : '관측 위성을 선택하면 해당 위성의 항법정보를 모아 봅니다.';
+    summary.textContent = selected && !showAllNavigation ? (selected.constellationId === 0 ? counts.join(' · ') + ' · 메시지 보유 현황' : 'GPS LNAV 분류 대상 아님') : '';
     summary.title = 'SF1~3이 모두 있어도 시각·궤도 유효성과 PVT 채택은 별도입니다. GPS SF는 AFS SB와 다른 구분입니다.';
     container.querySelector('[data-navigation-caption]').textContent = iq ? (data.assistance || 'I/Q 복호 항법정보')
       : frame ? 'AFS 프레임 복원 · 원본 수집 순번·시각 없음' : '원본 레코드 순서 기준 · 관측 이후 메시지는 해당 시점 계산과 구분';
@@ -206,8 +269,8 @@ export function createObservationView(container, onSelect = () => {}, role = '')
       const content = document.createElement('pre');
       const values = navigationCells(item, iq);
       content.textContent = (frame || iq ? '' : '수집 순번 ' + (item.sequence ?? '—')
-        + ' · ' + (item.capturedAt ?? '시각 없음') + '\n신호 ID ' + (item.message.signalId ?? '—')
-        + ' · 주파수 ID ' + (item.message.frequencyId ?? '—') + ' · 버전 ' + (item.message.sfrbxVersion ?? '—') + '\n')
+        + ' · ' + (item.capturedAt ?? '시각 없음') + ' · 신호 ID ' + (item.message.signalId ?? '—')
+        + ' · 주파수 ID ' + (item.message.frequencyId ?? '—') + ' · 버전 ' + (item.message.sfrbxVersion ?? '—') + ' · ')
         + values[7] + ' words · HEX ' + (iq ? '24 bit (패리티 제외)' : '32 bit') + '\n' + values[8];
       cell.append(content); row.append(cell); target.append(row);
     }
@@ -225,6 +288,24 @@ export function createObservationView(container, onSelect = () => {}, role = '')
     const commonBody = container.querySelector('[data-common-body]');
     commonBody.replaceChildren();
     common.forEach(item => appendMessage(commonBody, item));
+  }
+
+  function renderPvtStatus() {
+    const state = pvtInputStatus(data, Number(select.value) || 0, pvtResults,
+      role === '수신 원본' ? delayEvidence : null);
+    const label = container.querySelector('[data-pvt-status-label]');
+    label.textContent = '계산 상태 · ' + state.label;
+    label.className = 'pill ' + state.level;
+    const reasons = container.querySelector('[data-pvt-status-reasons]');
+    reasons.replaceChildren();
+    const messages = [...state.reasons];
+    if (role === '수신 원본' && report?.clockWarning) messages.push(report.clockWarning);
+    for (const reason of messages) {
+      const item = document.createElement('li');
+      item.textContent = reason;
+      reasons.append(item);
+    }
+    container.querySelector('[data-pvt-status]').hidden = !data;
   }
 
   function render(notify = true) {
@@ -382,9 +463,10 @@ export function createObservationView(container, onSelect = () => {}, role = '')
   return {
     setData(next, preserve = false, evidence = null, comparisonReport = null) {
       report = comparisonReport;
+      pvtResults = (role === '수신 원본' ? report?.receivedPvt : report?.referencePvt) || [];
       if (!preserve) {
         selectedSatellite = null;
-        showAllNavigation = false;
+        showAllNavigation = true;
       }
       const selected = preserve ? Number(select.value) : 0;
       data = next;
@@ -423,6 +505,7 @@ export function createObservationView(container, onSelect = () => {}, role = '')
       if (data?.epochs?.length) select.value = String(Math.min(selected || 0, data.epochs.length - 1));
       render();
     },
+    setPvt(values) { pvtResults = values || []; renderPvtStatus(); },
     select(index) { if (data?.epochs?.[index]) { select.value = String(index); render(false); } }
   };
 }

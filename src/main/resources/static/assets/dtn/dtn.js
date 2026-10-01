@@ -4,7 +4,7 @@ import {initGnssControls} from './dtn-gnss.js?v=20261001-review';
 import {createDtnLog} from './dtn-log.js?v=20261001-review';
 import {initAdapterHealth, validAdapterUrl} from './dtn-adapter-health.js?v=20260922-compact-settings';
 import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20261001-review';
-import {createObservationView, numeric, renderClockBias} from './dtn-observations.js?v=20261001-navigation-plain';
+import {createObservationView, numeric, renderClockBias} from './dtn-observations.js?v=20261001-pvt-status';
 
 const $ = id => document.getElementById(id);
 const payload = createPayloadViewer($('dtn-payload'), {sentOnly: true});
@@ -253,6 +253,7 @@ function destination(text, state = 'unknown') {
 const buildSendUrl = () => validAdapterUrl($('dtn-send-url').value);
 const urlValid = () => !!buildSendUrl();
 function renderPvt() {
+  view.setPvt(pvt);
   const value = pvt[epochIndex];
   for (const [i, axis] of ['x', 'y', 'z'].entries()) {
     $('pvt-' + axis).textContent = numeric(value?.positionValid ? value.ecefMeters?.[i] : null);

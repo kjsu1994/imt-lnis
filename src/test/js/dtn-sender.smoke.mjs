@@ -40,7 +40,7 @@ assert.match(html, /id="dtn-development"[^>]*\bhidden\b/);
 elements.get('dtn-development').hidden = true;
 elements.get('dtn-settings-view').hidden = true;
 let loaded = null, currentJob = null, failUpload = false, starts = 0, lastStartBody, cancels = 0;
-let observationSelection;
+let observationSelection, displayedPvt;
 let healthFetch, healthCalls = 0, healthUrl;
 let gnssStatus = {state: 'DISCONNECTED', timeState: 'UNAVAILABLE'};
 const intervals = [];
@@ -53,7 +53,7 @@ const context = {
   createPayloadViewer: () => ({setJob() {}}),
   createObservationView: (_container, onSelect) => {
     observationSelection = onSelect;
-    return {setData(data) { loaded = data; }, select() {}};
+    return {setData(data) { loaded = data; }, select() {}, setPvt(values) { displayedPvt = values; }};
   },
   numeric, renderClockBias,
   URLSearchParams,
@@ -131,6 +131,7 @@ assert.equal(elements.get('dtn-graw-file').files[0], file, 'selected file surviv
 assert.equal(intervals.length, timerCount, 'navigation does not start extra polling');
 assert.equal(elements.get('dtn-development').hidden, true);
 assert.equal(loaded, observations);
+assert.equal(displayedPvt[0].positionValid, true);
 assert.equal(elements.get('dtn-send').disabled, false);
 await elements.get('dtn-send').onclick();
 assert.equal(starts, 1);
