@@ -133,3 +133,69 @@ if ($LASTEXITCODE -ne 0 -or $decoded.directory -ne $expectedDirectory) {
     throw 'Native UTF-8 JSON or Korean deployment path was corrupted'
 }
 Write-Host 'PASS: native UTF-8 JSON and Korean deployment paths with redirected stdout'
+
+# Read configuration without opening COM ports, starting JVMs, or touching deployed settings.
+$bridgeScript = Join-Path $repo 'deployment\node\start-serial-bridge.ps1'
+$bridgeAst = [System.Management.Automation.Language.Parser]::ParseFile($bridgeScript, [ref]$tokens, [ref]$errors)
+foreach ($function in $bridgeAst.FindAll({param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst]}, $false)) {
+    Invoke-Expression $function.Extent.Text
+}
+$environmentFile = Join-Path $nodeRoot '.env'
+$absentConfig = Join-Path $nodeRoot 'not-created.properties'
+$configFile = Join-Path $bridgeRoot 'bridge.properties'
+Set-Content $environmentFile 'LNIS_NODE_ROLE=sender'
+if ((Get-BridgeSettings $environmentFile $absentConfig).Port -ne 18765) { throw 'New sender default changed' }
+Set-Content $environmentFile 'LNIS_NODE_ROLE=receiver'
+if ((Get-BridgeSettings $environmentFile $absentConfig).Port -ne 18766) { throw 'New receiver default changed' }
+Set-Content $configFile "bind=127.0.0.1`nport=24567`ntoken=test-only-secret-do-not-print"
+Set-Content $environmentFile "LNIS_NODE_ROLE=receiver`nLNIS_SERIAL_BRIDGE_PORT="
+if ((Get-BridgeSettings $environmentFile $configFile).Port -ne 24567) { throw 'Existing custom port was overwritten' }
+Set-Content $environmentFile @(' LNIS_SERIAL_BRIDGE_PORT = "24568" # custom', 'LNIS_SERIAL_BRIDGE_BIND=127.0.0.1', 'LNIS_SERIAL_BRIDGE_HOST=host.docker.internal')
+$settings = Get-BridgeSettings $environmentFile $configFile
+if ($settings.Port -ne 24568 -or $settings.Bind -ne '127.0.0.1' -or $settings.Host -ne 'host.docker.internal') {
+    throw 'Explicit settings were not applied'
+}
+foreach ($port in @('1', '65535')) {
+    Set-Content $environmentFile ('LNIS_SERIAL_BRIDGE_PORT=' + $port)
+    if ((Get-BridgeSettings $environmentFile $configFile).Port -ne [int]$port) { throw 'Port boundary rejected' }
+}
+foreach ($setting in @('PORT=0', 'PORT=65536', 'PORT=abc', 'PORT=999999999999', 'BIND=0.0.0.0', 'BIND=localhost', 'HOST=http://localhost:1234')) {
+    Set-Content $environmentFile ('LNIS_SERIAL_BRIDGE_' + $setting)
+    $blocked = $false
+    try { Get-BridgeSettings $environmentFile $configFile | Out-Null } catch { $blocked = $_.Exception.Message.Contains('[GNSS_CONFIG]') }
+    if (!$blocked) { throw ('Invalid bridge setting accepted: ' + $setting) }
+}
+Write-Host 'PASS: bridge defaults, existing port preservation, single env override, host/bind and port validation'
+
+Copy-Item $bridgeScript $nodeRoot
+$mainClass = Join-Path $bridgeRoot 'classes\server\gnss'
+New-Item -ItemType Directory -Path $mainClass -Force | Out-Null
+Set-Content (Join-Path $mainClass 'WindowsSerialBridge.class') 'isolated-fixture'
+$hashLines = @(Get-ChildItem -LiteralPath (Join-Path $bridgeRoot 'classes'), (Join-Path $bridgeRoot 'lib') -File -Recurse |
+    Where-Object { $_.Extension -in @('.class', '.jar') } | Sort-Object FullName | ForEach-Object {
+        $_.FullName.Substring($bridgeRoot.Length + 1).Replace('\', '/') + '=' + (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
+    })
+$sha = [Security.Cryptography.SHA256]::Create()
+try { $global:opsBridgeVersion = ([BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($hashLines -join "`n")))).Replace('-', '').ToLowerInvariant() }
+finally { $sha.Dispose() }
+$global:opsHealthUri = $null
+function Get-NetIPAddress { param($AddressFamily) return [pscustomobject]@{IPAddress='127.0.0.1'} }
+function Start-Process { throw 'Isolated startup test must not launch a real process' }
+function Invoke-RestMethod {
+    param($Uri, $Method, $Headers, $ContentType, $Body, $TimeoutSec)
+    $global:opsHealthUri = $Uri
+    return [pscustomobject]@{status='UP'; busy=$false; version=$global:opsBridgeVersion}
+}
+Set-Content $environmentFile "LNIS_NODE_ROLE=receiver`nLNIS_SERIAL_BRIDGE_PORT="
+$beforeConfig = (Get-FileHash $configFile).Hash
+$beforeStops = $global:opsStopCalls
+& (Join-Path $nodeRoot 'start-serial-bridge.ps1') -DockerDesktop
+if ($global:opsHealthUri -ne 'http://127.0.0.1:24567/health' -or
+    $global:opsStopCalls -ne $beforeStops -or (Get-FileHash $configFile).Hash -ne $beforeConfig) {
+    throw 'Healthy bridge was restarted or its existing port/configuration changed'
+}
+$generatedEnvironment = Get-Content -LiteralPath (Join-Path $nodeRoot '.serial-bridge.env')
+if ($generatedEnvironment[0] -ne 'LNIS_SERIAL_BRIDGE_URL=http://host.docker.internal:24567') {
+    throw 'Container URL did not use the existing custom bridge port'
+}
+Write-Host 'PASS: already-running custom port reused and container URL generated without restarting or changing credentials'

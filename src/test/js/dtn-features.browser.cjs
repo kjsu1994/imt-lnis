@@ -129,33 +129,217 @@ const server=createServer((req,res)=>{
  await page.waitForFunction(()=>document.querySelector('#dtn-observations [data-integrity]')?.textContent==='데이터 불일치');
  reportFixture={referencePvt:[],receivedPvt:[]};
 
- await page.goto(base+'/dtn-intro');assert.equal(await page.locator('.pc-boundary').count(),2);assert.equal(await page.locator('.scope-boundary').count(),4);
- await page.locator('#data-switch').click();assert.ok(await page.locator('.tx-folder').isVisible());
- const count=await page.locator('#step-count').innerText();await page.locator('#tx-adapter').click();assert.match(await page.locator('#step-title').innerText(),/POST \/transfers/);assert.equal(await page.locator('#step-count').innerText(),count);
- await page.locator('#rx-adapter').click();assert.match(await page.locator('#step-title').innerText(),/dtn\/receive/);
+
+ await page.goto(base + '/dtn-intro');
+ assert.equal(await page.locator('.pc-boundary').count(), 2);
+ assert.equal(await page.locator('.scope-boundary').count(), 4);
+ assert.equal(await page.locator('#evidence-details').evaluate(el => el.open), false);
+ assert.match(await page.locator('#step-copy').innerText(), /관측/);
+ assert.match(await page.locator('#step-copy').innerText(), /PVT|Reference/);
+ assert.equal(await page.locator('.outcome, .learn, #step-owner, #step-takeaway').count(), 0);
+
+ assert.equal(await page.locator('#gnss-fields').isVisible(), false, 'GNSS detail is collapsed initially');
+ await page.locator('#evidence-summary').click();
+ const gnssDetails = await page.locator('#gnss-fields').innerText();
+ for (const sample of ['GPS G04 / L1 C/A', 'week 2438', '201724.989', '20,886,574.963', '+3,712.078', '27 dB-Hz', '109,759,724.342', '52.520 s']) {
+  assert.ok(gnssDetails.includes(sample), 'verified UBX sample: ' + sample);
+ }
+ assert.match(gnssDetails, /현재 PVT 계산 입력에는 사용하지 않습니다/);
+ assert.match(gnssDetails, /항법정보가 모두 확보됐다는 뜻은 아닙니다/);
+ await page.locator('#evidence-summary').click();
+
+
+ const selectStage = async (mode, stage) => {
+  await page.evaluate(({mode, stage}) => {
+   state.data = mode;
+   goToStep(steps().indexOf(stage));
+  }, {mode, stage});
+ };
+ const captureIntro = async path => {
+  await page.mouse.move(2, 2);
+  await page.waitForTimeout(250); // Let short stage/hover transitions settle before visual review.
+  await page.screenshot({path,fullPage:true});
+ };
+ const currentStage = () => page.evaluate(() => steps()[state.step]);
+ const openStageDetails = async () => {
+  if (!await page.locator('#evidence-details').evaluate(el => el.open)) {
+   await page.locator('#evidence-summary').click();
+  }
+ };
+ const routeCounts = {raw:8, afs:9, iq:11};
+
+ for (const mode of ['raw', 'afs', 'iq']) {
+  await selectStage(mode, 'source');
+  const route = await page.evaluate(() => steps());
+  assert.equal(route.length, routeCounts[mode], mode + ' stage count');
+  for (const stage of route) {
+   await selectStage(mode, stage);
+   assert.ok(await page.locator('#step-title').isVisible(), mode + '/' + stage + ' title');
+   assert.ok((await page.locator('#step-copy').innerText()).trim(), mode + '/' + stage + ' copy');
+   assert.equal(await page.locator('#evidence-details').evaluate(el => el.open), false, mode + '/' + stage + ' starts collapsed');
+   await openStageDetails();
+   assert.ok(await page.locator('#evidence-detail-copy').isVisible(), mode + '/' + stage + ' detail');
+   assert.ok((await page.locator('#evidence-details').innerText()).trim().length > 15);
+   await page.locator('#evidence-summary').click();
+   const referenceActive = await page.locator('.wire.reference.active').count();
+   assert.equal(referenceActive > 0, mode !== 'iq' && stage === 'compare', mode + '/' + stage + ' reference route');
+  }
+ }
+
+ // Route and engine switches preserve the current semantic stage.
+ await selectStage('afs', 'calculate');
+ await page.locator('#tx-switch').click();
+ assert.equal(await currentStage(), 'calculate');
+ await page.locator('#rx-switch').click();
+ assert.equal(await currentStage(), 'calculate');
+ await page.locator('#data-switch').click();
+ assert.equal(await currentStage(), 'calculate');
+ assert.equal(await page.evaluate(() => state.data), 'iq');
+ await page.locator('#data-switch').click();
+ assert.equal(await currentStage(), 'calculate');
+ assert.equal(await page.evaluate(() => state.data), 'raw');
+ await selectStage('iq', 'decode');
+ await page.locator('#data-switch').click();
+ assert.equal(await currentStage(), 'restore', 'removed decode continues to restoration');
+ await selectStage('iq', 'encode');
+ await page.locator('#data-switch').click();
+ assert.equal(await currentStage(), 'send', 'removed encoding continues to sending');
+
+ // Arrow keys navigate the diagram, but do not steal keys from data entry.
+ await selectStage('afs', 'source');
+ await page.locator('body').click({position:{x:4,y:4}});
+ await page.keyboard.press('ArrowRight');
+ assert.equal(await currentStage(), 'data');
+ await page.keyboard.press('ArrowLeft');
+ assert.equal(await currentStage(), 'source');
+ await selectStage('afs', 'calculate');
+ await openStageDetails();
+ for (const seconds of [0, 0.001, 1, 20, 60]) {
+  await page.locator('#delay').fill(String(seconds));
+  assert.equal(await page.locator('#delay').getAttribute('aria-invalid'), 'false');
+  const values = await page.locator('#satellite-rows tr').evaluateAll(rows => rows.map(row =>
+   [...row.cells].slice(1).map(cell => Number(cell.textContent.replace(/[+,\s]/g, '')))));
+  assert.equal(values.length, 4);
+  for (const [original, added, converted] of values) {
+   assert.ok(Math.abs(added - 299792458 * seconds) < 0.002, 'common delay distance');
+   assert.ok(Math.abs(converted - original - added) < 0.002, 'recomputed pseudorange');
+  }
+ }
+ for (const invalid of ['', '-1', '61', '0.0001']) {
+  await page.locator('#delay').fill(invalid);
+  assert.equal(await page.locator('#delay').getAttribute('aria-invalid'), 'true', 'invalid delay ' + invalid);
+  assert.deepEqual(await page.locator('#satellite-rows td:nth-child(3)').allTextContents(), ['—','—','—','—']);
+ }
+ await page.locator('[data-delay="20"]').click();
+ assert.equal(await page.locator('#delay').inputValue(), '20');
+ await page.locator('#delay').focus();
+ await page.keyboard.press('ArrowLeft');
+ assert.equal(await currentStage(), 'calculate', 'editing delay must not navigate');
+ await selectStage('afs', 'compare');
+ assert.equal(await page.locator('#delay').inputValue(), '20', 'delay survives stage navigation');
+ await page.locator('#tx-switch').click();
+ await page.locator('#data-switch').click();
+ await page.locator('#data-switch').click();
+ assert.equal(await page.locator('#delay').inputValue(), '20', 'delay survives engine and route changes');
+
+ // The two AFS variants and the send request examples remain available.
+ for (const mode of ['afs', 'iq']) {
+  await selectStage(mode, 'frame');
+  await openStageDetails();
+  await page.locator('[data-sb="4"]').click();
+  const description = await page.locator('#frame-description').innerText();
+  assert.match(description, mode === 'afs' ? /보정 송신 시각/ : /원본 관측값/);
+  assert.match(description, mode === 'afs' ? /670/ : /506/);
+ }
+ for (const mode of ['raw', 'afs', 'iq']) {
+  await selectStage(mode, 'send');
+  await openStageDetails();
+  assert.ok(await page.locator('#request-json').isVisible());
+  const request = JSON.parse(await page.locator('#request-json').innerText());
+  assert.equal(request.testType, {raw:'GNSS_RAW', afs:'AFS_METADATA', iq:'IQ_SAMPLE'}[mode]);
+ }
+
+ // Inspecting virtual links highlights their own routes without moving the stage.
+ await selectStage('iq', 'calculate');
+ for (const [selector, endpoint] of [['#tx-adapter', /POST \/transfers/], ['#rx-adapter', /dtn\/receive/], ['.tx-folder', /BIN|공유|exchange/], ['.rx-folder', /BIN|공유|exchange/], ['.management-link', /REST|원본|등록/]]) {
+  const before = await page.locator('#step-count').innerText();
+  await page.locator(selector).click();
+  assert.equal(await page.locator('#step-count').innerText(), before);
+  assert.ok(await page.locator('.wire.active').count() > 0, selector + ' route highlights');
+  await openStageDetails();
+  assert.match((await page.locator('#step-copy').innerText()) + ' ' + (await page.locator('#evidence-details').innerText()), endpoint);
+ }
+
+ await selectStage('afs', 'network');
+ const moving = await page.evaluate(() => ({
+  wireAnimation: [...document.querySelectorAll('.wire.active')].some(el => getComputedStyle(el).animationName !== 'none'),
+  dotCount: document.querySelectorAll('.traveler animateMotion').length
+ }));
+ assert.equal(moving.wireAnimation, false, 'only traveler dots animate, not the wire stroke');
+ assert.ok(moving.dotCount > 0, 'active edge shows moving data');
+ await page.emulateMedia({reducedMotion:'reduce'});
+ assert.ok(await page.evaluate(() => [...document.querySelectorAll('.traveler')].every(el =>
+  getComputedStyle(el).display === 'none' || getComputedStyle(el).visibility === 'hidden' || !el.querySelector('animateMotion'))),
+  'reduced motion suppresses moving dots');
+ await page.emulateMedia({reducedMotion:'no-preference'});
+
+ if (await page.evaluate(() => document.fullscreenEnabled)) {
+  await page.locator('#fullscreen').click();
+  await page.waitForFunction(() => !!document.fullscreenElement);
+  await page.locator('#fullscreen').click();
+  await page.waitForFunction(() => !document.fullscreenElement);
+ }
+
  for (const width of [1600,1100,390]) {
   await page.setViewportSize({width,height:1000});
   for (const mode of ['raw','afs','iq']) {
-   await page.evaluate(mode=>{state.data=mode;state.step=0;render();},mode);
-   const geometry=await page.evaluate(()=>{
-    const box=selector=>document.querySelector(selector).getBoundingClientRect();
-    const aligned=['tx','rx'].every(side=>{
-     const service=box('.'+side+'-service'), routing=box('.'+side+'-routing');
-     return Math.abs(service.top-routing.top)<1 && Math.abs(service.bottom-routing.bottom)<1;
+   await selectStage(mode, 'source');
+   const geometry = await page.evaluate(() => {
+    const box = selector => document.querySelector(selector).getBoundingClientRect();
+    const aligned = ['tx','rx'].every(side => {
+     const service = box('.' + side + '-service'), routing = box('.' + side + '-routing');
+     return Math.abs(service.top - routing.top) < 1 && Math.abs(service.bottom - routing.bottom) < 1;
     });
-    const folder=document.querySelector('.tx-folder');
+    const folder = document.querySelector('.tx-folder');
     return {
      aligned,
-     fits:document.documentElement.scrollWidth<=innerWidth,
-     folderCorrect:state.data==='iq' ? !folder.hidden && box('.tx-folder').bottom<box('.tx-routing').top && box('.tx-folder').bottom<box('#tx-adapter').top : folder.hidden,
-     noteCorrect:state.data!=='iq' || document.getElementById('clock-note').hidden,
-     routersAligned:Math.abs((box('#tx-switch').left+box('#tx-switch').right)/2-(box('#rx-switch').left+box('#rx-switch').right)/2)<1
+     fits: document.documentElement.scrollWidth <= innerWidth,
+     folderCorrect: state.data === 'iq' ? !folder.hidden && box('.tx-folder').bottom < box('.tx-routing').top && box('.tx-folder').bottom < box('#tx-adapter').top : folder.hidden,
+     noteCorrect: state.data !== 'iq' || document.getElementById('clock-note').hidden,
+     routersAligned: Math.abs((box('#tx-switch').left + box('#tx-switch').right) / 2 - (box('#rx-switch').left + box('#rx-switch').right) / 2) < 1
     };
    });
-   assert.ok(Object.values(geometry).every(Boolean),JSON.stringify({width,mode,geometry}));
+   assert.ok(Object.values(geometry).every(Boolean), JSON.stringify({width,mode,geometry}));
+   await selectStage(mode, mode === 'iq' ? 'frame' : 'calculate');
+   await openStageDetails();
+   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'expanded details fit ' + width + '/' + mode);
   }
  }
+
+ for (const viewport of [{width:1366,height:900},{width:1366,height:768},{width:390,height:844}]) {
+  await page.setViewportSize(viewport);
+  const heights = [];
+  for (const mode of ['afs','iq','raw']) {
+   await selectStage(mode, 'source');
+   heights.push((await page.locator('#scene').boundingBox()).height);
+  }
+  assert.ok(Math.max(...heights) - Math.min(...heights) < 1, 'switching I/Q preserves diagram height: ' + JSON.stringify(viewport));
+  await selectStage('afs', 'source');
+  if (viewport.height === 900) {
+   const explanation = await page.locator('.explanation').boundingBox();
+   assert.ok(explanation.y + explanation.height <= viewport.height, 'initial diagram and brief fit 1366x900');
+  }
+  await captureIntro('build/intro-' + viewport.width + '-' + viewport.height + '.png');
+ }
+ await page.setViewportSize({width:1366,height:900});
+ await selectStage('afs', 'source');
+ await openStageDetails();
+ await captureIntro('build/intro-gnss-values.png');
  await page.setViewportSize({width:1600,height:1000});
- await page.screenshot({path:'build/intro-layout-review.png',fullPage:true});
+ await selectStage('afs', 'source');
+ await captureIntro('build/intro-layout-review.png');
+ await selectStage('afs', 'calculate');
+ await openStageDetails();
+ await captureIntro('build/intro-calculation-review.png');
  assert.deepEqual(errors,[]);await browser.close();console.log('PASS: preset CRUD/apply/capacity/shared list, trial settings, viewport fullscreen, waiting batch cancellation, scoped intro and responsive layout.');
 })().catch(e=>{console.error(e);process.exitCode=1;}).finally(async()=>{await browser?.close();server.close();});

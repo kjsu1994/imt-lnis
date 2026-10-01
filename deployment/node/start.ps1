@@ -14,7 +14,7 @@ try {
     & (Join-Path $composeRoot 'start-serial-bridge.ps1')
     $composeArgs += @('-f','docker-compose.windows-serial.yml')
 } catch {
-    if ($_.Exception.Message.Contains('[GNSS_BUSY]')) { throw }
+    if ($_.Exception.Message -match '\[GNSS_(BUSY|CONFIG)\]') { throw }
     Write-Warning "GNSS bridge unavailable; starting file/REST service with system time. $($_.Exception.Message)"
 }
 & wsl.exe --cd $linuxRoot -- docker compose @composeArgs up -d --build
