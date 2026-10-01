@@ -9,7 +9,11 @@ import java.util.UUID;
 
 /** 기존 AFS 테이블과 분리해 DTN 전달 및 계산 상태를 보관한다. */
 @Entity
-@Table(name = "dtn_job")
+@Table(name = "dtn_job", indexes = {
+        @Index(name = "dtn_job_state_created", columnList = "state,createdAt"),
+        @Index(name = "dtn_job_reference_retry", columnList = "referenceStatus,referenceNextAttemptAt"),
+        @Index(name = "dtn_job_cancel_pending", columnList = "cancelPending")
+})
 @Data
 public class DtnJob {
     @Id private UUID id;
@@ -26,6 +30,9 @@ public class DtnJob {
 
     /** 연결이 복구되면 상대 노드에 중지 요청을 다시 전달한다. */
     private Boolean cancelPending;
+
+    /** 일괄 종료는 상대가 아직 미수신인 경우에만 닫는다. 재시도·재기동에도 유지한다. */
+    private Boolean cancelWaitingOnly;
 
     private String testType;
     private String senderMode;

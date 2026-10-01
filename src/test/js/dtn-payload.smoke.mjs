@@ -172,3 +172,28 @@ await receiverViewer.setReceipts([{id:'receipt-1',testId:'rejected',status:'REJE
 await receiverViewer.setJob({testId:'rejected',receivedPayloadAvailable:true});
 assert.ok(!receiverDownload.href.includes('/receipts/'), 'accepted original replaces rejected receipt automatically');
 console.log('PASS: JSON and downloads follow only the trial selected in the main history');
+
+// A temporary body failure must retry the same rejected receipt without switching trials.
+await receiverViewer.setJob({testId:'rejected-retry', receivedPayloadAvailable:false});
+const retryReceipt = {id:'retry-body', testId:'rejected-retry', status:'REJECTED', arrivedAt:'2026-10-01T00:00:00Z', message:'검증 실패'};
+const realNow = Date.now;
+let now = realNow(), bodyAttempts = 0;
+Date.now = () => now;
+try {
+  globalThis.fetch = async () => {
+    bodyAttempts++;
+    if (bodyAttempts === 1) throw new Error('temporary network failure');
+    return {ok:true, text:async()=>original, headers:{get:()=> 'original'}};
+  };
+  await receiverViewer.setReceipts([retryReceipt]);
+  await receiverViewer.setReceipts([retryReceipt]);
+  assert.equal(bodyAttempts, 1, 'retry is bounded while polling continues');
+  now += 10001;
+  await receiverViewer.setReceipts([retryReceipt]);
+  assert.equal(bodyAttempts, 2);
+  assert.equal(receiverText.value, displayedJson(original, true));
+  assert.match(receiverDownload.href, /retry-body/);
+} finally {
+  Date.now = realNow;
+}
+console.log('PASS: rejected receipt body recovers after a transient failure without changing trial selection');

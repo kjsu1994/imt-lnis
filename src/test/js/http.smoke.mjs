@@ -5,6 +5,12 @@ globalThis.fetch = async (url, options) => {call = {url, options}; return new Re
 assert.deepEqual(await requestJson('/test', {cache:'no-store',method:'POST'}), {ok:true});
 assert.equal(call.url, '/lnis/api/v1/test');
 assert.equal(call.options.cache, 'no-store');
+assert.equal(call.options.signal, undefined, 'mutations retain their existing request lifetime');
+await requestJson('/poll');
+assert.ok(call.options.signal instanceof AbortSignal, 'GET receives a bounded lifetime');
+const providedSignal = new AbortController().signal;
+await requestJson('/poll', {signal: providedSignal});
+assert.equal(call.options.signal, providedSignal, 'caller cancellation remains authoritative');
 globalThis.fetch = async () => new Response(null,{status:204});
 assert.equal(await requestJson('/empty'), null);
 assert.deepEqual(await requestJson('/empty', {}, {allowEmpty:true}), {});
@@ -22,3 +28,11 @@ const aborted = new Error('aborted');
 globalThis.fetch = async () => {throw aborted;};
 await assert.rejects(requestJson('/abort'), error => error === aborted);
 console.log('PASS: HTTP JSON, text errors, no-content, legacy 404 and abort');
+
+const interruptedBody = new AbortController();
+globalThis.fetch = async () => ({ok:true, status:200, json:async()=>{
+    interruptedBody.abort(new Error('body deadline exceeded'));
+    throw interruptedBody.signal.reason;
+}});
+await assert.rejects(requestJson('/body', {signal:interruptedBody.signal}, {allowEmpty:true}), /body deadline exceeded/);
+console.log('PASS: a read deadline is not mistaken for an allowed empty JSON response');

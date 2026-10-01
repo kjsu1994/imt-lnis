@@ -189,7 +189,7 @@ public class DataManagementService {
 
     private String projection(Kind kind) {
         return switch (kind) {
-            case DTN -> "e.id,e.testType,e.state,e.createdAt,e.updatedAt,e.cancelPending";
+            case DTN -> "e.id,e.testType,e.state,e.createdAt,e.updatedAt,e.cancelPending,e.referenceStatus";
             case RECEIPT -> "e.id,e.contentType,e.status,e.arrivedAt,e.arrivedAt,e.sizeBytes";
             case INPUT ->
                     "e.inputId,e.fileName,e.complete,e.createdAt,e.completedAt,e.receivedSize,e.captureDecision";
@@ -209,6 +209,9 @@ public class DataManagementService {
         }
         if (kind == Kind.DTN && Boolean.TRUE.equals(values[5])) {
             blocked = "상대 노드 중지 확인 대기";
+        }
+        if (kind == Kind.DTN && "WAITING".equals(values[6])) {
+            blocked = "비교자료 조회 대기";
         }
         if (kind == Kind.INPUT
                 && state.equals("INCOMPLETE")
@@ -643,7 +646,7 @@ public class DataManagementService {
         if (dtn.managementBusy()
                 || iq.managementBusy(null)
                 || em.createQuery(
-                                        "select count(e) from DtnJob e where e.state not in ('COMPLETED','FAILED','CANCELLED','INCONCLUSIVE') or e.cancelPending=true",
+                                        "select count(e) from DtnJob e where e.state in ('PREPARING','WAITING_RECEIVER','CALCULATING')",
                                         Long.class)
                                 .getSingleResult()
                         > 0
@@ -778,7 +781,7 @@ public class DataManagementService {
         if (key.kind() == Kind.INPUT) {
             var input = em.find(InputBufferEntity.class, key.id());
             if (input != null) {
-                inputRepository.delete(key.id(), input.chunkCount());
+                inputRepository.delete(key.id());
             }
         } else if (key.kind() == Kind.IQ) {
             try {

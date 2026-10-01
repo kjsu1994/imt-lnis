@@ -8,6 +8,7 @@ const root = resolve(__dirname, '../../main/resources/static');
 const config = {maxNumberOfBundlesInPipeline:50,maxSumOfBundleBytesInPipeline:50000000,maxBundleSizeBytes:10485760,
   tcpclMaxSegmentSizeBytes:20000,neighborDepletedStorageDelaySeconds:10,enforceBundlePriority:false,
   storageDeletionPolicy:'DELETE_AFTER_FORWARDING',totalStorageCapacityBytes:8589934592,maxLtpReceiveUdpPacketSizeBytes:65536,acsSendPeriodMilliseconds:1000};
+let browser, bulkRequests=0;
 let rows=[], id=0, job=null, starts=0, reportFixture={referencePvt:[],receivedPvt:[]};
 const server=createServer((req,res)=>{
  const path=new URL(req.url,'http://localhost').pathname;
@@ -27,10 +28,15 @@ const server=createServer((req,res)=>{
     if(data.version!==rows[index].version)return json({detail:'변경 충돌'},409);
     rows[index]={...rows[index],...data,version:data.version+1};return json(rows[index]);
    }
+   if(path.endsWith('/waiting-summary'))return json({count:3,asOf:'2026-10-01T00:00:00Z',testIds:['waiting-a','waiting-b','waiting-c']});
+   if(path.endsWith('/cancel-waiting')){assert.equal(data.asOf,'2026-10-01T00:00:00Z');assert.deepEqual(data.testIds,['waiting-a','waiting-b','waiting-c']);bulkRequests++;return json({requested:3,cancelled:2,skipped:1,pending:0});}
+   if(path.endsWith('/node/gnss/ports')||path.endsWith('/captures/pending'))return json([]);
+   if(path.endsWith('/node/gnss'))return json({state:'DISCONNECTED',timeState:'UNAVAILABLE'});
+   if(path.endsWith('/node/clock'))return json({busy:false,clock:{trialAt:new Date().toISOString(),rawAt:new Date().toISOString(),source:'SYSTEM',offsetSeconds:0,ageSeconds:0,clockChanges:0}});
    if(path.endsWith('/config'))return json({delaySupported:true,iqEnabled:false,defaultSendUrl:'http://adapter:8080',adapterUrl:'http://adapter:8080'});
    if(path.endsWith('/agents'))return json([{agentId:'sender-1',role:'SENDER',state:'READY'},{agentId:'receiver-1',role:'RECEIVER',state:'READY'}]);
    if(path.endsWith('/node/connection'))return json({ip:'127.0.0.1',port:8091,editable:true,peerOnline:true});
-   if(path.includes('adapter-health'))return json({adapter:{ok:true,message:'정상연결',responseBody:{status:'ready'}}});
+   if(path.includes('adapter-health'))return json({checkedAt:new Date().toISOString(),adapter:{status:'ready',message:'정상연결',elapsedMillis:1,url:'http://adapter:8080/sender/health'}});
    if(path.endsWith('/tests')&&req.method==='POST'){starts++;return json({});}
    if(path.endsWith('/tests'))return json(job?[job]:[]);
    if(path.endsWith('/tests/test1'))return json(job);
@@ -48,7 +54,7 @@ const server=createServer((req,res)=>{
 });
 (async()=>{
  await new Promise(r=>server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+server.address().port;
- const browser=await chromium.launch();const context=await browser.newContext();
+ browser=await chromium.launch();const context=await browser.newContext();
  await context.addInitScript(()=>{window.WebSocket=class {};});
  const page=await context.newPage();page.setDefaultTimeout(15000);const errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.goto(base+'/sender');await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>!document.getElementById('preset-save').disabled);
@@ -64,11 +70,28 @@ const server=createServer((req,res)=>{
  for(const route of ['/sender','/receiver']){
   await page.goto(base+route);await page.waitForFunction(()=>document.getElementById('trial-settings').textContent.includes('50'));
   await page.locator('#trial-settings summary').click();assert.equal(await page.locator('.trial-config-values > div').count(),10);assert.match(await page.locator('#trial-settings').innerText(),/8,589,934,592/);
-  await page.locator('#dtn-log-fullscreen').click();await page.waitForFunction(()=>!!document.fullscreenElement);assert.equal(await page.locator('.log-expanded').count(),1);
-  await page.locator('#dtn-log-detail').click();await page.waitForFunction(()=>document.getElementById('dtn-log').textContent.includes('상세 확인'));
-  await page.locator('#dtn-log-fullscreen').click();await page.waitForFunction(()=>!document.fullscreenElement);
-  await page.evaluate(()=>{document.getElementById('dtn-log').closest('section').requestFullscreen=()=>Promise.reject(new Error('denied'));});
-  await page.locator('#dtn-log-fullscreen').click();await page.waitForFunction(()=>!!document.querySelector('.log-maximized'));await page.keyboard.press('Escape');assert.equal(await page.locator('.log-maximized').count(),0);
+  const beforeBulk = bulkRequests;
+  page.once('dialog', dialog => {assert.match(dialog.message(), /3건/);dialog.accept();});
+  await page.locator('#dtn-cancel-waiting').click();
+  await page.waitForFunction(()=>!document.getElementById('dtn-cancel-waiting').disabled);
+  assert.equal(bulkRequests,beforeBulk+1);
+  assert.match(await page.locator('#dtn-log').innerText(),/종료 2건/);
+  await page.locator('#dtn-log-fullscreen').click();
+  await page.waitForFunction(()=>!!document.querySelector('.log-maximized'));
+  const viewportLog = await page.locator('.log-maximized').boundingBox();
+  assert.equal(viewportLog.x,0);assert.equal(viewportLog.y,0);
+  assert.equal(Math.round(viewportLog.width),page.viewportSize().width);
+  assert.equal(Math.round(viewportLog.height),page.viewportSize().height);
+  await page.locator('#dtn-log-detail').click();
+  await page.waitForFunction(()=>document.getElementById('dtn-log').textContent.includes('상세 확인'));
+  await page.keyboard.press('Escape');assert.equal(await page.locator('.log-maximized').count(),0);
+  for (const width of [1600,1100,390]) {
+    await page.setViewportSize({width,height:1000});
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),route+' fits '+width);
+    assert.ok(await page.locator('#dtn-cancel-waiting').isVisible());
+  }
+  await page.setViewportSize({width:1600,height:1000});
+  await page.screenshot({path:'build/frontend-review-'+route.slice(1)+'.png',fullPage:true});
  }
 
  const original = {constellationId:0,satelliteId:19,signalId:0,pseudorangeMeters:21000000,
@@ -134,5 +157,5 @@ const server=createServer((req,res)=>{
  }
  await page.setViewportSize({width:1600,height:1000});
  await page.screenshot({path:'build/intro-layout-review.png',fullPage:true});
- assert.deepEqual(errors,[]);await browser.close();console.log('PASS: preset CRUD/apply/capacity/shared list, trial settings, real/fallback fullscreen, scoped intro and responsive layout.');
-})().catch(e=>{console.error(e);process.exitCode=1;}).finally(()=>{server.close();setTimeout(()=>process.exit(process.exitCode||0),1000).unref();});
+ assert.deepEqual(errors,[]);await browser.close();console.log('PASS: preset CRUD/apply/capacity/shared list, trial settings, viewport fullscreen, waiting batch cancellation, scoped intro and responsive layout.');
+})().catch(e=>{console.error(e);process.exitCode=1;}).finally(async()=>{await browser?.close();server.close();});

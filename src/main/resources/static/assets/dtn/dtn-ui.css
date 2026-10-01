@@ -73,20 +73,6 @@ body[data-page^="dtn-"] .card .dtn-payload-header > h2 { margin: 0 auto 0 0; fon
     flex-wrap: wrap;
 }
 
-.connection-item {
-    display: flex;
-
-    align-items: center;
-
-    gap: 7px;
-
-    font-size: 12px;
-}
-
-.connection-item strong {
-    color: var(--ink);
-}
-
 .connection-dot {
     display: inline-block;
 
@@ -356,14 +342,6 @@ body[data-page^="dtn-"] .receiver-pvt-pair .pvt-grid { grid-template-columns: re
     overflow: hidden;
 }
 
-.epoch-observation-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 24px;
-    margin-bottom: 18px;
-}
-
 .section-kicker {
     display: block;
     margin-bottom: 4px;
@@ -371,90 +349,6 @@ body[data-page^="dtn-"] .receiver-pvt-pair .pvt-grid { grid-template-columns: re
     font-size: 10px;
     font-weight: 800;
     letter-spacing: .14em;
-}
-
-.epoch-observation-header h2 {
-    margin-bottom: 5px;
-    font-size: 20px;
-}
-
-.epoch-observation-header p {
-    margin: 0;
-    color: var(--muted);
-    font-size: 13px;
-}
-
-.epoch-input-status {
-    min-width: 150px;
-    padding: 10px 14px;
-    border: 1px solid #cfe0e1;
-    border-radius: 10px;
-    background: #f2f8f7;
-    text-align: right;
-}
-
-.epoch-input-status span,
-.epoch-input-status strong {
-    display: block;
-}
-
-.epoch-input-status span {
-    color: var(--muted);
-    font-size: 10px;
-    font-weight: 700;
-}
-
-.epoch-input-status strong {
-    margin-top: 2px;
-    color: var(--navy);
-    font-size: 15px;
-}
-
-.epoch-summary-grid {
-    display: grid;
-    grid-template-columns: minmax(190px, 1.6fr) repeat(5, minmax(120px, 1fr));
-    gap: 8px;
-    margin-bottom: 14px;
-}
-
-.epoch-summary-item {
-    min-width: 0;
-    padding: 11px 13px;
-    border: 1px solid var(--line);
-    border-radius: 9px;
-    background: #fbfcfc;
-}
-
-.epoch-summary-item.accent {
-    border-color: #b9ddd8;
-    background: #eef8f6;
-}
-
-.epoch-summary-item span,
-.epoch-summary-item strong,
-.epoch-summary-item small {
-    display: block;
-}
-
-.epoch-summary-item span {
-    color: var(--muted);
-    font-size: 10px;
-    font-weight: 700;
-}
-
-.epoch-summary-item strong {
-    margin-top: 3px;
-    overflow: hidden;
-    color: var(--ink);
-    font-size: 15px;
-    font-variant-numeric: tabular-nums;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.epoch-summary-item small {
-    margin-top: 1px;
-    font-size: 9px;
 }
 
 .epoch-table-viewport {
@@ -632,47 +526,9 @@ body[data-page^="dtn-"] .receiver-pvt-pair .pvt-grid { grid-template-columns: re
  * 전송 시험
  * ========================================================= */
 
-.test-action-card {
-    display: flex;
-
-    align-items: center;
-
-    justify-content: space-between;
-
-    gap: 20px;
-}
-
-.test-action-card h2 {
-    margin-bottom: 4px;
-}
-
-.test-action-card p {
-    margin: 0;
-
-    color: var(--muted);
-}
-
-.test-start-button {
-    min-width: 210px;
-
-    padding: 13px 20px;
-}
-
 /* =========================================================
  * 시험 결과
  * ========================================================= */
-
-.result-console {
-    min-height: 80px;
-
-    padding: 14px;
-
-    border-radius: 8px;
-
-    background: #f7f9f9;
-
-    white-space: pre-wrap;
-}
 
 /* =========================================================
  * Responsive
@@ -697,53 +553,18 @@ body[data-page^="dtn-"] .receiver-pvt-pair .pvt-grid { grid-template-columns: re
         grid-template-columns:
             repeat(2, 1fr);
     }
-
-    .test-action-card {
-        display: block;
-    }
-
-    .test-start-button {
-        width: 100%;
-
-        margin-top: 15px;
-    }
-
-    .epoch-summary-grid {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
 }
 
 @media(max-width: 600px) {
     .epoch-observation-card {
         padding: 18px;
     }
-
-    .epoch-observation-header {
-        display: block;
-    }
-
-    .epoch-input-status {
-        width: 100%;
-        margin-top: 14px;
-        text-align: left;
-    }
-
-    .epoch-summary-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
 }
 /* DTN-only shared layout. Do not change AFS page styles. */
-body[data-page^="dtn-"] .dtn-send-actions { display: flex; justify-content: flex-end; align-items: center; gap: 12px; margin: 0; }
 body[data-page="dtn-sender"] .dtn-input-header { gap: 8px 20px; align-items: center; flex-wrap: wrap; }
 body[data-page="dtn-sender"] .dtn-input-heading { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px 14px; min-width: 0; }
 body[data-page="dtn-sender"] .dtn-input-heading h2 { margin: 0; }
 body[data-page="dtn-sender"] .dtn-input-heading strong { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
-body[data-page="dtn-sender"] .dtn-input-header .dtn-send-actions { margin-left: auto; min-width: 0; }
-body[data-page="dtn-sender"] .dtn-send-actions button { flex-shrink: 0; }
-body[data-page^="dtn-"] .dtn-send-actions p { margin: 0; font-size: 13px; color: var(--muted); }
-body[data-page^="dtn-"] .dtn-comparison-card { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 13px; }
-body[data-page^="dtn-"] .dtn-comparison-card .result-console { min-height: 0; padding: 0; margin: 0; background: none; white-space: pre-wrap; overflow-wrap: anywhere; }
-body[data-page^="dtn-"] .dtn-comparison-card .observation-summary { padding: 0; }
 body[data-page^="dtn-"] main { max-width: 1500px; display: grid; gap: 14px; }
 body[data-page^="dtn-"] .status-strip { margin: 0; }
 .synthetic-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
@@ -927,6 +748,7 @@ body[data-page="dtn-receiver"] .destination-status > div { display: flex; align-
 .receiver-selection, .receiver-epoch-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .receiver-selection label, .receiver-epoch-row label { margin: 0; white-space: nowrap; }
 .receiver-selection button { margin: 0; white-space: nowrap; }
+#dtn-cancel-waiting { color: var(--red); border-color: #e5c1c1; }
 .receiver-trial-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
 .receiver-trial-grid > div { min-width: 0; }
 .receiver-selection { margin: 0; }
@@ -1028,36 +850,6 @@ body[data-page="dtn-sender"] .sender-summary-row #service-clock-sync { padding: 
 /* Receipt history opens only when needed; the shared output layout sizes the text area. */
 
 /* 지연 시험은 설정에서 한 번 선택하고 시험 중에는 변경하지 않는다. */
-.dtn-delay-toggle {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  cursor: pointer;
-}
-.dtn-delay-toggle input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  flex: 0 0 18px;
-  accent-color: #79d6ce;
-}
-.dtn-delay-settings {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px 14px;
-}
-.dtn-delay-settings[hidden] { display: none; }
-.dtn-delay-settings .dtn-delay-toggle {
-  margin: 0;
-  gap: 7px;
-  font-size: 13px;
-  white-space: nowrap;
-}
-.dtn-delay-settings .dtn-delay-toggle input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  flex-basis: 16px;
-}
 
 /* Compact HDTN controls: bounds and explanations are available on focus/hover. */
 .adapter-config-panel { padding:12px 14px; }
@@ -1124,7 +916,7 @@ body[data-page^="dtn-"] section.log-expanded .log { flex: 1; height: auto; min-h
 .receiver-selection #dtn-test-filter { flex: 0 1 110px; }
 .receiver-selection #dtn-tests { flex: 1 1 260px; }
 .sender-trial-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 20px; }
-.sender-trial-toolbar .receiver-selection { flex: 0 1 690px; min-width: 0; margin: 0; }
+.sender-trial-toolbar .receiver-selection { flex: 1 1 780px; min-width: 0; margin: 0; }
 .sender-trial-toolbar .receiver-selection #dtn-tests { flex: 1 1 180px; width: 240px; min-width: 150px; }
 .sender-trial-buttons { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 #dtn-tests[data-trial-tone="success"], #dtn-tests option.trial-success { color: #167044; }

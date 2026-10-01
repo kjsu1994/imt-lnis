@@ -719,6 +719,109 @@ class IndependentNodeIntegrationTest {
         }
     }
 
+    @Test
+    @Timeout(180)
+    void rejectedUnknownAndBulkWaitingTrialsUseSafeHttpLifecycle() throws Exception {
+        int receiverPort = tcpPort(), senderPort = tcpPort();
+        var packets = new java.util.concurrent.LinkedBlockingQueue<byte[]>();
+        var status = new java.util.concurrent.atomic.AtomicInteger(401);
+        HttpServer adapter = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        adapter.createContext("/transfers", exchange -> {
+            try (exchange) {
+                packets.add(exchange.getRequestBody().readAllBytes());
+                if (status.get() != 0) exchange.sendResponseHeaders(status.get(), -1);
+            }
+        });
+        adapter.start();
+        try (var receiver = node("receiver", receiverPort, senderPort);
+                var sender = node("sender", senderPort, receiverPort)) {
+            await(() -> ready(sender, "sender-1") && ready(sender, "receiver-1"), 20);
+            var tx = sender.getBean(DtnService.class);
+            var rx = receiver.getBean(DtnService.class);
+            var inputs = sender.getBean(InputBufferService.class);
+            var json = sender.getBean(ObjectMapper.class);
+            byte[] source = NativePvtIntegrationTest.validSample();
+            UUID input = inputs.create("lifecycle.graw", source.length, InputKind.GRAW_UPLOAD).inputId();
+            inputs.append(input, 0, source);
+            inputs.complete(input);
+            String url = "http://127.0.0.1:" + adapter.getAddress().getPort() + "/transfers";
+            UUID rejected = tx.createDelay(input, "sender-1", "receiver-1", url, "GNSS_RAW",
+                    "DTN", "HDTN", null, null, java.time.Instant.now()).getId();
+            assertNotNull(packets.poll(20, java.util.concurrent.TimeUnit.SECONDS));
+            await(() -> "FAILED".equals(tx.get(rejected).getState())
+                    && !Boolean.TRUE.equals(tx.get(rejected).getCancelPending()), 15);
+            assertEquals("REJECTED", tx.get(rejected).getSendStatus());
+            assertTrue(tx.get(rejected).getMessage().contains("401"));
+            assertEquals("CANCELLED", rx.get(rejected).getState());
+            status.set(0); // POST 본문은 받았지만 응답 전에 연결이 끊어진다.
+            await(() -> !tx.sendBusy(), 10);
+            UUID unknown = tx.createDelay(input, "sender-1", "receiver-1", url, "GNSS_RAW",
+                    "DTN", "HDTN", null, null, java.time.Instant.now()).getId();
+            assertNotNull(packets.poll(20, java.util.concurrent.TimeUnit.SECONDS));
+            await(() -> "UNKNOWN".equals(tx.get(unknown).getSendStatus()) && !tx.sendBusy(), 40);
+            assertEquals("WAITING_DTN", rx.get(unknown).getState());
+            var summaryRequest = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + senderPort
+                    + "/lnis/api/v1/dtn/tests/waiting-summary")).GET().build();
+            var summary = json.readTree(HttpClient.newHttpClient()
+                    .send(summaryRequest, HttpResponse.BodyHandlers.ofString()).body());
+            assertEquals(1, summary.path("count").asInt());
+            packets.clear();
+            status.set(202);
+            UUID delivered = tx.createDelay(input, "sender-1", "receiver-1", url, "GNSS_RAW",
+                    "DTN", "HDTN", null, null, java.time.Instant.now()).getId();
+            byte[] deliveredBody = packets.poll(20, java.util.concurrent.TimeUnit.SECONDS);
+            assertNotNull(deliveredBody);
+            await(() -> !tx.sendBusy(), 10);
+            var stopped = postJson(senderPort, "/lnis/api/v1/dtn/tests/cancel-waiting",
+                    json.writeValueAsString(Map.of("asOf", summary.path("asOf").asText(), "testIds", summary.path("testIds"))), null);
+            assertEquals(200, stopped.statusCode(), stopped.body());
+            assertEquals(1, json.readTree(stopped.body()).path("pending").asInt());
+            await(() -> "CANCELLED".equals(rx.get(unknown).getState()), 10);
+            assertEquals("WAITING_DTN", tx.get(delivered).getState());
+            assertEquals("WAITING_DTN", rx.get(delivered).getState());
+            UUID waiting = tx.createDelay(input, "sender-1", "receiver-1", url, "AFS_METADATA",
+                    "DTN", "HDTN", null, null, java.time.Instant.now()).getId();
+            byte[] lateBody = packets.poll(20, java.util.concurrent.TimeUnit.SECONDS);
+            assertNotNull(lateBody);
+            await(() -> !tx.sendBusy(), 10);
+            var receiverSummaryRequest = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + receiverPort
+                    + "/lnis/api/v1/dtn/tests/waiting-summary")).GET().build();
+            var receiverSummary = json.readTree(HttpClient.newHttpClient()
+                    .send(receiverSummaryRequest, HttpResponse.BodyHandlers.ofString()).body());
+            assertEquals(2, receiverSummary.path("count").asInt());
+            var callback = postJson(receiverPort, "/lnis/api/v1/dtn/receive",
+                    new String(deliveredBody, java.nio.charset.StandardCharsets.UTF_8), "test-dtn-receive");
+            assertEquals(202, callback.statusCode(), callback.body());
+            var receiverStopped = postJson(receiverPort, "/lnis/api/v1/dtn/tests/cancel-waiting",
+                    json.writeValueAsString(Map.of("asOf", receiverSummary.path("asOf").asText(), "testIds", receiverSummary.path("testIds"))), null);
+            assertEquals(200, receiverStopped.statusCode(), receiverStopped.body());
+            assertEquals(1, json.readTree(receiverStopped.body()).path("cancelled").asInt());
+            assertNotEquals("CANCELLED", rx.get(delivered).getState());
+            assertNotNull(rx.get(delivered).getReceivedAt());
+            assertEquals("CANCELLED", rx.get(waiting).getState());
+            String closePath = "/lnis/api/v1/node/peer/dtn/tests/" + delivered + "/close-waiting";
+            assertEquals(401, postJson(receiverPort, closePath, "{}", null).statusCode());
+            assertEquals(200, postJson(receiverPort, closePath, "{}", "test-node-management").statusCode());
+            assertNotEquals("CANCELLED", rx.get(delivered).getState());
+            var late = postJson(receiverPort, "/lnis/api/v1/dtn/receive",
+                    new String(lateBody, java.nio.charset.StandardCharsets.UTF_8), "test-dtn-receive");
+            assertEquals(202, late.statusCode(), late.body());
+            assertFalse(json.readTree(late.body()).path("accepted").asBoolean());
+            assertNotNull(rx.get(waiting).getLateReceivedAt());
+            assertEquals("CANCELLED", rx.get(waiting).getState());
+        } finally {
+            adapter.stop(0);
+        }
+    }
+
+    private HttpResponse<String> postJson(int port, String path, String body, String token) throws Exception {
+        var request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + path))
+                .timeout(Duration.ofSeconds(10)).header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(body));
+        if (token != null) request.header("Authorization", "Bearer " + token);
+        return HttpClient.newHttpClient().send(request.build(), HttpResponse.BodyHandlers.ofString());
+    }
+
     private ConfigurableApplicationContext node(String role, int port, int peerPort) {
         String databaseUrl =
                 "jdbc:h2:file:"

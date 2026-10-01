@@ -58,13 +58,13 @@ I/Q 생성 난수는 현재 시각을 seed로 사용하므로 별도 생성 파�
 
 현재 입력 어댑터는 GPS L1 C/A를 지원한다. 다중 GNSS 전체 지원은 포함하지 않는다.
 
-### AFS + Metadata 전송 (v2/v3)
+### 이전 AFS + Metadata 형식 (v2/v3 호환 읽기)
 
-서비스 연결부 `src/main/java/server/agent/dtn/AfsMetadataCodec.java`에서 GPS LNAV를 원본 `afs_sim.c:eph2sbf`와 같은 SB2 배치로 옮긴다. toe/toc, e, sqrtA, i0, Ω0, ω, M0, af0/af1을 담고 SB3/SB4는 원본의 교대 0101 데이터 비트를 유지한다. CRC/FEC는 기존 네이티브 인코더/디코더를 그대로 호출한다. vendor·패치·ABI는 이 변경으로 수정하지 않는다.
+서비스 연결부 `src/main/java/server/afs/AfsMetadataCodec.java`에서 GPS LNAV를 원본 `afs_sim.c:eph2sbf`와 같은 SB2 배치로 옮긴다. toe/toc, e, sqrtA, i0, Ω0, ω, M0, af0/af1을 담고 SB3/SB4는 원본의 교대 0101 데이터 비트를 유지한다. CRC/FEC는 기존 네이티브 인코더/디코더를 그대로 호출한다. vendor·패치·ABI는 이 변경으로 수정하지 않는다.
 
 LNIS 목적의 차이는 **달 궤도값 대신 GPS 항법값 사용**, **RAWX와 SB2에 없는 GPS LNAV 필드를 JSON으로 보조**하는 것이다. JSON 항법 words에서는 SB2로 전달한 비트를 0으로 비워 중복하지 않는다. GPS 이심률 단위 2^-33과 원본 AFS 단위 2^-32의 차이 때문에 마지막 1 bit는 JSON에 남긴다. 수신은 SB2를 원위치에 채우고 원본 GRAW SHA-256을 검증한다. 따라서 수신 RAW 표와 지구 PVT는 원래 관측값·항법정보를 사용하며 SB2 양자화로 계산 정밀도를 잃지 않는다. 해당 Java 코드에 배치와 목적을 주석으로 기록했다.
 
-기존 AFS Frame 오류 주입 시험의 `AfsFrameBuilder`/GRAW fragment 경로와 과거 DTN AFS v1 수신은 호환을 위해 유지한다. I/Q는 아래의 별도 추적 경로를 사용한다.
+독립 AFS Frame 오류 주입 화면과 `AfsFrameBuilder`는 제거됐다. 이전 전송 형식의 읽기와 I/Q에서 사용하는 공용 코덱은 유지한다. 신규 RAW/AFS 시험은 아래 v5 경로를 사용한다.
 
 v3는 이 AFS 비트 생성/복원 방식을 바꾸지 않고 JSON만 `satellites[]`의 PRN별 프레임·관측값·보조 항법정보로 묶는다. `recordIndex`/`measurementIndex`로 원본 레코드와 신호 순서를 복원한 뒤 v2 검증 경로를 재사용한다. 관측 시점이나 항법 갱신이 여러 개라도 첫 항목만 남기지 않는다. 수집 정보와 RAWX 공통 헤더는 최상위 `metadata.commonRecords`에 한 번만 보존한다.
 
@@ -74,7 +74,7 @@ v3는 이 AFS 비트 생성/복원 방식을 바꾸지 않고 JSON만 `satellite
 
 `04-iq-receiver.patch`는 원본 추적기의 탐색 도플러 범위·신호 임계값·GPS PRN 범위를 조정하고, CRC 통과 채널의 샘플 시각/코드 지연/도플러/누적 위상/C/N0를 출력한다. 원본 달 PVT 경로 대신 `IqReceiver` → 공유 `NativePvtCodec` → 기존 `lnis_pvt_gps_solve`로 연결한다. 실시간 채널 집계 경합을 피하려고 파일 처리 후 같은 샘플 시각끼리 합친다. 2 ms 상관 구간의 종료 TOW를 샘플 시작 시각으로 맞춰 의사거리를 구한다.
 
-원본 AFS SB2만으로 GPS LNAV의 모든 보정항을 보존하지 못하므로 선택 PRN의 LNAV를 JSON 메타데이터로 보조한다. 기준 PVT는 이 계산 경로에 넣지 않는다. 생성기 거리 감쇠 기준은 달의 5,200 km에서 GPS의 20,200 km로 변경하며 변조·LDPC·잡음 생성 방식은 유지한다. 현재 생성기는 대기 지연을 합성하지 않지만 기존 SPP 보정은 유지하므로 잡음·모델 차이에 따른 미터급 오차가 남는다. 수신 PVT를 기준값에 강제로 맞추지 않는다.
+현재 I/Q는 복호화한 SB2·SB3·SB4에서 항법정보를 복원하고, 신호 추적으로 얻은 의사거리·Doppler로 PVT를 계산한다. JSON 항법정보로 복호 실패를 대신하지 않는다. 기준 PVT는 이 계산 경로에 넣지 않는다. 생성기 거리 감쇠 기준은 달의 5,200 km에서 GPS의 20,200 km로 변경하며 변조·LDPC·잡음 생성 방식은 유지한다. 현재 생성기는 대기 지연을 합성하지 않지만 기존 SPP 보정은 유지하므로 잡음·모델 차이에 따른 미터급 오차가 남는다. 수신 PVT를 기준값에 강제로 맞추지 않는다.
 
 추가 vendor 파일은 PocketSDR의 파일 입력·추적·복조와 링크에 필요한 RTKLIB 함수의 **주석 포함 원본**이다. SHA-256 목록으로 전부 검사한다. 기존 RAW/AFS용 코덱과 Windows DLL의 알고리즘·ABI는 바꾸지 않는다. Linux 수신 실행기는 FFTW/libusb/libfec 런타임을 사용하며 배포 이미지가 함께 설치한다.
 
@@ -96,11 +96,11 @@ RAWX 관측값과 SFRBX 항법 메시지를 obsd_t/nav_t와 원본 항법 해석
 
 ## 계산 재현성
 
-- 양쪽은 동일한 관측 시각, 항법 갱신 순서와 계산 설정을 사용한다.
+- 원본 복원 비교는 동일 관측 시각·항법 갱신 순서·계산 설정을 사용한다. RAW/AFS 지연 시험만 의도적으로 관측 시각과 의사거리에 같은 추가 시간을 반영한다.
 - DTN 도착 시각이나 현재 PC 시각으로 관측 시각을 대체하지 않는다.
 - 외부 항법 캐시를 암묵적으로 읽지 않고 초기 상태를 재현한다.
 - 측위 불가와 좌표 0, 속도 계산 불가와 유효 속도 0을 구분한다.
-- 송신 기준 PVT는 비교용 JSON 필드로 전달한다. Receiver는 해당 값을 계산 입력으로 쓰지 않고 복원 데이터로 독립 계산한다.
+- 신규 RAW/AFS의 Reference와 원본은 수신 계산 후 서비스 간 REST로 조회한다. I/Q Reference는 기존 전송 JSON을 사용한다. 어느 경로도 Reference를 수신 PVT 계산 입력으로 사용하지 않는다.
 - PVT 일치는 전달 전후 계산의 일치성이며 절대 위치 정확도를 증명하지 않는다.
 
 ## 빌드와 검증
@@ -147,3 +147,15 @@ Java 입력 어댑터에서 LNAV preamble 위치까지 확인하여 CNAV가 계�
 PocketSDR emits `$IQAFS,<sample time>,<PRN>,<block>,<packed hex>` only after LDPC/CRC success. SB2 exports 147 bytes; SB3/SB4 export 106 bytes with the last two padding bits zero. The Java receiver combines blocks from the same decoded frame, validates the LNIS extension, and supplies recovered navigation to RTKLIB. The tracked pseudorange/Doppler remain the RF solver's observations. The local type 63/version 2 payload is not an official message assignment. See README for bit offsets and the 6000-bit layout.
 
 실제 파일 재생 PVT 회귀 검사는 `LNIS_IQ_REPLAY_DIRECTORY`에 90초 검증 자료(`source.json`, `tracking-0-20.log`, `tracking-1-1.log`, `tracking-2-20.log`)가 있는 폴더를 지정하면 실행한다. `NativeFileReplayIntegrationTest`는 JSON 항법 보조 없이 마지막 Epoch까지 위치·속도가 유효한지 검사한다. 자료가 없으면 생략한다.
+
+## 현재 RAW/AFS 지연 시험 (v5)
+
+Java의 `DelayTransferCodec`과 `AfsPvtFrameCodec`이 시험 시작 기준 가상 송신 시각을 만든다.
+AFS v5는 SB2·SB3에 항법정보, SB4에 원본 의사거리 대신 가상 송신 시각과 Doppler·C/N0 등을 담는다.
+수신 Java 연결부가 수신 시각에서 의사거리를 재계산한 뒤 기존 `NativePvtCodec`을 호출한다.
+6,000비트 배치와 부호화 전후 크기는 [서비스 README](../README.md#afs-프레임-안에서-pvt-입력-전달)를 기준으로 확인한다.
+
+무기한 DTN 수신 대기는 네이티브 계산의 무제한 지연 지원을 의미하지 않는다.
+큰 공통 지연에서는 반복 계산 수렴 또는 항법정보 유효기간 때문에 PVT가 무효일 수 있다.
+이 경우 원문·복원 결과를 보존하고 계산 불가 사유를 표시하며, 정답 Clock Bias를 주입하지 않는다.
+이번 서비스 안정화에서는 네이티브 원본·패치·C/C++ 연결 코드·알고리즘을 변경하지 않는다.

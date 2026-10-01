@@ -1,9 +1,9 @@
-import {renderTrialSettings, trialOption, colorTrialSelection} from './dtn-settings.js?v=20260929-trial-status';
-import {requestJson} from '../common/http.js?v=20260915-structure';
-import {initGnssControls} from './dtn-gnss.js?v=20260929-service-clock';
-import {createDtnLog} from './dtn-log.js?v=20260929-unified-trial';
+import {renderTrialSettings, trialOption, colorTrialSelection, initWaitingCancellation} from './dtn-settings.js?v=20261001-review';
+import {requestJson} from '../common/http.js?v=20261001-review';
+import {initGnssControls} from './dtn-gnss.js?v=20261001-review';
+import {createDtnLog} from './dtn-log.js?v=20261001-review';
 import {initAdapterHealth} from './dtn-adapter-health.js?v=20260922-compact-structure';
-import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20260929-unified-trial';
+import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20261001-review';
 import {createObservationView, numeric, renderClockBias} from './dtn-observations.js?v=20260929-clock-precision';
 
 const $ = id => document.getElementById(id);
@@ -36,7 +36,7 @@ $('reference-retry').onclick = async () => {
 };
 const clearScreen = location.pathname?.endsWith('/clear') === true;
 let tests = [], epochs = [], selectedId = '', renderVersion = 0, polling = false;
-let reportKey = '', lastEvent = '';
+let reportKey = '';
 let receivedIds = null;
 let historyPage = 0, selectionPinned = false, cancelling = false;
 let referenceEpochs = [], comparisonEpochs = [], delayComparison = false, delayEvidence = null;
@@ -73,6 +73,7 @@ function get(path) {
 }
 
 const logView=createDtnLog($('dtn-log'));
+const waitingCancellation = initWaitingCancellation({isLocked: () => cancelling, refresh: () => poll(true), log});
 function log(message,level='INFO') { logView.write(message,level); }
 const gnss = initGnssControls({port: 'gnss-port', baud: 'gnss-baud', refresh: 'gnss-refresh', log});
 let peerAddressDirty = false, peerSaving = false;
@@ -214,6 +215,7 @@ function setEpochs(values, preserve = false) {
 }
 
 function renderSummary(job) {
+  waitingCancellation.update();
   $('dtn-cancel').disabled = cancelling || !['PREPARING', 'WAITING_DTN', 'WAITING_RECEIVER', 'CALCULATING'].includes(job?.state);
   $('dtn-cancel').textContent = job?.state === 'CALCULATING' ? '계산 중지' : job?.state === 'WAITING_DTN' ? '대기 종료' : '시험 중지';
   renderTrialSettings($('trial-settings'), job);
@@ -264,7 +266,6 @@ async function renderTest(force = false) {
   }
   if (!job) return;
   const event = job.testId + ':' + job.state + ':' + job.updatedAt;
-  lastEvent = event;
   if (!job.receivedEpochs) return;
   if (!force && reportKey === event) return;
   try {
@@ -296,11 +297,11 @@ function renderAgents(agents) {
 }
 
 async function poll(force = false) {
-  if (polling) return;
+  if (polling || (!force && document.visibilityState === 'hidden')) return;
   polling = true;
-  await gnss.poll();
   $('dtn-refresh').disabled = true;
   try {
+    await gnss.poll();
     const query = new URLSearchParams({page: historyPage});
     if ($('dtn-test-filter').value) query.set('state', $('dtn-test-filter').value);
     const [agents, nextTests] = await Promise.all([get('/agents'), get('/dtn/tests?' + query)]);
@@ -336,7 +337,12 @@ async function poll(force = false) {
     else if (tests.some(job => job.testId === selected)) $('dtn-tests').value = selected;
     colorTrialSelection($('dtn-tests'), tests.find(job => job.testId === $('dtn-tests').value));
     await renderTest(force);
-    payloadViewer.setReceipts(await get('/dtn/receipts').catch(() => []));
+    const receiptTestId = selectedId;
+    const selectedJob = tests.find(item => item.testId === receiptTestId);
+    if (receiptTestId && !selectedJob?.receivedPayloadAvailable) {
+      const receipts = await get('/dtn/receipts?testId=' + encodeURIComponent(receiptTestId)).catch(() => null);
+      if (receipts && selectedId === receiptTestId) payloadViewer.setReceipts(receipts);
+    }
     $('last-updated').textContent = '최근 확인 ' + new Date().toLocaleTimeString('ko-KR') + ' · 자동 갱신';
   } catch (error) {
     pill('dtn-server-status', '갱신 실패 · 재시도 중', 'error');

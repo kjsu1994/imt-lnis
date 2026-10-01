@@ -15,6 +15,7 @@ public final class WindowsSerialBridge implements AutoCloseable {
     private final ScheduledExecutorService expiry = Executors.newSingleThreadScheduledExecutor();
     private final ObjectMapper json = new ObjectMapper();
     private final String token;
+    private final String version = System.getProperty("lnis.bridge.version", "development");
     private final TimeReference time = new TimeReference();
     private UbloxParser timeParser = new UbloxParser();
     private volatile SerialConnection port;
@@ -91,7 +92,9 @@ public final class WindowsSerialBridge implements AutoCloseable {
 
     private synchronized Object dispatch(String path, JsonNode body) throws Exception {
         if (body == null) throw new IllegalArgumentException("JSON required");
-        if (path.equals("/health")) return Map.of("status", "UP", "busy", port != null);
+        if (path.equals("/health")) {
+            return Map.of("status", "UP", "busy", port != null, "version", version);
+        }
         if (path.equals("/ports")) return ports.get();
         if (path.equals("/open")) {
             expire();

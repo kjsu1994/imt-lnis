@@ -56,9 +56,13 @@ class NodeFailureTest {
         registration.setReceiverAgentId("receiver-1");
         registration.setProfile(DtnModels.PROFILE);
         registration.setPayloadSha256("a".repeat(64));
-        service.accept(registration);
-        stored.get().setState("COMPLETED");
-        assertEquals("COMPLETED", service.accept(registration).getState());
+        var clock = new server.common.ServiceClock();
+        var initial = clock.stamp();
+        service.accept(registration, initial);
+        assertEquals(mapper.valueToTree(initial).toString(), stored.get().getReceiverRegistrationClockJson());
+        stored.get().setState("CANCELLED");
+        assertEquals("CANCELLED", service.accept(registration, clock.stamp()).getState());
+        assertEquals(mapper.valueToTree(initial).toString(), stored.get().getReceiverRegistrationClockJson());
         assertNull(stored.get().getSentJson());
         assertNull(stored.get().getReferenceJson());
         verify(repository, times(1)).saveAndFlush(any());

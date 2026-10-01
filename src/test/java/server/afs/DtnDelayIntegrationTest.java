@@ -134,6 +134,46 @@ class DtnDelayIntegrationTest {
     }
 
     @Test
+    void delayedTransferRemainsRestorableWhenNativePvtCannotConverge() throws Exception {
+        byte[] source = NativePvtIntegrationTest.validSample();
+        var json = new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules();
+        try (var codec = NativeAfsCodec.load(nativeDirectory)) {
+            var processor = new DtnProcessor(codec, nativeDirectory);
+            for (boolean raw : List.of(true, false)) {
+                UUID id = UUID.randomUUID();
+                var prepared = processor.prepare(id, source, raw, started, (stage, message) -> {});
+                String packet = json.writeValueAsString(prepared.getTransfer());
+                assertNull(prepared.getTransfer().getReferencePvt());
+                for (long seconds : List.of(600L, 3600L, 86400L)) {
+                    var timing = new DtnDelay.Timing(started, started.plusSeconds(seconds));
+                    var received = processor.receive(id, prepared.getTransfer(), (stage, message) -> {}, timing);
+                    assertNull(received.getError());
+                    assertFalse(received.getObservations().epochs().isEmpty());
+                    assertEquals(seconds, received.getDelayEvidence().delaySeconds(), 1e-9);
+                    assertEquals(packet, json.writeValueAsString(prepared.getTransfer()));
+                    var comparison = DtnComparison.delay(prepared.getPvt(), received.getPvt(),
+                            received.getDelayEvidence());
+                    var pvt = received.getPvt().getFirst();
+                    if (seconds == 600) {
+                        assertTrue(pvt.isPositionValid(), pvt.getMessage());
+                        assertEquals("MEASURED", comparison.get("verdict"));
+                    } else {
+                        // This fixed fixture exposes the existing solver's domain limits.
+                        // Preserve receipt evidence instead of fabricating a valid position.
+                        assertFalse(pvt.isPositionValid());
+                        assertNotNull(pvt.getMessage());
+                        assertFalse(pvt.getMessage().isBlank());
+                        assertNull(pvt.getEcefMeters());
+                        assertEquals("INCONCLUSIVE", comparison.get("verdict"));
+                        assertEquals("수신·복원 완료 · PVT 비교 불가", comparison.get("message"));
+                    }
+                }
+            }
+        }
+        assertArrayEquals(source, NativePvtIntegrationTest.validSample());
+    }
+
+    @Test
     void selectedEpochPreservesOnlyPrecedingNavigationAndRejectsStaleSelection() throws Exception {
         var records =
                 new ArrayList<>(

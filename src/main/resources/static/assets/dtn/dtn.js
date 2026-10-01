@@ -1,18 +1,18 @@
-import {initPresetControls, renderTrialSettings, trialOption, colorTrialSelection} from './dtn-settings.js?v=20260929-trial-status';
-import {requestJson} from '../common/http.js?v=20260915-structure';
-import {initGnssControls} from './dtn-gnss.js?v=20260929-service-clock';
-import {createDtnLog} from './dtn-log.js?v=20260929-unified-trial';
+import {initPresetControls, renderTrialSettings, trialOption, colorTrialSelection, initWaitingCancellation} from './dtn-settings.js?v=20261001-review';
+import {requestJson} from '../common/http.js?v=20261001-review';
+import {initGnssControls} from './dtn-gnss.js?v=20261001-review';
+import {createDtnLog} from './dtn-log.js?v=20261001-review';
 import {initAdapterHealth, validAdapterUrl} from './dtn-adapter-health.js?v=20260922-compact-settings';
-import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20260929-unified-trial';
+import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20261001-review';
 import {createObservationView, numeric, renderClockBias} from './dtn-observations.js?v=20260929-real-gnss';
 
-const api = '/lnis/api/v1', $ = id => document.getElementById(id);
+const $ = id => document.getElementById(id);
 const payload = createPayloadViewer($('dtn-payload'), {sentOnly: true});
 let inputId = null, agents = [], busy = false, job = null, config = {}, peerConfig = null;
 let selectedType = 'AFS_METADATA', senderMode = 'DTN', receiverMode = 'HDTN';
-let pvt = [], epochIndex = 0, reportKey = '', lastEvent = '', lastAgentState = '';
+let pvt = [], inputPvt = [], epochIndex = 0, reportKey = '', lastAgentState = '';
 let polling = false, inputMode = 'upload';
-let delayChoices = [];
+let delayChoices = [], preparedEpoch = null, inputView = false;
 let captureId = null, captureError = '';
 let pendingCapture = null, acceptedCapture = false;
 let gnssState = {state: 'DISCONNECTED'};
@@ -23,7 +23,14 @@ const generatingIq = () => iqJob?.state === 'GENERATING';
 const active = () => ['PREPARING', 'WAITING_DTN', 'WAITING_RECEIVER', 'CALCULATING'].includes(job?.state);
 const locked = () => !!pendingCapture || busy || config.sendBusy || job?.sendBusy
   || job?.state === 'PREPARING' || job?.sendStatus === 'REQUESTING' || generatingIq();
-const view = createObservationView($('dtn-observations'), index => { epochIndex = index; renderPvt(); if (config.delaySupported) updateControls(); }, '송신 원본');
+const view = createObservationView($('dtn-observations'), index => {
+  epochIndex = index;
+  if (inputView && inputId && delayChoices[index]) {
+    preparedEpoch = {inputId, choice: delayChoices[index]};
+  }
+  renderPvt();
+  if (config.delaySupported) updateControls();
+}, '송신 원본');
 view.setData(null);
 
 function request(path, options = {}) {
@@ -34,6 +41,7 @@ const post = (path, body) => request(path, {method: 'POST', headers: {'Content-T
 const logView=createDtnLog($('dtn-log'));
 const gnss = initGnssControls({port: 'dtn-port', baud: 'dtn-baud', refresh: 'dtn-refresh', log,
   changed(state) { gnssState = state; updateControls(); }});
+const waitingCancellation = initWaitingCancellation({isLocked: () => busy || !!pendingCapture, refresh: () => poll(), log});
 function log(message,level='INFO') {
   logView.write(message,level);
   if (!$('dtn-settings-view').hidden && (busy || level === 'ERROR')) {
@@ -231,7 +239,10 @@ function updateInputSummary() {
   const type = {GNSS_RAW: 'GNSS RAW', AFS_METADATA: 'AFS Frame', IQ_SAMPLE: 'I/Q Sample'}[selectedType];
   $('dtn-condition-summary').textContent = type + ' · ' + senderMode + ' → ' + receiverMode + (delayMode() ? ' · 지연 반영 1 Epoch' : '');
   const source = inputMode === 'capture' ? 'COM ' + ($('dtn-port').value || '미선택') : 'GNSS 파일';
-  $('dtn-input-summary').textContent = source + ' · ' + $('dtn-input-state').textContent;
+  const epoch = delayMode() ? selectedDelayEpoch()?.epoch : null;
+  $('dtn-input-summary').textContent = source + ' · ' + $('dtn-input-state').textContent
+    + (epoch ? ' · 시험 TOW ' + numeric(epoch.towSeconds) + ' s' : '');
+  $('dtn-input-summary').title = epoch ? '다음 전송: Week ' + epoch.week + ' / TOW ' + epoch.towSeconds + ' s' : '';
 }
 function pill(id, text, state = '') { $(id).textContent = text; $(id).className = 'pill ' + state; }
 function destination(text, state = 'unknown') {
@@ -257,26 +268,40 @@ function renderPvt() {
 }
 function delayMode() { return selectedType !== 'IQ_SAMPLE'; }
 function selectedDelayEpoch() {
-  return delayChoices[epochIndex];
+  return preparedEpoch?.inputId === inputId ? preparedEpoch.choice : null;
+}
+function showInputObservations(data) {
+  inputView = true;
+  inputPvt = pvt;
+  view.setData(data);
+  renderPvt();
 }
 async function loadDelayEpochs() {
+  const selected = selectedDelayEpoch()?.epoch;
   delayChoices = [];
   if (!config.delaySupported || !inputId) return;
   try {
     delayChoices = await request('/dtn/inputs/' + inputId + '/delay-epochs');
-    const first = delayChoices.findIndex(choice => choice.reference.positionValid);
-    if (first >= 0) {
-      epochIndex = first;
-      view.select(first);
+    const sameEpoch = choice => selected && choice.epoch.recordIndex === selected.recordIndex
+      && choice.epoch.week === selected.week && choice.epoch.towSeconds === selected.towSeconds;
+    let index = delayChoices.findIndex(sameEpoch);
+    if (index < 0) index = delayChoices.findIndex(choice => choice.reference.positionValid);
+    if (index < 0 && acceptedCapture && delayChoices.length) index = 0;
+    preparedEpoch = index < 0 ? null : {inputId, choice: delayChoices[index]};
+    if (index >= 0 && inputView) {
+      epochIndex = index;
+      view.select(index);
       renderPvt();
-    } else if (!acceptedCapture && !pendingCapture) {
+    } else if (index < 0 && !acceptedCapture && !pendingCapture) {
       log('지연 반영 시험에 사용할 유효한 Epoch가 없습니다. 입력·항법정보를 확인하세요.', 'WARN');
     }
   } catch (error) {
+    preparedEpoch = null;
     log('시험 Epoch 확인 실패 · ' + error.message, 'WARN');
   }
 }
 function updateControls() {
+  waitingCancellation.update();
   presets.update();
   updateInputSummary();
   $('dtn-settings-lock').hidden = !locked();
@@ -290,7 +315,7 @@ function updateControls() {
   $('dtn-cancel').textContent = job?.cancelPending ? '종료 전달 중' : job?.state === 'WAITING_DTN' ? '대기 종료' : job?.state === 'CALCULATING' ? '계산 중지' : '시험 중지';
   const noAfs = selectedType === 'AFS_METADATA' && selectedDelayEpoch()?.afsReady === false;
   $('dtn-send').disabled = locked() || (selectedType === 'IQ_SAMPLE' ? iqJob?.state !== 'READY' : !inputId) || (delayMode() && !acceptedCapture && !selectedDelayEpoch()?.reference?.positionValid) || noAfs || !urlValid() || tx?.state !== 'READY' || !rx || ['OFFLINE', 'ERROR'].includes(rx.state);
-  $('iq-generate').disabled = locked() || !config.iqEnabled || !inputId || (acceptedCapture && !pvt.some(v => v.positionValid && v.velocityValid));
+  $('iq-generate').disabled = locked() || !config.iqEnabled || !inputId || (acceptedCapture && !inputPvt.some(v => v.positionValid && v.velocityValid));
   for (const id of ['capture-use', 'capture-retry', 'capture-discard']) $(id).disabled = busy;
   $('iq-cancel').disabled = !generatingIq();
   $('iq-saved').disabled = locked();
@@ -306,7 +331,7 @@ function updateControls() {
       : iqJob?.state === 'READY' ? '선택한 I/Q 파일을 전송합니다.' : 'GNSS 입력 적용 후 90초 I/Q를 생성하세요.';
   if (pendingCapture) $('dtn-message').textContent = '확보한 데이터의 사용 여부를 선택하세요.';
   else if (acceptedCapture && noAfs) $('dtn-message').textContent = 'AFS 생성에 필요한 GPS LNAV 항법정보 부족 · GNSS RAW로 전송 가능';
-  else if (acceptedCapture && selectedType === 'IQ_SAMPLE' && !pvt.some(v => v.positionValid && v.velocityValid)) $('dtn-message').textContent = 'I/Q 생성에는 유효한 위치·속도 PVT가 필요합니다.';
+  else if (acceptedCapture && selectedType === 'IQ_SAMPLE' && !inputPvt.some(v => v.positionValid && v.velocityValid)) $('dtn-message').textContent = 'I/Q 생성에는 유효한 위치·속도 PVT가 필요합니다.';
 }
 function renderIq() {
   if(iqJob?.id && !job?.testId) logView.setContext(iqJob.id,'IQ');
@@ -340,8 +365,13 @@ $('iq-cancel').onclick = async () => {
   catch (error) { log(error.message, 'ERROR'); }
   updateControls();
 };
+function resetInputSelection() {
+  preparedEpoch = null;
+  delayChoices = [];
+  inputPvt = [];
+}
 function resetResult() {
-  job = null; reportKey = ''; lastEvent = ''; pvt = []; epochIndex = 0;
+  job = null; reportKey = ''; pvt = []; epochIndex = 0; inputView = false;
   $('dtn-iq-result').hidden = true;
   renderIqFile($('dtn-iq-result'), null, '');
   payload.setJob(null); renderPvt(); pill('dtn-test-status', '시험 대기');
@@ -354,7 +384,7 @@ async function upload(file) {
   const ubx = /\.ubx$/i.test(file?.name || '');
   const maximum = ubx ? 64 * 1024 * 1024 : config.maximumInputBytes;
   if (!file || file.size === 0 || file.size > maximum) throw new Error('UBX는 64 MiB 이하, GRAW는 1 MiB 이하의 파일을 선택하세요.');
-  busy = true; inputId = null; acceptedCapture = false; clearIqSelection(); resetResult(); view.setData(null); updateControls();
+  busy = true; resetInputSelection(); inputId = null; acceptedCapture = false; clearIqSelection(); resetResult(); view.setData(null); updateControls();
   try {
     $('dtn-input-state').textContent = '입력 확인 중'; $('dtn-upload-progress').value = 0;
     let input, complete;
@@ -377,7 +407,7 @@ async function upload(file) {
     inputId = input.inputId;
     try { pvt = await request('/dtn/inputs/' + inputId + '/pvt'); }
     catch (error) { pvt = []; log('PVT 미리보기 불가 · ' + error.message, 'WARN'); }
-    view.setData(observations); renderPvt(); await loadDelayEpochs();
+    showInputObservations(observations); await loadDelayEpochs();
     $('dtn-upload-progress').value = 100; $('dtn-input-state').textContent = file.name + ' · ' + complete.recordCount + '건';
     log('입력 완료 · ' + file.name); void logView.refresh();
   } catch (error) {
@@ -388,7 +418,7 @@ $('dtn-upload').onclick = () => upload($('dtn-graw-file').files[0]).catch(e => l
 $('dtn-port').onchange = updateControls;
 $('dtn-start').onclick = async () => {
   if (locked() || gnssState.state !== 'CONNECTED' || !$('dtn-port').value) return;
-  busy = true; inputId = null; acceptedCapture = false; clearIqSelection(); captureError = ''; $('dtn-capture-status').textContent = ''; resetResult(); view.setData(null); updateControls();
+  busy = true; resetInputSelection(); inputId = null; acceptedCapture = false; clearIqSelection(); captureError = ''; $('dtn-capture-status').textContent = ''; resetResult(); view.setData(null); updateControls();
   $('dtn-input-state').textContent = '항법정보·관측값 수집 중 · 최대 120초';
   log('한 시점 수집 시작 · ' + $('dtn-port').value);
   try {
@@ -416,7 +446,7 @@ $('dtn-start').onclick = async () => {
     pvt = await request('/dtn/inputs/' + captureId + '/pvt');
     if (observations.epochs?.length !== 1 || !pvt[0]?.positionValid || !pvt[0]?.velocityValid)
       throw new Error('유효한 한 시점 PVT 입력이 아닙니다.');
-    inputId = captureId; view.setData(observations); renderPvt(); await loadDelayEpochs();
+    inputId = captureId; showInputObservations(observations); await loadDelayEpochs();
     $('dtn-input-state').textContent = '한 시점 수집 완료 · 지구 PVT 계산 완료';
     log('수집 완료 · 관측값 1시점 · 지구 PVT 계산 완료');
   } catch (e) {
@@ -426,6 +456,7 @@ $('dtn-start').onclick = async () => {
 };
 
 async function showCaptureDecision(input) {
+  resetInputSelection();
   resetResult();
   clearIqSelection();
   pendingCapture = input;
@@ -437,7 +468,7 @@ async function showCaptureDecision(input) {
   const data = await request('/dtn/inputs/' + input.inputId + '/observations');
   pendingCapture.receiver = data.receiver;
   pvt = await request('/dtn/inputs/' + input.inputId + '/pvt');
-  view.setData(data); renderPvt();
+  showInputObservations(data);
   const epoch = data.epochs?.[0]?.observation;
   $('capture-decision-summary').textContent = (epoch ? 'Week ' + epoch.week + ' / TOW ' + epoch.receiverTowSeconds + ' s · 관측 신호 ' + epoch.observations.length : '관측 데이터 확보')
     + ' · 항법정보 ' + data.navigationCount + '건 · ' + (pvt[0]?.message || 'PVT 계산 조건 미충족');
@@ -490,14 +521,14 @@ $('capture-retry').onclick = () => decideCapture('retry');
 $('capture-discard').onclick = () => decideCapture('discard');
 if ($('dtn-replay')) $('dtn-replay').onclick = async () => {
   if (locked()) return;
-  busy = true; inputId = null; acceptedCapture = false; clearIqSelection(); resetResult(); view.setData(null); updateControls();
+  busy = true; resetInputSelection(); inputId = null; acceptedCapture = false; clearIqSelection(); resetResult(); view.setData(null); updateControls();
   $('dtn-input-state').textContent = '저장된 실제 GNSS 데이터 불러오는 중';
   try {
     const input = await post('/dtn/example/replay');
     logView.setContext(input.inputId,'INPUT');
     const observations = await request('/dtn/inputs/' + input.inputId + '/observations');
     pvt = await request('/dtn/inputs/' + input.inputId + '/pvt');
-    inputId = input.inputId; view.setData(observations); renderPvt(); await loadDelayEpochs();
+    inputId = input.inputId; showInputObservations(observations); await loadDelayEpochs();
     $('dtn-input-state').textContent = '실측 GRAW 불러오기 완료 · GNSS 기준시간에서 1에폭 선택';
     log('저장된 실측 GRAW ' + observations.epochs.length + '에폭 로드 · 새 실시간 수집은 COM 포트에서 실행');
   } catch (error) { inputId = null; $('dtn-input-state').textContent = '재생 실패'; log(error.message, 'ERROR'); }
@@ -608,9 +639,6 @@ function renderSummary() {
 
   $('dtn-test-detail').textContent = job.testId + ' · ' + (job.message || '');
   payload.setJob(job);
-
-  const key = job.testId + ':' + job.state + ':' + job.updatedAt;
-  lastEvent = key;
 }
 let historyPage = 0, historyVersion = 0;
 async function refreshHistory() {
@@ -645,10 +673,10 @@ $('dtn-tests').onchange = async () => {
 };
 
 async function poll() {
-  if (polling) return;
+  if (polling || document.visibilityState === 'hidden') return;
   polling = true;
-  await gnss.poll();
   try {
+    await gnss.poll();
     if (generatingIq()) {
       iqJob = await request('/dtn/iq/' + iqJob.id); renderIq();
       if (!generatingIq()) { log('I/Q 생성 결과 · ' + iqJob.state + ' · ' + iqJob.message); await loadIqFiles(); }
@@ -707,7 +735,7 @@ async function poll() {
           const report = await request('/dtn/tests/' + id + '/report');
           if (job?.testId === id && !busy && version === jobVersion) {
             pvt = report.referencePvt || [];
-            if (report.observations) view.setData(report.observations, true);
+            if (report.observations) { inputView = false; view.setData(report.observations, true); }
             renderPvt(); reportKey = key;
 
           }

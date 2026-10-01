@@ -93,6 +93,11 @@ public class DtnReceiptService {
         return repository.findAllByOrderByArrivedAtDesc(PageRequest.of(0, 50));
     }
 
+    public List<Summary> recent(UUID testId) {
+        return testId == null ? recent()
+                : repository.findByTestIdOrderByArrivedAtDesc(testId, PageRequest.of(0, 50));
+    }
+
     public DtnReceipt get(UUID id) {
         return repository
                 .findById(id)
@@ -101,7 +106,7 @@ public class DtnReceiptService {
 }
 
 @Entity
-@Table(name = "dtn_receipt")
+@Table(name = "dtn_receipt", indexes = @Index(name = "dtn_receipt_test_arrival", columnList = "testId,arrivedAt"))
 @Getter
 @Setter
 @NoArgsConstructor
@@ -121,6 +126,9 @@ class DtnReceipt {
 }
 
 interface DtnReceiptRepository extends JpaRepository<DtnReceipt, UUID> {
+    List<DtnReceiptService.Summary> findByTestIdOrderByArrivedAtDesc(
+            UUID testId, org.springframework.data.domain.Pageable pageable);
+
     List<DtnReceiptService.Summary> findAllByOrderByArrivedAtDesc(
             org.springframework.data.domain.Pageable pageable);
 }

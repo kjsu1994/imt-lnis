@@ -71,7 +71,9 @@ class DtnSenderLogTest {
     void waitingDoesNotExpireAfterTenMinutes() {
         var fixture = new Fixture();
         fixture.job.setCreatedAt(Instant.now().minusSeconds(601));
-        when(fixture.repository.findByStateIn(any())).thenReturn(List.of(fixture.job));
+        when(fixture.repository.findTasksByStateIn(any())).thenReturn(List.of(
+                new org.springframework.data.projection.SpelAwareProxyProjectionFactory()
+                        .createProjection(DtnRepository.TaskView.class, fixture.job)));
         fixture.service.tick();
         assertEquals("WAITING_DTN", fixture.job.getState());
         verify(fixture.logs, never())

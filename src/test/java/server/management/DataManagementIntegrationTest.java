@@ -43,6 +43,20 @@ class DataManagementIntegrationTest {
     server.node.LocalNodeLifecycle localRuntime;
 
     static final Path directory = temp();
+    private static final ThreadLocal<List<String>> projectionSql = new ThreadLocal<>();
+
+    @org.springframework.boot.test.context.TestConfiguration(proxyBeanMethods = false)
+    static class QueryInspection {
+        @org.springframework.context.annotation.Bean
+        org.springframework.boot.autoconfigure.orm.jpa.HibernatePropertiesCustomizer inspectQueries() {
+            return properties -> properties.put("hibernate.session_factory.statement_inspector",
+                    (org.hibernate.resource.jdbc.spi.StatementInspector) sql -> {
+                        List<String> captured = projectionSql.get();
+                        if (captured != null) captured.add(sql);
+                        return sql;
+                    });
+        }
+    }
 
     static Path temp() {
         try {
@@ -214,7 +228,7 @@ class DataManagementIntegrationTest {
         assertNotNull(inputs.get(input.inputId()));
         second.setCancelPending(true);
         jobs.saveAndFlush(second);
-        assertThrows(RuntimeException.class, () -> remove(key(second)));
+        assertEquals("FAILED", remove(key(second)).results().getFirst().status());
         second.setCancelPending(false);
         jobs.saveAndFlush(second);
         var body =
@@ -231,6 +245,69 @@ class DataManagementIntegrationTest {
                         .contains(new Key(Kind.INPUT, input.inputId())));
         assertEquals("DELETED", remove(key(second)).results().getFirst().status());
         assertThrows(RuntimeException.class, () -> inputs.get(input.inputId()));
+    }
+
+    @Test
+    void backgroundQueriesSelectOnlySchedulingColumns() {
+        DtnJob stored = job(null);
+        stored.setSentJson("large-sent-body");
+        stored.setReceivedJson("large-received-body");
+        stored.setReferenceStatus("WAITING");
+        jobs.saveAndFlush(stored);
+        var captured = new ArrayList<String>();
+        projectionSql.set(captured);
+        try {
+            assertEquals(stored.getId(), jobs.findTasksByStateIn(List.of("COMPLETED")).getFirst().getId());
+            assertEquals(stored.getId(), jobs.findTasksByReferenceStatus("WAITING").getFirst().getId());
+        } finally {
+            projectionSql.remove();
+        }
+        var selects = captured.stream().map(String::toLowerCase)
+                .filter(sql -> sql.contains(" from dtn_job ")).toList();
+        assertEquals(2, selects.size(), captured.toString());
+        for (String sql : selects) {
+            for (String column : List.of("sent_json", "received_json", "reference_source_base64",
+                    "observations_json", "receiver_json", "delay_evidence_json")) {
+                assertFalse(sql.contains(column), sql);
+            }
+        }
+    }
+
+    @Test
+    void unrelatedCompletedHistoryCanBeDeletedDuringDeliveryWait() {
+        DtnJob waiting = job(null);
+        waiting.setState("WAITING_DTN");
+        jobs.saveAndFlush(waiting);
+        DtnJob reference = job(null);
+        reference.setReferenceStatus("WAITING");
+        jobs.saveAndFlush(reference);
+        DtnJob pinned = job(null);
+        management.pin(key(pinned), true);
+        DtnJob completed = job(null);
+        assertEquals("DELETED", remove(key(completed)).results().getFirst().status());
+        assertEquals("FAILED", remove(key(waiting)).results().getFirst().status());
+        assertEquals("FAILED", remove(key(reference)).results().getFirst().status());
+        assertEquals("FAILED", remove(key(pinned)).results().getFirst().status());
+        assertTrue(jobs.existsById(waiting.getId()));
+        assertTrue(jobs.existsById(reference.getId()));
+    }
+
+    @Test
+    void selectedTrialReceiptsRemainAvailableBeyondGlobalRecentPage() throws Exception {
+        UUID target = UUID.randomUUID();
+        byte[] original = ("{\"testId\":\"" + target + "\"}")
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        receipts.capture(original, "application/json", false, old);
+        for (int i = 0; i < 51; i++) {
+            receipts.capture(("{\"testId\":\"" + UUID.randomUUID() + "\"}")
+                    .getBytes(java.nio.charset.StandardCharsets.UTF_8), "application/json", false);
+        }
+        assertTrue(receipts.recent().stream().noneMatch(row -> target.equals(row.getTestId())));
+        assertEquals(1, receipts.recent(target).size());
+        mvc.perform(get("/lnis/api/v1/dtn/receipts").param("testId", target.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].testId").value(target.toString()))
+                .andExpect(jsonPath("$[0].body").doesNotExist());
     }
 
     @Test

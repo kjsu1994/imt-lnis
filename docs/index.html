@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ko">
 <head>
-  <link rel="icon" type="image/png" href="/logo_v3.png">
+  <link rel="icon" type="image/png" href="./logo_v3.png?v=995392000e36">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="GNSS 데이터의 DTN/HDTN 전송 과정과 지연·PVT 비교 시험을 설명하는 대화형 안내">
@@ -267,12 +267,12 @@
   </svg>
   <main class="wrap">
     <header class="masthead">
-      <a class="brand" aria-label="시험 화면으로 이동" title="시험 화면으로 이동">
-        <img src="/logo_v3.png?v=995392000e36" alt="LNIS" width="56" height="56">
+      <a class="brand" href="./" aria-label="안내 처음으로" title="안내 처음으로">
+        <img src="./logo_v3.png?v=995392000e36" alt="LNIS" width="56" height="56">
       </a>
       <button class="plain" id="fullscreen" type="button">전체화면</button>
     </header>
-    <section id="guide" aria-labelledby="purpose-title">
+    <section id="guide" aria-label="GNSS 송수신 시험 안내">
       <section class="panel" aria-label="송수신 구성도">
         <div class="diagram-head">
           <strong id="selection-summary"></strong>
@@ -471,8 +471,8 @@
       const items = {
         source: [
           '송신측 · 원본 확보',
-          '출발점은 GNSS 관측과 원본 PVT입니다.',
-          'GNSS 수신기에서 위성별 관측값과 항법정보를 수집합니다. 원본 PVT는 나중에 수신측 계산 결과와 비교할 Reference로 보관합니다.',
+          '출발점은 GNSS 관측과 Reference PVT입니다.',
+          'GNSS 수신기에서 위성별 관측값과 항법정보를 수집합니다. 송신 서비스가 원본 관측값으로 계산한 PVT를 수신측 결과와 비교할 Reference로 보관합니다.',
           'Reference는 비교 기준입니다. 수신측 계산 결과를 대신하는 값이 아닙니다.'
         ],
         data: [
@@ -572,7 +572,7 @@
             [
               ['관측값 · 계산 입력', '관측 시각, 위성별 의사거리·Doppler·C/N0·유효성'],
               ['항법정보 · 계산 입력', '위성 위치와 시계 보정에 필요한 궤도·시계 정보'],
-              ['Reference PVT · 비교용', '원본 위치·속도·시각 관련 해. 수신측 해를 대신하지 않습니다.'],
+              ['Reference PVT · 비교용', '송신 서비스가 원본 관측값으로 계산한 위치·속도·시각 해'],
               ['Epoch · 관측 시점', '같은 시점의 여러 위성 측정값을 묶습니다. 지연 시험은 1 Epoch를 사용합니다.']
             ],
             iq ? '관측값·항법정보는 신호 생성에 사용하고 Reference는 비교에 사용합니다.' : '송신부가 원본 의사거리로 T*ᵢ = S − Pᵢ/c를 계산합니다. 수집 후 시작 전 대기는 이 보정으로 제외됩니다.',
@@ -650,7 +650,7 @@
               ['다음 확인', '본문 도착 후 내용 검증과 계산 결과를 별도로 확인']
             ],
             iq ? '본문 도착만으로 내용 검증이나 PVT 계산까지 성공한 것은 아닙니다.' : '수집 후 시작 전 대기는 제외합니다. 두 PC의 시계 차이는 측정 지연에 섞일 수 있습니다.',
-            'S는 시험 시작 접수 시각이고 R은 수신 본문 수신 완료 시각입니다. Δt = R − S로 측정합니다.\n실제 계산 시간축은 GNSS 관측 시각을 유지하며 PC의 UTC를 그대로 대입하지 않습니다. I/Q 신호 기반 PVT와 RAW·AFS 공통 지연 주입은 다른 경로입니다.',
+            'S는 시험 시작 접수 시각이고 R은 수신 본문 수신 완료 시각입니다. 서비스의 시험 기준 시각으로 Δt = R − S를 측정합니다. 시간 맞추기는 GNSS·상대 GNSS·NTP로 내부 시각을 근사 보정하며 Windows 시계는 바꾸지 않습니다. 보정 여부와 정확도는 실제 시험 결과에서 확인합니다.\n실제 계산 시간축은 GNSS 관측 시각을 유지하며 PC의 UTC를 그대로 대입하지 않습니다. I/Q 신호 기반 PVT와 RAW·AFS 공통 지연 주입은 다른 경로입니다.',
             '측정 범위와 시계 동기화 보기');
         case 'decode':
           return make(

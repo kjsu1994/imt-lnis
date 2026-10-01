@@ -39,14 +39,18 @@ public class NodeClockController {
     }
 
     private boolean busy() {
-        return dtn.managementBusy() || !jobs.findByStateIn(
-                List.of("PREPARING", "WAITING_DTN", "WAITING_RECEIVER", "CALCULATING")).isEmpty();
+        return dtn.managementBusy() || jobs.existsByStateIn(
+                List.of("PREPARING", "WAITING_DTN", "WAITING_RECEIVER", "CALCULATING"));
     }
 
     @GetMapping("/clock")
     public Probe status() {
         Instant received = Instant.now();
-        return new Probe(received, Instant.now(), clock.stamp(), gnssState(), busy());
+        // Finish potentially slow status queries before recording the reply timestamp.
+        String gnss = gnssState();
+        boolean active = busy();
+        ServiceClock.Stamp stamp = clock.stamp();
+        return new Probe(received, stamp.rawAt(), stamp, gnss, active);
     }
 
     @GetMapping("/peer/clock")

@@ -16,7 +16,5 @@ import java.time.Duration;
 @ConfigurationProperties(prefix = "lnis.storage")
 public class StorageProperties {
     private Path dataDirectory = Path.of("./data");
-    private Duration incompleteRetention = Duration.ofHours(1);
-    private Duration completedRetention = Duration.ofHours(24);
     private Duration cleanupDelay = Duration.ofMinutes(10);
 }

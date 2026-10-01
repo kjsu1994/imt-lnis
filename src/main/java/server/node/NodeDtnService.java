@@ -157,6 +157,23 @@ public class NodeDtnService implements DtnNodeLink {
         }
     }
 
+    @Override
+    public DtnRemoteResult closeWaiting(UUID testId) {
+        return closeWaiting(testId, "ADAPTER_REJECTED");
+    }
+
+    @Override
+    public DtnRemoteResult closeWaiting(UUID testId, String reason) {
+        if (!sender()) throw new IllegalStateException("송신 노드 전용 요청입니다.");
+        DtnRemoteResult result = peerClient.exchange(
+                "/lnis/api/v1/node/peer/dtn/tests/" + testId + "/close-waiting",
+                java.util.Map.of("reason", reason), DtnRemoteResult.class, DtnModels.MAX_JSON_BYTES);
+        if (result == null || !testId.equals(result.getTestId())) {
+            throw new IllegalStateException("상대 노드의 시험 식별자가 다릅니다.");
+        }
+        return result;
+    }
+
     /** 등록보다 먼저 중지가 도착해도 뒤늦은 등록이 시험을 다시 열지 않게 한다. */
     @Transactional
     public synchronized void prepareCancellation(UUID testId) {
@@ -183,6 +200,12 @@ public class NodeDtnService implements DtnNodeLink {
     /** 같은 ID와 해시의 재등록은 최초 상태를 유지한다. 변경된 내용으로 덮어쓰기는 금지한다. */
     @Transactional
     public synchronized DtnRemoteResult accept(NodeDtnRegistration registration) {
+        return accept(registration, null);
+    }
+
+    @Transactional
+    public synchronized DtnRemoteResult accept(
+            NodeDtnRegistration registration, server.common.ServiceClock.Stamp receiverClock) {
         requireReceiver();
         validateParticipants(registration.getSenderAgentId(), registration.getReceiverAgentId());
         if (registration.getTestId() == null
@@ -233,6 +256,9 @@ public class NodeDtnService implements DtnNodeLink {
         job.setSenderAgentId(registration.getSenderAgentId());
         job.setReceiverAgentId(registration.getReceiverAgentId());
         job.setExpectedPayloadSha256(registration.getPayloadSha256());
+        if (receiverClock != null) {
+            job.setReceiverRegistrationClockJson(mapper.valueToTree(receiverClock).toString());
+        }
         job.setComparisonMode(registration.getComparisonMode());
         job.setTestStartedAt(registration.getTestStartedAt());
         if (registration.getSenderClock() != null) {

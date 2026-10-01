@@ -59,6 +59,7 @@ public class NodeRoleFilter extends OncePerRequestFilter {
                 && !path.equals("/lnis/api/v1/dtn/receive")
                 && !("POST".equals(request.getMethod())
                         && (path.equals("/lnis/api/v1/dtn/logs/screen")
+                            || path.equals("/lnis/api/v1/dtn/tests/cancel-waiting")
                             || path.matches("/lnis/api/v1/dtn/tests/[0-9a-fA-F-]+/cancel")
                             || path.matches("/lnis/api/v1/dtn/tests/[0-9a-fA-F-]+/reference/retry")) )
                 && !("DELETE".equals(request.getMethod())

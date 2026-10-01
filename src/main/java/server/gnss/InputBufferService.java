@@ -4,17 +4,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import server.common.LnisModels.InputKind;
-import server.config.StorageProperties;
 import server.dtn.DtnRepository;
 
 import java.io.ByteArrayOutputStream;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 
 @Service
 /**
- * GRAW 입력의 생성, 순차 청크 수신, 무결성 검증과 TTL 전환을 담당한다.
+ * GRAW 입력의 생성, 순차 청크 수신, 무결성 검증과 완료 처리을 담당한다.
  *
  * <p>H2 메타데이터와 GRAW 파일 저장을 조정하는 업무 계층으로, 청크 크기와 순서를 강제한다. complete가 성공하기 전까지 해당 입력은 시험 세션에서 사용할 수
  * 없다.
@@ -25,8 +23,6 @@ public class InputBufferService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private server.management.DataManagementGuard managementGuard;
 
-    private final Duration incompleteRetention;
-    private final Duration completedRetention;
     private final InputBufferRepository inputBufferRepository;
     private final DtnRepository dtnRepository;
 
@@ -35,12 +31,9 @@ public class InputBufferService {
 
     public InputBufferService(
             InputBufferRepository inputBufferRepository,
-            DtnRepository dtnRepository,
-            StorageProperties properties) {
+            DtnRepository dtnRepository) {
         this.inputBufferRepository = inputBufferRepository;
         this.dtnRepository = dtnRepository;
-        this.incompleteRetention = properties.getIncompleteRetention();
-        this.completedRetention = properties.getCompletedRetention();
     }
 
     /** 메타데이터만 먼저 생성하며 미완성 보존 기간은 정리 작업에서 적용한다. */
@@ -63,7 +56,7 @@ public class InputBufferService {
                         false,
                         Instant.now(),
                         null);
-        inputBufferRepository.save(value, incompleteRetention);
+        inputBufferRepository.save(value);
         return value;
     }
 
@@ -85,7 +78,7 @@ public class InputBufferService {
             throw new IllegalArgumentException("Expected chunk " + current.chunkCount());
         }
         // 바이너리를 먼저 저장한 뒤 메타데이터의 chunkCount를 올려 조회자가 없는 청크를 참조하지 않게 한다.
-        inputBufferRepository.putChunk(id, index, bytes, incompleteRetention);
+        inputBufferRepository.putChunk(id, index, bytes);
         InputBufferEntity updated =
                 new InputBufferEntity(
                         id,
@@ -99,7 +92,7 @@ public class InputBufferService {
                         false,
                         current.createdAt(),
                         null);
-        inputBufferRepository.save(updated, incompleteRetention);
+        inputBufferRepository.save(updated);
         return updated;
     }
 
@@ -154,9 +147,7 @@ public class InputBufferService {
             complete.capturedPvtJson =
                     current.capturedPvtJson() != null ? current.capturedPvtJson() : capturedPvtJson;
             complete.captureDecision = current.captureDecision();
-            inputBufferRepository.save(complete, completedRetention);
-            // 메타데이터만 먼저 만료돼 고아 청크가 남지 않도록 모든 청크 TTL도 같은 시점으로 연장한다.
-            inputBufferRepository.touchChunks(id, current.chunkCount(), completedRetention);
+            inputBufferRepository.save(complete);
             inputBufferRepository.completeFile(id);
             if (recording) {
                 logs.add(
@@ -211,7 +202,7 @@ public class InputBufferService {
             throw new IllegalArgumentException("확보한 관측 에폭이 없습니다.");
         }
         input.captureDecision = "AWAITING_DECISION";
-        inputBufferRepository.save(input, incompleteRetention);
+        inputBufferRepository.save(input);
         return complete(id, pvtJson);
     }
 
@@ -227,7 +218,7 @@ public class InputBufferService {
         }
         input.captureDecision = "ACCEPTED";
         input.completedAt = Instant.now();
-        inputBufferRepository.save(input, completedRetention);
+        inputBufferRepository.save(input);
         if (logs != null) {
             logs.add(id, "INPUT", "WARN", "COM 수집", false, "사용자 승인 · PVT 조건 미충족 관측 데이터를 시험에 사용");
         }
@@ -286,7 +277,7 @@ public class InputBufferService {
         }
         InputBufferEntity input = get(id);
         // 기준 버전과 동일하게 사용자의 명시적 삭제는 허용한다. 자동 보존 정리만 세션 참조를 보호한다.
-        inputBufferRepository.delete(id, input.chunkCount());
+        inputBufferRepository.delete(id);
     }
 
     /** 보존 정리 작업에서 참조 검사를 통과한 입력을 제거한다. */
@@ -294,7 +285,7 @@ public class InputBufferService {
     public void removeExpired(InputBufferEntity input) {
         if (!"AWAITING_DECISION".equals(input.captureDecision())
                 && !dtnRepository.existsByInputId(input.inputId())) {
-            inputBufferRepository.delete(input.inputId(), input.chunkCount());
+            inputBufferRepository.delete(input.inputId());
         }
     }
 }

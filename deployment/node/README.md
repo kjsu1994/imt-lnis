@@ -11,7 +11,7 @@ Java와 네이티브 실행기는 같은 컨테이너/JVM에서 동작합니다.
 
 상대 PC 주소를 아직 정하지 않았다면 `LNIS_NODE_PEER_URL`을 비워 로컬 실행기와 화면만 먼저 시작할 수 있습니다. 송수신 시험 전에는 실제 상대 주소와 양쪽 공통 관리 토큰을 설정해야 합니다.
 
-Windows의 WSL Docker에서 실행할 때는 `START.cmd`/`STOP.cmd`를 편의상 사용할 수 있습니다. 이 도우미는 Docker만 제어하며 Windows Agent를 실행하지 않습니다. USB 연결은 자동 구성하지 않습니다.
+Windows의 WSL Docker에서 실행할 때는 `START.cmd`/`STOP.cmd`를 편의상 사용할 수 있습니다. 이 도우미는 Docker 서비스와 같은 PC의 Windows COM 중계를 함께 시작합니다. 장치를 WSL에 넘기지 않고 Windows COM 포트를 사용합니다. 중계가 없는 Linux 환경에서는 직접 USB 매핑 또는 파일 업로드를 사용합니다.
 
 중앙 서버·별도 Windows Agent 배포는 제거되었습니다. 독립 노드 배포는 `linuxNodeDistZip` 산출물을 사용하며 기존 `.env`, `DB`, `exchange`는 유지하세요. 실행 명령은 기존과 같은 `docker compose up -d --build`입니다.
 
@@ -35,9 +35,11 @@ USB 매핑 없이도 GRAW 파일 업로드 시험은 가능합니다. 기본 구
 - 수신 DB: 사전 등록된 ID/해시, 최초 수신 JSON 원문, 복호화/PVT 결과. 기준 PVT나 송신 입력 파일은 복사하지 않습니다.
 - 각 PC의 `DB` 폴더가 `/app/data`에 연결됩니다. 실행 중인 H2 파일을 복사하지 말고 `docker compose down` 후 백업하세요. 다른 노드의 DB를 덮어쓰거나 동일 DB를 두 프로세스에서 열면 안 됩니다.
 
-관리 연결 실패 시 시험 데이터를 자동 재전송하지 않습니다. 재시작 후 진행 상태와 타임아웃을 확인하고 새 시험으로 다시 시작하세요. 외부 DTN 전달 실패로 수신 대기 항목이 남아도 10분 제한 후 실패로 정리됩니다.
+관리 연결 실패 시 시험 데이터를 자동 재전송하지 않습니다. 재시작 후 기존 시험의 상태를 확인하세요. 외부 DTN/HDTN 전달 대기는 시간 제한 없이 유지하며, testId가 일치하는 늦은 수신을 해당 시험에 반영합니다. 종료할 시험만 개별 중지합니다. 준비·계산 실행 단계의 제한 시간은 수신 대기와 구분합니다.
 
 `licenses/native-sources.zip`에는 원본·변경 패치·Linux SO/IQ 및 Windows DLL 빌드 자료와 라이선스가 포함됩니다. 실행에는 외부 오픈소스 폴더가 필요하지 않습니다. 재빌드는 저장소의 `nativeBuild` 작업 또는 소스 ZIP의 `README.md`를 참고하세요.
 
+
+기존 설치 갱신은 저장소의 `scripts/deploy-nodes.ps1`을 사용합니다. `check bootJar windowsSerialBridgeDist`로 함께 빌드한 뒤 `-ValidateOnly`로 먼저 확인할 수 있습니다. 실행 중인 Compose 프로젝트와 추가 설정 파일을 유지하며, COM 중계는 서버 JAR와 같은 빌드인지 확인합니다. GNSS 수집·시험 준비·송신·계산 중이면 배포를 중단합니다. 연결만 유지한 GNSS는 서비스 정상 종료로 해제한 뒤 중계를 갱신하며, 재기동 후 필요한 포트를 다시 연결합니다. 실패 시 이전 JAR·이미지·중계를 복원하고, `.env`·토큰·DB는 보존합니다.
 
 현재 Windows COM 수집은 [Windows 중계 방식](WINDOWS-SERIAL-BRIDGE.md)을 기본으로 사용합니다. Windows 송신 노드에서 start.ps1을 실행하면 Java 중계와 Docker 웹서버가 함께 시작됩니다. 기본 통신속도는 38400입니다.

@@ -2,7 +2,7 @@
 <html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>LNIS 데이터 관리</title><link rel="icon" href="/lnis/assets/common/logo_v3.png?v=995392000e36">
 <link rel="stylesheet" href="/lnis/assets/common/app.css?v=20260918-management">
-<link rel="stylesheet" href="/lnis/assets/management/data-management.css?v=1"></head>
+<link rel="stylesheet" href="/lnis/assets/management/data-management.css?v=20261001-review"></head>
 <body><header><div><h1>데이터 관리</h1><p id="node">현재 PC 확인 중</p></div><a class="back" id="back" href="/">시험 화면으로</a></header>
 <main><p id="message" role="status" aria-live="polite"></p>
 <section class="card"><h2>저장 현황</h2><div id="summary" class="metrics"></div><small>이 PC의 데이터만 관리합니다. 자료를 삭제해도 DB 파일의 실제 크기는 바로 줄어들지 않을 수 있습니다.</small></section>
@@ -20,4 +20,4 @@
 <p><small>10분마다 확인하며 한 번에 최대 500건을 정리합니다. 시험·수집·파일 처리 중에는 정리를 미룹니다.</small></p><h2>최근 정리 내역</h2><div id="history"></div></section>
 <section id="detail" class="card" hidden><div class="card-title"><h2>선택한 자료</h2><button id="close-detail">닫기</button></div><div id="detail-links" class="actions"></div><pre id="detail-content"></pre></section>
 <dialog id="confirm"><h2 id="confirm-title">삭제 대상 확인</h2><p id="confirm-note"></p><div id="preview-items"></div><p>진행 중·보관 고정·공유 자료는 서버에서 다시 확인합니다. 삭제한 자료는 이 화면에서 복원할 수 없습니다.</p><div class="actions"><button id="confirm-cancel">취소</button><button id="confirm-apply" class="danger">확인</button></div></dialog>
-</main><script type="module" src="/lnis/assets/management/data-management.js?v=1"></script></body></html>
+</main><script type="module" src="/lnis/assets/management/data-management.js?v=20261001-review"></script></body></html>

@@ -27,6 +27,7 @@ class WindowsSerialBridgeTest {
         try(var server=server(fake,30000)){
             var client=client(server,TOKEN);
             assertEquals("COM5",client.ports().getFirst().name());
+            assertFalse(client.request("/health", Map.of()).path("version").asText().isBlank());
             assertFalse(client.request("/health",Map.of()).path("busy").asBoolean());
             assertFalse(client.request("/time",Map.of()).path("ready").asBoolean());
             assertTrue(client.request("/time",Map.of()).hasNonNull("sentAt"));

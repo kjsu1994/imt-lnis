@@ -1,4 +1,4 @@
-import {requestJson} from '../common/http.js?v=20260915-structure';
+import {requestJson} from '../common/http.js?v=20261001-review';
 
 /** 화면이 닫혀도 백엔드 연결은 유지한다. GNSS 시간 수신을 PC 동기화로 표시하지 않는다. */
 export function initGnssControls({port, baud, refresh, changed = () => {}, log = () => {}}) {

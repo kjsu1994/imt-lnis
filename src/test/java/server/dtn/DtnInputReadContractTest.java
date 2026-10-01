@@ -12,7 +12,6 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import server.common.ApiExceptionHandler;
 import server.common.DtnModels;
-import server.config.StorageProperties;
 import server.gnss.*;
 import server.iq.IqController;
 import server.iq.IqService;
@@ -25,7 +24,7 @@ class DtnInputReadContractTest {
     private final InputBufferRepository repository = mock(InputBufferRepository.class);
     private final InputBufferEntity input = mock(InputBufferEntity.class);
     private final InputBufferService inputs =
-            new InputBufferService(repository, mock(DtnRepository.class), new StorageProperties());
+            new InputBufferService(repository, mock(DtnRepository.class));
 
     private void prepare(long size, long chunks) {
         when(repository.find(id)).thenReturn(Optional.of(input));

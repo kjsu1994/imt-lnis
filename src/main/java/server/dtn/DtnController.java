@@ -42,8 +42,8 @@ public class DtnController {
     private server.common.ServiceClock clock = new server.common.ServiceClock();
 
     @GetMapping("/receipts")
-    public ResponseEntity<?> receipts() {
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(receipts.recent());
+    public ResponseEntity<?> receipts(@RequestParam(required = false) UUID testId) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(receipts.recent(testId));
     }
 
     @GetMapping("/receipts/{id}/body")
@@ -295,6 +295,20 @@ public class DtnController {
         dtnService.recordClock(dtnJob, stamp, true);
         Map<String, Object> response = summary(dtnJob);
         return new ResponseEntity<>(response, HttpStatus.ACCEPTED);
+    }
+
+    @GetMapping("/tests/waiting-summary")
+    public DtnService.WaitingSummary waitingSummary() {
+        return dtnService.waitingSummary();
+    }
+
+    public record CancelWaitingRequest(
+            @jakarta.validation.constraints.NotNull java.time.Instant asOf,
+            @jakarta.validation.constraints.NotNull List<UUID> testIds) {}
+
+    @PostMapping("/tests/cancel-waiting")
+    public DtnService.WaitingCancellation cancelWaiting(@Valid @RequestBody CancelWaitingRequest request) {
+        return dtnService.cancelWaiting(request.asOf(), request.testIds());
     }
 
     @PostMapping("/tests/{id}/cancel")

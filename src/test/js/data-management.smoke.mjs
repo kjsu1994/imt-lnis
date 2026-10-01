@@ -20,7 +20,7 @@ const requests=[];
 const item={key:{kind:'DTN',id:'11111111-1111-1111-1111-111111111111'},name:'AFS_METADATA',state:'COMPLETED',createdAt:new Date().toISOString(),bytes:0,pinned:false,blocked:''};
 const settings={tests:{enabled:false,days:30},receipts:{enabled:false,days:30},files:{enabled:false,days:30}};
 const preview={token:'preview-token',role:'receiver',items:[{row:item,related:[],logs:1,receipts:1,evidence:0,blocked:''}]};
-const context={console,URLSearchParams,Date,Set,Option:function(text,value){const e=new Element('option');e.textContent=text;e.value=String(value);return e;},document:{getElementById:id=>elements.get(id),createElement:tag=>new Element(tag),querySelectorAll:()=>tabs},fetch:async(url,options)=>{
+const context={console,URLSearchParams,Date,Set,AbortSignal,Option:function(text,value){const e=new Element('option');e.textContent=text;e.value=String(value);return e;},document:{getElementById:id=>elements.get(id),createElement:tag=>new Element(tag),querySelectorAll:()=>tabs},fetch:async(url,options)=>{
  requests.push({url,...options,body:options.body?JSON.parse(options.body):undefined});
  let data={};
  if(url.endsWith('/summary'))data={role:'receiver',counts:{DTN:1,AFS:0,RECEIPT:1},databaseBytes:123,inputBytes:0,iqBytes:0};
@@ -32,7 +32,9 @@ const context={console,URLSearchParams,Date,Set,Option:function(text,value){cons
  else if(url.endsWith('/history'))data=[];
  return {ok:true,json:async()=>data};
 }};
-vm.runInNewContext(readFileSync(new URL('assets/management/data-management.js',base),'utf8'),context);
+const httpSource = readFileSync(new URL('assets/common/http.js', base), 'utf8').replace(/^export /gm, '');
+const managementSource = readFileSync(new URL('assets/management/data-management.js', base), 'utf8').replace(/^import .*;\r?\n/gm, '');
+vm.runInNewContext(httpSource + '\n' + managementSource, context);
 for(let i=0;i<8;i++)await new Promise(resolve=>setImmediate(resolve));
 assert.equal(elements.get('rows').children.length,1);
 assert.match(elements.get('node').textContent,/수신 PC/);

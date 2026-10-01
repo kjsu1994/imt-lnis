@@ -41,10 +41,10 @@ docker compose ps
 관리 토큰은 양쪽 동일하게, 어댑터 토큰은 해당 연결 상대와 맞춥니다. 기존 DB·토큰을 임의 삭제하지 마세요.
 
 - 독립 AFS Frame 검증시험은 제거했습니다. 과거 `/lnis/afstest/sender`, `/lnis/afstest/receiver` 북마크는 DTN 화면으로 이동합니다.
-- DTN의 AFS Frame + Metadata·I/Q와 공용 AFS 코덱은 유지합니다. 기존 AFS 시험 DB·산출물은 자동 삭제하지 않으며, 이전 버전 이력은 운영 백업으로 보존합니다.
+- DTN의 AFS Frame·I/Q와 공용 AFS 코덱은 유지합니다. 기존 AFS 시험 DB·산출물은 자동 삭제하지 않으며, 이전 버전 이력은 운영 백업으로 보존합니다.
 - DTN 화면: `/lnis/dtntest/sender`, `/lnis/dtntest/receiver`
 - [운영 USB/WSL2 연결](deployment/node/WSL2-GNSS.md)
-- [어댑터 개발자 공유 계약 — API-SPEC 맨 아래 15장 전체](API-SPEC.md#adapter-contract)
+- 외부 어댑터 전송은 아래 시험 유형·프레임 구조를 따릅니다. 이번 정리에서는 전송 JSON 규격을 바꾸지 않습니다.
 
 ## 실제 GNSS 데이터와 Windows COM 수집 (2026-09-29)
 
@@ -77,7 +77,7 @@ Windows 중계는 직렬 바이트 송수신과 수신 지점의 NAV-TIMEUTC 추
 
 전체 검증 및 운영 절차는 [Windows COM 중계](deployment/node/WINDOWS-SERIAL-BRIDGE.md)를 참고하세요. 직접 USB를 넘기는 이전 방식은 [WSL2-GNSS.md](deployment/node/WSL2-GNSS.md)에 남겨 두었습니다. 두 방식을 동시에 사용하지 마세요.
 
-실측 파일 해시는 [GNSS-VALIDATION.json](GNSS-VALIDATION.json), 형식 설명은 [REAL-GNSS.md](REAL-GNSS.md)를 참고하세요.
+실측 파일 해시는 [GNSS-VALIDATION.json](GNSS-VALIDATION.json)을 참고하세요. 입력 형식과 장비 연결은 위 절차를 따릅니다.
 
 ## 시험
 
@@ -97,6 +97,8 @@ DTN의 GNSS 수집 데이터 화면은 관측값(RAWX)과 항법정보(SFRBX)를
 - **여러 시험 송신:** 어댑터 요청이 끝나면 이전 시험의 최종 수신을 기다리지 않고 다음 시험을 시작합니다. 클릭마다 새 testId와 입력·설정 스냅샷을 만들며, 수신 서비스에 먼저 등록합니다. 어댑터 응답 미확인은 자동 재전송하지 않고 수신 대기로 남깁니다.
 - **순서와 시간에 독립적인 수신:** RAW·AFS·I/Q 모두 testId·인증·원문 해시로 검증합니다. 외부 수신 및 계산 순서 대기는 시간 제한이 없습니다. 정상 본문을 먼저 저장하고 계산은 한 건씩 진행합니다. 지연 측정에는 계산 대기시간을 포함하지 않습니다. 준비·계산 작업 자체의 제한은 단계 시작부터 일반 10분, I/Q 20분입니다.
 - **시험별 종료:** 시험 기록에서 대상을 선택한 뒤 `대기 종료` 또는 `계산 중지`를 누릅니다. 다른 시험에는 영향을 주지 않습니다. 송신에서 종료하면 상대 수신 서비스에도 요청하고, 연결이 끊기면 `종료 전달 중`으로 남겨 재시도합니다. 종료 후 늦게 도착한 정상 데이터는 원문만 보관하며 결과를 다시 계산하지 않습니다. 이미 어댑터에 전달된 번들의 회수는 보장하지 않습니다. I/Q 생성은 별도의 `생성 취소`를 사용합니다.
+- **대기 전체 종료:** 송신·수신 화면의 시험 목록 옆에서 현재 PC의 수신 대기를 한꺼번에 끝냅니다. 확인창에 대상 건수를 표시하고, 확인 시각 이후 생성된 시험·전송 준비/요청 중인 시험·이미 수신 또는 계산 중인 시험은 제외합니다. 원문·로그·결과는 삭제하지 않습니다. 송신에서는 상대가 아직 수신 대기인지 확인한 뒤 종료하며, 상대가 이미 수신·계산한 시험은 유지합니다. 확인이 안 되면 종료 전달 대기로 남겨 같은 조건으로 재시도하고, 안내에 종료·제외·상대 확인 대기 건수를 구분합니다.
+- **Epoch 선택 유지:** 전송할 Epoch는 새 입력을 적용하거나 사용자가 직접 변경할 때만 바뀝니다. 반복 전송과 과거 시험 조회는 다음 시험의 Epoch를 바꾸지 않습니다.
 - **보관·복구:** 대기 중 시험과 참조 파일은 자동 삭제에서 보호합니다. 재기동 후 수신·계산 대기는 이어가되, 끊긴 준비·계산은 실패 처리합니다. 어댑터 요청 중 재기동은 접수 미확인으로 표시하고 자동 재송신하지 않습니다. 과거 실패 기록은 자동으로 재개하지 않습니다.
 - **라우팅 시험 범위:** 여러 건의 지연 전달·순서 역전·내용 보존을 확인할 수 있습니다. 실제 중계 경로는 라우터 로그로 별도 확인해야 하며, LNIS 대기 제한 제거와 별개로 번들 수명(TTL)은 어댑터에서 설정해야 합니다.
 - 수신 화면은 새 JSON이 접수되면 해당 시험을 자동 선택합니다.
@@ -107,11 +109,11 @@ DTN의 GNSS 수집 데이터 화면은 관측값(RAWX)과 항법정보(SFRBX)를
 | AFS Frame | v5 SB2·SB3 항법 + SB4 가상 송신 시각 | 프레임 복원·데이터 대조·지연 PVT |
 | I/Q Sample | 90초 BIN 경로·크기·해시 + 생성 정보·초기 기준 PVT | 파일 무결성·I/Q 추적 관측값·프레임 항법 기반 지구 PVT 오차(v2) |
 
-PVT는 지구 ECEF GPS L1 SPP입니다. 송수신 일치는 계산 재현성 검증이며 실제 위치 정확도 보증이 아닙니다.
+Reference는 장비 NAV-PVT가 아니라 원본 RAW를 동일 RTKLIB로 계산한 값입니다. PVT는 지구 ECEF GPS L1 C/A SPP입니다. 송수신 일치는 계산 재현성 검증이며 실제 위치 정확도 보증이 아닙니다.
 수신 화면은 독립 계산 결과와 별도 조회한 송신 기준을 비교합니다. I/Q의 기준값은 기존 전송 JSON을 사용합니다. 송신 화면에는 기준 PVT와 상대 상태를 표시합니다.
 
 송수신 로그의 **상세 로그**에서 처리 단계·수량·검증 결과를 확인하고 시험 기록을 선택해 TXT로 다운로드할 수 있습니다. LNIS 자체 처리 로그는 각 PC에 저장합니다. 어댑터가 수신 JSON에 `dtnLogsBase64`로 첨부한 로그는 수신에서 해석하여 수신 상세 로그에만 남깁니다. 송신에는 상대 수신·완료·실패 상태만 표시합니다. 잘못된 로그 형식은 경고로 남기며 시험 데이터 접수를 막지 않습니다. ‘화면 지우기’는 저장 기록을 삭제하지 않으며, 시험에 연결하지 않은 준비 로그는 7일 후 정리합니다.
-신규 RAW/AFS 시험에는 유효한 Reference PVT를 계산할 수 있는 1 Epoch 입력이 필요합니다.
+신규 RAW/AFS는 선택한 1 Epoch를 사용합니다. 정상 입력에는 유효한 Reference가 필요하며, 시간 초과 수집 자료를 명시적으로 승인한 경우에는 앞서 설명한 계산 불가 입력 처리 규칙을 따릅니다.
 
 ### 1 Epoch 지연 반영 PVT와 Clock Bias 확인
 
@@ -146,6 +148,8 @@ c=299,792,458 m/s입니다. 수집 후 시작 전 대기는 제외하고 시작 
 
 공통 지연은 주로 Clock Bias 증가로 나타납니다. Doppler를 유지해도 계산 위치·위성 방향·수치 정밀도에 따라 속도에 작은 차이가 생길 수 있습니다.
 `MEASURED/PARTIAL/INCONCLUSIVE`는 측정 완료/부분 비교/비교 불가이며 데이터 일치 여부와 별개입니다. 합격 허용오차는 없습니다. 두 PC 시계 동기화는 시험 전제이며 표시 자릿수는 측정 정확도가 아닙니다.
+
+장시간 대기 후에도 testId와 무결성이 맞으면 데이터를 접수합니다. 다만 큰 공통 지연에서는 기존 PVT 계산기가 수렴하지 못하거나 항법정보 유효기간을 벗어날 수 있습니다. 이 경우 전송·복원 근거는 보존하고 PVT 비교를 `INCONCLUSIVE`로 표시합니다. 지연을 제거하거나 Clock Bias 정답을 넣어 계산을 성공 처리하지 않습니다.
 
 ## AFS 프레임 안에서 PVT 입력 전달
 
@@ -241,7 +245,17 @@ I/Q는 `LNIS-IQ-FILE-v2`, `pvtMethod=AFS_IQ_FRAME_PVT-v2`로 구분합니다. JS
 - Linux 코덱: `build/native-linux/libLnisAfsCodec.so`
 - Windows 후보 DLL: `build/native-pvt/LnisAfsCodec.dll` — 기존 DLL을 자동 덮어쓰지 않습니다.
 - 90초 I/Q 생성기·수신 추적기: `build/iq/afs_sim`, `build/iq/pocket_trk`
-- 배포 ZIP: `gradlew.bat linuxNodeDistZip -PnativeCandidate=build/native-pvt`
+- 배포 ZIP: `gradlew.bat linuxNodeDistZip` — 같은 실행에서 새로 빌드한 플랫폼별 네이티브 후보로 검증합니다.
+
+### 안내 페이지와 운영 배포
+
+안내 원본은 `src/main/resources/static/dtn-intro.html` 한 곳에서 수정합니다. `gradlew.bat syncIntroDocs`는 공개 페이지 `docs/index.html`과 로고를 동기화하며, `check`는 내용 차이만 검사합니다. 서비스 홈 링크만 공개 페이지에 맞게 바뀝니다.
+
+`scripts/deploy-nodes.ps1`는 실행 중인 컨테이너의 Compose 프로젝트와 설정 파일 조합을 유지합니다. 시험 준비·전송 요청·계산 또는 GNSS 수집 중에는 배포를 중단하며, 연결만 유지한 COM은 서비스를 정상 종료하여 해제합니다. 배포 후 필요하면 GNSS를 다시 연결하세요. 브리지 클래스·의존성을 함께 교체하고 버전을 확인하며 `.env`, 토큰, DB와 입력 파일은 유지합니다. 브리지 묶음에는 정적 화면 파일을 넣지 않습니다. 교체 전 `classes`·`lib`는 같은 `serial-bridge` 폴더 안의 `*.previous-*`로 보존하며 실행 클래스 경로에서 제외합니다.
+
+프로젝트 드라이브에서 스크립트 위치를 자동 인식하지 못하면 `scripts/deploy-nodes.ps1 -SourceDirectory "O:\3.ing\LNIS\LnisServer" -ValidateOnly`로 먼저 확인하고, 실제 배포 시 `-ValidateOnly`를 뺍니다. 종료된 COM 브리지는 새 버전으로 기동하지만, 살아 있는 브리지의 상태를 확인할 수 없으면 배포를 멈춥니다.
+
+입력 보관기간은 데이터 관리 화면의 정책을 사용합니다. 사용되지 않던 `LNIS_INCOMPLETE_RETENTION`·`LNIS_COMPLETED_RETENTION` 설정은 제거했습니다. 수신 대기만 있다는 이유로 다른 완료 시험의 정리를 막지 않으며, 진행 중 시험·상대 종료 전달 대기·Reference 재조회에 필요한 데이터는 계속 보호합니다.
 
 ### 원본·수정본 위치
 
@@ -281,8 +295,22 @@ docker compose -f src/test/dtn-native-compose.yml down
 | 시험 | `server/dtn` | 등록·REST 송수신·진행·결과 저장 |
 | 관리·실시간 | `server/management`, `server/realtime` | 보관·삭제·브라우저 이벤트 |
 | 공통 | `server/common` | 기존 공통 모델·HTTP·해시·로그 |
-| 화면 공통 | `static/assets/common` | 기본 CSS, HTTP 요청, 노드 연결 |
+| 화면 공통 | `static/assets/common` | 기본 CSS, HTTP 요청 |
 | DTN 화면 | `static/assets/dtn` | 송수신 화면, 어댑터 상태, 관측값·원문·로그 |
+
+## 송수신 운영 API
+
+| 요청 | 용도 |
+|---|---|
+| `GET /lnis/api/v1/dtn/tests/waiting-summary` | 현재 종료 가능한 수신 대기의 `count`, 시험 목록 `testIds`, 서버 확인 시각 `asOf` 조회 |
+| `POST /lnis/api/v1/dtn/tests/cancel-waiting` | 조회 응답의 `asOf`·`testIds`를 그대로 보내 당시 확인한 대기만 종료. `requested`, `cancelled`, `skipped`, `pending` 건수 반환 |
+| `POST /lnis/api/v1/dtn/tests/{id}/cancel` | 선택한 시험만 종료 |
+| `GET /lnis/api/v1/dtn/receipts?testId={id}` | 선택 시험의 수신 원문 이력. 전체 최근 50건 밖의 시험도 조회 |
+| `GET /lnis/api/v1/dtn/receipts/{id}/body` | 해당 접수 원문 다운로드 |
+
+일괄 종료는 각 시험의 상태를 실행 직전에 다시 확인합니다. 확인 이후 도착한 시험은 종료 대상에서 빠질 수 있어 확인창과 결과 건수가 다를 수 있습니다. `pending`은 송신 서비스에서 상대의 대기 여부를 확인하고 종료를 전달 중인 건수입니다. 상대가 이미 수신했다면 종료하지 않으며, 이미 외부로 전달한 번들을 회수했다는 의미도 아닙니다.
+
+노드 내부 `POST /lnis/api/v1/node/peer/dtn/tests/{id}/close-waiting`는 관리 토큰으로 인증합니다. 일괄 종료 또는 어댑터의 명확한 HTTP 거절 후 아직 수신되지 않은 등록만 닫으며, 도착·계산·결과가 있으면 보존합니다. 응답이 유실된 `UNKNOWN`은 수신 대기를 유지합니다. 상대가 이 API를 지원하지 않거나 일시 단절이면 정리 대기로 남기고 재시도하며, 일반 시험 중지 API로 대체하지 않습니다. 송신 실패의 원래 HTTP 사유는 그대로 남습니다.
 
 ## Docker 로그 확인
 
@@ -331,5 +359,3 @@ Docker 로그는 서비스별 `100m` 파일 5개로 순환 보관합니다. 한�
 시험 DB·원문 파일 보관 정책에는 영향을 주지 않습니다. 컨테이너 재생성 전 필요한 기존 로그는 별도로 보관합니다.
 
 네이티브 I/Q 파일 수신기는 분석보다 파일 읽기가 앞서면 대기하고, 파일 끝에서도 남은 채널 분석을 완료한 뒤 종료합니다. 기존 20배속 설정은 유지하며, 처리 정지·읽기 오류·취소를 정상 완료와 구분합니다. 자세한 정책과 검증 방법은 `native/README.md`의 파일 재생 설명을 참고하세요.
-### Outdoor capture update (2026-09-29)
-COM5 outdoor capture replaced the earlier indoor fixture. real-gnss-source.ubx contains 24 RAWX epochs. real-gnss-10epochs.graw contains the final 10 consecutive epochs (GPS week 2438, TOW 201738.989 through 201747.989). All 10 passed independent position and velocity calculation with the project's native PVT engine. Earlier statements that the bundled fixture cannot compute PVT describe the superseded indoor capture. The web development replay uses this updated file.

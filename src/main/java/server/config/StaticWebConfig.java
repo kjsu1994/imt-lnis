@@ -36,7 +36,5 @@ public class StaticWebConfig implements WebMvcConfigurer {
         registry.addRedirectViewController(
                 "/lnis/assets/dtn-ui.css", "/lnis/assets/dtn/dtn-ui.css");
         registry.addRedirectViewController("/lnis/assets/dtn.js", "/lnis/assets/dtn/dtn.js");
-        registry.addRedirectViewController(
-                "/lnis/assets/node-connection.js", "/lnis/assets/common/node-connection.js");
     }
 }

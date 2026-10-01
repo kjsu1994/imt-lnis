@@ -30,8 +30,6 @@ public class NodeDtnController {
     private final server.dtn.DtnService dtnService;
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private server.common.ServiceClock clock = new server.common.ServiceClock();
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
-    private server.dtn.DtnRepository jobs;
 
     @GetMapping("/capabilities")
     public java.util.Map<String, Boolean> capabilities(
@@ -63,15 +61,7 @@ public class NodeDtnController {
         }
         synchronized (clock) {
             clock.requireAvailable();
-            var result = service.accept(registration);
-            if (jobs != null) {
-                jobs.findById(registration.getTestId()).ifPresent(job -> {
-                    if (job.getReceiverRegistrationClockJson() == null) {
-                        job.setReceiverRegistrationClockJson(mapper.valueToTree(clock.stamp()).toString());
-                        jobs.saveAndFlush(job);
-                    }
-                });
-            }
+            var result = service.accept(registration, clock.stamp());
             return new ResponseEntity<>(result, HttpStatus.ACCEPTED);
         }
     }
@@ -83,6 +73,21 @@ public class NodeDtnController {
         authentication.authenticate(authorization);
         service.prepareCancellation(testId);
         dtnService.cancel(testId);
+        return ResponseEntity.ok(service.localResult(testId));
+    }
+
+    public record CloseWaitingRequest(String reason) {}
+
+    @PostMapping("/{testId}/close-waiting")
+    public ResponseEntity<DtnRemoteResult> closeWaiting(
+            @PathVariable UUID testId, HttpServletRequest request) throws Exception {
+        authentication.authenticate(request.getHeader("Authorization"));
+        byte[] body = request.getInputStream().readNBytes(513);
+        if (body.length > 512) throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE);
+        CloseWaitingRequest reason = body.length == 0 ? null : mapper.readValue(body, CloseWaitingRequest.class);
+        service.localResult(testId); // 역할과 시험 참여자를 먼저 확인한다.
+        dtnService.closeWaiting(testId, reason == null || reason.reason() == null
+                ? "ADAPTER_REJECTED" : reason.reason());
         return ResponseEntity.ok(service.localResult(testId));
     }
 

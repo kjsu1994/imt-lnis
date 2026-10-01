@@ -1,4 +1,4 @@
-import {requestJson} from '../common/http.js?v=20260915-structure';
+import {requestJson} from '../common/http.js?v=20261001-review';
 
 const types = {GNSS_RAW: 'RAW', AFS_METADATA: 'AFS', IQ_SAMPLE: 'I/Q'};
 const trialStates = {PREPARING: '준비 중', WAITING_DTN: '수신 대기', WAITING_RECEIVER: '계산 대기',
@@ -172,4 +172,45 @@ export function initPresetControls({read, apply, isLocked}) {
   $('preset-delete').onclick = () => void save(true);
   dialog.addEventListener('cancel', event => { if (pending) event.preventDefault(); });
   return {refresh, update};
+}
+
+// 확인창을 열 때 서버가 확정한 ID만 전송한다. 그 뒤 대기 상태가 된 시험은 포함하지 않는다.
+export function initWaitingCancellation({isLocked = () => false, refresh, log}) {
+  const button = document.getElementById('dtn-cancel-waiting');
+  let working = false;
+  const update = () => {
+    button.disabled = working || isLocked();
+    button.setAttribute('aria-busy', String(working));
+  };
+  button.onclick = async () => {
+    if (working || isLocked()) return;
+    working = true;
+    update();
+    try {
+      const summary = await requestJson('/dtn/tests/waiting-summary', {cache: 'no-store'});
+      if (!summary.count) {
+        log('종료할 수신 대기 시험이 없습니다.');
+        return;
+      }
+      if (!Array.isArray(summary.testIds) || summary.testIds.length !== summary.count) {
+        throw new Error('종료 대상 목록을 확인할 수 없습니다. 다시 시도하세요.');
+      }
+      if (!confirm('수신 대기 ' + summary.count + '건을 모두 종료할까요?\n'
+          + '전송·계산 중인 시험은 제외하며 기록은 보존합니다.\n'
+          + '이미 전달된 번들은 회수되지 않으며, 이후 도착한 데이터는 종료 시험의 수신 기록으로 남습니다.')) return;
+      const result = await requestJson('/dtn/tests/cancel-waiting', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({asOf: summary.asOf, testIds: summary.testIds})
+      });
+      log('수신 대기 전체 종료 요청 · 즉시 종료 ' + result.cancelled + '건 · 상태 변경으로 제외 ' + result.skipped + '건'
+        + (result.pending ? ' · 상대 대기 상태 확인·종료 전달 중 ' + result.pending + '건' : ''), 'INFO');
+      await refresh();
+    } catch (error) {
+      log('수신 대기 전체 종료 실패 · ' + error.message, 'ERROR');
+    } finally {
+      working = false;
+      update();
+    }
+  };
+  return {update};
 }

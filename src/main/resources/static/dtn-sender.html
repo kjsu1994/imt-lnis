@@ -5,7 +5,7 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>LNIS DTN Sender</title>
   <link rel="stylesheet" href="/lnis/assets/common/app.css?v=20260918-admin-icon">
-  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20260929-clock-inline">
+  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20261001-review">
 </head>
 <body data-page="dtn-sender">
 <header>
@@ -219,6 +219,7 @@
       <button id="dtn-tests-prev" type="button" disabled aria-label="이전 시험 목록">이전</button>
       <span id="dtn-tests-page">1</span>
       <button id="dtn-tests-next" type="button" disabled aria-label="다음 시험 목록">다음</button>
+      <button id="dtn-cancel-waiting" type="button" title="목록 페이지와 관계없이 수신 대기 시험 전체를 종료합니다. 전송·계산 중인 시험과 기록은 유지됩니다.">대기 전체 종료</button>
       <button id="dtn-cancel" type="button" disabled title="LNIS 시험 대기·계산과 상대 수신 시험을 중지합니다. 이미 어댑터에 전달된 번들의 회수는 보장하지 않습니다.">시험 중지</button>
     </div>
     <div class="sender-trial-buttons" aria-label="수집 및 전송">
@@ -258,5 +259,5 @@
   </div>
   </div>
 </main>
-<script type="module" src="/lnis/assets/dtn/dtn.js?v=20260929-unified-trial"></script>
+<script type="module" src="/lnis/assets/dtn/dtn.js?v=20261001-review"></script>
 </body></html>

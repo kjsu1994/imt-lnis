@@ -9,7 +9,32 @@ import java.util.UUID;
 public interface DtnRepository extends JpaRepository<DtnJob, UUID> {
     List<DtnJob> findByStateIn(List<String> states);
 
+    /** 반복 상태 조회에서 송수신 원문과 계산 결과 LOB를 읽지 않는다. */
+    interface TaskView {
+        UUID getId();
+        String getState();
+        String getSendStatus();
+        Boolean getCancelPending();
+        String getTestType();
+        String getReceiverAgentId();
+        String getSenderAgentId();
+        java.time.Instant getCreatedAt();
+        java.time.Instant getStageStartedAt();
+        java.time.Instant getReceivedAt();
+    }
+
+    interface ReferenceTask {
+        UUID getId();
+        java.time.Instant getReferenceNextAttemptAt();
+    }
+
+    List<TaskView> findTasksByStateIn(List<String> states);
+
+    List<ReferenceTask> findTasksByReferenceStatus(String status);
+
     boolean existsByState(String state);
+
+    boolean existsByStateIn(List<String> states);
 
     boolean existsByStateInAndSendStatusIn(List<String> states, List<String> statuses);
 

@@ -2,7 +2,11 @@ const apiRoot = '/lnis/api/v1';
 
 /** Shared JSON decoding; callers retain their cache, header and failure policies. */
 export async function requestJson(path, options = {}, policy = {}) {
-    const response = await fetch(apiRoot + path, options);
+    const method = (options.method || 'GET').toUpperCase();
+    const requestOptions = method === 'GET' && !options.signal
+        ? {...options, signal: AbortSignal.timeout(policy.timeoutMillis ?? 30000)}
+        : options;
+    const response = await fetch(apiRoot + path, requestOptions);
     if (policy.notFoundIsNull && response.status === 404) return null;
     if (!response.ok && policy.errorDetails === false) throw new Error('HTTP ' + response.status);
     if (response.status === 204) return policy.allowEmpty ? {} : null;
@@ -12,6 +16,7 @@ export async function requestJson(path, options = {}, policy = {}) {
     try {
         body = await bodySource.json();
     } catch (error) {
+        if (requestOptions.signal?.aborted) throw requestOptions.signal.reason || error;
         if (response.ok) {
             if (!policy.allowEmpty) throw error;
             body = {};

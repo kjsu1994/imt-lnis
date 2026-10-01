@@ -14,7 +14,7 @@ const elements = new Map([...html.matchAll(/id="([^"]+)"/g)].map(([, id]) => [id
   replaceChildren(...options) { this.options = options; this.value = options[0]?.value ?? ''; },
   removeAttribute(key) { delete this[key]; }, focus() {}, select() {}
 }]));
-let nextTests = [], report = {}, reportRequest = null;
+let nextTests = [], report = {}, reportRequest = null, shownReceipts = null;
 const requests = [];
 const removedHealth = new Set(['dtn-adapter-health-results','dtn-adapter-detail','dtn-adapter-health-time','dtn-adapter-health-json']);
 let healthState = 'ready';
@@ -25,7 +25,7 @@ const context = {
   renderIqFile() {},
   createDtnLog: () => ({write() {},setContext() {},refresh() {}}),
   document: {visibilityState:'visible', getElementById(id) { if (removedHealth.has(id)) return null; assert.ok(elements.has(id), 'DOM missing: ' + id); return elements.get(id); }},
-  createPayloadViewer(container, options) { assert.equal(options.receivedOnly, true); return {setJob() {},setReceipts() {}}; },
+  createPayloadViewer(container, options) { assert.equal(options.receivedOnly, true); return {setJob() {},setReceipts(values) {shownReceipts = values;}}; },
   createObservationView() { return {setData() {}, select() {}}; },
   URLSearchParams,
   Option: function(text, value) { this.text = text; this.value = value; },
@@ -283,3 +283,27 @@ context.renderSummary({testType: 'GNSS_RAW'});
 context.renderReference({});
 assert.equal(elements.get('received-observation-card').hidden, false);
 console.log('PASS: reference data shares the observation card without an empty I/Q card');
+
+const ordinaryReceiverFetch = context.fetch;
+const oldReceipt = {id:'old-body', testId:'old-rejected', status:'REJECTED'};
+context.fetch = async (url, options) => {
+  if (url.startsWith('/lnis/api/v1/dtn/receipts?')) {
+    assert.equal(new URL(url, 'http://test').searchParams.get('testId'), 'old-rejected');
+    return {ok:true,json:async()=>[oldReceipt]};
+  }
+  return ordinaryReceiverFetch(url, options);
+};
+nextTests = [{testId:'old-rejected', state:'WAITING_DTN', receivedPayloadAvailable:false}];
+vm.runInContext("tests=[{testId:'old-rejected',state:'WAITING_DTN',receivedPayloadAvailable:false}]; selectedId='old-rejected';selectionPinned=true;", context);
+elements.get('dtn-tests').value = 'old-rejected';
+await context.poll(true);
+assert.deepEqual(shownReceipts, [oldReceipt]);
+assert.equal(elements.get('dtn-tests').value, 'old-rejected');
+context.fetch = ordinaryReceiverFetch;
+assert.ok(elements.has('dtn-cancel-waiting'));
+const gnssControls = vm.runInContext('gnss', context), normalGnssPoll = gnssControls.poll;
+gnssControls.poll = async () => { throw new Error('GNSS view failed'); };
+await context.poll(true);
+assert.equal(vm.runInContext('polling', context), false);
+gnssControls.poll = normalGnssPoll;
+console.log('PASS: selected-trial receipts remain reachable beyond global history and GNSS errors release polling');

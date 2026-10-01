@@ -107,7 +107,7 @@ export function createPayloadViewer(container, {receivedOnly = false, sentOnly =
   if (!sentOnly && !receivedOnly) container.append(title);
   container.append(controls, status, panel);
   let job = null, original = '', generation = 0, pending = null;
-  let automaticKey = null, receipt = null, retryAt = 0;
+  let automaticKey = null, receiptKey = null, receipt = null, retryAt = 0;
   status.hidden = singleDirection;
 
   function reset() {
@@ -136,7 +136,7 @@ export function createPayloadViewer(container, {receivedOnly = false, sentOnly =
     status.hidden = false;
     status.textContent = 'JSON 본문을 불러오는 중입니다.';
     try {
-      const response = await fetch(url, {cache: 'no-store', signal: pending.signal});
+      const response = await fetch(url, {cache: 'no-store', signal: AbortSignal.any([pending.signal, AbortSignal.timeout(30000)])});
       if (!response.ok) {
         const error = await response.json().catch(() => ({}));
         throw new Error(error.detail || error.message || ('HTTP ' + response.status));
@@ -169,7 +169,7 @@ export function createPayloadViewer(container, {receivedOnly = false, sentOnly =
       if (requestGeneration === generation && error.name !== 'AbortError') {
         status.hidden = false;
         status.textContent = 'JSON 조회 실패: ' + error.message;
-        if (singleDirection) { automaticKey = null; retryAt = Date.now() + 10000; }
+        if (singleDirection) { automaticKey = receiptKey = null; retryAt = Date.now() + 10000; }
       }
     } finally {
       if (requestGeneration === generation) pending = null;
@@ -199,10 +199,13 @@ export function createPayloadViewer(container, {receivedOnly = false, sentOnly =
       if(!receivedOnly) return;
       const available=Array.isArray(values) && job?.testId
         ? values.filter(e=>e.testId===job.testId) : [];
-      const previous=receipt;
       receipt=job?.receivedPayloadAvailable ? null : available[0] || null;
       received.disabled=!receipt && !job?.receivedPayloadAvailable;
-      if(receipt && (!previous || previous.id!==receipt.id || previous.status!==receipt.status)) return show('received');
+      const key = receipt ? receipt.id + ':' + receipt.status : null;
+      if (key && key !== receiptKey && Date.now() >= retryAt) {
+        receiptKey = key;
+        return show('received');
+      }
     },
     setJob(nextJob) {
       if (receipt && nextJob?.receivedPayloadAvailable) {
@@ -210,7 +213,7 @@ export function createPayloadViewer(container, {receivedOnly = false, sentOnly =
         automaticKey = null;
       }
       if (job?.testId !== nextJob?.testId) {
-        automaticKey = null; retryAt = 0; receipt=null;
+        automaticKey = receiptKey = null; retryAt = 0; receipt=null;
         reset();
         status.textContent = nextJob
           ? (receivedOnly ? '수신 원문 준비 중입니다.' : sentOnly ? '송신 원문 준비 중입니다.' : '준비된 송신 또는 수신 JSON을 선택하세요.')

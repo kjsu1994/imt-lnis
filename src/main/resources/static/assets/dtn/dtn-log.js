@@ -8,7 +8,10 @@ export function createDtnLog(target) {
   const fullscreen = initLogFullscreen(target);
   const toggle=$('dtn-log-detail'), download=$('dtn-log-download');
   let current='', currentType='TEST', scope='', version=0, cursor=0, cleared=0, entries=[], local=[], detailed=false, running=false, lastError='';
+  let dirty = true;
   const render=()=>{
+    if (!dirty) return;
+    dirty = false;
     const follow=target.scrollHeight-target.scrollTop-target.clientHeight<36;
     const visible=entries.filter(e=>e.sequence>cleared && (detailed || !e.detail));
     target.textContent=[...visible,...local].sort((a,b)=>new Date(a.occurredAt)-new Date(b.occurredAt)).map(logLine).join('\n');
@@ -18,7 +21,7 @@ export function createDtnLog(target) {
   };
   const change=()=>{
     const next=current;
-    if(next!==scope) {scope=next;version++;cursor=cleared=0;entries=[];lastError='';}
+    if(next!==scope) {scope=next;version++;cursor=cleared=0;entries=[];lastError='';dirty=true;}
     if(scope) {download.href='/lnis/api/v1/dtn/logs?scopeId='+encodeURIComponent(scope)+'&download=true';download.setAttribute('aria-disabled','false');}
     else {download.removeAttribute('href');download.setAttribute('aria-disabled','true');}
     fullscreen?.setScope(scope);
@@ -36,7 +39,8 @@ export function createDtnLog(target) {
         if(!response.ok) throw new Error('처리 로그 조회 실패 · HTTP '+response.status);
         const page=await response.json();
         if(revision!==version || requested!==scope) return;
-        entries.push(...page.entries.filter(e=>e.sequence>cursor));
+        const added = page.entries.filter(e=>e.sequence>cursor);
+        if (added.length) { entries.push(...added); dirty = true; }
         cursor=page.nextSequence; more=page.hasMore;
         if(entries.length>10000) entries=entries.slice(-10000);
       } while(more);
@@ -48,7 +52,7 @@ export function createDtnLog(target) {
   function write(message,level='INFO') {
     if(local.at(-1)?.message===message) return;
     const entry={occurredAt:new Date().toISOString(),level,stage:'화면',message};
-    local.push(entry);
+    local.push(entry); dirty = true;
     // 전송 실패를 다시 로그로 보내면 무한 반복되므로 화면 표시만 유지한다.
     void fetch('/lnis/api/v1/dtn/logs/screen',{
       method:'POST',headers:{'Content-Type':'application/json'},signal:AbortSignal.timeout(5000),
@@ -57,12 +61,14 @@ export function createDtnLog(target) {
     }).catch(()=>{});
     local=local.slice(-200);render();
   }
-  toggle.onclick=()=>{detailed=!detailed;toggle.setAttribute('aria-pressed',String(detailed));render();};
-  $('dtn-log-clear').onclick=()=>{cleared=cursor;local=[];target.textContent='';};
+  toggle.onclick=()=>{detailed=!detailed;dirty=true;toggle.setAttribute('aria-pressed',String(detailed));render();};
+  $('dtn-log-clear').onclick=()=>{cleared=cursor;local=[];dirty=false;target.textContent='';};
   setInterval(()=>void poll(),2000);
   return {write,refresh:poll,setContext(id,type='TEST') {
     const next=id || '';
-    if(current!==next) {current=next;currentType=type;local=[];}
+    if (current === next && currentType === type) return;
+    if (current !== next) local = [];
+    current = next; currentType = type; dirty = true;
     change();void poll();
   }};
 }

@@ -30,8 +30,26 @@ class NodeClockControllerTest {
         when(gnss.status()).thenReturn(new GnssConnection.Status("CONNECTED", "COM4", 38400,
                 false, "VALID", Instant.now(), Instant.now(), 50L, "", false, false));
         when(gnss.timeReference()).thenReturn(Map.of("ready", false));
-        when(jobs.findByStateIn(any())).thenReturn(List.of());
+        when(jobs.existsByStateIn(any())).thenReturn(false);
         ReflectionTestUtils.setField(controller, "ntpServer", "test.invalid");
+    }
+
+    @Test
+    void replyTimestampIncludesStatusLookupAndBusyDoesNotLoadPayloads() {
+        var queryCompletedAt = new java.util.concurrent.atomic.AtomicReference<Instant>();
+        when(jobs.existsByStateIn(any())).thenAnswer(invocation -> {
+            Thread.sleep(30);
+            queryCompletedAt.set(Instant.now());
+            return true;
+        });
+
+        var probe = controller.status();
+
+        assertTrue(probe.busy());
+        assertFalse(probe.sentAt().isBefore(queryCompletedAt.get()));
+        assertEquals(probe.clock().rawAt(), probe.sentAt());
+        assertTrue(ServiceClock.seconds(probe.receivedAt(), probe.sentAt()) >= .02);
+        verify(jobs, never()).findByStateIn(any());
     }
 
     @Test

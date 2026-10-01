@@ -40,6 +40,7 @@ assert.match(html, /id="dtn-development"[^>]*\bhidden\b/);
 elements.get('dtn-development').hidden = true;
 elements.get('dtn-settings-view').hidden = true;
 let loaded = null, currentJob = null, failUpload = false, starts = 0, lastStartBody, cancels = 0;
+let observationSelection;
 let healthFetch, healthCalls = 0, healthUrl;
 let gnssStatus = {state: 'DISCONNECTED', timeState: 'UNAVAILABLE'};
 const intervals = [];
@@ -50,7 +51,10 @@ const context = {
   createDtnLog: () => ({write() {},setContext() {},refresh() {}}),
   document: {visibilityState: 'visible', getElementById: id => { assert.ok(elements.has(id), 'missing ' + id); return elements.get(id); }, querySelectorAll: () => []},
   createPayloadViewer: () => ({setJob() {}}),
-  createObservationView: () => ({setData(data) { loaded = data; }, select() {}}),
+  createObservationView: (_container, onSelect) => {
+    observationSelection = onSelect;
+    return {setData(data) { loaded = data; }, select() {}};
+  },
   numeric, renderClockBias,
   URLSearchParams,
   Option: function(text, value) { this.value = value; },
@@ -93,6 +97,7 @@ const context = {
   }
 };
 vm.createContext(context); vm.runInContext(source, context); await context.ready;
+const selectInputEpoch = observationSelection;
 assert.equal(elements.has('dtn-example'), false);
 assert.equal(html.includes('합성 GRAW 다운로드'), false);
 assert.equal(html.includes('합성 데이터 · 실측 아님'), false);
@@ -218,6 +223,7 @@ const callsBeforeHidden = healthCalls;
 context.document.visibilityState = 'hidden';
 intervals.find(value => value.delay === 10000).callback();
 assert.equal(healthCalls, callsBeforeHidden);
+context.document.visibilityState = 'visible';
 console.log('PASS: busy status, stale response ignored and hidden tab skips polling');
 
 vm.runInContext("job=null; selectedType='IQ_SAMPLE'; inputId=null; config.iqEnabled=true; updateControls();", context);
@@ -269,6 +275,7 @@ assert.equal(elements.get('hdtn-maxNumberOfBundlesInPipeline').value, '75');
 for (const [txMode, rxMode] of [['DTN', 'HDTN'], ['HDTN', 'DTN'], ['HDTN', 'HDTN'], ['DTN', 'DTN']]) {
   vm.runInContext(`job=null; busy=false; captureId=null; iqJob=null; inputId='input1'; selectedType='GNSS_RAW'; senderMode='${txMode}'; receiverMode='${rxMode}';`,context);
   elements.get('dtn-send-url').value = 'http://adapter:8080';
+  await context.loadDelayEpochs();
   context.updateControls();
   await elements.get('dtn-send').onclick();
   const usesHdtn = txMode === 'HDTN' || rxMode === 'HDTN';
@@ -370,7 +377,8 @@ console.log('PASS: trial cancellation, repeat prevention, failed trial cleanup a
 // RAW/AFS always select exactly one valid source epoch.
 vm.runInContext("config.delaySupported=true; selectedType='GNSS_RAW'; job=null; busy=false; inputId='input1';",context);
 assert.equal(elements.has('dtn-comparison-mode'),false,'RAW/AFS always use delay PVT');
-vm.runInContext("delayChoices=[{epoch:{recordIndex:95},reference:{positionValid:false}},{epoch:{recordIndex:96,week:2400,towSeconds:100000},reference:{positionValid:true,velocityValid:false}}]; epochIndex=1",context);
+vm.runInContext("delayChoices=[{epoch:{recordIndex:95},reference:{positionValid:false}},{epoch:{recordIndex:96,week:2400,towSeconds:100000},reference:{positionValid:true,velocityValid:false}}]; inputView=true",context);
+selectInputEpoch(1);
 context.updateControls();
 assert.equal(elements.has('dtn-epoch-summary'),false);
 assert.equal(elements.has('dtn-epoch-options'),false);
@@ -378,16 +386,38 @@ assert.equal(elements.get('dtn-send').disabled,false);
 await elements.get('dtn-send').onclick();
 assert.equal(lastStartBody.comparisonMode,'DELAY');
 assert.equal(lastStartBody.selectedEpoch.recordIndex,96);
-vm.runInContext("job=null; delayChoices=[];",context);
+currentJob = {testId:'t1',state:'WAITING_DTN',sendStatus:'ACCEPTED',referenceEpochs:1,updatedAt:'first-invalid'};
+await context.poll();
+assert.equal(elements.get('dtn-send').disabled, false, 'invalid first epoch does not block repeating a valid selection');
+await elements.get('dtn-send').onclick();
+assert.equal(lastStartBody.selectedEpoch.recordIndex,96);
+vm.runInContext("job=null; preparedEpoch=null; delayChoices=[];",context);
 context.updateControls();
 assert.equal(elements.get('dtn-send').disabled,true,'invalid Reference cannot start');
 
-vm.runInContext("config.sendBusy=false; busy=false; job=null; selectedType='GNSS_RAW'; inputId='real10'; senderMode='DTN'; receiverMode='DTN'; delayChoices=[{epoch:{recordIndex:4},reference:{positionValid:true}},{epoch:{recordIndex:9},reference:{positionValid:false}},{epoch:{recordIndex:15},reference:{positionValid:true}}]; epochIndex=2; updateControls();", context);
+vm.runInContext("config.sendBusy=false; busy=false; job=null; selectedType='GNSS_RAW'; inputId='real10'; senderMode='DTN'; receiverMode='DTN'; delayChoices=[{epoch:{recordIndex:4},reference:{positionValid:true}},{epoch:{recordIndex:9},reference:{positionValid:false}},{epoch:{recordIndex:15},reference:{positionValid:true}}]; inputView=true;", context);
+selectInputEpoch(2);
 assert.equal(context.selectedDelayEpoch().epoch.recordIndex, 15, 'use selected epoch, not first valid epoch');
 assert.equal(elements.get('dtn-send').disabled, false);
 await elements.get('dtn-send').onclick();
 assert.equal(lastStartBody.selectedEpoch.recordIndex, 15);
-vm.runInContext("busy=false; job=null; epochIndex=1; updateControls();", context);
+// Polling a one-Epoch result must never replace the prepared input selection.
+currentJob = {testId:'t1', state:'WAITING_DTN', sendStatus:'ACCEPTED', referenceEpochs:1, updatedAt:'repeat'};
+await context.poll();
+assert.equal(vm.runInContext('inputView', context), false);
+assert.equal(vm.runInContext('epochIndex', context), 0);
+assert.equal(elements.get('dtn-send').disabled, false);
+await elements.get('dtn-send').onclick();
+assert.equal(lastStartBody.inputId, 'real10');
+assert.equal(lastStartBody.selectedEpoch.recordIndex, 15, 'repeat sends keep the selected source epoch');
+// Selecting a report row is display-only even when its local index is zero.
+vm.runInContext("job={testId:'historical',state:'COMPLETED'}; inputView=false;", context);
+selectInputEpoch(0);
+assert.equal(context.selectedDelayEpoch().epoch.recordIndex, 15, 'history does not reselect the prepared input');
+await elements.get('dtn-send').onclick();
+assert.equal(lastStartBody.selectedEpoch.recordIndex, 15);
+vm.runInContext("busy=false; job=null; inputView=true;", context);
+selectInputEpoch(1);
 assert.equal(elements.get('dtn-send').disabled, true, 'invalid selected epoch cannot silently substitute another epoch');
 assert.match(html, /실측 GNSS 10에폭 불러오기/);
 console.log('PASS: selected real-data epoch reaches request and invalid selection is not substituted');
@@ -459,13 +489,13 @@ assert.equal(elements.get('dtn-tests').disabled, true, 'pending capture cannot b
 vm.runInContext("job={testId:'old',state:'COMPLETED'};", context);
 await context.showCaptureDecision({inputId: 'pending'});
 assert.equal(vm.runInContext('job', context), null, 'restored capture clears the previous report before polling');
-vm.runInContext("pendingCapture=null; acceptedCapture=true; inputId='approved'; delayChoices=[{reference:{positionValid:false},afsReady:false}]; epochIndex=0;", context);
+vm.runInContext("pendingCapture=null; acceptedCapture=true; inputId='approved'; delayChoices=[{reference:{positionValid:false},afsReady:false}]; preparedEpoch={inputId,choice:delayChoices[0]}; epochIndex=0;", context);
 context.updateControls();
 assert.equal(elements.get('dtn-send').disabled, false, 'approved RAW may transmit without valid PVT');
 vm.runInContext("selectedType='AFS_METADATA';", context);
 context.updateControls();
 assert.equal(elements.get('dtn-send').disabled, true, 'AFS still needs navigation');
-vm.runInContext("config.iqEnabled=true; pvt=[{positionValid:false,velocityValid:false}];", context);
+vm.runInContext("config.iqEnabled=true; inputPvt=[{positionValid:false,velocityValid:false}];", context);
 context.updateControls();
 assert.equal(elements.get('iq-generate').disabled, true);
 console.log('PASS: Korean history states, colors, compact action group and incomplete capture approval controls');
@@ -496,3 +526,39 @@ assert.match(html, /class="sender-summary-row">[\s\S]*?id="dtn-condition-summary
 assert.equal((html.match(/id="service-clock-value"/g) || []).length, 1);
 assert.ok(html.indexOf('id="service-clock-sync"') > html.indexOf('id="dtn-main-view"'));
 console.log('PASS: sender clock shares the trial summary row with unique existing controls');
+
+const originalGnssPoll = vm.runInContext('gnss', context).poll;
+vm.runInContext('gnss', context).poll = async () => { throw new Error('GNSS view update failed'); };
+await context.poll();
+assert.equal(vm.runInContext('polling', context), false, 'GNSS exception must release polling guard');
+vm.runInContext('gnss', context).poll = originalGnssPoll;
+await context.poll();
+assert.equal(vm.runInContext('polling', context), false);
+console.log('PASS: repeated sends preserve prepared Epoch and polling recovers from GNSS rendering errors');
+
+let bulkCount = 3, bulkPosts = 0, bulkRefresh = 0;
+const bulkMessages = [], bulkRequests = [];
+context.confirm = () => false;
+context.fetch = async (url, options) => {
+  bulkRequests.push({url, options});
+  if (url.endsWith('/waiting-summary')) return {ok:true, json:async()=>({count:bulkCount, asOf:'2026-10-01T00:00:00Z', testIds:bulkCount ? ['waiting-a','waiting-b','waiting-c'] : []})};
+  assert.ok(url.endsWith('/cancel-waiting'));
+  bulkPosts++;
+  assert.deepEqual(JSON.parse(options.body), {asOf:'2026-10-01T00:00:00Z', testIds:['waiting-a','waiting-b','waiting-c']});
+  return {ok:true, json:async()=>({requested:3, cancelled:2, skipped:1, pending:1})};
+};
+context.initWaitingCancellation({refresh:async()=>{bulkRefresh++;}, log:(message,level)=>bulkMessages.push({message,level})});
+await elements.get('dtn-cancel-waiting').onclick();
+assert.equal(bulkPosts, 0, 'declining confirmation sends no cancellation request');
+context.confirm = message => { assert.match(message, /3건/); return true; };
+await elements.get('dtn-cancel-waiting').onclick();
+assert.equal(bulkPosts, 1);
+assert.equal(bulkRefresh, 1);
+assert.equal(bulkMessages.at(-1).level, 'INFO');
+assert.match(bulkMessages.at(-1).message, /즉시 종료 2건.*제외 1건.*상대 대기 상태 확인·종료 전달 중 1건/);
+bulkCount = 0;
+await elements.get('dtn-cancel-waiting').onclick();
+assert.equal(bulkPosts, 1, 'empty waiting set needs no mutation');
+assert.match(bulkMessages.at(-1).message, /없습니다/);
+assert.equal(elements.get('dtn-cancel-waiting').disabled, false);
+console.log('PASS: bulk waiting cancellation confirms count, fixes cutoff, preserves records and reports peer retries');

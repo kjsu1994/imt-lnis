@@ -5,8 +5,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
-import java.time.Duration;
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -19,7 +17,7 @@ public class InputBufferRepository {
     private final InputChunkJpaRepository inputChunkJpaRepository;
     private final GrawFileStorage files;
 
-    public void save(InputBufferEntity value, Duration ttl) {
+    public void save(InputBufferEntity value) {
         inputMetadataJpaRepository.save(value);
     }
 
@@ -31,7 +29,7 @@ public class InputBufferRepository {
         return inputMetadataJpaRepository.lockDecision(id);
     }
 
-    public void putChunk(UUID id, long index, byte[] value, Duration ttl) {
+    public void putChunk(UUID id, long index, byte[] value) {
         InputBufferEntity input =
                 inputMetadataJpaRepository
                         .findById(id)
@@ -51,24 +49,14 @@ public class InputBufferRepository {
         return files.read(id, input.complete(), chunk.getFileOffset(), chunk.getByteLength());
     }
 
-    public void touchChunks(UUID id, long count, Duration ttl) {}
-
     public void completeFile(UUID id) {
         files.complete(id);
     }
 
-    public void delete(UUID id, long count) {
+    public void delete(UUID id) {
         inputChunkJpaRepository.deleteByInputId(id);
         inputMetadataJpaRepository.deleteById(id);
         files.delete(id);
-    }
-
-    public List<InputBufferEntity> incompleteBefore(Instant cutoff) {
-        return inputMetadataJpaRepository.findByCompleteFalseAndCreatedAtBefore(cutoff);
-    }
-
-    public List<InputBufferEntity> completeBefore(Instant cutoff) {
-        return inputMetadataJpaRepository.findByCompleteTrueAndCompletedAtBefore(cutoff);
     }
 
     public List<InputBufferEntity> pendingCaptures() {
@@ -82,9 +70,6 @@ interface InputMetadataJpaRepository extends JpaRepository<InputBufferEntity, UU
     Optional<InputBufferEntity> lockDecision(@org.springframework.data.repository.query.Param("id") UUID id);
 
     List<InputBufferEntity> findByCaptureDecisionOrderByCreatedAtDesc(String decision);
-    List<InputBufferEntity> findByCompleteFalseAndCreatedAtBefore(Instant cutoff);
-
-    List<InputBufferEntity> findByCompleteTrueAndCompletedAtBefore(Instant cutoff);
 }
 
 interface InputChunkJpaRepository extends JpaRepository<InputChunkEntity, InputChunkEntity.Key> {

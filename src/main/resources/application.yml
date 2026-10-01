@@ -67,8 +67,6 @@ lnis:
     receive-token: ${LNIS_DTN_RECEIVE_TOKEN:}
   storage:
     data-directory: ${LNIS_DATA_DIR:./data}
-    incomplete-retention: ${LNIS_INCOMPLETE_RETENTION:PT1H}
-    completed-retention: ${LNIS_COMPLETED_RETENTION:PT24H}
     cleanup-delay: ${LNIS_CLEANUP_DELAY:PT10M}
 
 ---

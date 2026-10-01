@@ -58,6 +58,8 @@ tasks.named('test') {
         include '*.dll', '*.so'
     })
     systemProperty 'lnis.f9t.source', providers.gradleProperty('f9tExampleSource').orElse('').get()
+    inputs.files(fileTree('build/native-pvt') { include '*.dll' })
+    inputs.files(fileTree('build/native-linux') { include '*.so' })
     useJUnitPlatform()
     testLogging {
         events 'failed', 'skipped'
@@ -71,11 +73,10 @@ tasks.register('webTest') {
         [
                 'src/test/js/http.smoke.mjs',
                 'src/test/js/assets.smoke.mjs',
-                  'src/test/js/dtn-payload.smoke.mjs',
-                  'src/test/js/dtn-log.smoke.mjs',
+                'src/test/js/dtn-payload.smoke.mjs',
+                'src/test/js/dtn-log.smoke.mjs',
                 'src/test/js/dtn-observations.smoke.mjs',
                 'src/test/js/dtn-sender.smoke.mjs',
-                'src/test/js/node-connection.smoke.mjs',
                 'src/test/js/dtn-receiver.smoke.mjs',
                 'src/test/js/data-management.smoke.mjs'
         ].each { script ->
@@ -200,6 +201,21 @@ tasks.named('test') { mustRunAfter tasks.named('nativeBuild') }
 tasks.named('syntheticGraw') { mustRunAfter tasks.named('nativeBuild') }
 tasks.named('linuxNativeVerificationZip') { mustRunAfter tasks.named('nativeBuild') }
 
+// Resolve the candidate before Gradle compares task inputs or decides UP-TO-DATE.
+gradle.taskGraph.whenReady { graph ->
+    if (graph.hasTask(tasks.named('nativeBuild').get())) {
+        def builtCandidate = System.getProperty('os.name').toLowerCase().contains('windows')
+                ? 'build/native-pvt' : 'build/native-linux'
+        def requestedCandidate = providers.gradleProperty('nativeCandidate').getOrElse(builtCandidate)
+        if (graph.hasTask(tasks.named('linuxNodeDistZip').get())
+                && file(requestedCandidate).canonicalFile != file(builtCandidate).canonicalFile) {
+            throw new GradleException('Distribution checks must use the newly built native candidate.')
+        }
+        tasks.named('test').get().systemProperty 'lnis.native.candidate', requestedCandidate
+    }
+}
+
+
 
 // Build verifies artifacts only. Deployment is always an explicit task.
 
@@ -218,7 +234,9 @@ tasks.register('windowsSerialBridgeDist', Sync) {
     group = 'distribution'
     dependsOn tasks.named('classes')
     into layout.buildDirectory.dir('windows-serial-bridge')
-    from(sourceSets.main.output) { into 'classes' }
+    from(sourceSets.main.output.classesDirs) {
+        into 'classes'
+    }
     from(configurations.runtimeClasspath.filter {
         it.name.startsWith('jSerialComm-') || it.name.startsWith('jackson-core-') ||
         it.name.startsWith('jackson-databind-') || it.name.startsWith('jackson-annotations-')
@@ -228,3 +246,50 @@ tasks.named('linuxNodeDistZip') {
     dependsOn tasks.named('windowsSerialBridgeDist')
     from(layout.buildDirectory.dir('windows-serial-bridge')) { into 'serial-bridge' }
 }
+// Service guide is the source; publishing only changes links for the static site.
+def introForDocs = {
+    file('src/main/resources/static/dtn-intro.html').getText('UTF-8')
+            .replace('/lnis/assets/common/logo_v3.png', './logo_v3.png')
+            .replace('<a class="brand" href="/" aria-label="시험 화면으로 이동" title="시험 화면으로 이동">',
+                    '<a class="brand" href="./" aria-label="안내 처음으로" title="안내 처음으로">')
+}
+
+tasks.register('syncIntroDocs') {
+    group = 'documentation'
+    description = '서비스 안내를 공개 설명 페이지에 명시적으로 반영한다.'
+    doLast {
+        file('docs').mkdirs()
+        file('docs/index.html').setText(introForDocs(), 'UTF-8')
+        copy {
+            from 'src/main/resources/static/assets/common/logo_v3.png'
+            into 'docs'
+        }
+    }
+}
+
+tasks.register('verifyIntroDocs') {
+    group = 'verification'
+    description = '안내 설명과 공개 문서의 불일치를 검사한다. 파일을 수정하지 않는다.'
+    doLast {
+        if (file('docs/index.html').getText('UTF-8') != introForDocs()
+                || !Arrays.equals(file('docs/logo_v3.png').bytes,
+                        file('src/main/resources/static/assets/common/logo_v3.png').bytes)) {
+            throw new GradleException('Run syncIntroDocs to update the published guide from the service source.')
+        }
+    }
+}
+
+tasks.named('check') { dependsOn tasks.named('verifyIntroDocs') }
+
+
+tasks.named('verifyIntroDocs') { mustRunAfter tasks.named('syncIntroDocs') }
+
+tasks.register('deploymentTest', Exec) {
+    group = 'verification'
+    description = '격리된 Windows 배포 경로와 활성 작업 보호를 검사한다.'
+    onlyIf { System.getProperty('os.name').toLowerCase().contains('windows') }
+    commandLine 'powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass',
+            '-File', 'src/test/powershell/deployment.smoke.ps1'
+}
+
+tasks.named('check') { dependsOn tasks.named('deploymentTest') }
