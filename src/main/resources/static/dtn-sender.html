@@ -5,7 +5,7 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>LNIS DTN Sender</title>
   <link rel="stylesheet" href="/lnis/assets/common/app.css?v=20260918-admin-icon">
-  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20261001-gnss-info">
+  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20261001-serial-layout">
 </head>
 <body data-page="dtn-sender">
 <header>
@@ -159,18 +159,28 @@
       <button type="button" id="dtn-replay">실측 GNSS 10에폭 불러오기 · 개발용</button>
     </div>
     </div>
-    <div id="dtn-capture-panel" class="hidden compact-input-row">
-      <label>COM 포트<select id="dtn-port"><option value="">포트 선택</option></select></label>
+    <div id="dtn-capture-panel" class="hidden serial-panel">
+      <div class="serial-controls">
+        <label class="serial-port">COM 포트<select id="dtn-port"><option value="">포트 선택</option></select></label>
+        <label class="serial-baud">통신 속도 (baud)<select id="dtn-baud"><option>9600</option><option selected>38400</option><option>57600</option><option>115200</option><option>230400</option><option>460800</option><option>921600</option></select></label>
         <button id="dtn-refresh" type="button">포트 조회</button>
         <button id="gnss-connect" type="button">연결</button>
+      </div>
+      <div class="serial-status" aria-live="polite">
         <span id="gnss-connection-state" class="pill">미연결</span>
         <span id="gnss-time-state">시간 미확인</span>
-        <label><input id="gnss-dtr" type="checkbox">DTR</label>
-        <label><input id="gnss-rts" type="checkbox">RTS</label>
-      <label class="serial-settings">통신 속도 (baud)<select id="dtn-baud"><option>9600</option><option selected>38400</option><option>57600</option><option>115200</option><option>230400</option><option>460800</option><option>921600</option></select></label>
+        <details class="gnss-details"><summary>시간 상세</summary><pre id="gnss-time-detail"></pre></details>
+      </div>
+      <p id="dtn-port-status" role="status" hidden></p>
+      <details class="serial-advanced">
+        <summary>고급 설정 · DTR / RTS</summary>
+        <div class="serial-signals">
+          <label><input id="gnss-dtr" type="checkbox"><span><strong>DTR</strong> PC 준비 신호<small>Data Terminal Ready · PC가 통신할 준비가 됐음을 알립니다.</small></span></label>
+          <label><input id="gnss-rts" type="checkbox"><span><strong>RTS</strong> 송신 요청 신호<small>Request To Send · PC의 송신 요청을 알립니다.</small></span></label>
+        </div>
+        <p>장비에서 요구할 때만 켜세요. 일부 장비는 이 신호를 전원·리셋 등에 사용합니다. 변경하려면 연결을 해제하세요.</p>
+      </details>
     </div>
-    <p id="dtn-port-status" role="status" hidden></p>
-    <details class="gnss-details"><summary>GNSS 시간 상세</summary><pre id="gnss-time-detail"></pre></details>
     <div id="dtn-upload-panel" class="compact-input-row">
       <label>GNSS 파일<input id="dtn-graw-file" type="file" accept=".ubx,.graw,application/octet-stream"></label>
       <button id="dtn-upload" type="button">파일 적용</button>
