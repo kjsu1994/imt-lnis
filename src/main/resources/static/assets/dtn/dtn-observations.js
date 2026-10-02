@@ -43,7 +43,7 @@ export function lockTime(milliseconds) {
 
 export function unclassifiedNavigation(message) {
   if ([1, 2, 3, 4, 5, 6, 7].includes(message.constellationId)) {
-    return '항법정보 수신 · 현재 PVT 계산 대상 아님';
+    return 'Signal X';
   }
   if (message.constellationId === 0 && Number.isInteger(message.signalId) && message.signalId !== 0) {
     return '항법정보 수신 · GPS L1 C/A 전용 계산';

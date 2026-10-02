@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko">
+<html lang="ko" xmlns="http://www.w3.org/1999/html">
 <head>
   <link rel="icon" type="image/png" href="/lnis/assets/common/logo_v3.png?v=995392000e36">
   <meta charset="utf-8">
@@ -224,7 +224,7 @@
             <button type="button" class="shared-folder tx-folder" data-link="tx-file" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 5h8l2 3h10v12H2z"/></svg>송신 공유 폴더 · BIN</button>
             <button type="button" class="shared-folder rx-folder" data-link="rx-file" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 5h8l2 3h10v12H2z"/></svg>수신 공유 폴더 · BIN</button>
             <button type="button" class="management-link" data-link="management">서비스 간 REST · 등록 / 원본 비교 ↕</button>
-            <button class="node tx-node" data-node="source" style="left:12%" type="button"><svg fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><use href="#icon-satellite"/></svg><strong>GNSS 수신기</strong><small>관측값 · 항법정보</small></button>
+            <button class="node tx-node" data-node="source" style="left:12%" type="button"><svg fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><use href="#icon-satellite"/></svg><strong>GNSS 수신기</strong><small>관측값 · 항법정보</br>시간 동기화</small></button>
             <button class="node tx-node switch" id="data-switch" style="left:30%" type="button" title="클릭하여 RAW, AFS, I/Q 순서로 전환"><svg fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><use id="data-icon" href="#icon-frame"/></svg><strong id="data-label"></strong><small>클릭하여 변경 ↻</small></button>
             <button class="node tx-node" data-node="frame" style="left:48%" type="button"><svg fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><use href="#icon-frame"/></svg><strong>AFS Frame 구성</strong><small>6,000 bits</small></button>
             <button class="node tx-node" data-node="encode" style="left:66%" type="button"><svg fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><use href="#icon-wave"/></svg><strong>I/Q 생성</strong><small>프레임 → 신호 샘플</small></button>
