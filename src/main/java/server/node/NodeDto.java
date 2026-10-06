@@ -13,7 +13,6 @@ public final class NodeDto {
 
     @Data
     @NoArgsConstructor
-    @AllArgsConstructor
     public static class StatusResponse {
         private int protocolVersion;
         private String agentId;
@@ -24,6 +23,21 @@ public final class NodeDto {
         private String baseUrl;
         private Boolean peerOnline;
         private String gnssTimeState;
+        private Long serverTimeMillis = System.currentTimeMillis();
+
+        public StatusResponse(int protocolVersion, String agentId, AgentRole role, AgentState state,
+                              boolean online, int codecAbiVersion, String baseUrl, Boolean peerOnline, String gnssTimeState) {
+            this.protocolVersion = protocolVersion;
+            this.agentId = agentId;
+            this.role = role;
+            this.state = state;
+            this.online = online;
+            this.codecAbiVersion = codecAbiVersion;
+            this.baseUrl = baseUrl;
+            this.peerOnline = peerOnline;
+            this.gnssTimeState = gnssTimeState;
+            this.serverTimeMillis = System.currentTimeMillis();
+        }
 
         public StatusResponse(int protocolVersion, String agentId, AgentRole role, AgentState state,
                               boolean online, int codecAbiVersion, String baseUrl, Boolean peerOnline) {

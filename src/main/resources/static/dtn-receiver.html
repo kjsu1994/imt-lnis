@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>LNIS DTN Receiver</title>
   <link rel="stylesheet" href="/lnis/assets/common/app.css?v=20260918-admin-icon">
-  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20261001-serial-layout">
+  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20261006-pvt-filter">
 </head>
 <body data-page="dtn-receiver">
 <header>
@@ -27,6 +27,7 @@
     <span id="dtn-server-status" class="pill warning">서버 연결 확인 중</span>
     <span id="dtn-sender-status" class="pill">송신 처리기 확인 중</span>
     <span id="dtn-receiver-status" class="pill">수신 처리기 확인 중</span>
+    <span id="dtn-clock-skew-warning" class="pill warning" hidden title="노드 간 시각이 어긋나 있습니다. 시간 맞추기 버튼으로 보정하세요.">⚠️ 시계 오차 <strong id="clock-skew-val">0.0s</strong> · 동기화 필요</span>
   </section>
 
   <section class="card receiver-overview">
@@ -184,6 +185,6 @@
   </section>
   </div>
 </main>
-<script type="module" src="/lnis/assets/dtn/dtn-receiver.js?v=20261001-gnss-info"></script>
+<script type="module" src="/lnis/assets/dtn/dtn-receiver.js?v=20261006-pvt-filter"></script>
 </body>
 </html>

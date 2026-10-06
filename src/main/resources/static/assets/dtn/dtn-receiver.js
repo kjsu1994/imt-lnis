@@ -4,7 +4,7 @@ import {initGnssControls} from './dtn-gnss.js?v=20261001-review';
 import {createDtnLog} from './dtn-log.js?v=20261001-review';
 import {initAdapterHealth} from './dtn-adapter-health.js?v=20260922-compact-structure';
 import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20261001-review';
-import {createObservationView, numeric, renderClockBias} from './dtn-observations.js?v=20261001-gnss-info';
+import {createObservationView, numeric, renderClockBias} from './dtn-observations.js?v=20261006-pvt-filter';
 
 const $ = id => document.getElementById(id);
 const payloadViewer = createPayloadViewer($('dtn-payload'), {receivedOnly: true});
@@ -70,6 +70,19 @@ observations.setData(null);
 
 function get(path) {
   return requestJson(path, {cache: 'no-store'}, {errorDetails: false});
+}
+
+function updateClockSkewWarning(connection) {
+  const warning = $('dtn-clock-skew-warning');
+  if (!warning) return;
+  const skew = connection?.peerClockSkewSeconds;
+  if (connection?.peerOnline && typeof skew === 'number' && Math.abs(skew) >= 0.5) {
+    warning.hidden = false;
+    const skewVal = $('clock-skew-val');
+    if (skewVal) skewVal.textContent = (skew > 0 ? '+' : '') + skew.toFixed(2) + 's';
+  } else {
+    warning.hidden = true;
+  }
 }
 
 const logView=createDtnLog($('dtn-log'));
@@ -319,6 +332,7 @@ async function poll(force = false) {
     tests = nextTests;
     const connection = await get('/node/connection').catch(() => ({}));
     gnss.setPeerTime(connection.peerGnssTimeState);
+    updateClockSkewWarning(connection);
     if (!peerAddressDirty) {
       $('sender-address').value = connection.baseUrl || '';
       $('reverse-state').textContent = connection.peerOnline == null ? '미확인' : connection.peerOnline ? '연결됨' : '연결 끊김';

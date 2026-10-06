@@ -16,6 +16,33 @@ export function renderClockBias(element, value) {
   element.title = Number.isFinite(value) ? String(value) + ' s' : '';
 }
 
+export function renderCnoCell(cell, cno) {
+  cell.replaceChildren();
+  if (!Number.isFinite(cno) || cno <= 0) {
+    cell.textContent = '—';
+    return;
+  }
+  const container = document.createElement('div');
+  container.className = 'cno-indicator';
+  const num = document.createElement('span');
+  num.className = 'cno-num';
+  num.textContent = String(cno);
+
+  const meter = document.createElement('span');
+  meter.className = 'cno-meter';
+  const level = cno >= 40 ? 4 : cno >= 33 ? 3 : cno >= 26 ? 2 : 1;
+  meter.classList.add('level-' + level);
+  meter.title = 'C/N₀ ' + cno + ' dB-Hz (' + (level === 4 ? '최우수' : level === 3 ? '양호' : level === 2 ? '보통' : '불량') + ')';
+
+  for (let i = 1; i <= 4; i++) {
+    const bar = document.createElement('i');
+    bar.className = 'bar b' + i;
+    meter.append(bar);
+  }
+  container.append(num, meter);
+  cell.append(container);
+}
+
 const constellation = id => ['GPS', 'SBAS', 'Galileo', 'BeiDou', 'IMES', 'QZSS', 'GLONASS', 'NavIC'][id] || ('GNSS ' + id);
 export function navigationCells(item, iq = false) {
   const n = item.message;
@@ -188,7 +215,10 @@ export function createObservationView(container, onSelect = () => {}, role = '')
         <summary>수신기 정보</summary>
         <pre id="dtn-receiver-info-body"></pre>
       </details>` : ''}</div>
-    <h3 data-observation-title>관측값 · RAWX</h3>
+    <div class="observation-header-row">
+      <h3 data-observation-title>관측값 · RAWX</h3>
+      <label class="pvt-filter-toggle"><input type="checkbox" data-pvt-filter> <span>PVT 계산 위성만 보기</span></label>
+    </div>
     <p data-delay-summary hidden></p>
     <div class="epoch-table-viewport" tabindex="0" aria-label="GNSS 관측값 표">
       <table class="epoch-observation-table"><caption>위성·신호별 관측값</caption><thead><tr>
@@ -229,6 +259,32 @@ export function createObservationView(container, onSelect = () => {}, role = '')
   container.querySelector('[data-transmit-heading]').hidden = hideTransmitEstimate;
   const select = container.querySelector('[data-epoch]');
   const body = container.querySelector('[data-observations]');
+  const filterCheckbox = container.querySelector('[data-pvt-filter]');
+  const observationTable = container.querySelector('.epoch-observation-table');
+  function applyPvtFilter() {
+    const isFiltered = !!filterCheckbox?.checked;
+    if (observationTable) {
+      if (observationTable.classList?.toggle) {
+        observationTable.classList.toggle('pvt-filter-active', isFiltered);
+      }
+    }
+    const rows = body?.children ? [...body.children] : [];
+    for (const tr of rows) {
+      const isExcluded = tr.classList?.contains ? tr.classList.contains('pvt-excluded-row')
+        : (tr.className || '').includes('pvt-excluded-row');
+      if (isExcluded) {
+        tr.hidden = isFiltered;
+        if (tr.style) tr.style.display = isFiltered ? 'none' : '';
+      } else {
+        tr.hidden = false;
+        if (tr.style) tr.style.display = '';
+      }
+    }
+  }
+  if (filterCheckbox) {
+    filterCheckbox.onchange = applyPvtFilter;
+    filterCheckbox.oninput = applyPvtFilter;
+  }
   let data = null, delayEvidence = null, report = null, pvtResults = [];
 
   const linkedNavigation = role === '수신 원본' || hideTransmitEstimate;
@@ -262,7 +318,12 @@ export function createObservationView(container, onSelect = () => {}, role = '')
   function linkSatellite(row, observation) {
     if (!linkedNavigation) return;
     const selected = !showAllNavigation && satelliteKey(observation) === selectedSatellite;
-    row.className = selected ? 'satellite-selected' : '';
+    if (row.classList?.toggle) {
+      row.classList.toggle('satellite-selected', selected);
+    } else {
+      row.className = (row.className || '').replace(/\bsatellite-selected\b/g, '').trim();
+      if (selected) row.className = (row.className ? row.className + ' ' : '') + 'satellite-selected';
+    }
     const cell = row.children[1];
     const button = document.createElement('button');
     button.type = 'button';
@@ -286,7 +347,6 @@ export function createObservationView(container, onSelect = () => {}, role = '')
   }
 
   function renderAssociation(observations) {
-    renderPvtStatus();
     renderPvtStatus();
     if (!linkedNavigation) return;
     const navigation = data?.navigation || [];
@@ -418,6 +478,16 @@ export function createObservationView(container, onSelect = () => {}, role = '')
     } else {
       for (const {index, observation} of ordered(epoch.observations)) {
         const row = document.createElement('tr');
+        const prValid = (observation.trackingStatus & 1) !== 0;
+        const isEligible = observation.constellationId === 0 && observation.signalId === 0 && prValid
+          && Number.isFinite(observation.pseudorangeMeters) && observation.pseudorangeMeters > 0
+          && Number.isFinite(observation.dopplerHz);
+        if (row.classList?.toggle) {
+          row.classList.toggle('pvt-eligible-row', isEligible);
+          row.classList.toggle('pvt-excluded-row', !isEligible);
+        } else {
+          row.className = isEligible ? 'pvt-eligible-row' : 'pvt-excluded-row';
+        }
         const values = observationCells(observation, epoch.receiverTowSeconds);
         if (hideTransmitEstimate) values.pop();
         if (comparison) {
@@ -429,9 +499,23 @@ export function createObservationView(container, onSelect = () => {}, role = '')
           const converted = matches ? satellite.recalculatedMeters : null;
           values.splice(4, 0, numeric(converted), numeric(Number.isFinite(converted) ? delayEvidence.addedMeters : null));
         }
-        for (const value of values) {
-          const cell = document.createElement('td'); cell.textContent = String(value ?? '—'); row.append(cell);
-        }
+        const cnoColIndex = comparison ? 8 : 6;
+        const pvtColIndex = comparison ? 12 : 10;
+        values.forEach((value, colIndex) => {
+          const cell = document.createElement('td');
+          if (colIndex === cnoColIndex) {
+            renderCnoCell(cell, observation.carrierToNoiseDbHz);
+          } else if (colIndex === pvtColIndex) {
+            if (value === '입력 대상') {
+              cell.innerHTML = '<span class="pill online pvt-input-badge">입력 대상</span>';
+            } else {
+              cell.innerHTML = '<span class="pvt-excluded-badge">' + value + '</span>';
+            }
+          } else {
+            cell.textContent = String(value ?? '—');
+          }
+          row.append(cell);
+        });
         linkSatellite(row, observation);
         body.append(row);
       }
@@ -468,6 +552,7 @@ export function createObservationView(container, onSelect = () => {}, role = '')
     container.querySelector('[data-status]').textContent = iq ? '위상은 상대 누적값 · F9T 편차·상태 정보 없음' : epoch ? 'RAWX v' + (epoch.rawxVersion ?? '—') + ' · 윤초 ' + ((epoch.receiverStatus & 1) ? epoch.leapSeconds + ' s' : '미확정') + ((epoch.receiverStatus & 2) ? ' · 수신기 시계 재설정' : '') + ' · 수신기 상태 0x' + epoch.receiverStatus.toString(16) : '';
 
     renderAssociation(epoch?.observations || []);
+    applyPvtFilter();
     if (notify) onSelect(Number(select.value), epoch);
   }
 
@@ -527,17 +612,35 @@ export function createObservationView(container, onSelect = () => {}, role = '')
       cells[11] = stamp ? String(stamp.seconds) + '.' + String(stamp.femtoseconds).padStart(15, '0') : '—';
       cells.splice(4, 0, numeric(delayEvidence?.error ? null : converted?.pseudorangeMeters));
       const row = document.createElement('tr');
+      const isEligible = cells[11] === '입력 대상';
+      if (row.classList?.toggle) {
+        row.classList.toggle('pvt-eligible-row', isEligible);
+        row.classList.toggle('pvt-excluded-row', !isEligible);
+      } else {
+        row.className = isEligible ? 'pvt-eligible-row' : 'pvt-excluded-row';
+      }
       cells.forEach((value, index) => {
         const cell = document.createElement('td');
-        cell.textContent = String(value ?? '—');
         if (index === 4) cell.className = 'converted-range';
         if (index === cells.length - 1 && stamp) cell.className = 'converted-value';
+        if (index === 7) {
+          renderCnoCell(cell, observation.carrierToNoiseDbHz);
+        } else if (index === 11) {
+          if (value === '입력 대상') {
+            cell.innerHTML = '<span class="pill online pvt-input-badge">입력 대상</span>';
+          } else {
+            cell.innerHTML = '<span class="pvt-excluded-badge">' + value + '</span>';
+          }
+        } else {
+          cell.textContent = String(value ?? '—');
+        }
         row.append(cell);
       });
       linkSatellite(row, observation);
       body.append(row);
     }
     renderAssociation(values);
+    applyPvtFilter();
     if (notify) onSelect(0, calculated);
   }
 

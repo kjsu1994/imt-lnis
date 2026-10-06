@@ -38,6 +38,7 @@ public final class NodeConnectionDto {
         private boolean peerOnline;
         private Boolean reverseOnline;
         private String peerGnssTimeState;
+        private Double peerClockSkewSeconds;
     }
 
     @Data

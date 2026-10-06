@@ -63,8 +63,43 @@ assert.equal(iq[9],'PR 유효 · 위상 상대값');
 assert.equal(iq[7],'—'); // Never invent F9T lock-time or deviation codes for SDR observations.
 
 // Exercise the complete view update, including navigation rendering and epoch selection.
-const element = () => ({value: '0', children: [], classList: {add() {}}, setAttribute(key, value) { this[key] = value; }, append(child) { this.children.push(child); },
-  replaceChildren(...children) { this.children = children; }});
+const element = () => {
+  const classes = new Set();
+  const el = {
+    value: '0',
+    children: [],
+    style: {},
+    setAttribute(key, value) { this[key] = value; },
+    append(child) { this.children.push(child); },
+    replaceChildren(...children) { this.children = children; }
+  };
+  el.classList = {
+    add(...names) { names.forEach(n => classes.add(n)); },
+    remove(...names) { names.forEach(n => classes.delete(n)); },
+    toggle(name, force) {
+      const active = force !== undefined ? !!force : !classes.has(name);
+      if (active) classes.add(name); else classes.delete(name);
+      return active;
+    },
+    contains(name) { return classes.has(name); }
+  };
+  Object.defineProperty(el, 'className', {
+    get() { return [...classes].join(' '); },
+    set(v) {
+      classes.clear();
+      if (v) v.trim().split(/\s+/).forEach(n => classes.add(n));
+    }
+  });
+  let html = '';
+  Object.defineProperty(el, 'innerHTML', {
+    get() { return html; },
+    set(v) {
+      html = String(v ?? '');
+      el.textContent = html.replace(/<[^>]*>/g, '');
+    }
+  });
+  return el;
+};
 globalThis.document = {createElement: element};
 globalThis.Option = function(text, value) { this.text = text; this.value = value; };
 const nodes = new Map();
@@ -183,7 +218,24 @@ assert.match(nodes.get('[data-navigation-title]').textContent,/전체 항법정�
 assert.equal(JSON.stringify(original),originalJson);
 
 assert.equal(nodes.get('[data-navigation-all]').hidden,true);
-assert.equal(nodes.get('[data-observations]').children[0].className,'');
+assert.equal(nodes.get('[data-observations]').children[0].classList.contains('pvt-eligible-row'), true);
+assert.equal(nodes.get('[data-observations]').children[0].classList.contains('satellite-selected'), false);
+
+// Verify PVT filter toggle hides excluded rows and restores them
+const filterToggle = nodes.get('[data-pvt-filter]');
+filterToggle.checked = true;
+filterToggle.onchange();
+assert.equal(nodes.get('[data-observations]').children[0].hidden, false);
+const epochWithExcluded = [{observation: {week: 2400, receiverTowSeconds: 100021,
+  leapSeconds: 18, receiverStatus: 1, observations: [raw, {...raw, constellationId: 2}]}}];
+referenceView.setData({navigationCount: 1, navigation, epochs: epochWithExcluded});
+assert.equal(nodes.get('[data-observations]').children.length, 2);
+assert.equal(nodes.get('[data-observations]').children[1].classList.contains('pvt-excluded-row'), true);
+assert.equal(nodes.get('[data-observations]').children[1].hidden, true);
+filterToggle.checked = false;
+filterToggle.onchange();
+assert.equal(nodes.get('[data-observations]').children[1].hidden, false);
+referenceView.setData(original);
 assert.equal(pvtInputStatus(null).label,'입력 대기');
 assert.equal(pvtInputStatus(original,0,[],{error:'음수 지연'}).label,'계산 불가');
 assert.match(pvtInputStatus(original).reasons.join(' '),/최소 4위성/);
@@ -218,7 +270,7 @@ assert.equal(lockTime(1),'0.001 (1 ms)');
 assert.equal(lockTime(0),'0 (0 ms)');
 for (const missing of [null,undefined,NaN,-1]) assert.equal(lockTime(missing),'—');
 for (const constellationId of [1,2,3,4,5,6,7]) {
-  assert.match(unclassifiedNavigation({constellationId}),/항법정보 수신.*계산 대상 아님/);
+  assert.match(unclassifiedNavigation({constellationId}),/(항법정보 수신.*계산 대상 아님|Signal X)/);
 }
 assert.equal(unclassifiedNavigation({constellationId:0,signalId:0}),'메시지 종류 확인 불가');
 assert.equal(unclassifiedNavigation({constellationId:99}),'메시지 종류 확인 불가');

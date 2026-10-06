@@ -25,6 +25,7 @@ public class NodePeerConnection implements java.util.function.BooleanSupplier {
     private volatile Instant lastOnline;
     private volatile Boolean reverseOnline;
     private volatile String gnssTimeState;
+    private volatile Double peerClockSkewSeconds;
 
     public String gnssTimeState() {
         return online() ? gnssTimeState : null;
@@ -32,6 +33,10 @@ public class NodePeerConnection implements java.util.function.BooleanSupplier {
 
     public Boolean reverseOnline() {
         return online() ? reverseOnline : null;
+    }
+
+    public Double peerClockSkewSeconds() {
+        return online() ? peerClockSkewSeconds : null;
     }
 
     private boolean registered;
@@ -55,6 +60,10 @@ public class NodePeerConnection implements java.util.function.BooleanSupplier {
                 lastOnline = status.isOnline() ? Instant.now() : null;
                 reverseOnline = status.getPeerOnline();
                 gnssTimeState = status.getGnssTimeState();
+                if (status.getServerTimeMillis() != null) {
+                    long diffMillis = System.currentTimeMillis() - status.getServerTimeMillis();
+                    peerClockSkewSeconds = diffMillis / 1000.0;
+                }
                 String host = checkedAddress.getHost();
                 List<String> addresses =
                         host.matches("[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+")
@@ -79,6 +88,7 @@ public class NodePeerConnection implements java.util.function.BooleanSupplier {
                     return;
                 }
                 lastOnline = null;
+                peerClockSkewSeconds = null;
                 agents.find(properties.getPeerAgentId())
                         .ifPresent(
                                 previous ->

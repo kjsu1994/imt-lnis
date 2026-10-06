@@ -1,4 +1,4 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param([string]$JavaHome, [switch]$DockerDesktop)
 $ErrorActionPreference = 'Stop'
 function Get-BridgeSettings {
@@ -53,8 +53,11 @@ $bindAddress = $settings.Bind
 if (!$bindAddress) {
     $bindAddress = '127.0.0.1'
     if (!$DockerDesktop) {
-        $route = (& wsl.exe -- sh -c 'ip -4 route show default') -join ' '
-        if ($route -match 'default via ([0-9.]+)') { $bindAddress = $Matches[1] }
+        Push-Location $env:SystemRoot
+        try {
+            $route = (& wsl.exe --cd / -- sh -c 'ip -4 route show default') -join ' '
+            if ($route -match 'default via ([0-9.]+)') { $bindAddress = $Matches[1] }
+        } finally { Pop-Location }
     }
 }
 if (!(Get-NetIPAddress -AddressFamily IPv4 | Where-Object IPAddress -eq $bindAddress)) {

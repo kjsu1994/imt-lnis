@@ -4,7 +4,7 @@ import {initGnssControls} from './dtn-gnss.js?v=20261001-review';
 import {createDtnLog} from './dtn-log.js?v=20261001-review';
 import {initAdapterHealth, validAdapterUrl} from './dtn-adapter-health.js?v=20260922-compact-settings';
 import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20261001-review';
-import {createObservationView, numeric, renderClockBias, receiverInformation} from './dtn-observations.js?v=20261001-receiver-info';
+import {createObservationView, numeric, renderClockBias, receiverInformation} from './dtn-observations.js?v=20261006-pvt-filter';
 
 const $ = id => document.getElementById(id);
 const payload = createPayloadViewer($('dtn-payload'), {sentOnly: true});
@@ -249,6 +249,18 @@ function destination(text, state = 'unknown') {
   $('destination-state').textContent = text; $('destination-dot').className = 'connection-dot ' + state;
   $('dtn-peer-summary').textContent = text;
   $('dtn-peer-summary-dot').className = 'connection-dot ' + state;
+}
+function updateClockSkewWarning(connection) {
+  const warning = $('dtn-clock-skew-warning');
+  if (!warning) return;
+  const skew = connection?.peerClockSkewSeconds;
+  if (connection?.peerOnline && typeof skew === 'number' && Math.abs(skew) >= 0.5) {
+    warning.hidden = false;
+    const skewVal = $('clock-skew-val');
+    if (skewVal) skewVal.textContent = (skew > 0 ? '+' : '') + skew.toFixed(2) + 's';
+  } else {
+    warning.hidden = true;
+  }
 }
 const buildSendUrl = () => validAdapterUrl($('dtn-send-url').value);
 const urlValid = () => !!buildSendUrl();
@@ -715,8 +727,11 @@ async function poll() {
     if (peerConfig) {
       const connection = await request('/node/connection');
       gnss.setPeerTime(connection.peerGnssTimeState);
+      updateClockSkewWarning(connection);
       if ($('dtn-receiver-ip').value === connection.ip && Number($('dtn-receiver-port').value) === connection.port)
         destination(connection.peerOnline ? '연결됨' : '연결 끊김', connection.peerOnline ? 'online' : 'offline');
+    } else {
+      updateClockSkewWarning(null);
     }
     pill('dtn-server-status', '서버 연결됨', 'online');
     for (const role of ['SENDER', 'RECEIVER']) {

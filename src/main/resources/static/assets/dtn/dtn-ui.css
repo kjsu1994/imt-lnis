@@ -983,3 +983,33 @@ body[data-page="dtn-sender"] .gnss-data-header .observation-summary { margin-lef
 .receiver-file-info[hidden] { display:none; }
 .receiver-file-info summary { cursor:pointer; color:#245787; }
 .receiver-file-info pre { position:absolute; z-index:8; top:100%; right:0; margin:6px 0 0; padding:12px; width:min(330px,calc(100vw - 60px)); box-sizing:border-box; border:1px solid #c8d5df; border-radius:6px; background:white; color:#34465a; white-space:pre-wrap; overflow-wrap:anywhere; font-size:12px; line-height:1.7; font-family:inherit; box-shadow:0 3px 10px #0002; }
+
+/* Observation header, PVT filter toggle & row highlight */
+.observation-header-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin: 14px 0 6px; }
+.observation-header-row h3 { margin: 0; }
+.pvt-filter-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #1e3a5f; cursor: pointer; user-select: none; padding: 4px 10px; border-radius: 6px; background: #eaf1f8; border: 1px solid #cad9e8; transition: background-color .15s; }
+.pvt-filter-toggle:hover { background: #dce7f3; }
+.pvt-filter-toggle input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-color: #2563eb; }
+.epoch-observation-table tr.pvt-eligible-row { background-color: #f0f7ff; }
+.epoch-observation-table tr.pvt-eligible-row td:first-child { border-left: 3px solid #2563eb; font-weight: 600; }
+.epoch-observation-table.pvt-filter-active tr.pvt-excluded-row { display: none !important; }
+.pvt-input-badge { font-size: 11px; padding: 2px 7px; }
+.pvt-excluded-badge { color: #8c9ba5; font-size: 11px; }
+
+/* C/N0 Mini Signal Bar Indicator */
+.cno-indicator { display: inline-flex; align-items: flex-end; justify-content: flex-end; gap: 6px; font-variant-numeric: tabular-nums; }
+.cno-num { font-weight: 600; min-width: 18px; text-align: right; }
+.cno-meter { display: inline-flex; align-items: flex-end; gap: 2px; height: 13px; padding-bottom: 1px; }
+.cno-meter .bar { display: inline-block; width: 3px; border-radius: 1px; background-color: #cbd5e1; }
+.cno-meter .b1 { height: 4px; }
+.cno-meter .b2 { height: 7px; }
+.cno-meter .b3 { height: 10px; }
+.cno-meter .b4 { height: 13px; }
+.cno-meter.level-4 .bar { background-color: #10b981; }
+.cno-meter.level-3 .bar:nth-child(-n+3) { background-color: #34d399; }
+.cno-meter.level-2 .bar:nth-child(-n+2) { background-color: #f59e0b; }
+.cno-meter.level-1 .bar:nth-child(1) { background-color: #ef4444; }
+
+/* Clock Skew Warning Badge */
+#dtn-clock-skew-warning { font-weight: 600; border: 1px solid #d97706; background: #fffbeb; color: #92400e; cursor: default; }
+#dtn-clock-skew-warning strong { color: #b45309; }
