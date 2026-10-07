@@ -69,8 +69,10 @@ export function lockTime(milliseconds) {
 }
 
 export function unclassifiedNavigation(message) {
+  if (!message) return '메시지 종류 확인 불가';
   if ([1, 2, 3, 4, 5, 6, 7].includes(message.constellationId)) {
-    return 'Signal X';
+    const name = constellation(message.constellationId);
+    return '항법정보 수신 · ' + name;
   }
   if (message.constellationId === 0 && Number.isInteger(message.signalId) && message.signalId !== 0) {
     return '항법정보 수신 · GPS L1 C/A 전용 계산';
@@ -78,17 +80,124 @@ export function unclassifiedNavigation(message) {
   return '메시지 종류 확인 불가';
 }
 
-export function observationCells(o, receiverTowSeconds) {
+export function navigationLabel(item) {
+  const header = item?.display;
+  const msg = item?.message || item || {};
+  const cid = msg.constellationId;
+  const words = msg.words;
+  const sig = msg.signalId;
+
+  if (cid === 0) {
+    if (header?.commonCorrection) return 'SF4 · 전리층·UTC 공통 보정';
+    const sf = header?.subframeId;
+    const labels = {1: '위성 시계·상태', 2: '궤도정보 ①', 3: '궤도정보 ②', 4: '보정·위성군 정보', 5: '위성군 정보'};
+    if (labels[sf]) {
+      return 'SF' + sf + ' · ' + labels[sf] + (header.pageId == null ? '' : ' · Page ' + header.pageId);
+    }
+    if (words && words.length === 10) {
+      const parsedSf = (Number(words[1]) >>> 8) & 0x7;
+      if (labels[parsedSf]) return 'SF' + parsedSf + ' · ' + labels[parsedSf];
+    }
+    if (Number.isInteger(sig) && sig !== 0) {
+      return '항법정보 수신 · GPS L1 C/A 전용 계산';
+    }
+    return 'GPS LNAV 항법 메시지';
+  }
+
+  if (cid === 3) {
+    if (words && words.length === 10) {
+      const w0 = Number(words[0]);
+      const frn = (w0 >>> 12) & 0x7;
+      const bdsLabels = {
+        1: 'SF1 · 위성 시계·상태 (BDS B1I)',
+        2: 'SF2 · 궤도정보 ① (BDS B1I)',
+        3: 'SF3 · 궤도정보 ② (BDS B1I)',
+        4: 'SF4 · 전리층·보정·알마낙 (BDS B1I)',
+        5: 'SF5 · 위성군 정보 (BDS B1I)'
+      };
+      if (bdsLabels[frn]) return bdsLabels[frn];
+    }
+    if (sig === 6) return 'BDS B1C CNAV1 · 보조 항법';
+    if (sig === 8) return 'BDS B2a CNAV2 · 보조 항법';
+    if (sig === 1) return 'BDS B1I D2 · GEO 항법';
+    return 'BeiDou 항법 메시지' + (Number.isInteger(sig) ? ' (신호 ' + sig + ')' : '');
+  }
+
+  if (cid === 2) {
+    if (words && words.length === 8) {
+      const w0 = Number(words[0]);
+      const type = (w0 >>> 24) & 0x3f;
+      const galLabels = {
+        0: 'Word 0 · 예비/동기 (GAL I/NAV)',
+        1: 'Word 1 · 궤도정보 ① (GAL I/NAV)',
+        2: 'Word 2 · 궤도정보 ② (GAL I/NAV)',
+        3: 'Word 3 · 궤도정보 ③ & SVID (GAL I/NAV)',
+        4: 'Word 4 · 궤도정보 ④ & 시계 (GAL I/NAV)',
+        5: 'Word 5 · 전리층·UTC 보정 (GAL I/NAV)',
+        6: 'Word 6 · GST-GPS 변환 (GAL I/NAV)',
+        7: 'Word 7 · 알마낙 ① (GAL I/NAV)',
+        8: 'Word 8 · 알마낙 ② (GAL I/NAV)',
+        9: 'Word 9 · 알마낙 ③ (GAL I/NAV)',
+        10: 'Word 10 · 알마낙 ④ (GAL I/NAV)'
+      };
+      if (galLabels[type]) return galLabels[type];
+      return 'Word ' + type + ' · I/NAV 메시지 (GAL)';
+    }
+    if (sig === 5) return 'Galileo E5a F/NAV 항법 메시지';
+    return 'Galileo 항법 메시지' + (Number.isInteger(sig) ? ' (신호 ' + sig + ')' : '');
+  }
+
+  if (cid === 5) {
+    if (words && words.length === 10) {
+      const qzssSf = (Number(words[1]) >>> 8) & 0x7;
+      const labels = {1: '위성 시계·상태', 2: '궤도정보 ①', 3: '궤도정보 ②', 4: '보정·알마낙', 5: '위성군 정보'};
+      if (labels[qzssSf]) return 'SF' + qzssSf + ' · ' + labels[qzssSf] + ' (QZSS)';
+    }
+    if (sig === 8) return 'QZSS L5 CNAV 항법 메시지';
+    return 'QZSS 항법 메시지' + (Number.isInteger(sig) ? ' (신호 ' + sig + ')' : '');
+  }
+
+  if (cid === 6) return 'GLONASS 항법 스트링 (G1/G2)';
+  if (cid === 1) return 'SBAS 보정 메시지 (L1 C/A)';
+
+  return unclassifiedNavigation(msg);
+}
+
+export function isObservationEligible(o, targetConstellation = 'GPS') {
+  const prValid = (o.trackingStatus & 1) !== 0;
+  if (!prValid || !Number.isFinite(o.pseudorangeMeters) || o.pseudorangeMeters <= 0 || !Number.isFinite(o.dopplerHz)) {
+    return false;
+  }
+  const target = String(targetConstellation || 'GPS').toUpperCase();
+  if (target === 'GPS') {
+    return o.constellationId === 0 && o.signalId === 0;
+  }
+  if (target === 'BEIDOU') {
+    return o.constellationId === 3 && (o.signalId === 0 || o.signalId === 1);
+  }
+  if (target === 'GALILEO') {
+    return o.constellationId === 2 && (o.signalId === 0 || o.signalId === 1);
+  }
+  if (target === 'ALL') {
+    return (o.constellationId === 0 && o.signalId === 0)
+      || (o.constellationId === 3 && (o.signalId === 0 || o.signalId === 1))
+      || (o.constellationId === 2 && (o.signalId === 0 || o.signalId === 1));
+  }
+  return false;
+}
+
+export function observationCells(o, receiverTowSeconds, targetConstellation = 'GPS') {
   const iq = o.source === 'IQ_TRACKING';
   const gnss = constellation(o.constellationId);
   const prValid = (o.trackingStatus & 1) !== 0;
   const cpValid = (o.trackingStatus & 2) !== 0;
+  const eligible = isObservationEligible(o, targetConstellation);
   return [gnss, o.satelliteId, iq ? 'AFS Data · L1' : o.constellationId === 0 && o.signalId === 0 ? 'L1 C/A (0)' : 'ID ' + o.signalId,
     numeric(o.pseudorangeMeters), numeric(o.carrierPhaseCycles), numeric(o.dopplerHz),
     o.carrierToNoiseDbHz, lockTime(o.lockTimeMilliseconds),
     iq ? '—' : ['PR ' + (o.pseudorangeStdDev ?? '—'), 'CP ' + (o.carrierPhaseStdDev ?? '—'), 'D ' + (o.dopplerStdDev ?? '—')].join(' / '),
     iq ? 'PR 유효 · 위상 상대값' : 'PR ' + (prValid ? '유효' : '무효') + ' · CP ' + (cpValid ? '유효' : '무효'),
-    o.constellationId === 0 && o.signalId === 0 && prValid && Number.isFinite(o.pseudorangeMeters) && o.pseudorangeMeters > 0 && Number.isFinite(o.dopplerHz) ? '입력 대상' : '제외',
+    eligible ? '입력 대상' : '제외',
     transmitTime(o, receiverTowSeconds)];
 }
 
@@ -174,24 +283,28 @@ function precedingNavigation(data, index) {
   return (data.navigation || []).filter((_, i) => restored || nav[i] != null && nav[i] < epochs[index]);
 }
 
-export function observationCounts(data, index = 0, results = [], evidence = null) {
+export function observationCounts(data, index = 0, results = [], evidence = null, targetConstellation = 'GPS') {
   const epoch = data?.epochs?.[index]?.observation;
   const wire = data?.receivedValues;
   const displayed = wire?.records?.find(r => r.observation)?.observation?.observations
     || wire?.observations || epoch?.observations || [];
   const eligible = evidence?.error ? [] : (epoch?.observations || []).filter(o =>
-    o.constellationId === 0 && o.signalId === 0 && (o.trackingStatus & 1)
-    && Number.isFinite(o.pseudorangeMeters) && o.pseudorangeMeters > 0 && Number.isFinite(o.dopplerHz));
-  const gps = new Set(displayed.filter(o => o.constellationId === 0 && o.signalId === 0).map(o => o.satelliteId));
+    isObservationEligible(o, targetConstellation));
+  const target = String(targetConstellation || 'GPS').toUpperCase();
+  const matching = new Set(displayed.filter(o => isObservationEligible(o, targetConstellation)).map(o => o.constellationId + ':' + o.satelliteId));
   const nav = precedingNavigation(data, index);
-  const complete = nav == null ? null : [...gps].filter(sv => [1, 2, 3].every(sf =>
-    nav.some(n => n.message.constellationId === 0 && n.message.satelliteId === sv && n.display?.subframeId === sf))).length;
+  const complete = (nav == null || target !== 'GPS') ? null : [...matching].filter(sv => {
+    const prn = Number(sv.split(':')[1]);
+    return [1, 2, 3].every(sf =>
+      nav.some(n => n.message.constellationId === 0 && n.message.satelliteId === prn && n.display?.subframeId === sf));
+  }).length;
   const result = results[index];
   return {
     satellites: new Set(displayed.map(o => o.constellationId + ':' + o.satelliteId)).size,
     signals: displayed.length,
-    gps: gps.size,
-    eligible: new Set(eligible.map(o => o.satelliteId)).size,
+    gps: matching.size,
+    eligible: new Set(eligible.map(o => o.constellationId + ':' + o.satelliteId)).size,
+
     complete,
     used: result?.positionValid && Number.isInteger(result.satellitesUsed) ? result.satellitesUsed : null
   };
@@ -362,10 +475,44 @@ export function createObservationView(container, onSelect = () => {}, role = '')
     allNavigation.hidden = showAllNavigation || !selected;
     allNavigation.disabled = !selected;
     allNavigation.setAttribute('aria-pressed', String(showAllNavigation));
-    const counts = [1, 2, 3].map(sf => 'SF' + sf + ' ' + matching.filter(n => n.display?.subframeId === sf).length + '건');
     const summary = container.querySelector('[data-navigation-summary]');
-    summary.textContent = selected && !showAllNavigation ? (selected.constellationId === 0 ? counts.join(' · ') + ' · 메시지 보유 현황' : 'GPS LNAV 분류 대상 아님') : '';
-    summary.title = 'SF1~3이 모두 있어도 시각·궤도 유효성과 PVT 채택은 별도입니다. GPS SF는 AFS SB와 다른 구분입니다.';
+    if (selected && !showAllNavigation) {
+      if (selected.constellationId === 0) {
+        const counts = [1, 2, 3].map(sf => 'SF' + sf + ' ' + matching.filter(n => n.display?.subframeId === sf).length + '건');
+        summary.textContent = counts.join(' · ') + ' · GPS LNAV 메시지 보유 현황';
+        summary.title = 'SF1~3이 모두 있어도 시각·궤도 유효성과 PVT 채택은 별도입니다.';
+      } else if (selected.constellationId === 3) {
+        const bdsSf = sf => matching.filter(n => {
+          const w = n.message?.words;
+          return w && w.length === 10 && ((Number(w[0]) >>> 12) & 0x7) === sf;
+        }).length;
+        const counts = [1, 2, 3, 4, 5].map(sf => 'SF' + sf + ' ' + bdsSf(sf) + '건');
+        summary.textContent = counts.join(' · ') + ' · BDS B1I 메시지 보유 현황';
+        summary.title = 'BDS B1I SF1~3(시계 및 궤도) 수신 현황입니다. 실제 계산 성공 여부는 PVT 상태를 확인하세요.';
+      } else if (selected.constellationId === 2) {
+        const galType = type => matching.filter(n => {
+          const w = n.message?.words;
+          return w && w.length === 8 && ((Number(w[0]) >>> 24) & 0x3f) === type;
+        }).length;
+        const counts = [1, 2, 3, 4, 5].map(t => 'W' + t + ' ' + galType(t) + '건');
+        summary.textContent = counts.join(' · ') + ' · GAL I/NAV 메시지 보유 현황';
+        summary.title = 'Galileo Word 1~4(궤도·시계) 및 Word 5(보정) 수신 현황입니다. Word 1~4가 모두 있어야 궤도가 복원됩니다.';
+      } else if (selected.constellationId === 5) {
+        const qzssSf = sf => matching.filter(n => {
+          const w = n.message?.words;
+          return w && w.length === 10 && ((Number(w[1]) >>> 8) & 0x7) === sf;
+        }).length;
+        const counts = [1, 2, 3].map(sf => 'SF' + sf + ' ' + qzssSf(sf) + '건');
+        summary.textContent = counts.join(' · ') + ' · QZSS L1 메시지 보유 현황';
+        summary.title = 'QZSS L1 SF1~3 수신 현황입니다.';
+      } else {
+        summary.textContent = '수신 항법 메시지 ' + matching.length + '건';
+        summary.title = '';
+      }
+    } else {
+      summary.textContent = '';
+      summary.title = '';
+    }
     container.querySelector('[data-navigation-caption]').textContent = iq ? (data.assistance || 'I/Q 복호 항법정보')
       : frame ? 'AFS 프레임 복원 · 원본 수집 순번·시각 없음' : '원본 레코드 순서 기준 · 관측 이후 메시지는 해당 시점 계산과 구분';
 
@@ -385,12 +532,7 @@ export function createObservationView(container, onSelect = () => {}, role = '')
 
     function appendMessage(target, item) {
       const row = document.createElement('tr');
-      const header = item.display;
-      const sf = header?.subframeId;
-      const labels = {1: '위성 시계·상태', 2: '궤도정보 ①', 3: '궤도정보 ②', 4: '보정·위성군 정보', 5: '위성군 정보'};
-      const label = header?.commonCorrection ? 'SF4 · 전리층·UTC 공통 보정'
-        : labels[sf] ? 'SF' + sf + ' · ' + labels[sf] + (header.pageId == null ? '' : ' · Page ' + header.pageId)
-        : unclassifiedNavigation(item.message);
+      const label = navigationLabel(item);
       const position = navigationPositions[navigation.indexOf(item)];
       const timing = frame ? '프레임 복원' : iq ? '복호·보조 정보'
         : position == null || epochPosition == null ? '순서 확인 불가'
@@ -425,16 +567,27 @@ export function createObservationView(container, onSelect = () => {}, role = '')
     common.forEach(item => appendMessage(commonBody, item));
   }
 
+  function activeConstellation() {
+    const el = typeof document !== 'undefined' && typeof document?.getElementById === 'function'
+      ? document.getElementById('dtn-pvt-constellation') : null;
+    return report?.pvtConstellation || el?.value || 'GPS';
+  }
+
+
   function renderPvtStatus() {
+    const activeSys = activeConstellation();
     const state = pvtInputStatus(data, Number(select.value) || 0, pvtResults,
       role === '수신 원본' ? delayEvidence : null);
     const counts = observationCounts(data, Number(select.value) || 0, pvtResults,
-      role === '수신 원본' ? delayEvidence : null);
+      role === '수신 원본' ? delayEvidence : null, activeSys);
     container.querySelector('[data-count]').textContent = data
       ? '관측 ' + counts.satellites + '위성 · ' + counts.signals + '신호' : '관측 신호 —';
+    const activeLabel = {GPS: 'GPS L1', BEIDOU: 'BeiDou B1I', GALILEO: 'Galileo E1', ALL: 'Multi-GNSS'}[activeSys] || activeSys;
     container.querySelector('[data-pvt-counts]').textContent = data
-      ? 'GPS L1 ' + counts.gps + ' · 입력 대상 ' + counts.eligible
-        + ' · SF1~3 확인 ' + (counts.complete ?? '—') + ' · 실제 사용 ' + (counts.used ?? '—') : '';
+      ? activeLabel + ' ' + counts.gps + ' · 입력 대상 ' + counts.eligible
+
+        + (counts.complete != null ? ' · SF1~3 확인 ' + counts.complete : '')
+        + ' · 실제 사용 ' + (counts.used ?? '—') : '';
     const label = container.querySelector('[data-pvt-status-label]');
     label.textContent = '계산 상태 · ' + state.label;
     label.className = 'pill ' + state.level;
@@ -478,17 +631,14 @@ export function createObservationView(container, onSelect = () => {}, role = '')
     } else {
       for (const {index, observation} of ordered(epoch.observations)) {
         const row = document.createElement('tr');
-        const prValid = (observation.trackingStatus & 1) !== 0;
-        const isEligible = observation.constellationId === 0 && observation.signalId === 0 && prValid
-          && Number.isFinite(observation.pseudorangeMeters) && observation.pseudorangeMeters > 0
-          && Number.isFinite(observation.dopplerHz);
+        const isEligible = isObservationEligible(observation, activeConstellation());
         if (row.classList?.toggle) {
           row.classList.toggle('pvt-eligible-row', isEligible);
           row.classList.toggle('pvt-excluded-row', !isEligible);
         } else {
           row.className = isEligible ? 'pvt-eligible-row' : 'pvt-excluded-row';
         }
-        const values = observationCells(observation, epoch.receiverTowSeconds);
+        const values = observationCells(observation, epoch.receiverTowSeconds, activeConstellation());
         if (hideTransmitEstimate) values.pop();
         if (comparison) {
           // 순서·위성·신호·원본 값을 대조하여 다른 관측의 변환값을 표시하지 않는다.
@@ -690,6 +840,7 @@ export function createObservationView(container, onSelect = () => {}, role = '')
       if (data?.epochs?.length) select.value = String(Math.min(selected || 0, data.epochs.length - 1));
       render();
     },
+    render() { render(false); },
     setPvt(values) { pvtResults = values || []; renderPvtStatus(); },
     select(index) { if (data?.epochs?.[index]) { select.value = String(index); render(false); } }
   };

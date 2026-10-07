@@ -88,9 +88,9 @@ const context = {
     else if (url.endsWith('/complete')) body = {recordCount: 2};
     else if (url.endsWith('/captures')) { assert.equal(JSON.parse(options.body).singleEpoch, true); body = {inputId: 'capture1'}; }
     else if (url.endsWith('/inputs/capture1')) body = {complete: true};
-    else if (url.endsWith('/pvt')) body = [{positionValid: true, velocityValid: true, ecefMeters: [1, 2, 3], velocityMetersPerSecond: [0, 0, 0]}];
+    else if (url.includes('/pvt')) body = [{positionValid: true, velocityValid: true, ecefMeters: [1, 2, 3], velocityMetersPerSecond: [0, 0, 0]}];
     else if (url.endsWith('/observations')) body = observations;
-    else if (url.endsWith('/delay-epochs')) body = [{epoch:{recordIndex:0,week:2400,towSeconds:1},reference:{positionValid:true}}];
+    else if (url.includes('/delay-epochs')) body = [{epoch:{recordIndex:0,week:2400,towSeconds:1},reference:{positionValid:true}}];
     else if (url.endsWith('/tests/t1/cancel')) { cancels++; currentJob = {...currentJob, state: 'CANCELLED', cancelPending: false}; body = currentJob; }
     else if (url.endsWith('/tests/t1')) body = currentJob;
     else if (url.endsWith('/report')) body = {referencePvt: [{week: 2400, towSeconds: 1,

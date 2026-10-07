@@ -24,6 +24,7 @@ import server.gnss.GrawCodec;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import server.pvt.DtnComparison;
 import server.pvt.DtnDelay;
+import server.pvt.PvtConstellation;
 
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -209,6 +210,9 @@ public class DtnController {
         @jakarta.validation.constraints.Pattern(regexp = "RESTORE|DELAY")
         private String comparisonMode;
 
+        @jakarta.validation.constraints.Pattern(regexp = "GPS|BEIDOU|GALILEO|ALL")
+        private String pvtConstellation = "GPS";
+
         private DtnDelay.Epoch selectedEpoch;
         private String senderMode;
         private String receiverMode;
@@ -275,6 +279,7 @@ public class DtnController {
         if ("RESTORE".equals(request.getComparisonMode()) && !"IQ_SAMPLE".equals(request.getTestType())) {
             throw new IllegalArgumentException("RAW·AFS는 지연 반영 PVT 시험으로 통합되었습니다.");
         }
+        var constellation = PvtConstellation.parse(request.getPvtConstellation());
         if (!"IQ_SAMPLE".equals(request.getTestType())) {
             String senderMode = request.getSenderMode();
             String receiverMode = request.getReceiverMode();
@@ -282,34 +287,65 @@ public class DtnController {
                 senderMode = "DTN";
                 receiverMode = "HDTN";
             }
-            dtnJob =
-                    dtnService.createDelay(
-                            inputId,
-                            request.getSenderAgentId(),
-                            request.getReceiverAgentId(),
-                            request.getSendUrl(),
-                            request.getTestType(),
-                            senderMode,
-                            receiverMode,
-                            request.getHdtnConfig(),
-                            request.getSelectedEpoch(),
-                            startedAt);
+            if (constellation == PvtConstellation.GPS) {
+                dtnJob =
+                        dtnService.createDelay(
+                                inputId,
+                                request.getSenderAgentId(),
+                                request.getReceiverAgentId(),
+                                request.getSendUrl(),
+                                request.getTestType(),
+                                senderMode,
+                                receiverMode,
+                                request.getHdtnConfig(),
+                                request.getSelectedEpoch(),
+                                startedAt);
+            } else {
+                dtnJob =
+                        dtnService.createDelay(
+                                inputId,
+                                request.getSenderAgentId(),
+                                request.getReceiverAgentId(),
+                                request.getSendUrl(),
+                                request.getTestType(),
+                                senderMode,
+                                receiverMode,
+                                request.getHdtnConfig(),
+                                request.getSelectedEpoch(),
+                                startedAt,
+                                constellation);
+            }
         } else if (request.getHdtnConfig() != null) {
             String senderMode = request.getSenderMode(), receiverMode = request.getReceiverMode();
             if (senderMode == null && receiverMode == null) {
                 senderMode = "DTN";
                 receiverMode = "HDTN";
             }
-            dtnJob =
-                    dtnService.create(
-                            inputId,
-                            request.getSenderAgentId(),
-                            request.getReceiverAgentId(),
-                            request.getSendUrl(),
-                            request.getTestType(),
-                            senderMode,
-                            receiverMode,
-                            request.getHdtnConfig());
+            if (constellation == PvtConstellation.GPS) {
+                dtnJob =
+                        dtnService.create(
+                                inputId,
+                                request.getSenderAgentId(),
+                                request.getReceiverAgentId(),
+                                request.getSendUrl(),
+                                request.getTestType(),
+                                senderMode,
+                                receiverMode,
+                                request.getHdtnConfig());
+            } else {
+                dtnJob =
+                        dtnService.create(
+                                inputId,
+                                request.getSenderAgentId(),
+                                request.getReceiverAgentId(),
+                                request.getSendUrl(),
+                                request.getTestType(),
+                                senderMode,
+                                receiverMode,
+                                request.getHdtnConfig(),
+                                constellation);
+            }
+
         } else if (request.getSenderMode() != null || request.getReceiverMode() != null) {
             dtnJob =
                     dtnService.create(
@@ -567,6 +603,7 @@ public class DtnController {
         result.put(
                 "comparisonMode",
                 job.getComparisonMode() == null ? "RESTORE" : job.getComparisonMode());
+        result.put("pvtConstellation", job.getPvtConstellation() == null ? "GPS" : job.getPvtConstellation());
         result.put("testStartedAt", job.getTestStartedAt());
         result.put(
                 "selectedEpoch",

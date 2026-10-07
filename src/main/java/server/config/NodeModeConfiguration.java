@@ -21,9 +21,9 @@ public class NodeModeConfiguration {
     @Bean
     server.pvt.DtnPvtCalculator dtnPvtCalculator(Environment environment) {
         var directory = java.nio.file.Path.of(environment.getProperty("lnis.native.dir", "native"));
-        return records -> {
+        return (records, constellation) -> {
             try (var codec = new server.pvt.NativePvtCodec(directory)) {
-                return codec.calculate(records);
+                return codec.calculate(records, constellation);
             }
         };
     }

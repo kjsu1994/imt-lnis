@@ -36,18 +36,34 @@ public final class DtnProcessor {
         return prepare(id, source, raw, (stage, message) -> {});
     }
 
+    public AgentResult prepare(UUID id, byte[] source, boolean raw, server.pvt.PvtConstellation constellation) {
+        return prepareDirect(id, source, raw, (stage, message) -> {}, constellation);
+    }
+
+
     public AgentResult prepare(
             UUID id,
             byte[] source,
             boolean raw,
             java.util.function.BiConsumer<String, String> progress) {
+        return prepareDirect(id, source, raw, progress, server.pvt.PvtConstellation.GPS);
+    }
+
+    private AgentResult prepareDirect(
+            UUID id,
+            byte[] source,
+            boolean raw,
+            java.util.function.BiConsumer<String, String> progress,
+            server.pvt.PvtConstellation constellation) {
         if (source.length == 0 || source.length > DtnModels.MAX_INPUT_BYTES) {
             throw new IllegalArgumentException("DTN 수집 입력은 1 MiB 이하로 제한됩니다.");
         }
+        if (constellation == null) constellation = server.pvt.PvtConstellation.GPS;
         var records = GrawCodec.splitLengthPrefixed(source);
-        AgentResult result = calculate(records, progress);
+        AgentResult result = calculate(records, progress, null, constellation);
         Transfer transfer = new Transfer();
         transfer.setTestId(id);
+        transfer.setPvtConstellation(constellation.name());
         transfer.setSourceSha256(Hashing.hex(Hashing.sha256Digest().digest(source)));
         transfer.setRecordCount(records.size());
         if (raw) {
@@ -82,13 +98,22 @@ public final class DtnProcessor {
 
     public AgentResult prepare(UUID id, byte[] source, boolean raw,
             java.time.Instant startedAt, java.util.function.BiConsumer<String, String> progress) {
-        if (startedAt == null) return prepare(id, source, raw, progress);
+        return prepare(id, source, raw, startedAt, progress, server.pvt.PvtConstellation.GPS);
+    }
+
+    public AgentResult prepare(UUID id, byte[] source, boolean raw,
+            java.time.Instant startedAt, java.util.function.BiConsumer<String, String> progress,
+            server.pvt.PvtConstellation constellation) {
+        if (constellation == null) constellation = server.pvt.PvtConstellation.GPS;
+        if (startedAt == null) return prepareDirect(id, source, raw, progress, constellation);
         if (source.length == 0 || source.length > DtnModels.MAX_INPUT_BYTES) {
             throw new IllegalArgumentException("DTN 수집 입력은 1 MiB 이하로 제한됩니다.");
         }
         var records = GrawCodec.splitLengthPrefixed(source);
-        AgentResult result = calculate(records, progress);
-        result.setTransfer(DelayTransferCodec.prepare(id, records, raw, startedAt, afs));
+        AgentResult result = calculate(records, progress, null, constellation);
+        Transfer transfer = DelayTransferCodec.prepare(id, records, raw, startedAt, afs);
+        transfer.setPvtConstellation(constellation.name());
+        result.setTransfer(transfer);
         for (var epoch : result.getObservations().epochs()) {
             for (var observation : epoch.observation().observations()) {
                 double range = observation.pseudorangeMeters();
@@ -124,6 +149,8 @@ public final class DtnProcessor {
             Transfer transfer,
             java.util.function.BiConsumer<String, String> progress,
             DtnDelay.Timing timing) {
+        server.pvt.PvtConstellation constellation =
+                server.pvt.PvtConstellation.parse(transfer != null ? transfer.getPvtConstellation() : null);
 
         if (DelayTransferCodec.supports(transfer)) {
             if (!id.equals(transfer.getTestId())) throw new IllegalArgumentException("시험 ID 불일치");
@@ -147,7 +174,7 @@ public final class DtnProcessor {
             }
             var restored = DelayTransferCodec.restore(transfer, afs, timing);
             progress.accept("의사거리 계산", "P′ = c × (본문 수신 완료 − 가상 송신 시각) · 프레임/변환 RAW만 사용");
-            AgentResult result = calculate(restored.records(), progress);
+            AgentResult result = calculate(restored.records(), progress, null, constellation);
             result.setDelayEvidence(restored.evidence());
             result.setObservations(result.getObservations().withReceivedValues(restored.receivedValues()));
             return result;
@@ -163,7 +190,7 @@ public final class DtnProcessor {
                     "프레임/원본 검증 완료 · "
                             + restored.frameCount()
                             + " frames · PVT 입력 출처: AFS 프레임 · metadata 계산 대체 없음");
-            AgentResult result = calculate(restored.calculation(), progress, timing);
+            AgentResult result = calculate(restored.calculation(), progress, timing, constellation);
             result.setObservations(
                     server.common.DtnObservationView.fromRecords(restored.source())
                             .withFrameInput(restored.calculation(), restored.frameCount()));
@@ -193,10 +220,10 @@ public final class DtnProcessor {
             progress.accept("AFS 복원", "CRC·원본 0101 패턴 검사 → SB2 항법정보와 관측 metadata 결합");
             var records = AfsMetadataCodec.restore(transfer, afs);
             progress.accept("AFS 복원", "GRAW 복원·SHA-256 검증 완료 · " + records.size() + " records");
-            return calculate(records, progress, timing);
+            return calculate(records, progress, timing, constellation);
         }
         if (transfer != null && "LNIS-GRAW-RAW-v1".equals(transfer.getFormat())) {
-            return receiveRaw(id, transfer, progress, timing);
+            return receiveRaw(id, transfer, progress, timing, constellation);
         }
         if (transfer == null
                 || !id.equals(transfer.getTestId())
@@ -260,14 +287,15 @@ public final class DtnProcessor {
                         + " records · "
                         + source.size()
                         + " bytes");
-        return calculate(records, progress, timing);
+        return calculate(records, progress, timing, constellation);
     }
 
     private AgentResult receiveRaw(
             UUID id,
             Transfer transfer,
             java.util.function.BiConsumer<String, String> progress,
-            DtnDelay.Timing timing) {
+            DtnDelay.Timing timing,
+            server.pvt.PvtConstellation constellation) {
         progress.accept("RAW 복원", "Base64 복원·크기·SHA-256·레코드 수 확인 시작");
         if (!id.equals(transfer.getTestId())
                 || transfer.getSchemaVersion() != 1
@@ -296,18 +324,27 @@ public final class DtnProcessor {
                         + " records · "
                         + source.length
                         + " bytes");
-        return calculate(records, progress, timing);
+        return calculate(records, progress, timing, constellation);
     }
 
     private AgentResult calculate(
             List<byte[]> records, java.util.function.BiConsumer<String, String> progress) {
-        return calculate(records, progress, null);
+        return calculate(records, progress, null, server.pvt.PvtConstellation.GPS);
     }
 
     private AgentResult calculate(
             List<byte[]> records,
             java.util.function.BiConsumer<String, String> progress,
             DtnDelay.Timing timing) {
+        return calculate(records, progress, timing, server.pvt.PvtConstellation.GPS);
+    }
+
+    private AgentResult calculate(
+            List<byte[]> records,
+            java.util.function.BiConsumer<String, String> progress,
+            DtnDelay.Timing timing,
+            server.pvt.PvtConstellation constellation) {
+        if (constellation == null) constellation = server.pvt.PvtConstellation.GPS;
         AgentResult result = new AgentResult();
         result.setObservations(server.common.DtnObservationView.fromRecords(records));
         if (timing != null) {
@@ -323,10 +360,10 @@ public final class DtnProcessor {
             }
             records = converted.records();
         }
-        progress.accept("PVT", "지구 PVT 계산 시작 · " + records.size() + " records");
+        progress.accept("PVT", constellation.label() + " 지구 PVT 계산 시작 · " + records.size() + " records");
         long started = System.nanoTime();
         try (var pvt = new NativePvtCodec(nativeDirectory)) {
-            result.setPvt(pvt.calculate(records));
+            result.setPvt(pvt.calculate(records, constellation));
         } catch (RuntimeException error) {
             if (timing == null) {
                 throw error;

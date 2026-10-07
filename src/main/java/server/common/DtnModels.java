@@ -29,6 +29,10 @@ public final class DtnModels {
         /** Adapter dispatch key; absent in legacy AFS v1 requests. */
         private String testType = "AFS_METADATA";
 
+        @com.fasterxml.jackson.annotation.JsonInclude(
+                com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+        private String pvtConstellation = "GPS";
+
         private String senderMode;
         private String receiverMode;
 

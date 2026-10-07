@@ -61,6 +61,17 @@
       <button type="button" class="test-type-button" data-test-type="IQ_SAMPLE">I/Q Sample</button>
     </div>
 
+    <div class="pvt-constellation-section">
+      <div class="pvt-constellation-title"><span>PVT 계산 대상 (Constellation)</span><strong id="dtn-pvt-constellation-state">GPS</strong></div>
+      <div class="pvt-constellation-selector" aria-label="PVT 계산 대상 항법위성군">
+        <button type="button" class="pvt-constellation-button active" data-constellation="GPS">GPS</button>
+        <button type="button" class="pvt-constellation-button" data-constellation="BEIDOU">BeiDou</button>
+        <button type="button" class="pvt-constellation-button" data-constellation="GALILEO">Galileo</button>
+        <button type="button" class="pvt-constellation-button" data-constellation="ALL">Multi-GNSS</button>
+      </div>
+      <input type="hidden" id="dtn-pvt-constellation" value="GPS">
+    </div>
+
     <div class="transport-mode-section">
       <div class="transport-mode-title"><span>전송 경로</span><strong id="dtn-transport-mode-state">어댑터 적용 전</strong></div>
       <div class="transport-mode-selector">
@@ -270,5 +281,5 @@
   </div>
   </div>
 </main>
-<script type="module" src="/lnis/assets/dtn/dtn.js?v=20261006-pvt-filter"></script>
+<script type="module" src="/lnis/assets/dtn/dtn.js?v=20261007-multi-pvt"></script>
 </body></html>

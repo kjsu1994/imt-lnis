@@ -42,7 +42,7 @@ public class DtnExampleController {
         return read(syntheticFile, "synthetic-earth-pvt.graw");
     }
 
-    @Value("${lnis.dtn.real-file:}")
+    @Value("${lnis.dtn.real-file:/app/examples/real-gnss-10epochs.graw}")
     private String realFile;
 
     @GetMapping("/lnis/api/v1/dtn/example/real/file")
@@ -70,10 +70,22 @@ public class DtnExampleController {
         }
     }
     private ResponseEntity<byte[]> read(String file, String filename) throws IOException {
-        if (file.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "예제 파일 미설정");
+        Path path = null;
+        if (file != null && !file.isBlank()) {
+            path = Path.of(file);
         }
-        Path path = Path.of(file);
+        if (path == null || !Files.isRegularFile(path)) {
+            for (String fallback : java.util.List.of(
+                    "/app/examples/" + filename,
+                    "examples/" + filename,
+                    "C:/lnis-compose/examples/" + filename)) {
+                Path p = Path.of(fallback);
+                if (Files.isRegularFile(p)) {
+                    path = p;
+                    break;
+                }
+            }
+        }
         if (!Files.isRegularFile(path) || Files.size(path) > DtnModels.MAX_INPUT_BYTES) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "예제 파일 확인 필요");
         }

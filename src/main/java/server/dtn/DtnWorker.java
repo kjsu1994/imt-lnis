@@ -49,6 +49,12 @@ public final class DtnWorker implements AutoCloseable {
 
     public void prepare(UUID id, byte[] data, boolean raw, java.time.Instant startedAt,
             BiConsumer<String, String> progress, Consumer<AgentResult> output) {
+        prepare(id, data, raw, startedAt, server.pvt.PvtConstellation.GPS, progress, output);
+    }
+
+    public void prepare(UUID id, byte[] data, boolean raw, java.time.Instant startedAt,
+            server.pvt.PvtConstellation constellation,
+            BiConsumer<String, String> progress, Consumer<AgentResult> output) {
         if (role != AgentRole.SENDER) {
             throw new IllegalArgumentException("DTN 작업과 실행기 역할이 다릅니다.");
         }
@@ -56,7 +62,11 @@ public final class DtnWorker implements AutoCloseable {
             throw new IllegalArgumentException("DTN 수집 입력은 1 MiB 이하로 제한됩니다.");
         }
         byte[] snapshot = data.clone();
-        submit(id, () -> processor.prepare(id, snapshot, raw, startedAt, progress(id, progress)), output);
+        if (constellation == null || constellation == server.pvt.PvtConstellation.GPS) {
+            submit(id, () -> processor.prepare(id, snapshot, raw, startedAt, progress(id, progress)), output);
+        } else {
+            submit(id, () -> processor.prepare(id, snapshot, raw, startedAt, progress(id, progress), constellation), output);
+        }
     }
 
     public void receive(

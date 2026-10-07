@@ -60,16 +60,23 @@ public class DtnInputViewController {
         return result;
     }
 
+    public java.util.List<DtnModels.Pvt> pvt(UUID id) throws java.io.IOException {
+        return pvt(id, null);
+    }
+
     @GetMapping("/{id}/pvt")
-    public java.util.List<DtnModels.Pvt> pvt(@PathVariable UUID id) throws java.io.IOException {
+    public java.util.List<DtnModels.Pvt> pvt(
+            @PathVariable UUID id,
+            @RequestParam(required = false) String constellation) throws java.io.IOException {
         var records = records(id);
         long started = System.nanoTime();
+        var target = server.pvt.PvtConstellation.parse(constellation);
         if (logs != null) {
-            logs.add(id, "INPUT", "PVT", true, "지구 PVT 계산·수집 결과 조회 시작");
+            logs.add(id, "INPUT", "PVT", true, "지구 PVT 계산·수집 결과 조회 시작 (" + target.name() + ")");
         }
         try {
             String captured = inputs.get(id).capturedPvtJson();
-            if (captured != null) {
+            if (captured != null && (constellation == null || target == server.pvt.PvtConstellation.GPS)) {
                 java.util.List<DtnModels.Pvt> result =
                         json.readValue(
                                 captured, new com.fasterxml.jackson.core.type.TypeReference<>() {});
@@ -82,11 +89,14 @@ public class DtnInputViewController {
             if (calculator == null) {
                 throw new IllegalStateException("PVT 미리보기는 통합 노드 실행에서 지원됩니다.");
             }
-            var result = calculator.calculate(records);
+            var result = target == server.pvt.PvtConstellation.GPS
+                    ? calculator.calculate(records)
+                    : calculator.calculate(records, target);
             if (logs != null) {
                 logs.pvt(id, "INPUT", result, started);
             }
             return result;
+
         } catch (RuntimeException | java.io.IOException error) {
             if (logs != null) {
                 logs.add(id, "INPUT", "WARN", "PVT", false, "미리보기 불가 · " + error.getMessage());
@@ -98,8 +108,10 @@ public class DtnInputViewController {
     @org.springframework.beans.factory.annotation.Autowired private DtnService dtnService;
 
     @GetMapping("/{id}/delay-epochs")
-    public java.util.List<DtnService.EpochChoice> delayEpochs(@PathVariable UUID id) {
-        return dtnService.delayEpochs(id);
+    public java.util.List<DtnService.EpochChoice> delayEpochs(
+            @PathVariable UUID id,
+            @RequestParam(required = false, defaultValue = "GPS") String constellation) {
+        return dtnService.delayEpochs(id, server.pvt.PvtConstellation.parse(constellation));
     }
 
     private java.util.List<byte[]> records(UUID id) {

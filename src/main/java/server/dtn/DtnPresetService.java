@@ -32,10 +32,27 @@ public class DtnPresetService {
             @NotNull @Pattern(regexp = "GNSS_RAW|AFS_METADATA|IQ_SAMPLE") String testType,
             @NotNull @Pattern(regexp = "DTN|HDTN") String senderMode,
             @NotNull @Pattern(regexp = "DTN|HDTN") String receiverMode,
+            @Pattern(regexp = "GPS|BEIDOU|GALILEO|ALL") String pvtConstellation,
             @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.WRITE_ONLY)
             Boolean delayEnabled,
             @NotNull @Valid @JsonDeserialize(using = HdtnConfigRequestDeserializer.class)
-                    HdtnConfig hdtnConfig) {}
+                    HdtnConfig hdtnConfig) {
+
+        public Settings(
+                String testType,
+                String senderMode,
+                String receiverMode,
+                Boolean delayEnabled,
+                HdtnConfig hdtnConfig) {
+            this(testType, senderMode, receiverMode, "GPS", delayEnabled, hdtnConfig);
+        }
+
+        public Settings {
+            if (pvtConstellation == null || pvtConstellation.isBlank()) {
+                pvtConstellation = "GPS";
+            }
+        }
+    }
 
     public record Save(
             @NotBlank @Size(max = 40) String name,

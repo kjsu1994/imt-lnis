@@ -28,6 +28,7 @@ import server.node.AgentRepository;
 import server.pvt.DtnComparison;
 import server.pvt.DtnDelay;
 import server.pvt.DtnPvtCalculator;
+import server.pvt.PvtConstellation;
 
 import java.io.ByteArrayOutputStream;
 import java.net.URI;
@@ -126,12 +127,19 @@ public class DtnService {
     }
 
     public List<EpochChoice> delayEpochs(UUID inputId) {
+        return delayEpochs(inputId, PvtConstellation.GPS);
+    }
+
+    public List<EpochChoice> delayEpochs(UUID inputId, PvtConstellation constellation) {
         if (pvtCalculator == null) {
             throw new IllegalStateException("지연 시험은 통합 노드에서 지원됩니다.");
         }
+        if (constellation == null) {
+            constellation = PvtConstellation.GPS;
+        }
 
         var records = GrawCodec.splitLengthPrefixed(readInput(inputId));
-        var values = pvtCalculator.calculate(records);
+        var values = pvtCalculator.calculate(records, constellation);
         List<EpochChoice> choices = new ArrayList<>();
         int pvtIndex = 0;
 
@@ -166,15 +174,45 @@ public class DtnService {
             HdtnConfig config,
             DtnDelay.Epoch epoch,
             Instant startedAt) {
+        return createDelay(
+                inputId,
+                sender,
+                receiver,
+                url,
+                testType,
+                senderMode,
+                receiverMode,
+                config,
+                epoch,
+                startedAt,
+                PvtConstellation.GPS);
+    }
+
+    public synchronized DtnJob createDelay(
+            UUID inputId,
+            String sender,
+            String receiver,
+            String url,
+            String testType,
+            String senderMode,
+            String receiverMode,
+            HdtnConfig config,
+            DtnDelay.Epoch epoch,
+            Instant startedAt,
+            PvtConstellation constellation) {
         if (pvtCalculator == null || nodeLink == null || !nodeLink.sender()) {
             throw new IllegalStateException("지연 시험은 송신 통합 노드에서 시작하세요.");
         }
         if (!List.of("GNSS_RAW", "AFS_METADATA").contains(testType)) {
             throw new IllegalArgumentException("지연 시험 유형 오류");
         }
+        if (constellation == null) {
+            constellation = PvtConstellation.GPS;
+        }
         if (epoch == null) {
+            final PvtConstellation targetConstellation = constellation;
             epoch =
-                    delayEpochs(inputId).stream()
+                    delayEpochs(inputId, targetConstellation).stream()
                             .filter(choice -> choice.reference().isPositionValid() || approvedCapture(inputId))
                             .map(EpochChoice::epoch)
                             .findFirst()
@@ -192,7 +230,8 @@ public class DtnService {
                 receiverMode,
                 config,
                 epoch,
-                startedAt);
+                startedAt,
+                constellation);
     }
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
@@ -287,6 +326,28 @@ public class DtnService {
             String senderMode,
             String receiverMode,
             HdtnConfig hdtnConfig) {
+        return create(
+                inputId,
+                sender,
+                receiver,
+                requestedUrl,
+                testType,
+                senderMode,
+                receiverMode,
+                hdtnConfig,
+                PvtConstellation.GPS);
+    }
+
+    public synchronized DtnJob create(
+            UUID inputId,
+            String sender,
+            String receiver,
+            String requestedUrl,
+            String testType,
+            String senderMode,
+            String receiverMode,
+            HdtnConfig hdtnConfig,
+            PvtConstellation constellation) {
         return createConfigured(
                 inputId,
                 sender,
@@ -297,7 +358,8 @@ public class DtnService {
                 receiverMode,
                 hdtnConfig,
                 null,
-                null);
+                null,
+                constellation);
     }
 
     private DtnJob createConfigured(
@@ -311,6 +373,35 @@ public class DtnService {
             HdtnConfig hdtnConfig,
             DtnDelay.Epoch epoch,
             Instant startedAt) {
+        return createConfigured(
+                inputId,
+                sender,
+                receiver,
+                requestedUrl,
+                testType,
+                senderMode,
+                receiverMode,
+                hdtnConfig,
+                epoch,
+                startedAt,
+                PvtConstellation.GPS);
+    }
+
+    private DtnJob createConfigured(
+            UUID inputId,
+            String sender,
+            String receiver,
+            String requestedUrl,
+            String testType,
+            String senderMode,
+            String receiverMode,
+            HdtnConfig hdtnConfig,
+            DtnDelay.Epoch epoch,
+            Instant startedAt,
+            PvtConstellation constellation) {
+        if (constellation == null) {
+            constellation = PvtConstellation.GPS;
+        }
         if (hdtnConfig != null && !"HDTN".equals(senderMode) && !"HDTN".equals(receiverMode)) {
             throw new IllegalArgumentException("HDTN 설정은 HDTN이 포함된 전송 경로에서만 사용할 수 있습니다.");
         }
@@ -337,7 +428,7 @@ public class DtnService {
         byte[] data = readInput(inputId);
         if (epoch != null) {
             data = DtnDelay.select(GrawCodec.splitLengthPrefixed(data), epoch);
-            var reference = pvtCalculator.calculate(GrawCodec.splitLengthPrefixed(data));
+            var reference = pvtCalculator.calculate(GrawCodec.splitLengthPrefixed(data), constellation);
             if (reference.size() != 1
                     || (!reference.getFirst().isPositionValid() && !approvedCapture(inputId))) {
                 throw new IllegalArgumentException("선택 Epoch의 Reference 위치 PVT를 계산할 수 없습니다.");
@@ -351,6 +442,7 @@ public class DtnService {
         DtnJob job = newJob(sender, receiver, destination, testType, senderMode, receiverMode);
         job.setHdtnConfigJson(hdtnConfigJson);
         job.setInputId(inputId);
+        job.setPvtConstellation(constellation.name());
         if (epoch != null) {
             job.setComparisonMode("DELAY");
             job.setTestStartedAt(java.util.Objects.requireNonNull(startedAt));
@@ -363,7 +455,7 @@ public class DtnService {
                     job.getId(),
                     "송신 시험 조건",
                     false,
-                    "지연 반영 비교 · 1 Epoch · 선택 " + epoch + " · 시험용 입력 " + data.length + " bytes");
+                    "지연 반영 비교 · 1 Epoch · 선택 " + epoch + " · " + constellation.name() + " · 시험용 입력 " + data.length + " bytes");
             trace(
                     job.getId(),
                     "송신 시작",
@@ -378,6 +470,7 @@ public class DtnService {
                     data,
                     "GNSS_RAW".equals(testType),
                     startedAt,
+                    constellation,
                     (stage, message) -> calculationProgress(job.getId(), stage, message),
                     result -> calculated(sender, job.getId(), result));
         } catch (RuntimeException e) {
@@ -901,6 +994,9 @@ public class DtnService {
             throw new IllegalArgumentException("시험 유형 오류");
         }
         job.setTestType(type);
+        if (received.hasNonNull("pvtConstellation")) {
+            job.setPvtConstellation(received.get("pvtConstellation").asText("GPS"));
+        }
         if ("IQ_SAMPLE".equals(type)) {
             String path = received.path("file").path("filePath").asText();
             if (!path.matches("/exchange/[0-9a-fA-F-]{36}\\.bin")) {
@@ -1749,6 +1845,7 @@ public class DtnService {
         expected.setReceiverMode(job.getReceiverMode());
         expected.setHdtnConfig(job.getHdtnConfigJson() == null ? null
                 : objectMapper.readValue(job.getHdtnConfigJson(), HdtnConfig.class));
+        expected.setPvtConstellation(job.getPvtConstellation() == null ? "GPS" : job.getPvtConstellation());
         String hash = DtnPayloadDigest.sha256(objectMapper,
                 objectMapper.readTree(objectMapper.writeValueAsBytes(
                         server.afs.DelayTransferCodec.packet(objectMapper, expected))));

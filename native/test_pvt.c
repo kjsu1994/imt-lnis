@@ -70,6 +70,20 @@ int main(void) {
     assert(sqrt(error)<100);
     assert(result_a[8]==1);
     for(j=0;j<9;j++) assert(result_a[j]==result_b[j]);
+
+    /* 범용 lnis_pvt_solve 5-tuple 검증 */
+    double obs5[32*5], result_multi[9];
+    for(j=0;j<n;j++) {
+        obs5[j*5+0] = LNIS_SYS_GPS;
+        obs5[j*5+1] = obs[j*4+0];
+        obs5[j*5+2] = obs[j*4+1];
+        obs5[j*5+3] = obs[j*4+2];
+        obs5[j*5+4] = obs[j*4+3];
+    }
+    status = lnis_pvt_solve(a, LNIS_SYS_GPS, week, 100000, obs5, n, result_multi, message, sizeof(message));
+    assert(status == 1);
+    for(j=0;j<9;j++) assert(result_a[j] == result_multi[j]);
+
     lnis_pvt_destroy(a); lnis_pvt_destroy(b);
     puts("Native PVT synthetic test passed.");
     return 0;

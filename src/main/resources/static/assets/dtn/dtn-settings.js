@@ -94,7 +94,7 @@ export function initPresetControls({read, apply, isLocked}) {
   let rows = [], loaded = null, pending = false, operation = '', base = null, opener = null;
   const message = text => { $('preset-status').textContent = text; };
   const chosen = () => rows.find(row => row.id === select.value);
-  const describe = row => row.name + ' · ' + types[row.settings.testType] + ' · ' + row.settings.senderMode + '→' + row.settings.receiverMode;
+  const describe = row => row.name + ' · ' + types[row.settings.testType] + (row.settings.pvtConstellation && row.settings.pvtConstellation !== 'GPS' ? ' (' + row.settings.pvtConstellation + ')' : '') + ' · ' + row.settings.senderMode + '→' + row.settings.receiverMode;
   const api = (path = '', method = 'GET', body) => requestJson('/dtn/presets' + path, {
     method, cache: 'no-store', headers: {'Content-Type': 'application/json'},
     ...(body ? {body: JSON.stringify(body)} : {})

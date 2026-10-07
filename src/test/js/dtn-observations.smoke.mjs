@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {numeric, clockBias, renderClockBias, observationCells, navigationCells, createObservationView, transmitTime, pvtInputStatus, lockTime, unclassifiedNavigation, receiverInformation, observationCounts} from '../../main/resources/static/assets/dtn/dtn-observations.js';
+import {numeric, clockBias, renderClockBias, observationCells, navigationCells, createObservationView, transmitTime, pvtInputStatus, lockTime, unclassifiedNavigation, navigationLabel, receiverInformation, observationCounts} from '../../main/resources/static/assets/dtn/dtn-observations.js';
 
 assert.equal(numeric(null), '—');
 assert.equal(numeric(NaN), '—');
@@ -270,11 +270,19 @@ assert.equal(lockTime(1),'0.001 (1 ms)');
 assert.equal(lockTime(0),'0 (0 ms)');
 for (const missing of [null,undefined,NaN,-1]) assert.equal(lockTime(missing),'—');
 for (const constellationId of [1,2,3,4,5,6,7]) {
-  assert.match(unclassifiedNavigation({constellationId}),/(항법정보 수신.*계산 대상 아님|Signal X)/);
+  assert.match(unclassifiedNavigation({constellationId}),/항법정보 수신/);
 }
 assert.equal(unclassifiedNavigation({constellationId:0,signalId:0}),'메시지 종류 확인 불가');
 assert.equal(unclassifiedNavigation({constellationId:99}),'메시지 종류 확인 불가');
 assert.match(unclassifiedNavigation({constellationId:0,signalId:3}),/GPS L1 C\/A 전용/);
+
+// Multi-GNSS navigation label formatting
+assert.match(navigationLabel({message: {constellationId: 3, signalId: 0, words: [(0x712 << 19) | (1 << 12), 0, 0, 0, 0, 0, 0, 0, 0, 0]}}), /SF1 · 위성 시계·상태 \(BDS B1I\)/);
+assert.match(navigationLabel({message: {constellationId: 3, signalId: 0, words: [(0x712 << 19) | (2 << 12), 0, 0, 0, 0, 0, 0, 0, 0, 0]}}), /SF2 · 궤도정보 ① \(BDS B1I\)/);
+assert.match(navigationLabel({message: {constellationId: 2, signalId: 1, words: [1 << 24, 0, 0, 0, 0, 0, 0, 0]}}), /Word 1 · 궤도정보 ① \(GAL I\/NAV\)/);
+assert.match(navigationLabel({message: {constellationId: 2, signalId: 1, words: [4 << 24, 0, 0, 0, 0, 0, 0, 0]}}), /Word 4 · 궤도정보 ④ & 시계 \(GAL I\/NAV\)/);
+assert.match(navigationLabel({message: {constellationId: 5, signalId: 0, words: [0, 1 << 8, 0, 0, 0, 0, 0, 0, 0, 0]}}), /SF1 · 위성 시계·상태 \(QZSS\)/);
+assert.match(navigationLabel({message: {constellationId: 6}}), /GLONASS 항법 스트링/);
 console.log('PASS: unsupported constellations versus unknown messages, RAWX lock saturation and missing values');
 
 const stats = observationCounts(ready,0,[{positionValid:true,satellitesUsed:3}]);

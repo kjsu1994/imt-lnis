@@ -42,6 +42,7 @@ public class DtnJob {
     @Lob private String hdtnConfigJson;
 
     private String comparisonMode;
+    private String pvtConstellation;
     @Column(columnDefinition = "timestamp(9) with time zone")
     private Instant testStartedAt;
     @Lob private String selectedEpochJson;

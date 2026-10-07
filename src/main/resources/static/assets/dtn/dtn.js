@@ -9,7 +9,7 @@ import {createObservationView, numeric, renderClockBias, receiverInformation} fr
 const $ = id => document.getElementById(id);
 const payload = createPayloadViewer($('dtn-payload'), {sentOnly: true});
 let inputId = null, agents = [], busy = false, job = null, config = {}, peerConfig = null;
-let selectedType = 'AFS_METADATA', senderMode = 'DTN', receiverMode = 'HDTN';
+let selectedType = 'AFS_METADATA', senderMode = 'DTN', receiverMode = 'HDTN', pvtConstellation = 'GPS';
 let pvt = [], inputPvt = [], epochIndex = 0, reportKey = '', lastAgentState = '';
 let polling = false, inputMode = 'upload';
 let delayChoices = [], preparedEpoch = null, inputView = false;
@@ -204,7 +204,7 @@ function updateHdtnControls() {
   $('hdtn-config-state').textContent = message;
 }
 const presets = initPresetControls({read: () => ({
-  testType: selectedType, senderMode, receiverMode,
+  testType: selectedType, senderMode, receiverMode, pvtConstellation,
   hdtnConfig: readHdtnConfig()
 }), isLocked: locked, apply: settings => {
   if (locked()) throw new Error('처리 중에는 불러올 수 없습니다.');
@@ -212,6 +212,7 @@ const presets = initPresetControls({read: () => ({
       || !['DTN', 'HDTN'].includes(settings.senderMode) || !['DTN', 'HDTN'].includes(settings.receiverMode)) throw new Error('프리셋 설정을 확인하세요.');
   const configValues = Object.fromEntries(Object.keys(hdtnRules).map(key => [key, hdtnValue(key, String(settings.hdtnConfig?.[key] ?? ''))]));
   selectedType = settings.testType; senderMode = settings.senderMode; receiverMode = settings.receiverMode;
+  pvtConstellation = settings.pvtConstellation || 'GPS';
   for (const [key, value] of Object.entries(configValues)) $('hdtn-' + key).value = String(value);
   for (const button of document.querySelectorAll('.test-type-button')) {
     const selected = button.dataset.testType === selectedType;
@@ -221,9 +222,29 @@ const presets = initPresetControls({read: () => ({
     const selected = button.dataset.senderMode === senderMode && button.dataset.receiverMode === receiverMode;
     button.classList.toggle('active', selected); button.setAttribute('aria-pressed', String(selected));
   }
+  for (const button of document.querySelectorAll('.pvt-constellation-button')) {
+    const selected = button.dataset.constellation === pvtConstellation;
+    button.classList.toggle('active', selected); button.setAttribute('aria-pressed', String(selected));
+    if (selected && $('dtn-pvt-constellation-state')) $('dtn-pvt-constellation-state').textContent = button.textContent;
+  }
+  if ($('dtn-pvt-constellation')) $('dtn-pvt-constellation').value = pvtConstellation;
   $('dtn-transport-mode-state').textContent = senderMode + ' → ' + receiverMode + ' · 전송 요청에 포함';
-  saveHdtnConfig(configValues); updateInputPanels(); updateControls();
-}});
+  saveHdtnConfig(configValues); updateInputPanels();
+
+  if (inputId) {
+    void (async () => {
+      await reloadInputPvt();
+      if (delayMode()) await loadDelayEpochs();
+      view.render();
+      renderPvt();
+      updateControls();
+    })();
+  } else {
+    updateControls();
+  }
+}
+});
+
 let mainScrollY = 0;
 function showSettings(open) {
   if (open && $('dtn-settings-view').hidden) { mainScrollY = window.scrollY; void presets.refresh(); }
@@ -237,7 +258,8 @@ $('dtn-settings-open').onclick = () => showSettings($('dtn-settings-view').hidde
 $('dtn-settings-close').onclick = () => showSettings(false);
 function updateInputSummary() {
   const type = {GNSS_RAW: 'GNSS RAW', AFS_METADATA: 'AFS Frame', IQ_SAMPLE: 'I/Q Sample'}[selectedType];
-  $('dtn-condition-summary').textContent = type + ' · ' + senderMode + ' → ' + receiverMode + (delayMode() ? ' · 지연 반영 1 Epoch' : '');
+  const sysLabel = pvtConstellation !== 'GPS' ? ' (' + pvtConstellation + ')' : '';
+  $('dtn-condition-summary').textContent = type + sysLabel + ' · ' + senderMode + ' → ' + receiverMode + (delayMode() ? ' · 지연 반영 1 Epoch' : '');
   const source = inputMode === 'capture' ? 'COM ' + ($('dtn-port').value || '미선택') : 'GNSS 파일';
   const epoch = delayMode() ? selectedDelayEpoch()?.epoch : null;
   $('dtn-input-summary').textContent = source + ' · ' + $('dtn-input-state').textContent
@@ -272,12 +294,12 @@ function renderPvt() {
     $('pvt-v' + axis).textContent = numeric(value?.velocityValid ? value.velocityMetersPerSecond?.[i] : null);
   }
   $('dtn-gnss-time').textContent = value ? 'Week ' + value.week + ' / TOW ' + numeric(value.towSeconds) + ' s' : '—';
-  $('pvt-satellites').textContent = value?.satellitesUsed ?? '—';
+  $('pvt-satellites').textContent = value?.positionValid && value?.satellitesUsed != null ? value.satellitesUsed : '—';
   renderClockBias($('pvt-clock'), value?.positionValid ? value.receiverClockBiasSeconds : null);
   pill('pvt-validity', !value ? '계산 대기' : '위치 ' + (value.positionValid ? '유효' : '무효') + ' · 속도 ' + (value.velocityValid ? '유효' : '무효'),
     !value ? '' : value.positionValid && value.velocityValid ? 'online' : 'warning');
-  $('pvt-message').textContent = value?.message || '지구 ECEF · GPS L1 C/A · 전송시험 시작 시 계산';
-
+  const sysLabel = job?.pvtConstellation || pvtConstellation || 'GPS';
+  $('pvt-message').textContent = value?.message || ('지구 ECEF · ' + sysLabel + ' · 전송시험 시작 시 계산');
 }
 function delayMode() { return selectedType !== 'IQ_SAMPLE'; }
 function selectedDelayEpoch() {
@@ -291,12 +313,22 @@ function showInputObservations(data) {
   view.setData(data);
   renderPvt();
 }
+async function reloadInputPvt() {
+  if (!inputId) return;
+  try {
+    pvt = await request('/dtn/inputs/' + inputId + '/pvt?constellation=' + encodeURIComponent(pvtConstellation));
+  } catch (error) {
+    pvt = [];
+    log('PVT 미리보기 불가 · ' + error.message, 'WARN');
+  }
+  inputPvt = pvt;
+}
 async function loadDelayEpochs() {
   const selected = selectedDelayEpoch()?.epoch;
   delayChoices = [];
   if (!config.delaySupported || !inputId) return;
   try {
-    delayChoices = await request('/dtn/inputs/' + inputId + '/delay-epochs');
+    delayChoices = await request('/dtn/inputs/' + inputId + '/delay-epochs?constellation=' + encodeURIComponent(pvtConstellation));
     const sameEpoch = choice => selected && choice.epoch.recordIndex === selected.recordIndex
       && choice.epoch.week === selected.week && choice.epoch.towSeconds === selected.towSeconds;
     let index = delayChoices.findIndex(sameEpoch);
@@ -308,12 +340,17 @@ async function loadDelayEpochs() {
       view.select(index);
       renderPvt();
     } else if (index < 0 && !acceptedCapture && !pendingCapture) {
+      if (inputView) {
+        epochIndex = 0;
+        renderPvt();
+      }
       log('지연 반영 시험에 사용할 유효한 Epoch가 없습니다. 입력·항법정보를 확인하세요.', 'WARN');
     }
   } catch (error) {
     preparedEpoch = null;
     log('시험 Epoch 확인 실패 · ' + error.message, 'WARN');
   }
+
 }
 function updateControls() {
   waitingCancellation.update();
@@ -338,7 +375,7 @@ function updateControls() {
   for (const id of ['dtn-upload', 'dtn-graw-file', 'dtn-send-url', 'dtn-adapter-save']) $(id).disabled = locked();
   if ($('dtn-replay')) $('dtn-replay').disabled = locked();
   $('dtn-refresh').disabled = locked() || tx?.state !== 'READY';
-  for (const button of document.querySelectorAll('.test-type-button,.transport-mode-button,.input-mode')) button.disabled = locked();
+  for (const button of document.querySelectorAll('.test-type-button,.transport-mode-button,.pvt-constellation-button,.input-mode')) button.disabled = locked();
   for (const id of ['dtn-connection-test', 'dtn-connection-save', 'dtn-receiver-ip', 'dtn-receiver-port']) $(id).disabled = busy || (!pendingCapture && locked()) || !peerConfig?.editable;
   $('dtn-message').textContent = selectedType !== 'IQ_SAMPLE'
     ? active() ? (locked() ? '송신 준비·어댑터 요청 중입니다.' : '이전 시험 수신 대기 · 다음 시험을 전송할 수 있습니다.') : !inputId ? 'GNSS 입력을 준비하세요.' : !urlValid() ? '어댑터 전송 URL을 입력하세요.' : ''
@@ -421,9 +458,10 @@ async function upload(file) {
     }
     logView.setContext(input.inputId,'INPUT');
     const observations = await request('/dtn/inputs/' + input.inputId + '/observations');
-    if (!observations.epochs?.length) throw new Error('RAWX 관측값이 없는 입력입니다.');
     inputId = input.inputId;
-    try { pvt = await request('/dtn/inputs/' + inputId + '/pvt'); }
+    try { pvt = await request('/dtn/inputs/' + inputId + '/pvt?constellation=' + encodeURIComponent(pvtConstellation)); }
+
+
     catch (error) { pvt = []; log('PVT 미리보기 불가 · ' + error.message, 'WARN'); }
     showInputObservations(observations); await loadDelayEpochs();
     $('dtn-upload-progress').value = 100; $('dtn-input-state').textContent = file.name + ' · ' + complete.recordCount + '건';
@@ -461,7 +499,7 @@ $('dtn-start').onclick = async () => {
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
     const observations = await request('/dtn/inputs/' + captureId + '/observations');
-    pvt = await request('/dtn/inputs/' + captureId + '/pvt');
+    pvt = await request('/dtn/inputs/' + captureId + '/pvt?constellation=' + encodeURIComponent(pvtConstellation));
     if (observations.epochs?.length !== 1 || !pvt[0]?.positionValid || !pvt[0]?.velocityValid)
       throw new Error('유효한 한 시점 PVT 입력이 아닙니다.');
     inputId = captureId; showInputObservations(observations); await loadDelayEpochs();
@@ -485,7 +523,7 @@ async function showCaptureDecision(input) {
   $('dtn-input-state').textContent = '사용 여부 선택 대기';
   const data = await request('/dtn/inputs/' + input.inputId + '/observations');
   pendingCapture.receiver = data.receiver;
-  pvt = await request('/dtn/inputs/' + input.inputId + '/pvt');
+  pvt = await request('/dtn/inputs/' + input.inputId + '/pvt?constellation=' + encodeURIComponent(pvtConstellation));
   showInputObservations(data);
   const epoch = data.epochs?.[0]?.observation;
   $('capture-decision-summary').textContent = (epoch ? 'Week ' + epoch.week + ' / TOW ' + epoch.receiverTowSeconds + ' s · 관측 신호 ' + epoch.observations.length : '관측 데이터 확보')
@@ -545,7 +583,7 @@ if ($('dtn-replay')) $('dtn-replay').onclick = async () => {
     const input = await post('/dtn/example/replay');
     logView.setContext(input.inputId,'INPUT');
     const observations = await request('/dtn/inputs/' + input.inputId + '/observations');
-    pvt = await request('/dtn/inputs/' + input.inputId + '/pvt');
+    pvt = await request('/dtn/inputs/' + input.inputId + '/pvt?constellation=' + encodeURIComponent(pvtConstellation));
     inputId = input.inputId; showInputObservations(observations); await loadDelayEpochs();
     $('dtn-input-state').textContent = '실측 GRAW 불러오기 완료 · GNSS 기준시간에서 1에폭 선택';
     log('저장된 실측 GRAW ' + observations.epochs.length + '에폭 로드 · 새 실시간 수집은 COM 포트에서 실행');
@@ -577,6 +615,22 @@ for (const button of document.querySelectorAll('.transport-mode-button')) button
   }
   $('dtn-transport-mode-state').textContent = senderMode + ' → ' + receiverMode + ' · 전송 요청에 포함';
   updateInputSummary(); updateHdtnControls();
+};
+for (const button of document.querySelectorAll('.pvt-constellation-button')) button.onclick = async () => {
+  pvtConstellation = button.dataset.constellation || 'GPS';
+  for (const other of document.querySelectorAll('.pvt-constellation-button')) {
+    other.classList.toggle('active', other === button); other.setAttribute('aria-pressed', String(other === button));
+  }
+  if ($('dtn-pvt-constellation')) $('dtn-pvt-constellation').value = pvtConstellation;
+  if ($('dtn-pvt-constellation-state')) $('dtn-pvt-constellation-state').textContent = button.textContent;
+  updateInputSummary();
+  await reloadInputPvt();
+  if (inputId && delayMode()) {
+    await loadDelayEpochs();
+  }
+  view.render();
+  renderPvt();
+  updateControls();
 };
 async function connectPeer(save) {
   if (!$('dtn-receiver-ip').reportValidity() || !$('dtn-receiver-port').reportValidity()) return;
@@ -626,7 +680,7 @@ $('dtn-send').onclick = async () => {
   busy = true; resetResult(); updateControls();
   try {
     job = await post('/dtn/tests', {inputId: selectedType === 'IQ_SAMPLE' ? null : inputId, iqFileId: iqJob?.id, senderAgentId: $('dtn-sender').value,
-      receiverAgentId: $('dtn-receiver').value, sendUrl: $('dtn-send-url').value.trim(), testType: selectedType, senderMode, receiverMode, ...delayRequest, ...(hdtnConfig ? {hdtnConfig} : {})});
+      receiverAgentId: $('dtn-receiver').value, sendUrl: $('dtn-send-url').value.trim(), testType: selectedType, senderMode, receiverMode, pvtConstellation, ...delayRequest, ...(hdtnConfig ? {hdtnConfig} : {})});
     log('전송시험 시작 · ' + job.testId);
     renderSummary();
     historyPage = 0; $('dtn-test-filter').value = ''; await refreshHistory();

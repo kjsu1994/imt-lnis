@@ -85,6 +85,7 @@ public class NodeDtnService implements DtnNodeLink {
             NodeDtnRegistration registration = new NodeDtnRegistration();
             registration.setTestId(job.getId());
             registration.setComparisonMode(job.getComparisonMode());
+            registration.setPvtConstellation(job.getPvtConstellation() == null ? "GPS" : job.getPvtConstellation());
             registration.setTestStartedAt(job.getTestStartedAt());
             if (job.getSenderClockJson() != null) {
                 registration.setSenderClock(mapper.readValue(job.getSenderClockJson(), server.common.ServiceClock.Stamp.class));
@@ -260,6 +261,8 @@ public class NodeDtnService implements DtnNodeLink {
             job.setReceiverRegistrationClockJson(mapper.valueToTree(receiverClock).toString());
         }
         job.setComparisonMode(registration.getComparisonMode());
+        job.setPvtConstellation(
+                registration.getPvtConstellation() == null ? "GPS" : registration.getPvtConstellation());
         job.setTestStartedAt(registration.getTestStartedAt());
         if (registration.getSenderClock() != null) {
             job.setSenderClockJson(mapper.valueToTree(registration.getSenderClock()).toString());

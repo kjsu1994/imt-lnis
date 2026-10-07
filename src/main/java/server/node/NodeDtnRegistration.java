@@ -17,6 +17,7 @@ import java.util.UUID;
 public class NodeDtnRegistration {
     @NotNull private UUID testId;
     private String comparisonMode;
+    private String pvtConstellation = "GPS";
     private java.time.Instant testStartedAt;
     private server.common.ServiceClock.Stamp senderClock;
     private DtnDelay.Epoch selectedEpoch;

@@ -182,4 +182,31 @@ class DtnPresetTest {
                                 .isForbidden());
         assertEquals(1, repository.count());
     }
+
+    @Test
+    void persistsCustomPvtConstellationAndDefaultsToGps() {
+        var gps = service.save(null, new DtnPresetService.Save("GPS Preset", null, settings()));
+        assertEquals("GPS", gps.settings().pvtConstellation());
+
+        HdtnConfig c = new HdtnConfig();
+        c.setMaxNumberOfBundlesInPipeline(50);
+        c.setMaxSumOfBundleBytesInPipeline(50000000L);
+        c.setMaxBundleSizeBytes(10485760L);
+        c.setTcpclMaxSegmentSizeBytes(20000);
+        c.setNeighborDepletedStorageDelaySeconds(10);
+        c.setEnforceBundlePriority(false);
+        c.setStorageDeletionPolicy("DELETE_AFTER_FORWARDING");
+        c.setTotalStorageCapacityBytes(8589934592L);
+        c.setMaxLtpReceiveUdpPacketSizeBytes(65536);
+        c.setAcsSendPeriodMilliseconds(1000);
+        var bdsSettings = new DtnPresetService.Settings("GNSS_RAW", "DTN", "HDTN", "BEIDOU", true, c);
+        var bds = service.save(null, new DtnPresetService.Save("BDS Preset", null, bdsSettings));
+        assertEquals("BEIDOU", bds.settings().pvtConstellation());
+
+        var loaded = service.list().stream().filter(v -> v.name().equals("BDS Preset")).findFirst().orElseThrow();
+        assertEquals("BEIDOU", loaded.settings().pvtConstellation());
+
+        var invalid = new DtnPresetService.Settings("GNSS_RAW", "DTN", "HDTN", "GLONASS_UNKNOWN", true, c);
+        assertThrows(ResponseStatusException.class, () -> service.save(null, new DtnPresetService.Save("Invalid", null, invalid)));
+    }
 }
