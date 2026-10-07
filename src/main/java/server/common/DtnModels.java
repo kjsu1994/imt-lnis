@@ -40,6 +40,10 @@ public final class DtnModels {
                 com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
         private HdtnConfig hdtnConfig;
 
+        @com.fasterxml.jackson.annotation.JsonInclude(
+                com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+        private DtnConfig dtnConfig;
+
         private IqFile file;
 
         /** AFS v4: original evidence, independent of frame PVT input. Older AFS/IQ formats retain their contracts. */
@@ -65,60 +69,61 @@ public final class DtnModels {
     public record ReferenceSnapshot(UUID testId, String payloadSha256,
             String sourceSha256, String grawBase64, List<Pvt> referencePvt) {}
 
-    /** 시험별 HDTN 어댑터 설정. 실제 정책 적용은 어댑터가 담당한다. */
+    /** 시험별 HDTN 어댑터 설정. 실제 정책 적용은 어댑터가 담당한다. 용량은 64비트이며 범위 제한을 두지 않는다. */
     @Data
     @NoArgsConstructor
     public static class HdtnConfig {
         @jakarta.validation.constraints.NotNull
-        @jakarta.validation.constraints.Min(10L)
-        @jakarta.validation.constraints.Max(10000L)
         private Integer maxNumberOfBundlesInPipeline;
 
         @jakarta.validation.constraints.NotNull
-        @jakarta.validation.constraints.Min(1048576L)
-        @jakarta.validation.constraints.Max(2147483648L)
         private Long maxSumOfBundleBytesInPipeline;
 
         @jakarta.validation.constraints.NotNull
-        @jakarta.validation.constraints.Min(1048576L)
-        @jakarta.validation.constraints.Max(104857600L)
         private Long maxBundleSizeBytes;
 
         @com.fasterxml.jackson.annotation.JsonInclude(
                 com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
-        @jakarta.validation.constraints.Min(20000L)
-        @jakarta.validation.constraints.Max(200000L)
         private Integer tcpclMaxSegmentSizeBytes;
 
         @jakarta.validation.constraints.NotNull
-        @jakarta.validation.constraints.Min(0L)
-        @jakarta.validation.constraints.Max(3600L)
         private Integer neighborDepletedStorageDelaySeconds;
 
         @com.fasterxml.jackson.annotation.JsonInclude(
                 com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
-        @jakarta.validation.constraints.Min(1L)
-        @jakarta.validation.constraints.Max(9007199254740991L)
         private Long totalStorageCapacityBytes;
 
         @com.fasterxml.jackson.annotation.JsonInclude(
                 com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
-        @jakarta.validation.constraints.Min(1L)
-        @jakarta.validation.constraints.Max(2147483647L)
         private Integer maxLtpReceiveUdpPacketSizeBytes;
 
         @com.fasterxml.jackson.annotation.JsonInclude(
                 com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
-        @jakarta.validation.constraints.Min(1L)
-        @jakarta.validation.constraints.Max(2147483647L)
         private Integer acsSendPeriodMilliseconds;
 
         @jakarta.validation.constraints.NotNull private Boolean enforceBundlePriority;
 
+        /** 어댑터 가이드: never / on_forward / on_delivery. 과거 저장값은 조회 호환을 위해 허용한다. */
         @jakarta.validation.constraints.NotBlank
         @jakarta.validation.constraints.Pattern(
-                regexp = "DELETE_AFTER_FORWARDING|on_expiration|on_storage_full|never")
+                regexp = "never|on_forward|on_delivery|DELETE_AFTER_FORWARDING|on_expiration|on_storage_full")
         private String storageDeletionPolicy;
+    }
+
+    /** 시험별 DTN(ION) 어댑터 설정. ionconfig.cfg / bpadmin.rc / ionadmin.rc 매핑은 어댑터가 담당한다. */
+    @Data
+    @NoArgsConstructor
+    public static class DtnConfig {
+        @jakarta.validation.constraints.NotNull private Long sdrHeapSizeBytes;
+        @jakarta.validation.constraints.NotNull private Long sdrWorkingMemorySizeBytes;
+        @jakarta.validation.constraints.NotNull private Boolean sdrTransientMode;
+        @jakarta.validation.constraints.NotNull private Long contactRateBytesPerSec;
+        @jakarta.validation.constraints.NotNull private Long maxProductionRateBytesPerSec;
+        @jakarta.validation.constraints.NotNull private Long maxConsumptionRateBytesPerSec;
+        @jakarta.validation.constraints.NotNull private Long maxBundleSizeBytes;
+        @jakarta.validation.constraints.NotNull private Integer tcpclMaxSegmentSizeBytes;
+        @jakarta.validation.constraints.NotNull private Integer stcpMaxSegmentSizeBytes;
+        @jakarta.validation.constraints.NotBlank private String routingMode;
     }
 
     /** A reference to a completed local shared file, never the I/Q binary body. */

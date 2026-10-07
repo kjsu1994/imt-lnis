@@ -130,7 +130,7 @@ class DtnCreateRequestContractTest {
                         "maxSumOfBundleBytesInPipeline",
                         "neighborDepletedStorageDelaySeconds",
                         "maxBundleSizeBytes")) {
-            Object original = settings.put(key, -1);
+            Object original = settings.put(key, "invalid_value");
             mvc.perform(
                             post("/lnis/api/v1/dtn/tests")
                                     .contentType(MediaType.APPLICATION_JSON)
@@ -138,25 +138,17 @@ class DtnCreateRequestContractTest {
                     .andExpect(status().isBadRequest());
             settings.put(key, original);
         }
-        settings.put("maxBundleSizeBytes", 9007199254740992L);
-        mvc.perform(
-                        post("/lnis/api/v1/dtn/tests")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(json.writeValueAsBytes(body)))
-                .andExpect(status().isBadRequest());
-        verifyNoInteractions(service);
-        settings.put("maxBundleSizeBytes", 10485760L);
-        for (int invalid : List.of(1399, 1000001)) {
-            settings.put("tcpclMaxSegmentSizeBytes", invalid);
+        for (long largeValue : List.of(3000000000L, 9007199254740992L)) {
+            settings.put("maxBundleSizeBytes", largeValue);
             mvc.perform(
                             post("/lnis/api/v1/dtn/tests")
                                     .contentType(MediaType.APPLICATION_JSON)
                                     .content(json.writeValueAsBytes(body)))
-                    .andExpect(status().isBadRequest());
+                    .andExpect(status().isAccepted());
         }
-        verifyNoInteractions(service);
-        for (int boundary : List.of(20000, 200000)) {
-            settings.put("tcpclMaxSegmentSizeBytes", boundary);
+        settings.put("maxBundleSizeBytes", 10485760L);
+        for (int segment : List.of(20000, 200000, 300000)) {
+            settings.put("tcpclMaxSegmentSizeBytes", segment);
             mvc.perform(
                             post("/lnis/api/v1/dtn/tests")
                                     .contentType(MediaType.APPLICATION_JSON)
@@ -201,21 +193,18 @@ class DtnCreateRequestContractTest {
                         "receiver-1",
                         "hdtnConfig",
                         settings);
-        var bounds =
-                Map.of(
-                        "maxNumberOfBundlesInPipeline", new long[] {10, 10000},
-                        "maxSumOfBundleBytesInPipeline", new long[] {1048576, 2147483648L},
-                        "maxBundleSizeBytes", new long[] {1048576, 104857600},
-                        "tcpclMaxSegmentSizeBytes", new long[] {20000, 200000},
-                        "neighborDepletedStorageDelaySeconds", new long[] {0, 3600},
-                        "totalStorageCapacityBytes", new long[] {1, 9007199254740991L},
-                        "maxLtpReceiveUdpPacketSizeBytes", new long[] {1, 2147483647},
-                        "acsSendPeriodMilliseconds", new long[] {1, 2147483647});
-        for (var entry : bounds.entrySet()) {
-            String key = entry.getKey();
+        for (String key :
+                List.of(
+                        "maxNumberOfBundlesInPipeline",
+                        "maxSumOfBundleBytesInPipeline",
+                        "maxBundleSizeBytes",
+                        "tcpclMaxSegmentSizeBytes",
+                        "neighborDepletedStorageDelaySeconds",
+                        "totalStorageCapacityBytes",
+                        "maxLtpReceiveUdpPacketSizeBytes",
+                        "acsSendPeriodMilliseconds")) {
             Object original = settings.get(key);
-            long min = entry.getValue()[0], max = entry.getValue()[1];
-            for (Object invalid : List.of(min - 1, max + 1, min + 0.5, Long.toString(min), "")) {
+            for (Object invalid : List.of("", "invalid-string")) {
                 settings.put(key, invalid);
                 mvc.perform(
                                 post("/lnis/api/v1/dtn/tests")
@@ -223,7 +212,7 @@ class DtnCreateRequestContractTest {
                                         .content(json.writeValueAsBytes(body)))
                         .andExpect(status().isBadRequest());
             }
-            for (long valid : new long[] {min, max}) {
+            for (long valid : List.of(50000L, 50L)) {
                 settings.put(key, valid);
                 mvc.perform(
                                 post("/lnis/api/v1/dtn/tests")
@@ -238,7 +227,7 @@ class DtnCreateRequestContractTest {
             }
         }
         for (String policy :
-                List.of("DELETE_AFTER_FORWARDING", "on_expiration", "on_storage_full", "never")) {
+                List.of("DELETE_AFTER_FORWARDING", "on_expiration", "on_storage_full", "never", "on_forward", "on_delivery")) {
             settings.put("storageDeletionPolicy", policy);
             mvc.perform(
                             post("/lnis/api/v1/dtn/tests")

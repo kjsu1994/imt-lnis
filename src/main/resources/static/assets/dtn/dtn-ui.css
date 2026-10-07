@@ -919,50 +919,354 @@ body[data-page="dtn-sender"] .sender-summary-row #service-clock-sync { padding: 
   .receiver-pvt .pvt-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
-/* Separate DTN/HDTN adapter settings. */
-.adapter-config-panel { min-width: 0; padding: 18px; border: 1px solid var(--line); border-radius: 12px; }
-.adapter-config-panel h3 { margin: 0 0 12px; }
-.adapter-config-panel > p { color: var(--muted); font-size: 13px; }
-.adapter-config-panel > small { display: block; margin-top: 14px; line-height: 1.5; }
-.adapter-config-panel label small { font-weight: 400; line-height: 1.5; }
+/* =========================================================
+ * DTN / HDTN 어댑터 설정 탭 및 4열 컴팩트 레이아웃
+ * ========================================================= */
+.adapter-config-container {
+  margin-top: 14px;
+}
 
-.adapter-config-help { color: var(--teal); cursor: help; }
+.adapter-tab-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  border-bottom: 2px solid var(--line);
+  padding: 0 4px;
+}
 
-/* Receipt history opens only when needed; the shared output layout sizes the text area. */
+.adapter-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border: 1px solid var(--line);
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  background: #f1f5f7;
+  color: #526773;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  position: relative;
+  bottom: -2px;
+  transition: all 0.15s ease;
+}
 
-/* 지연 시험은 설정에서 한 번 선택하고 시험 중에는 변경하지 않는다. */
+.adapter-tab-btn:hover {
+  background: #e8f0f4;
+  color: var(--navy);
+}
 
-/* Compact HDTN controls: bounds and explanations are available on focus/hover. */
-.adapter-config-panel { padding:12px 14px; }
-.hdtn-heading { display:flex; align-items:center; flex-wrap:wrap; gap:6px 12px; margin-bottom:10px; }
-.hdtn-heading h3 { margin:0; font-size:14px; }
-#hdtn-config-state { flex:1; color:var(--muted); font-size:11px; }
-.hdtn-heading button { padding:4px 10px; font-size:11px; margin-left:auto; }
-.hdtn-fields { display:flex; flex-wrap:wrap; align-items:flex-start; gap:10px 14px; }
-.hdtn-field { display:flex; flex-direction:column; flex:0 0 auto; width:170px; gap:4px; min-width:0; font-size:12px; position:relative; }
-.hdtn-field > span { min-height:30px; line-height:15px; }
-.hdtn-field:has(#hdtn-maxNumberOfBundlesInPipeline) { width:112px; }
-.hdtn-field:has(#hdtn-enforceBundlePriority) { width:122px; }
-.hdtn-field:has(#hdtn-tcpclMaxSegmentSizeBytes), .hdtn-field:has(#hdtn-storageDeletionPolicy) { width:182px; }
-.hdtn-field input, .hdtn-field select { width:100%; min-width:0; height:32px; padding:5px 8px; box-sizing:border-box; font-size:12px; }
-.hdtn-field small { font-size:11px; font-weight:400; overflow-wrap:anywhere; }
-.hdtn-field .hdtn-error { color:#b73243; }
-.hdtn-field [aria-invalid="true"] { border-color:#b73243; }
-.hdtn-field .adapter-config-help { display:inline-block; }
-.hdtn-tooltip { display:none; position:absolute; left:0; bottom:100%; width:240px; max-width:65vw; padding:9px; background:#14232f; color:#fff; border:1px solid var(--line); border-radius:6px; font-size:12px; font-weight:400; line-height:1.5; z-index:20; overflow-wrap:anywhere; }
-.hdtn-tooltip small { display:block; margin-top:5px; color:#c2e9ef; }
+.adapter-tab-btn.active {
+  background: #fff;
+  border-color: var(--teal);
+  border-bottom: 2px solid #fff;
+  color: var(--teal);
+  font-weight: 700;
+  z-index: 2;
+  box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.03);
+}
 
-.adapter-config-help:hover .hdtn-tooltip, .hdtn-field:focus-within .hdtn-tooltip { display:block; }
-#hdtn-advanced { margin-top:10px; }
-#hdtn-advanced summary { cursor:pointer; font-size:12px; }
-#hdtn-advanced summary small, .hdtn-advanced-note { color:var(--muted); font-size:11px; }
-#hdtn-advanced .hdtn-field { width:210px; }
-#hdtn-config-notice { margin:0 0 8px; font-size:11px; }
-@media(max-width:600px) {
-  .hdtn-field, .hdtn-field:has(input), .hdtn-field:has(select) { width:calc(50% - 7px); }
-  #hdtn-advanced .hdtn-field { width:100%; }
-  #hdtn-config-state { order:3; flex-basis:100%; }
-  .hdtn-field:nth-child(even) .hdtn-tooltip { left:auto; right:0; }
+.adapter-tab-badge {
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  background: #e2e8f0;
+  color: #64748b;
+  transition: all 0.15s ease;
+}
+
+.adapter-tab-badge.badge-sender {
+  background: rgba(0, 163, 154, 0.14);
+  color: #00877f;
+}
+
+.adapter-tab-badge.badge-receiver {
+  background: rgba(37, 99, 235, 0.12);
+  color: #1d4ed8;
+}
+
+.adapter-tab-badge.badge-both {
+  background: rgba(16, 185, 129, 0.14);
+  color: #059669;
+}
+
+.adapter-tab-badge.badge-inactive {
+  background: #f1f5f9;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+/* Panel Body */
+.adapter-config-panel {
+  min-width: 0;
+  padding: 12px 14px 14px;
+  border: 1px solid var(--line);
+  border-top: none;
+  border-radius: 0 0 10px 10px;
+  background: #fff;
+}
+
+.adapter-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #f1f5f7;
+}
+
+#dtn-config-state, #hdtn-config-state {
+  flex: 1;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.adapter-heading button {
+  padding: 3px 10px;
+  font-size: 11px;
+  height: 25px;
+  border-radius: 5px;
+  border: 1px solid var(--line);
+  background: #f8fafc;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.adapter-heading button:hover:not(:disabled) {
+  background: #edf2f7;
+  color: #1e293b;
+  border-color: #cbd5e1;
+}
+
+#dtn-config-notice, #hdtn-config-notice {
+  display: block;
+  margin: 0 0 8px;
+  font-size: 11px;
+  color: #059669;
+}
+
+/* 4-Column Compact Grid */
+.adapter-fields {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px 12px;
+  width: 100%;
+}
+
+.adapter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  width: 100%;
+  position: relative;
+}
+
+.adapter-field > span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #334155;
+  line-height: 1.3;
+  min-height: 18px;
+  white-space: nowrap;
+}
+
+.adapter-field .adapter-config-help {
+  color: var(--teal);
+  font-size: 11px;
+  cursor: help;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.adapter-field input, .adapter-field select {
+  width: 100%;
+  min-width: 0;
+  height: 28px;
+  padding: 3px 8px;
+  box-sizing: border-box;
+  font-size: 11.5px;
+  border: 1px solid #cbd5e1;
+  border-radius: 5px;
+  background: #fbfcfd;
+  color: #1e293b;
+  font-family: inherit;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+
+.adapter-field select {
+  padding-right: 18px;
+  text-overflow: ellipsis;
+}
+
+.adapter-field input:focus, .adapter-field select:focus {
+  outline: none;
+  border-color: var(--teal);
+  background: #fff;
+  box-shadow: 0 0 0 2px rgba(0, 163, 154, 0.14);
+}
+
+.adapter-field input:disabled, .adapter-field select:disabled {
+  background: #f1f5f9;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.adapter-field small {
+  font-size: 10.5px;
+  font-weight: 400;
+  overflow-wrap: anywhere;
+}
+
+.adapter-field .adapter-error {
+  color: #b73243;
+}
+
+.adapter-field [aria-invalid="true"] {
+  border-color: #b73243;
+}
+
+/* Tooltips */
+.adapter-tooltip {
+  display: none;
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 5px);
+  width: 270px;
+  max-width: min(320px, calc(100vw - 32px));
+  padding: 8px 11px;
+  background: #0f1c24;
+  color: #e2e8f0;
+  border: 1px solid #2d4559;
+  border-radius: 7px;
+  font-size: 11.5px;
+  font-weight: 400;
+  line-height: 1.5;
+  white-space: normal !important;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  z-index: 100;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+
+.adapter-tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 14px;
+  border-width: 5px;
+  border-style: solid;
+  border-color: #0f1c24 transparent transparent transparent;
+}
+
+.adapter-tooltip code {
+  display: block;
+  font-family: Consolas, Monaco, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: #38bdf8;
+  margin-bottom: 4px;
+  letter-spacing: 0.02em;
+  word-break: break-all;
+  line-height: 1.3;
+}
+
+.adapter-tooltip small {
+  display: block;
+  margin-top: 5px;
+  color: #94a3b8;
+  font-size: 10.5px;
+  line-height: 1.35;
+}
+
+.adapter-config-help:hover .adapter-tooltip,
+.adapter-field:focus-within .adapter-tooltip {
+  display: block;
+}
+
+/* Align right tooltips on columns 3 & 4 to prevent viewport overflow */
+.adapter-field:nth-child(4n) .adapter-tooltip,
+.adapter-field:nth-child(4n-1) .adapter-tooltip {
+  left: auto;
+  right: 0;
+}
+
+.adapter-field:nth-child(4n) .adapter-tooltip::after,
+.adapter-field:nth-child(4n-1) .adapter-tooltip::after {
+  left: auto;
+  right: 14px;
+}
+
+/* HDTN Advanced Details */
+#hdtn-advanced {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed #e2e8f0;
+  width: 100%;
+}
+
+#hdtn-advanced summary {
+  cursor: pointer;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #2563eb;
+  user-select: none;
+}
+
+#hdtn-advanced summary small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 400;
+  margin-left: 6px;
+}
+
+#hdtn-advanced[open] summary {
+  margin-bottom: 8px;
+}
+
+#hdtn-advanced .adapter-fields {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px 12px;
+  width: 100%;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .adapter-fields,
+  #hdtn-advanced .adapter-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .adapter-field:nth-child(even) .adapter-tooltip {
+    left: auto;
+    right: 0;
+  }
+}
+
+@media (max-width: 540px) {
+  .adapter-fields,
+  #hdtn-advanced .adapter-fields {
+    grid-template-columns: 1fr;
+  }
+  .adapter-tab-btn {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+  .adapter-field .adapter-tooltip {
+    left: 0;
+    right: auto;
+    width: 200px;
+  }
 }
 
 /* Presets and recorded trial settings share the existing compact toolbar scale. */

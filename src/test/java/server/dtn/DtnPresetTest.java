@@ -95,7 +95,7 @@ class DtnPresetTest {
                 ResponseStatusException.class,
                 () -> service.save(null, new DtnPresetService.Save("preset0", null, settings())));
         var invalid = settings();
-        invalid.hdtnConfig().setMaxNumberOfBundlesInPipeline(1);
+        invalid.hdtnConfig().setMaxNumberOfBundlesInPipeline(null);
         assertEquals(
                 400,
                 assertThrows(

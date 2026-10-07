@@ -185,7 +185,8 @@ public class DtnService {
                 config,
                 epoch,
                 startedAt,
-                PvtConstellation.GPS);
+                PvtConstellation.GPS,
+                null);
     }
 
     public synchronized DtnJob createDelay(
@@ -199,7 +200,8 @@ public class DtnService {
             HdtnConfig config,
             DtnDelay.Epoch epoch,
             Instant startedAt,
-            PvtConstellation constellation) {
+            PvtConstellation constellation,
+            DtnConfig dtnConfig) {
         if (pvtCalculator == null || nodeLink == null || !nodeLink.sender()) {
             throw new IllegalStateException("지연 시험은 송신 통합 노드에서 시작하세요.");
         }
@@ -231,7 +233,8 @@ public class DtnService {
                 config,
                 epoch,
                 startedAt,
-                constellation);
+                constellation,
+                dtnConfig);
     }
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
@@ -335,7 +338,8 @@ public class DtnService {
                 senderMode,
                 receiverMode,
                 hdtnConfig,
-                PvtConstellation.GPS);
+                PvtConstellation.GPS,
+                null);
     }
 
     public synchronized DtnJob create(
@@ -347,7 +351,8 @@ public class DtnService {
             String senderMode,
             String receiverMode,
             HdtnConfig hdtnConfig,
-            PvtConstellation constellation) {
+            PvtConstellation constellation,
+            DtnConfig dtnConfig) {
         return createConfigured(
                 inputId,
                 sender,
@@ -359,7 +364,8 @@ public class DtnService {
                 hdtnConfig,
                 null,
                 null,
-                constellation);
+                constellation,
+                dtnConfig);
     }
 
     private DtnJob createConfigured(
@@ -384,7 +390,8 @@ public class DtnService {
                 hdtnConfig,
                 epoch,
                 startedAt,
-                PvtConstellation.GPS);
+                PvtConstellation.GPS,
+                null);
     }
 
     private DtnJob createConfigured(
@@ -398,10 +405,16 @@ public class DtnService {
             HdtnConfig hdtnConfig,
             DtnDelay.Epoch epoch,
             Instant startedAt,
-            PvtConstellation constellation) {
+            PvtConstellation constellation,
+            DtnConfig dtnConfig) {
         if (constellation == null) {
             constellation = PvtConstellation.GPS;
         }
+        if (dtnConfig != null && !"DTN".equals(senderMode) && !"DTN".equals(receiverMode)) {
+            throw new IllegalArgumentException("DTN 설정은 DTN이 포함된 전송 경로에서만 사용할 수 있습니다.");
+        }
+        String dtnConfigJson =
+                dtnConfig == null ? null : objectMapper.valueToTree(dtnConfig).toString();
         if (hdtnConfig != null && !"HDTN".equals(senderMode) && !"HDTN".equals(receiverMode)) {
             throw new IllegalArgumentException("HDTN 설정은 HDTN이 포함된 전송 경로에서만 사용할 수 있습니다.");
         }
@@ -415,6 +428,7 @@ public class DtnService {
             }
             DtnJob job = newJob(sender, receiver, destination, testType, senderMode, receiverMode);
             job.setHdtnConfigJson(hdtnConfigJson);
+            job.setDtnConfigJson(dtnConfigJson);
             job.setIqFileId(inputId);
             beginLog(job, inputId);
             update(job, "PREPARING", "I/Q 파일 무결성 확인 중");
@@ -441,6 +455,7 @@ public class DtnService {
         }
         DtnJob job = newJob(sender, receiver, destination, testType, senderMode, receiverMode);
         job.setHdtnConfigJson(hdtnConfigJson);
+        job.setDtnConfigJson(dtnConfigJson);
         job.setInputId(inputId);
         job.setPvtConstellation(constellation.name());
         if (epoch != null) {
@@ -626,6 +641,10 @@ public class DtnService {
                     job.getHdtnConfigJson() == null
                             ? null
                             : objectMapper.readValue(job.getHdtnConfigJson(), HdtnConfig.class));
+            transfer.setDtnConfig(
+                    job.getDtnConfigJson() == null
+                            ? null
+                            : objectMapper.readValue(job.getDtnConfigJson(), DtnConfig.class));
             var source = iq.source(inputId, file);
             if (source != null) {
                 transfer.setMetadata(source.metadata());
@@ -989,6 +1008,8 @@ public class DtnService {
         job.setReceiverMode(rxMode);
         job.setHdtnConfigJson(
                 received.hasNonNull("hdtnConfig") ? received.get("hdtnConfig").toString() : null);
+        job.setDtnConfigJson(
+                received.hasNonNull("dtnConfig") ? received.get("dtnConfig").toString() : null);
         String type = received.path("testType").asText("AFS_METADATA");
         if (!List.of("AFS_METADATA", "GNSS_RAW", "IQ_SAMPLE").contains(type)) {
             throw new IllegalArgumentException("시험 유형 오류");
@@ -1170,6 +1191,12 @@ public class DtnService {
                                         ? null
                                         : objectMapper.readValue(
                                                 job.getHdtnConfigJson(), HdtnConfig.class));
+                result.getTransfer()
+                        .setDtnConfig(
+                                job.getDtnConfigJson() == null
+                                        ? null
+                                        : objectMapper.readValue(
+                                                job.getDtnConfigJson(), DtnConfig.class));
                 job.setSentJson(objectMapper.writeValueAsString(
                         server.afs.DelayTransferCodec.packet(objectMapper, result.getTransfer())));
                 update(job, "WAITING_DTN", "외부 DTN 전달 및 수신 대기");
@@ -1845,6 +1872,8 @@ public class DtnService {
         expected.setReceiverMode(job.getReceiverMode());
         expected.setHdtnConfig(job.getHdtnConfigJson() == null ? null
                 : objectMapper.readValue(job.getHdtnConfigJson(), HdtnConfig.class));
+        expected.setDtnConfig(job.getDtnConfigJson() == null ? null
+                : objectMapper.readValue(job.getDtnConfigJson(), DtnConfig.class));
         expected.setPvtConstellation(job.getPvtConstellation() == null ? "GPS" : job.getPvtConstellation());
         String hash = DtnPayloadDigest.sha256(objectMapper,
                 objectMapper.readTree(objectMapper.writeValueAsBytes(

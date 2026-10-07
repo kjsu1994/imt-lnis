@@ -81,57 +81,116 @@
         <button type="button" class="transport-mode-button" data-sender-mode="HDTN" data-receiver-mode="HDTN">HDTN → HDTN</button>
       </div>
     </div>
-    <section class="adapter-config-panel" aria-labelledby="hdtn-config-title">
-      <div class="hdtn-heading"><h3 id="hdtn-config-title">HDTN 설정</h3><span id="hdtn-config-state" role="status"></span><button id="hdtn-reset" type="button">전체 기본값</button></div>
-      <small id="hdtn-config-notice" role="status" hidden></small>
-      <div class="hdtn-fields">
-          <label class="hdtn-field"><span>최대 동시 번들 수 <span class="adapter-config-help" tabindex="0" role="img" aria-label="maxNumberOfBundlesInPipeline: 파이프라인에서 동시에 대기할 번들의 최대 개수입니다.">ⓘ<span class="hdtn-tooltip">maxNumberOfBundlesInPipeline: 파이프라인에서 동시에 대기할 번들의 최대 개수입니다.<small id="hdtn-maxNumberOfBundlesInPipeline-range">10~10,000 개</small></span></span></span>
-            <input id="hdtn-maxNumberOfBundlesInPipeline" title="maxNumberOfBundlesInPipeline: 파이프라인에서 동시에 대기할 번들의 최대 개수입니다." aria-describedby="hdtn-maxNumberOfBundlesInPipeline-range hdtn-maxNumberOfBundlesInPipeline-error" type="number" min="10" max="10000" step="1" value="50" required>
-            <small id="hdtn-maxNumberOfBundlesInPipeline-error" class="hdtn-error" aria-live="polite" hidden></small>
-          </label>
-          <label class="hdtn-field"><span>최대 동시 번들 용량 (Bytes) <span class="adapter-config-help" tabindex="0" role="img" aria-label="maxSumOfBundleBytesInPipeline: 대기 중인 번들 용량의 합계 상한입니다. 1 MiB~2 GiB이며 기본값은 50,000,000 Bytes입니다.">ⓘ<span class="hdtn-tooltip">maxSumOfBundleBytesInPipeline: 대기 중인 번들 용량의 합계 상한입니다. 1 MiB~2 GiB이며 기본값은 50,000,000 Bytes입니다.<small id="hdtn-maxSumOfBundleBytesInPipeline-range">1,048,576~2,147,483,648 Bytes</small></span></span></span>
-            <input id="hdtn-maxSumOfBundleBytesInPipeline" title="maxSumOfBundleBytesInPipeline: 대기 중인 번들 용량의 합계 상한입니다. 1 MiB~2 GiB이며 기본값은 50,000,000 Bytes입니다." aria-describedby="hdtn-maxSumOfBundleBytesInPipeline-range hdtn-maxSumOfBundleBytesInPipeline-error" type="number" min="1048576" max="2147483648" step="1" value="50000000" required>
-            <small id="hdtn-maxSumOfBundleBytesInPipeline-error" class="hdtn-error" aria-live="polite" hidden></small>
-          </label>
-          <label class="hdtn-field"><span>최대 번들 크기 (Bytes) <span class="adapter-config-help" tabindex="0" role="img" aria-label="maxBundleSizeBytes: 단일 번들의 크기 상한입니다. 1~100 MiB이며 실제 파일 분할은 어댑터가 담당합니다.">ⓘ<span class="hdtn-tooltip">maxBundleSizeBytes: 단일 번들의 크기 상한입니다. 1~100 MiB이며 실제 파일 분할은 어댑터가 담당합니다.<small id="hdtn-maxBundleSizeBytes-range">1,048,576~104,857,600 Bytes</small></span></span></span>
-            <input id="hdtn-maxBundleSizeBytes" title="maxBundleSizeBytes: 단일 번들의 크기 상한입니다. 1~100 MiB이며 실제 파일 분할은 어댑터가 담당합니다." aria-describedby="hdtn-maxBundleSizeBytes-range hdtn-maxBundleSizeBytes-error" type="number" min="1048576" max="104857600" step="1" value="10485760" required>
-            <small id="hdtn-maxBundleSizeBytes-error" class="hdtn-error" aria-live="polite" hidden></small>
-          </label>
-          <label class="hdtn-field"><span>TCPCL 세그먼트 크기 (Bytes) <span class="adapter-config-help" tabindex="0" role="img" aria-label="tcpclMaxSegmentSizeBytes: TCPCL 세그먼트 크기입니다. IP 패킷 MTU 및 번들 전체 크기와는 별도이며 실제 v3/v4 매핑은 어댑터가 담당합니다.">ⓘ<span class="hdtn-tooltip">tcpclMaxSegmentSizeBytes: TCPCL 세그먼트 크기입니다. IP 패킷 MTU 및 번들 전체 크기와는 별도이며 실제 v3/v4 매핑은 어댑터가 담당합니다.<small id="hdtn-tcpclMaxSegmentSizeBytes-range">20,000~200,000 Bytes</small></span></span></span>
-            <input id="hdtn-tcpclMaxSegmentSizeBytes" title="tcpclMaxSegmentSizeBytes: TCPCL 세그먼트 크기입니다. IP 패킷 MTU 및 번들 전체 크기와는 별도이며 실제 v3/v4 매핑은 어댑터가 담당합니다." aria-describedby="hdtn-tcpclMaxSegmentSizeBytes-range hdtn-tcpclMaxSegmentSizeBytes-error" type="number" min="20000" max="200000" step="1" value="20000" required>
-            <small id="hdtn-tcpclMaxSegmentSizeBytes-error" class="hdtn-error" aria-live="polite" hidden></small>
-          </label>
-          <label class="hdtn-field"><span>저장 공간 부족 시 대기 (초) <span class="adapter-config-help" tabindex="0" role="img" aria-label="neighborDepletedStorageDelaySeconds: 인접 노드의 저장 공간 부족 신호를 받았을 때 전송을 보류하는 대기 시간입니다.">ⓘ<span class="hdtn-tooltip">neighborDepletedStorageDelaySeconds: 인접 노드의 저장 공간 부족 신호를 받았을 때 전송을 보류하는 대기 시간입니다.<small id="hdtn-neighborDepletedStorageDelaySeconds-range">0~3,600 초</small></span></span></span>
-            <input id="hdtn-neighborDepletedStorageDelaySeconds" title="neighborDepletedStorageDelaySeconds: 인접 노드의 저장 공간 부족 신호를 받았을 때 전송을 보류하는 대기 시간입니다." aria-describedby="hdtn-neighborDepletedStorageDelaySeconds-range hdtn-neighborDepletedStorageDelaySeconds-error" type="number" min="0" max="3600" step="1" value="10" required>
-            <small id="hdtn-neighborDepletedStorageDelaySeconds-error" class="hdtn-error" aria-live="polite" hidden></small>
-          </label>
-          <label class="hdtn-field"><span>번들 우선순위 준수 <span class="adapter-config-help" tabindex="0" role="img" aria-label="enforceBundlePriority: 우선순위를 엄격하게 적용하도록 요청합니다. 기본값은 사용 안 함(false)입니다.">ⓘ<span class="hdtn-tooltip">enforceBundlePriority: 우선순위를 엄격하게 적용하도록 요청합니다. 기본값은 사용 안 함(false)입니다.<small id="hdtn-enforceBundlePriority-range">기본: 사용 안 함</small></span></span></span>
-            <select id="hdtn-enforceBundlePriority" title="enforceBundlePriority: 우선순위를 엄격하게 적용하도록 요청합니다. 기본값은 사용 안 함(false)입니다." aria-describedby="hdtn-enforceBundlePriority-range hdtn-enforceBundlePriority-error"><option value="false">사용 안 함</option><option value="true">사용</option></select>
-            <small id="hdtn-enforceBundlePriority-error" class="hdtn-error" aria-live="polite" hidden></small>
-          </label>
-          <label class="hdtn-field"><span>스토리지 삭제 정책 <span class="adapter-config-help" tabindex="0" role="img" aria-label="storageDeletionPolicy: DELETE_AFTER_FORWARDING은 어댑터 기본 정책이며 문서상 never로 매핑됩니다. 실제 보존·삭제 동작은 어댑터가 적용합니다.">ⓘ<span class="hdtn-tooltip">storageDeletionPolicy: DELETE_AFTER_FORWARDING은 어댑터 기본 정책이며 문서상 never로 매핑됩니다. 실제 보존·삭제 동작은 어댑터가 적용합니다.<small id="hdtn-storageDeletionPolicy-range">어댑터가 실제 정책 적용</small></span></span></span>
-            <select id="hdtn-storageDeletionPolicy" title="storageDeletionPolicy: DELETE_AFTER_FORWARDING은 어댑터 기본 정책이며 문서상 never로 매핑됩니다. 실제 보존·삭제 동작은 어댑터가 적용합니다." aria-describedby="hdtn-storageDeletionPolicy-range hdtn-storageDeletionPolicy-error"><option value="DELETE_AFTER_FORWARDING">어댑터 기본 정책</option><option value="on_expiration">유효 수명 만료 시</option><option value="on_storage_full">저장 공간 부족 시</option><option value="never">자동 삭제 안 함</option></select>
-            <small id="hdtn-storageDeletionPolicy-error" class="hdtn-error" aria-live="polite" hidden></small>
-          </label>
+    <div class="adapter-config-container">
+      <div class="adapter-tab-bar" role="tablist" aria-label="어댑터 엔진 설정">
+        <button type="button" class="adapter-tab-btn active" id="adapter-tab-dtn" role="tab" aria-selected="true" aria-controls="dtn-config-panel">
+          <span>DTN (ION) 설정</span>
+          <span class="adapter-tab-badge badge-sender" id="dtn-tab-badge">송신</span>
+        </button>
+        <button type="button" class="adapter-tab-btn" id="adapter-tab-hdtn" role="tab" aria-selected="false" aria-controls="hdtn-config-panel">
+          <span>HDTN 설정</span>
+          <span class="adapter-tab-badge badge-receiver" id="hdtn-tab-badge">수신</span>
+        </button>
       </div>
-      <details id="hdtn-advanced"><summary>고급 설정 <small>저장 용량 · LTP · ACS</small></summary>
-        <p class="hdtn-advanced-note">입력 제한은 자료형 기준입니다. 실제 엔진 허용 범위는 어댑터 확인이 필요합니다.</p>
-        <div class="hdtn-fields">
-          <label class="hdtn-field"><span>전체 저장 용량 (Bytes) <span class="adapter-config-help" tabindex="0" role="img" aria-label="totalStorageCapacityBytes: 로컬 스토리지 용량 상한입니다. 기본값 8 GiB. 현재 입력 제한은 JSON 정수 정밀도 기준이며 엔진의 허용 범위를 보장하지 않습니다.">ⓘ<span class="hdtn-tooltip">totalStorageCapacityBytes: 로컬 스토리지 용량 상한입니다. 기본값 8 GiB. 현재 입력 제한은 JSON 정수 정밀도 기준이며 엔진의 허용 범위를 보장하지 않습니다.<small id="hdtn-totalStorageCapacityBytes-range">1~9,007,199,254,740,991 Bytes</small></span></span></span>
-            <input id="hdtn-totalStorageCapacityBytes" title="totalStorageCapacityBytes: 로컬 스토리지 용량 상한입니다. 기본값 8 GiB. 현재 입력 제한은 JSON 정수 정밀도 기준이며 엔진의 허용 범위를 보장하지 않습니다." aria-describedby="hdtn-totalStorageCapacityBytes-range hdtn-totalStorageCapacityBytes-error" type="number" min="1" max="9007199254740991" step="1" value="8589934592" required>
-            <small id="hdtn-totalStorageCapacityBytes-error" class="hdtn-error" aria-live="polite" hidden></small>
+
+      <section class="adapter-config-panel" id="dtn-config-panel" role="tabpanel" aria-labelledby="adapter-tab-dtn">
+        <div class="adapter-heading"><span id="dtn-config-state" role="status">다음 시험 적용 · 자동 저장</span><button id="dtn-reset" type="button">전체 기본값</button></div>
+        <small id="dtn-config-notice" role="status" hidden></small>
+        <div class="adapter-fields">
+          <label class="adapter-field"><span>SDR 힙 크기 (Bytes) <span class="adapter-config-help" tabindex="0" role="img" aria-label="sdrHeapSizeBytes: SDR 공유 메모리 힙 총 크기">ⓘ<span class="adapter-tooltip"><code>sdrHeapSizeBytes</code>ION 라우터의 SDR 공유 메모리 힙 총 크기(Bytes)입니다. 대용량 파일 전송 시 파일 크기보다 10~20% 크게 권장합니다.<small>매핑: ionconfig.cfg heapWords</small></span></span></span>
+            <input id="dtn-sdrHeapSizeBytes" title="sdrHeapSizeBytes: SDR 공유 메모리 힙 크기(Bytes)" aria-describedby="dtn-sdrHeapSizeBytes-error" type="number" step="1" value="3500000000" required>
+            <small id="dtn-sdrHeapSizeBytes-error" class="adapter-error" aria-live="polite" hidden></small>
           </label>
-          <label class="hdtn-field"><span>LTP 최대 수신 패킷 크기 (Bytes) <span class="adapter-config-help" tabindex="0" role="img" aria-label="maxLtpReceiveUdpPacketSizeBytes: LTP의 UDP 최대 수신 패킷 크기입니다. 기본값 65,536 Bytes. 입력 제한은 int 자료형 기준이며 엔진 허용 범위는 별도 확인해야 합니다.">ⓘ<span class="hdtn-tooltip">maxLtpReceiveUdpPacketSizeBytes: LTP의 UDP 최대 수신 패킷 크기입니다. 기본값 65,536 Bytes. 입력 제한은 int 자료형 기준이며 엔진 허용 범위는 별도 확인해야 합니다.<small id="hdtn-maxLtpReceiveUdpPacketSizeBytes-range">1~2,147,483,647 Bytes</small></span></span></span>
-            <input id="hdtn-maxLtpReceiveUdpPacketSizeBytes" title="maxLtpReceiveUdpPacketSizeBytes: LTP의 UDP 최대 수신 패킷 크기입니다. 기본값 65,536 Bytes. 입력 제한은 int 자료형 기준이며 엔진 허용 범위는 별도 확인해야 합니다." aria-describedby="hdtn-maxLtpReceiveUdpPacketSizeBytes-range hdtn-maxLtpReceiveUdpPacketSizeBytes-error" type="number" min="1" max="2147483647" step="1" value="65536" required>
-            <small id="hdtn-maxLtpReceiveUdpPacketSizeBytes-error" class="hdtn-error" aria-live="polite" hidden></small>
+          <label class="adapter-field"><span>SDR 작업 메모리 (Bytes) <span class="adapter-config-help" tabindex="0" role="img" aria-label="sdrWorkingMemorySizeBytes: SDR 작업 메모리 크기">ⓘ<span class="adapter-tooltip"><code>sdrWorkingMemorySizeBytes</code>트랜잭션 관리 및 SDR 힙 오버헤드 처리용 작업 메모리 크기(Bytes)입니다. SDR 힙의 약 10% 권장.<small>매핑: ionconfig.cfg wmSize</small></span></span></span>
+            <input id="dtn-sdrWorkingMemorySizeBytes" title="sdrWorkingMemorySizeBytes: SDR 작업 메모리 크기(Bytes)" aria-describedby="dtn-sdrWorkingMemorySizeBytes-error" type="number" step="1" value="350000000" required>
+            <small id="dtn-sdrWorkingMemorySizeBytes-error" class="adapter-error" aria-live="polite" hidden></small>
           </label>
-          <label class="hdtn-field"><span>ACS 전송 주기 (ms) <span class="adapter-config-help" tabindex="0" role="img" aria-label="acsSendPeriodMilliseconds: ACS 집계 전송 주기입니다. 기본값 1,000 ms. 입력 제한은 int 자료형 기준이며 엔진 허용 범위는 별도 확인해야 합니다.">ⓘ<span class="hdtn-tooltip">acsSendPeriodMilliseconds: ACS 집계 전송 주기입니다. 기본값 1,000 ms. 입력 제한은 int 자료형 기준이며 엔진 허용 범위는 별도 확인해야 합니다.<small id="hdtn-acsSendPeriodMilliseconds-range">1~2,147,483,647 ms</small></span></span></span>
-            <input id="hdtn-acsSendPeriodMilliseconds" title="acsSendPeriodMilliseconds: ACS 집계 전송 주기입니다. 기본값 1,000 ms. 입력 제한은 int 자료형 기준이며 엔진 허용 범위는 별도 확인해야 합니다." aria-describedby="hdtn-acsSendPeriodMilliseconds-range hdtn-acsSendPeriodMilliseconds-error" type="number" min="1" max="2147483647" step="1" value="1000" required>
-            <small id="hdtn-acsSendPeriodMilliseconds-error" class="hdtn-error" aria-live="polite" hidden></small>
+          <label class="adapter-field"><span>SDR 임시(Transient) 모드 <span class="adapter-config-help" tabindex="0" role="img" aria-label="sdrTransientMode: 순수 RAM 고속 처리 여부">ⓘ<span class="adapter-tooltip"><code>sdrTransientMode</code>SDR 트랜잭션을 RAM에서만 고속 처리할지 결정합니다. 대용량(2.3GB 등) 파일 전송 시 RAM 보호를 위해 디스크 기반(false) 권장.</span></span></span>
+            <select id="dtn-sdrTransientMode" title="sdrTransientMode: Transient 모드 여부"><option value="false">디스크 기반 (권장)</option><option value="true">순수 RAM (고속)</option></select>
+            <small id="dtn-sdrTransientMode-error" class="adapter-error" aria-live="polite" hidden></small>
+          </label>
+          <label class="adapter-field"><span>최대 번들 크기 (Bytes) <span class="adapter-config-help" tabindex="0" role="img" aria-label="maxBundleSizeBytes: 단일 번들의 최대 한계 크기">ⓘ<span class="adapter-tooltip"><code>maxBundleSizeBytes</code>ION BP 데몬이 수용하는 단일 번들의 최대 한계 크기(Bytes)입니다. 송신 파일 용량보다 크게 설정해야 합니다.<small>매핑: bpadmin.rc m heapmax</small></span></span></span>
+            <input id="dtn-maxBundleSizeBytes" title="maxBundleSizeBytes: 단일 번들의 최대 크기(Bytes)" aria-describedby="dtn-maxBundleSizeBytes-error" type="number" step="1" value="3000000000" required>
+            <small id="dtn-maxBundleSizeBytes-error" class="adapter-error" aria-live="polite" hidden></small>
+          </label>
+          <label class="adapter-field"><span>접촉 전송 속도 (Bytes/s) <span class="adapter-config-help" tabindex="0" role="img" aria-label="contactRateBytesPerSec: CGR 가상 링크의 초당 최대 전송 대역폭">ⓘ<span class="adapter-tooltip"><code>contactRateBytesPerSec</code>CGR 가상 링크의 초당 최대 전송 허용 대역폭(Bytes/s)입니다. 1Gbps(125,000,000) 이상 권장.<small>매핑: ionadmin.rc a contact</small></span></span></span>
+            <input id="dtn-contactRateBytesPerSec" title="contactRateBytesPerSec: 초당 최대 전송 대역폭(Bytes/s)" aria-describedby="dtn-contactRateBytesPerSec-error" type="number" step="1" value="125000000" required>
+            <small id="dtn-contactRateBytesPerSec-error" class="adapter-error" aria-live="polite" hidden></small>
+          </label>
+          <label class="adapter-field"><span>최대 생성 속도 (Bytes/s) <span class="adapter-config-help" tabindex="0" role="img" aria-label="maxProductionRateBytesPerSec: 노드 단위 시간당 생성 가능한 최대 번들 바이트 양">ⓘ<span class="adapter-tooltip"><code>maxProductionRateBytesPerSec</code>노드 내부에서 단위 시간당 생성할 수 있는 최대 번들 바이트 양(Bytes/s)입니다.</span></span></span>
+            <input id="dtn-maxProductionRateBytesPerSec" title="maxProductionRateBytesPerSec: 초당 최대 생성 속도(Bytes/s)" aria-describedby="dtn-maxProductionRateBytesPerSec-error" type="number" step="1" value="100000000" required>
+            <small id="dtn-maxProductionRateBytesPerSec-error" class="adapter-error" aria-live="polite" hidden></small>
+          </label>
+          <label class="adapter-field"><span>최대 소비 속도 (Bytes/s) <span class="adapter-config-help" tabindex="0" role="img" aria-label="maxConsumptionRateBytesPerSec: 노드 단위 시간당 소비 가능한 최대 번들 바이트 양">ⓘ<span class="adapter-tooltip"><code>maxConsumptionRateBytesPerSec</code>노드 내부에서 단위 시간당 소비할 수 있는 최대 번들 바이트 양(Bytes/s)입니다.</span></span></span>
+            <input id="dtn-maxConsumptionRateBytesPerSec" title="maxConsumptionRateBytesPerSec: 초당 최대 소비 속도(Bytes/s)" aria-describedby="dtn-maxConsumptionRateBytesPerSec-error" type="number" step="1" value="100000000" required>
+            <small id="dtn-maxConsumptionRateBytesPerSec-error" class="adapter-error" aria-live="polite" hidden></small>
+          </label>
+          <label class="adapter-field"><span>TCPCL 세그먼트 크기 (Bytes) <span class="adapter-config-help" tabindex="0" role="img" aria-label="tcpclMaxSegmentSizeBytes: TCPCL 단일 프래그먼트 MTU">ⓘ<span class="adapter-tooltip"><code>tcpclMaxSegmentSizeBytes</code>TCPCL 컨버전스 레이어 프로토콜 사용 시 적용되는 단일 프래그먼트 MTU(Bytes)입니다.<small>권장값: 20,000 Bytes</small></span></span></span>
+            <input id="dtn-tcpclMaxSegmentSizeBytes" title="tcpclMaxSegmentSizeBytes: TCPCL 단일 프래그먼트 MTU(Bytes)" aria-describedby="dtn-tcpclMaxSegmentSizeBytes-error" type="number" step="1" value="20000" required>
+            <small id="dtn-tcpclMaxSegmentSizeBytes-error" class="adapter-error" aria-live="polite" hidden></small>
+          </label>
+          <label class="adapter-field"><span>STCP 세그먼트 크기 (Bytes) <span class="adapter-config-help" tabindex="0" role="img" aria-label="stcpMaxSegmentSizeBytes: STCP 단일 프래그먼트 MTU">ⓘ<span class="adapter-tooltip"><code>stcpMaxSegmentSizeBytes</code>STCP 컨버전스 레이어 프로토콜 사용 시 적용되는 단일 프래그먼트 MTU(Bytes)입니다.<small>권장값: 200,000 Bytes</small></span></span></span>
+            <input id="dtn-stcpMaxSegmentSizeBytes" title="stcpMaxSegmentSizeBytes: STCP 단일 프래그먼트 MTU(Bytes)" aria-describedby="dtn-stcpMaxSegmentSizeBytes-error" type="number" step="1" value="200000" required>
+            <small id="dtn-stcpMaxSegmentSizeBytes-error" class="adapter-error" aria-live="polite" hidden></small>
+          </label>
+          <label class="adapter-field"><span>라우팅 모드 <span class="adapter-config-help" tabindex="0" role="img" aria-label="routingMode: ION 라우팅 방식">ⓘ<span class="adapter-tooltip"><code>routingMode</code>ION 라우팅 방식입니다.<small>기본값: StaticPlan</small></span></span></span>
+            <input id="dtn-routingMode" title="routingMode: 라우팅 모드" aria-describedby="dtn-routingMode-error" type="text" value="StaticPlan" required>
+            <small id="dtn-routingMode-error" class="adapter-error" aria-live="polite" hidden></small>
           </label>
         </div>
-      </details>
-    </section>
+      </section>
+
+      <section class="adapter-config-panel" id="hdtn-config-panel" role="tabpanel" aria-labelledby="adapter-tab-hdtn" hidden>
+        <div class="adapter-heading"><span id="hdtn-config-state" role="status">다음 시험 적용 · 자동 저장</span><button id="hdtn-reset" type="button">전체 기본값</button></div>
+        <small id="hdtn-config-notice" role="status" hidden></small>
+        <div class="adapter-fields">
+          <label class="adapter-field"><span>최대 동시 번들 수 <span class="adapter-config-help" tabindex="0" role="img" aria-label="maxNumberOfBundlesInPipeline: 파이프라인 동시 대기 번들 최대 개수">ⓘ<span class="adapter-tooltip"><code>maxNumberOfBundlesInPipeline</code>송신 파이프라인(메모리 큐)에서 동시에 대기할 번들의 최대 개수입니다.</span></span></span>
+            <input id="hdtn-maxNumberOfBundlesInPipeline" title="maxNumberOfBundlesInPipeline: 파이프라인에서 동시에 대기할 번들의 최대 개수입니다." aria-describedby="hdtn-maxNumberOfBundlesInPipeline-error" type="number" step="1" value="50" required>
+            <small id="hdtn-maxNumberOfBundlesInPipeline-error" class="adapter-error" aria-live="polite" hidden></small>
+          </label>
+          <label class="adapter-field"><span>최대 동시 번들 용량 (Bytes) <span class="adapter-config-help" tabindex="0" role="img" aria-label="maxSumOfBundleBytesInPipeline: 대기 중인 번들 용량 합계 상한">ⓘ<span class="adapter-tooltip"><code>maxSumOfBundleBytesInPipeline</code>대기 중인 번들 용량의 합계 상한(Bytes)입니다. 대용량 파일 전송 시 파일 크기 이상으로 권장합니다.</span></span></span>
+            <input id="hdtn-maxSumOfBundleBytesInPipeline" title="maxSumOfBundleBytesInPipeline: 대기 중인 번들 용량의 합계(Bytes)" aria-describedby="hdtn-maxSumOfBundleBytesInPipeline-error" type="number" step="1" value="3000000000" required>
+            <small id="hdtn-maxSumOfBundleBytesInPipeline-error" class="adapter-error" aria-live="polite" hidden></small>
+          </label>
+          <label class="adapter-field"><span>최대 번들 크기 (Bytes) <span class="adapter-config-help" tabindex="0" role="img" aria-label="maxBundleSizeBytes: 단일 번들 최대 허용 크기">ⓘ<span class="adapter-tooltip"><code>maxBundleSizeBytes</code>HDTN 엔진이 거부하지 않고 처리할 수 있는 단일 번들의 최대 크기(Bytes)입니다. 송신 파일보다 커야 합니다.</span></span></span>
+            <input id="hdtn-maxBundleSizeBytes" title="maxBundleSizeBytes: 단일 번들의 크기 상한(Bytes)" aria-describedby="hdtn-maxBundleSizeBytes-error" type="number" step="1" value="3000000000" required>
+            <small id="hdtn-maxBundleSizeBytes-error" class="adapter-error" aria-live="polite" hidden></small>
+          </label>
+          <label class="adapter-field"><span>TCPCL 세그먼트 크기 (Bytes) <span class="adapter-config-help" tabindex="0" role="img" aria-label="tcpclMaxSegmentSizeBytes: TCPCL 세그먼트 크기">ⓘ<span class="adapter-tooltip"><code>tcpclMaxSegmentSizeBytes</code>HDTN TCPCL 프로토콜 단일 프래그먼트 MTU(Bytes)입니다.<small>기본값: 200,000 Bytes</small></span></span></span>
+            <input id="hdtn-tcpclMaxSegmentSizeBytes" title="tcpclMaxSegmentSizeBytes: TCPCL 세그먼트 크기(Bytes)" aria-describedby="hdtn-tcpclMaxSegmentSizeBytes-error" type="number" step="1" value="200000" required>
+            <small id="hdtn-tcpclMaxSegmentSizeBytes-error" class="adapter-error" aria-live="polite" hidden></small>
+          </label>
+          <label class="adapter-field"><span>저장 공간 부족 시 대기 (초) <span class="adapter-config-help" tabindex="0" role="img" aria-label="neighborDepletedStorageDelaySeconds: 저장 공간 부족 신호 수신 시 대기 시간">ⓘ<span class="adapter-tooltip"><code>neighborDepletedStorageDelaySeconds</code>인접 노드의 저장 공간 부족 신호를 받았을 때 전송을 보류하는 대기 시간(초)입니다.</span></span></span>
+            <input id="hdtn-neighborDepletedStorageDelaySeconds" title="neighborDepletedStorageDelaySeconds: 대기 시간(초)" aria-describedby="hdtn-neighborDepletedStorageDelaySeconds-error" type="number" step="1" value="10" required>
+            <small id="hdtn-neighborDepletedStorageDelaySeconds-error" class="adapter-error" aria-live="polite" hidden></small>
+          </label>
+          <label class="adapter-field"><span>번들 우선순위 준수 <span class="adapter-config-help" tabindex="0" role="img" aria-label="enforceBundlePriority: 우선순위 엄격 적용 여부">ⓘ<span class="adapter-tooltip"><code>enforceBundlePriority</code>패킷 처리 시 스토리지 경유를 강제할지 여부입니다. 속도 최적화를 위해 기본값은 사용 안 함(false) 권장.</span></span></span>
+            <select id="hdtn-enforceBundlePriority" title="enforceBundlePriority: 번들 우선순위 준수"><option value="false">사용 안 함 (속도 최적화)</option><option value="true">사용</option></select>
+            <small id="hdtn-enforceBundlePriority-error" class="adapter-error" aria-live="polite" hidden></small>
+          </label>
+          <label class="adapter-field"><span>스토리지 삭제 정책 <span class="adapter-config-help" tabindex="0" role="img" aria-label="storageDeletionPolicy: 스토리지 삭제 정책">ⓘ<span class="adapter-tooltip"><code>storageDeletionPolicy</code>번들 처리 후 스토리지 보존 및 삭제 정책입니다.<small>기본값: DELETE_AFTER_FORWARDING</small></span></span></span>
+            <select id="hdtn-storageDeletionPolicy" title="storageDeletionPolicy: 삭제 정책"><option value="never">자동 삭제 안 함 (never)</option><option value="on_forward">전달 완료 시 삭제 (on_forward)</option><option value="on_delivery">인도 완료 시 삭제 (on_delivery)</option><option value="DELETE_AFTER_FORWARDING">어댑터 기본 (DELETE_AFTER_FORWARDING)</option></select>
+            <small id="hdtn-storageDeletionPolicy-error" class="adapter-error" aria-live="polite" hidden></small>
+          </label>
+        </div>
+        <details id="hdtn-advanced"><summary>고급 설정 <small>저장 용량 · LTP · ACS</small></summary>
+          <div class="adapter-fields">
+            <label class="adapter-field"><span>전체 저장 용량 (Bytes) <span class="adapter-config-help" tabindex="0" role="img" aria-label="totalStorageCapacityBytes: 로컬 스토리지 용량 상한">ⓘ<span class="adapter-tooltip"><code>totalStorageCapacityBytes</code>노드 로컬 스토리지 최대 저장 용량 상한(Bytes)입니다.</span></span></span>
+              <input id="hdtn-totalStorageCapacityBytes" title="totalStorageCapacityBytes: 로컬 스토리지 용량 상한(Bytes)" aria-describedby="hdtn-totalStorageCapacityBytes-error" type="number" step="1" value="8589934592" required>
+              <small id="hdtn-totalStorageCapacityBytes-error" class="adapter-error" aria-live="polite" hidden></small>
+            </label>
+            <label class="adapter-field"><span>LTP 최대 수신 패킷 크기 (Bytes) <span class="adapter-config-help" tabindex="0" role="img" aria-label="maxLtpReceiveUdpPacketSizeBytes: LTP UDP 최대 수신 패킷 크기">ⓘ<span class="adapter-tooltip"><code>maxLtpReceiveUdpPacketSizeBytes</code>LTP 프로토콜의 UDP 최대 수신 패킷 크기(Bytes)입니다.<small>기본값: 65,536 Bytes</small></span></span></span>
+              <input id="hdtn-maxLtpReceiveUdpPacketSizeBytes" title="maxLtpReceiveUdpPacketSizeBytes: LTP 최대 수신 패킷 크기(Bytes)" aria-describedby="hdtn-maxLtpReceiveUdpPacketSizeBytes-error" type="number" step="1" value="65536" required>
+              <small id="hdtn-maxLtpReceiveUdpPacketSizeBytes-error" class="adapter-error" aria-live="polite" hidden></small>
+            </label>
+            <label class="adapter-field"><span>ACS 전송 주기 (ms) <span class="adapter-config-help" tabindex="0" role="img" aria-label="acsSendPeriodMilliseconds: ACS 집계 전송 주기">ⓘ<span class="adapter-tooltip"><code>acsSendPeriodMilliseconds</code>ACS 집계 전송 주기(ms)입니다.<small>기본값: 1,000 ms</small></span></span></span>
+              <input id="hdtn-acsSendPeriodMilliseconds" title="acsSendPeriodMilliseconds: ACS 전송 주기(ms)" aria-describedby="hdtn-acsSendPeriodMilliseconds-error" type="number" step="1" value="1000" required>
+              <small id="hdtn-acsSendPeriodMilliseconds-error" class="adapter-error" aria-live="polite" hidden></small>
+            </label>
+          </div>
+        </details>
+      </section>
+    </div>
     <select id="dtn-sender" hidden></select><select id="dtn-receiver" hidden></select>
     <div class="destination-row">
       <label>상대 수신 서비스 IP<input id="dtn-receiver-ip" type="text" placeholder="192.168.219.100" autocomplete="off" required></label>
@@ -281,5 +340,5 @@
   </div>
   </div>
 </main>
-<script type="module" src="/lnis/assets/dtn/dtn.js?v=20261007-multi-pvt"></script>
+<script type="module" src="/lnis/assets/dtn/dtn.js?v=20261007-tab-ui"></script>
 </body></html>

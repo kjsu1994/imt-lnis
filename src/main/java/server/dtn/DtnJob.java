@@ -40,6 +40,7 @@ public class DtnJob {
 
     /** 시험 시작 시 확정한 HDTN 설정이다. 기존 시험은 null이다. */
     @Lob private String hdtnConfigJson;
+    @Lob private String dtnConfigJson;
 
     private String comparisonMode;
     private String pvtConstellation;

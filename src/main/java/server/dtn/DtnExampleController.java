@@ -70,11 +70,11 @@ public class DtnExampleController {
         }
     }
     private ResponseEntity<byte[]> read(String file, String filename) throws IOException {
-        Path path = null;
-        if (file != null && !file.isBlank()) {
-            path = Path.of(file);
+        if (file == null || file.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "예제 파일 미설정");
         }
-        if (path == null || !Files.isRegularFile(path)) {
+        Path path = Path.of(file);
+        if (!Files.isRegularFile(path)) {
             for (String fallback : java.util.List.of(
                     "/app/examples/" + filename,
                     "examples/" + filename,

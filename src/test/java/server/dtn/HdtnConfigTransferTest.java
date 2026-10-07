@@ -182,4 +182,30 @@ class HdtnConfigTransferTest {
                                 "DTN",
                                 new HdtnConfig()));
     }
+
+    @Test
+    void rejectsDtnConfigurationOnHdtnOnlyRoute() {
+        DtnService service =
+                new DtnService(
+                        mock(DtnRepository.class),
+                        mock(AgentCommandService.class),
+                        mock(AgentRepository.class),
+                        mock(AgentConnectionRegistry.class),
+                        mock(InputBufferService.class),
+                        new ObjectMapper());
+        assertThrows(
+                IllegalArgumentException.class,
+                () ->
+                        service.create(
+                                UUID.randomUUID(),
+                                "sender-1",
+                                "receiver-1",
+                                "http://adapter:8080",
+                                "GNSS_RAW",
+                                "HDTN",
+                                "HDTN",
+                                null,
+                                server.pvt.PvtConstellation.GPS,
+                                new DtnConfig()));
+    }
 }

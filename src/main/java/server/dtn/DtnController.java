@@ -221,6 +221,12 @@ public class DtnController {
         @com.fasterxml.jackson.databind.annotation.JsonDeserialize(
                 using = HdtnConfigRequestDeserializer.class)
         private DtnModels.HdtnConfig hdtnConfig;
+
+        /** DTN(ION) 경로가 포함될 때만 전달한다. */
+        @Valid
+        @com.fasterxml.jackson.databind.annotation.JsonDeserialize(
+                using = DtnConfigRequestDeserializer.class)
+        private DtnModels.DtnConfig dtnConfig;
     }
 
     /* DTN 외부 연동 설정 조회 */
@@ -287,7 +293,7 @@ public class DtnController {
                 senderMode = "DTN";
                 receiverMode = "HDTN";
             }
-            if (constellation == PvtConstellation.GPS) {
+            if (constellation == PvtConstellation.GPS && request.getDtnConfig() == null) {
                 dtnJob =
                         dtnService.createDelay(
                                 inputId,
@@ -313,15 +319,16 @@ public class DtnController {
                                 request.getHdtnConfig(),
                                 request.getSelectedEpoch(),
                                 startedAt,
-                                constellation);
+                                constellation,
+                                request.getDtnConfig());
             }
-        } else if (request.getHdtnConfig() != null) {
+        } else if (request.getHdtnConfig() != null || request.getDtnConfig() != null) {
             String senderMode = request.getSenderMode(), receiverMode = request.getReceiverMode();
             if (senderMode == null && receiverMode == null) {
                 senderMode = "DTN";
                 receiverMode = "HDTN";
             }
-            if (constellation == PvtConstellation.GPS) {
+            if (constellation == PvtConstellation.GPS && request.getDtnConfig() == null) {
                 dtnJob =
                         dtnService.create(
                                 inputId,
@@ -343,9 +350,9 @@ public class DtnController {
                                 senderMode,
                                 receiverMode,
                                 request.getHdtnConfig(),
-                                constellation);
+                                constellation,
+                                request.getDtnConfig());
             }
-
         } else if (request.getSenderMode() != null || request.getReceiverMode() != null) {
             dtnJob =
                     dtnService.create(
@@ -599,6 +606,11 @@ public class DtnController {
                 job.getHdtnConfigJson() == null
                         ? null
                         : objectMapper.readTree(job.getHdtnConfigJson()));
+        result.put(
+                "dtnConfig",
+                job.getDtnConfigJson() == null
+                        ? null
+                        : objectMapper.readTree(job.getDtnConfigJson()));
         result.put("development", Boolean.TRUE.equals(job.getDevelopment()));
         result.put(
                 "comparisonMode",

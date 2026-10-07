@@ -37,24 +37,41 @@ const fields = {
   maxLtpReceiveUdpPacketSizeBytes: ['LTP 수신 크기', 'Bytes'],
   acsSendPeriodMilliseconds: ['ACS 주기', 'ms']
 };
-const policies = {DELETE_AFTER_FORWARDING: '어댑터 기본', on_expiration: '수명 만료 시', on_storage_full: '저장소 부족 시', never: '자동 삭제 안 함'};
+const dtnFields = {
+  sdrHeapSizeBytes: ['SDR 힙', 'Bytes'],
+  sdrWorkingMemorySizeBytes: ['SDR 작업 메모리', 'Bytes'],
+  sdrTransientMode: ['SDR 모드', ''],
+  maxBundleSizeBytes: ['번들 크기', 'Bytes'],
+  contactRateBytesPerSec: ['접촉 전송 속도', 'Bytes/s'],
+  maxProductionRateBytesPerSec: ['생성 속도', 'Bytes/s'],
+  maxConsumptionRateBytesPerSec: ['소비 속도', 'Bytes/s'],
+  tcpclMaxSegmentSizeBytes: ['TCPCL 크기', 'Bytes'],
+  stcpMaxSegmentSizeBytes: ['STCP 크기', 'Bytes'],
+  routingMode: ['라우팅 모드', '']
+};
+const policies = {never: '자동 삭제 안 함 (never)', on_forward: '전달 완료 시 삭제', on_delivery: '인도 완료 시 삭제', DELETE_AFTER_FORWARDING: '어댑터 기본', on_expiration: '수명 만료 시', on_storage_full: '저장소 부족 시'};
 function valueText(key, value, compact = false) {
   if (value == null) return '기록 없음';
   if (key === 'enforceBundlePriority') return value ? '사용' : '사용 안 함';
+  if (key === 'sdrTransientMode') return value ? '순수 RAM (Transient)' : '디스크 기반';
   if (key === 'storageDeletionPolicy') return policies[value] || String(value);
-  const unit = fields[key][1];
-  const exact = Number(value).toLocaleString('ko-KR') + ' ' + unit;
-  if (unit !== 'Bytes') return exact;
+  if (key === 'routingMode') return String(value);
+  const def = fields[key] || dtnFields[key] || ['', ''];
+  const unit = def[1];
+  const exact = Number(value).toLocaleString('ko-KR') + (unit ? ' ' + unit : '');
+  if (unit !== 'Bytes' && unit !== 'Bytes/s') return exact;
+  const baseUnit = unit === 'Bytes/s' ? 'B/s' : 'Bytes';
   const scale = value >= 1e9 ? 1e9 : value >= 1e6 ? 1e6 : value >= 1e3 ? 1e3 : 1;
-  const label = {1: 'Bytes', 1000: 'KB', 1000000: 'MB', 1000000000: 'GB'}[scale];
+  const label = {1: baseUnit, 1000: 'K' + baseUnit, 1000000: 'M' + baseUnit, 1000000000: 'G' + baseUnit}[scale];
   const readable = Number((value / scale).toFixed(3)).toLocaleString('ko-KR') + ' ' + label;
   return compact ? readable : exact + (scale > 1 ? ' · ' + readable : '');
 }
 
 export function renderTrialSettings(target, job) {
   if (!target) return;
-  const config = job?.hdtnConfig;
-  const signature = JSON.stringify([job?.testId, job?.senderMode, job?.receiverMode, config]);
+  const hdtn = job?.hdtnConfig;
+  const dtn = job?.dtnConfig;
+  const signature = JSON.stringify([job?.testId, job?.senderMode, job?.receiverMode, hdtn, dtn]);
   if (target.dataset.signature === signature) return;
   target.dataset.signature = signature;
   const open = target.querySelector('details')?.open || false;
@@ -63,26 +80,44 @@ export function renderTrialSettings(target, job) {
   heading.textContent = '이 시험의 어댑터 요청 설정';
   heading.title = '시험에 기록된 요청값입니다. 어댑터 실제 적용값은 미확인입니다.';
   target.append(heading);
-  if (!job || !config || (job.senderMode === 'DTN' && job.receiverMode === 'DTN')) {
+  if (!job || (!hdtn && !dtn)) {
     const empty = document.createElement('span');
-    empty.textContent = !job ? '시험 선택 대기' : job.senderMode === 'DTN' && job.receiverMode === 'DTN' ? 'HDTN 설정 미전달' : '기록된 설정 없음';
+    empty.textContent = !job ? '시험 선택 대기' : '기록된 설정 없음';
     target.append(empty);
     return;
   }
   const chips = document.createElement('div'); chips.className = 'trial-config-chips';
-  for (const key of ['maxNumberOfBundlesInPipeline', 'maxSumOfBundleBytesInPipeline', 'tcpclMaxSegmentSizeBytes']) {
+  if (dtn) {
     const chip = document.createElement('span');
-    chip.textContent = fields[key][0] + ' ' + valueText(key, config[key], true);
-    chip.title = valueText(key, config[key]); chips.append(chip);
+    chip.textContent = 'DTN 힙 ' + valueText('sdrHeapSizeBytes', dtn.sdrHeapSizeBytes, true);
+    chip.title = 'DTN SDR 힙: ' + valueText('sdrHeapSizeBytes', dtn.sdrHeapSizeBytes);
+    chips.append(chip);
+  }
+  if (hdtn) {
+    for (const key of ['maxNumberOfBundlesInPipeline', 'maxSumOfBundleBytesInPipeline', 'tcpclMaxSegmentSizeBytes']) {
+      const chip = document.createElement('span');
+      chip.textContent = 'HDTN ' + fields[key][0] + ' ' + valueText(key, hdtn[key], true);
+      chip.title = valueText(key, hdtn[key]); chips.append(chip);
+    }
   }
   const detail = document.createElement('details'); detail.open = open;
   const summary = document.createElement('summary'); summary.textContent = '전체 설정';
   const list = document.createElement('dl'); list.className = 'trial-config-values';
-  for (const [key, [label]] of Object.entries(fields)) {
-    const item = document.createElement('div');
-    const dt = document.createElement('dt'); dt.textContent = label; dt.title = key;
-    const dd = document.createElement('dd'); dd.textContent = valueText(key, config[key]);
-    item.append(dt, dd); list.append(item);
+  if (dtn) {
+    for (const [key, [label]] of Object.entries(dtnFields)) {
+      const item = document.createElement('div');
+      const dt = document.createElement('dt'); dt.textContent = '[DTN] ' + label; dt.title = key;
+      const dd = document.createElement('dd'); dd.textContent = valueText(key, dtn[key]);
+      item.append(dt, dd); list.append(item);
+    }
+  }
+  if (hdtn) {
+    for (const [key, [label]] of Object.entries(fields)) {
+      const item = document.createElement('div');
+      const dt = document.createElement('dt'); dt.textContent = '[HDTN] ' + label; dt.title = key;
+      const dd = document.createElement('dd'); dd.textContent = valueText(key, hdtn[key]);
+      item.append(dt, dd); list.append(item);
+    }
   }
   const note = document.createElement('small'); note.textContent = '요청값 · 실제 적용 여부 미확인';
   detail.append(summary, list, note); target.append(chips, detail);

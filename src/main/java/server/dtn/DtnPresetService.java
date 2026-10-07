@@ -36,7 +36,19 @@ public class DtnPresetService {
             @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.WRITE_ONLY)
             Boolean delayEnabled,
             @NotNull @Valid @JsonDeserialize(using = HdtnConfigRequestDeserializer.class)
-                    HdtnConfig hdtnConfig) {
+                    HdtnConfig hdtnConfig,
+            @Valid @JsonDeserialize(using = DtnConfigRequestDeserializer.class)
+                    server.common.DtnModels.DtnConfig dtnConfig) {
+
+        public Settings(
+                String testType,
+                String senderMode,
+                String receiverMode,
+                String pvtConstellation,
+                Boolean delayEnabled,
+                HdtnConfig hdtnConfig) {
+            this(testType, senderMode, receiverMode, pvtConstellation, delayEnabled, hdtnConfig, null);
+        }
 
         public Settings(
                 String testType,
@@ -44,7 +56,7 @@ public class DtnPresetService {
                 String receiverMode,
                 Boolean delayEnabled,
                 HdtnConfig hdtnConfig) {
-            this(testType, senderMode, receiverMode, "GPS", delayEnabled, hdtnConfig);
+            this(testType, senderMode, receiverMode, "GPS", delayEnabled, hdtnConfig, null);
         }
 
         public Settings {

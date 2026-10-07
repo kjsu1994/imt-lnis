@@ -53,36 +53,26 @@ const hdtnRules = {
   "maxNumberOfBundlesInPipeline": {
     "label": "최대 동시 번들 수",
     "default": 50,
-    "min": 10,
-    "max": 10000,
     "advanced": false
   },
   "maxSumOfBundleBytesInPipeline": {
     "label": "최대 동시 번들 용량",
-    "default": 50000000,
-    "min": 1048576,
-    "max": 2147483648,
+    "default": 3000000000,
     "advanced": false
   },
   "maxBundleSizeBytes": {
     "label": "최대 번들 크기",
-    "default": 10485760,
-    "min": 1048576,
-    "max": 104857600,
+    "default": 3000000000,
     "advanced": false
   },
   "tcpclMaxSegmentSizeBytes": {
     "label": "TCPCL 세그먼트 크기",
-    "default": 20000,
-    "min": 20000,
-    "max": 200000,
+    "default": 200000,
     "advanced": false
   },
   "neighborDepletedStorageDelaySeconds": {
     "label": "저장 공간 부족 시 대기",
     "default": 10,
-    "min": 0,
-    "max": 3600,
     "advanced": false
   },
   "enforceBundlePriority": {
@@ -92,43 +82,37 @@ const hdtnRules = {
   },
   "storageDeletionPolicy": {
     "label": "스토리지 삭제 정책",
-    "default": "DELETE_AFTER_FORWARDING",
+    "default": "never",
     "advanced": false
   },
   "totalStorageCapacityBytes": {
     "label": "전체 저장 용량",
     "default": 8589934592,
-    "min": 1,
-    "max": 9007199254740991,
     "advanced": true
   },
   "maxLtpReceiveUdpPacketSizeBytes": {
     "label": "LTP 최대 수신 패킷 크기",
     "default": 65536,
-    "min": 1,
-    "max": 2147483647,
     "advanced": true
   },
   "acsSendPeriodMilliseconds": {
     "label": "ACS 전송 주기",
     "default": 1000,
-    "min": 1,
-    "max": 2147483647,
     "advanced": true
   }
 };
 const hdtnDefaults = Object.fromEntries(Object.entries(hdtnRules).map(([key, rule]) => [key, rule.default]));
-const hdtnPolicies = ['DELETE_AFTER_FORWARDING', 'on_expiration', 'on_storage_full', 'never'];
+const hdtnPolicies = ['never', 'on_forward', 'on_delivery', 'DELETE_AFTER_FORWARDING', 'on_expiration', 'on_storage_full'];
 const hdtnStorageKey = 'lnis.hdtnConfig.v1';
 const usesHdtn = () => senderMode === 'HDTN' || receiverMode === 'HDTN';
 
 function hdtnValue(key, raw) {
   const rule = hdtnRules[key];
+  if (!rule) return raw;
   if (typeof rule.default === 'number') {
-    const value = Number(raw);
-    if (!raw || !Number.isSafeInteger(value) || value < rule.min || value > rule.max)
-      throw new Error(rule.label + ': ' + rule.min.toLocaleString() + '~' + rule.max.toLocaleString() + ' 사이의 정수를 입력하세요.');
-    return value;
+    if (!raw || !/^\d+$/.test(raw))
+      throw new Error(rule.label + ': 양의 정수를 입력하세요.');
+    return Number(raw);
   }
   if (typeof rule.default === 'boolean') {
     if (!['true', 'false'].includes(raw)) throw new Error('우선순위 사용 여부를 선택하세요.');
@@ -143,11 +127,14 @@ function readHdtnConfig() {
   let firstError = null;
   for (const key of Object.keys(hdtnRules)) {
     const input = $('hdtn-' + key), error = $('hdtn-' + key + '-error');
+    if (!input) continue;
     try {
       result[key] = hdtnValue(key, input.value.trim());
-      input.removeAttribute('aria-invalid'); error.hidden = true; error.textContent = '';
+      input.removeAttribute('aria-invalid');
+      if (error) { error.hidden = true; error.textContent = ''; }
     } catch (failure) {
-      input.setAttribute('aria-invalid', 'true'); error.hidden = false; error.textContent = failure.message;
+      input.setAttribute('aria-invalid', 'true');
+      if (error) { error.hidden = false; error.textContent = failure.message; }
       if (!firstError) { failure.field = key; firstError = failure; }
     }
   }
@@ -173,6 +160,7 @@ function initializeHdtnConfig() {
       catch { restored.push(rule.label); }
     }
     const input = $('hdtn-' + key);
+    if (!input) continue;
     input.value = String(value);
     input.oninput = input.onchange = () => {
       try { saveHdtnConfig(readHdtnConfig()); } catch { /* Keep invalid edits visible, never persist them. */ }
@@ -181,39 +169,265 @@ function initializeHdtnConfig() {
   }
   const values = readHdtnConfig();
   if (restored.length) saveHdtnConfig(values);
-  $('hdtn-config-notice').hidden = !restored.length;
-  $('hdtn-config-notice').textContent = restored.length ? '새 허용 범위에 맞춰 기본값 복구: ' + restored.join(', ') : '';
-  $('hdtn-reset').onclick = () => {
-    if (locked() || !usesHdtn()) return;
-    for (const [key, value] of Object.entries(hdtnDefaults)) $('hdtn-' + key).value = String(value);
-    saveHdtnConfig(readHdtnConfig());
-    $('hdtn-config-notice').hidden = false;
-    $('hdtn-config-notice').textContent = '고급 설정을 포함한 전체 값을 기본값으로 복원했습니다.';
-    updateHdtnControls();
-  };
+  if ($('hdtn-config-notice')) {
+    $('hdtn-config-notice').hidden = !restored.length;
+    $('hdtn-config-notice').textContent = restored.length ? '새 형식에 맞춰 기본값 복구: ' + restored.join(', ') : '';
+  }
+  if ($('hdtn-reset')) {
+    $('hdtn-reset').onclick = () => {
+      if (locked() || !usesHdtn()) return;
+      for (const [key, value] of Object.entries(hdtnDefaults)) {
+        const el = $('hdtn-' + key);
+        if (el) el.value = String(value);
+      }
+      saveHdtnConfig(readHdtnConfig());
+      if ($('hdtn-config-notice')) {
+        $('hdtn-config-notice').hidden = false;
+        $('hdtn-config-notice').textContent = '고급 설정을 포함한 HDTN 전체 값을 기본값으로 복원했습니다.';
+      }
+      updateHdtnControls();
+    };
+  }
 }
 
 function updateHdtnControls() {
-  for (const key of Object.keys(hdtnDefaults)) $('hdtn-' + key).disabled = locked() || !usesHdtn();
-  $('hdtn-reset').disabled = locked() || !usesHdtn();
+  for (const key of Object.keys(hdtnDefaults)) {
+    const el = $('hdtn-' + key);
+    if (el) el.disabled = locked() || !usesHdtn();
+  }
+  if ($('hdtn-reset')) $('hdtn-reset').disabled = locked() || !usesHdtn();
   let message = 'DTN → DTN 경로에서는 전송하지 않습니다.';
   if (usesHdtn()) {
     try { readHdtnConfig(); message = '다음 시험 적용 · 자동 저장'; }
     catch (error) { message = error.message; }
   }
-  $('hdtn-config-state').textContent = message;
+  if ($('hdtn-config-state')) $('hdtn-config-state').textContent = message;
 }
+
+const dtnRules = {
+  "sdrHeapSizeBytes": {
+    "label": "SDR 힙 크기",
+    "default": 3500000000
+  },
+  "sdrWorkingMemorySizeBytes": {
+    "label": "SDR 작업 메모리",
+    "default": 350000000
+  },
+  "sdrTransientMode": {
+    "label": "SDR 임시 모드",
+    "default": false
+  },
+  "maxBundleSizeBytes": {
+    "label": "최대 번들 크기",
+    "default": 3000000000
+  },
+  "contactRateBytesPerSec": {
+    "label": "접촉 전송 속도",
+    "default": 125000000
+  },
+  "maxProductionRateBytesPerSec": {
+    "label": "최대 생성 속도",
+    "default": 100000000
+  },
+  "maxConsumptionRateBytesPerSec": {
+    "label": "최대 소비 속도",
+    "default": 100000000
+  },
+  "tcpclMaxSegmentSizeBytes": {
+    "label": "TCPCL 세그먼트 크기",
+    "default": 20000
+  },
+  "stcpMaxSegmentSizeBytes": {
+    "label": "STCP 세그먼트 크기",
+    "default": 200000
+  },
+  "routingMode": {
+    "label": "라우팅 모드",
+    "default": "StaticPlan"
+  }
+};
+const dtnDefaults = Object.fromEntries(Object.entries(dtnRules).map(([key, rule]) => [key, rule.default]));
+const dtnStorageKey = 'lnis.dtnConfig.v1';
+const usesDtn = () => senderMode === 'DTN' || receiverMode === 'DTN';
+
+function dtnValue(key, raw) {
+  const rule = dtnRules[key];
+  if (!rule) return raw;
+  if (typeof rule.default === 'number') {
+    if (!raw || !/^\d+$/.test(raw))
+      throw new Error(rule.label + ': 양의 정수를 입력하세요.');
+    return Number(raw);
+  }
+  if (typeof rule.default === 'boolean') {
+    if (!['true', 'false'].includes(raw)) throw new Error('임시(Transient) 모드 여부를 선택하세요.');
+    return raw === 'true';
+  }
+  if (key === 'routingMode') {
+    if (!raw || !raw.trim()) throw new Error('라우팅 모드를 입력하세요.');
+    return raw.trim();
+  }
+  return raw;
+}
+
+function readDtnConfig() {
+  const result = {};
+  let firstError = null;
+  for (const key of Object.keys(dtnRules)) {
+    const input = $('dtn-' + key), error = $('dtn-' + key + '-error');
+    if (!input) continue;
+    try {
+      result[key] = dtnValue(key, input.value.trim());
+      input.removeAttribute('aria-invalid');
+      if (error) { error.hidden = true; error.textContent = ''; }
+    } catch (failure) {
+      input.setAttribute('aria-invalid', 'true');
+      if (error) { error.hidden = false; error.textContent = failure.message; }
+      if (!firstError) { failure.field = key; firstError = failure; }
+    }
+  }
+  if (firstError) throw firstError;
+  return result;
+}
+
+function saveDtnConfig(settings) {
+  try { localStorage.setItem(dtnStorageKey, JSON.stringify(settings)); }
+  catch { /* Current values still apply when browser storage is unavailable. */ }
+}
+
+function initializeDtnConfig() {
+  let saved = {}, restored = [];
+  try {
+    if (location.pathname?.endsWith('/clear')) localStorage.removeItem(dtnStorageKey);
+    saved = JSON.parse(localStorage.getItem(dtnStorageKey) || '{}') || {};
+  } catch { /* Use defaults for unavailable or malformed storage. */ }
+  for (const [key, rule] of Object.entries(dtnRules)) {
+    let value = rule.default;
+    if (Object.hasOwn(saved, key)) {
+      try { value = dtnValue(key, String(saved[key])); }
+      catch { restored.push(rule.label); }
+    }
+    const input = $('dtn-' + key);
+    if (!input) continue;
+    input.value = String(value);
+    input.oninput = input.onchange = () => {
+      try { saveDtnConfig(readDtnConfig()); } catch { /* Keep invalid edits visible, never persist them. */ }
+      updateDtnControls();
+    };
+  }
+  const values = readDtnConfig();
+  if (restored.length) saveDtnConfig(values);
+  if ($('dtn-config-notice')) {
+    $('dtn-config-notice').hidden = !restored.length;
+    $('dtn-config-notice').textContent = restored.length ? '새 형식에 맞춰 기본값 복구: ' + restored.join(', ') : '';
+  }
+  if ($('dtn-reset')) {
+    $('dtn-reset').onclick = () => {
+      if (locked() || !usesDtn()) return;
+      for (const [key, value] of Object.entries(dtnDefaults)) {
+        const el = $('dtn-' + key);
+        if (el) el.value = String(value);
+      }
+      saveDtnConfig(readDtnConfig());
+      if ($('dtn-config-notice')) {
+        $('dtn-config-notice').hidden = false;
+        $('dtn-config-notice').textContent = 'DTN 전체 설정을 기본값으로 복원했습니다.';
+      }
+      updateDtnControls();
+    };
+  }
+}
+
+function updateDtnControls() {
+  for (const key of Object.keys(dtnDefaults)) {
+    const el = $('dtn-' + key);
+    if (el) el.disabled = locked() || !usesDtn();
+  }
+  if ($('dtn-reset')) $('dtn-reset').disabled = locked() || !usesDtn();
+  let message = 'HDTN → HDTN 경로에서는 전송하지 않습니다.';
+  if (usesDtn()) {
+    try { readDtnConfig(); message = '다음 시험 적용 · 자동 저장'; }
+    catch (error) { message = error.message; }
+  }
+  if ($('dtn-config-state')) $('dtn-config-state').textContent = message;
+}
+
+let activeAdapterTab = 'dtn';
+
+function switchAdapterTab(engine) {
+  activeAdapterTab = engine;
+  const isDtn = engine === 'dtn';
+  if ($('adapter-tab-dtn')) {
+    $('adapter-tab-dtn').classList.toggle('active', isDtn);
+    $('adapter-tab-dtn').setAttribute('aria-selected', String(isDtn));
+  }
+  if ($('adapter-tab-hdtn')) {
+    $('adapter-tab-hdtn').classList.toggle('active', !isDtn);
+    $('adapter-tab-hdtn').setAttribute('aria-selected', String(!isDtn));
+  }
+  if ($('dtn-config-panel')) $('dtn-config-panel').hidden = !isDtn;
+  if ($('hdtn-config-panel')) $('hdtn-config-panel').hidden = isDtn;
+}
+
+function updateAdapterTabBadges() {
+  const dtnBadge = $('dtn-tab-badge');
+  const hdtnBadge = $('hdtn-tab-badge');
+  if (!dtnBadge || !hdtnBadge) return;
+
+  const dtnActive = usesDtn();
+  const hdtnActive = usesHdtn();
+
+  if (senderMode === 'DTN' && receiverMode === 'HDTN') {
+    dtnBadge.textContent = '송신';
+    dtnBadge.className = 'adapter-tab-badge badge-sender';
+    hdtnBadge.textContent = '수신';
+    hdtnBadge.className = 'adapter-tab-badge badge-receiver';
+  } else if (senderMode === 'HDTN' && receiverMode === 'DTN') {
+    dtnBadge.textContent = '수신';
+    dtnBadge.className = 'adapter-tab-badge badge-receiver';
+    hdtnBadge.textContent = '송신';
+    hdtnBadge.className = 'adapter-tab-badge badge-sender';
+  } else if (senderMode === 'DTN' && receiverMode === 'DTN') {
+    dtnBadge.textContent = '송수신';
+    dtnBadge.className = 'adapter-tab-badge badge-both';
+    hdtnBadge.textContent = '미사용';
+    hdtnBadge.className = 'adapter-tab-badge badge-inactive';
+  } else if (senderMode === 'HDTN' && receiverMode === 'HDTN') {
+    dtnBadge.textContent = '미사용';
+    dtnBadge.className = 'adapter-tab-badge badge-inactive';
+    hdtnBadge.textContent = '송수신';
+    hdtnBadge.className = 'adapter-tab-badge badge-both';
+  }
+
+  if (activeAdapterTab === 'dtn' && !dtnActive && hdtnActive) {
+    switchAdapterTab('hdtn');
+  } else if (activeAdapterTab === 'hdtn' && !hdtnActive && dtnActive) {
+    switchAdapterTab('dtn');
+  }
+}
+
+if ($('adapter-tab-dtn')) $('adapter-tab-dtn').onclick = () => switchAdapterTab('dtn');
+if ($('adapter-tab-hdtn')) $('adapter-tab-hdtn').onclick = () => switchAdapterTab('hdtn');
+
 const presets = initPresetControls({read: () => ({
   testType: selectedType, senderMode, receiverMode, pvtConstellation,
-  hdtnConfig: readHdtnConfig()
+  hdtnConfig: readHdtnConfig(),
+  dtnConfig: readDtnConfig()
 }), isLocked: locked, apply: settings => {
   if (locked()) throw new Error('처리 중에는 불러올 수 없습니다.');
   if (!['GNSS_RAW', 'AFS_METADATA', 'IQ_SAMPLE'].includes(settings.testType)
       || !['DTN', 'HDTN'].includes(settings.senderMode) || !['DTN', 'HDTN'].includes(settings.receiverMode)) throw new Error('프리셋 설정을 확인하세요.');
-  const configValues = Object.fromEntries(Object.keys(hdtnRules).map(key => [key, hdtnValue(key, String(settings.hdtnConfig?.[key] ?? ''))]));
   selectedType = settings.testType; senderMode = settings.senderMode; receiverMode = settings.receiverMode;
   pvtConstellation = settings.pvtConstellation || 'GPS';
-  for (const [key, value] of Object.entries(configValues)) $('hdtn-' + key).value = String(value);
+  if (settings.hdtnConfig) {
+    const configValues = Object.fromEntries(Object.keys(hdtnRules).map(key => [key, hdtnValue(key, String(settings.hdtnConfig?.[key] ?? ''))]));
+    for (const [key, value] of Object.entries(configValues)) if ($('hdtn-' + key)) $('hdtn-' + key).value = String(value);
+    saveHdtnConfig(configValues);
+  }
+  if (settings.dtnConfig) {
+    const dtnValues = Object.fromEntries(Object.keys(dtnRules).map(key => [key, dtnValue(key, String(settings.dtnConfig?.[key] ?? ''))]));
+    for (const [key, value] of Object.entries(dtnValues)) if ($('dtn-' + key)) $('dtn-' + key).value = String(value);
+    saveDtnConfig(dtnValues);
+  }
   for (const button of document.querySelectorAll('.test-type-button')) {
     const selected = button.dataset.testType === selectedType;
     button.classList.toggle('active', selected); button.setAttribute('aria-pressed', String(selected));
@@ -229,7 +443,10 @@ const presets = initPresetControls({read: () => ({
   }
   if ($('dtn-pvt-constellation')) $('dtn-pvt-constellation').value = pvtConstellation;
   $('dtn-transport-mode-state').textContent = senderMode + ' → ' + receiverMode + ' · 전송 요청에 포함';
-  saveHdtnConfig(configValues); updateInputPanels();
+  updateInputPanels();
+  updateDtnControls();
+  updateHdtnControls();
+  updateAdapterTabBadges();
 
   if (inputId) {
     void (async () => {
@@ -357,7 +574,9 @@ function updateControls() {
   presets.update();
   updateInputSummary();
   $('dtn-settings-lock').hidden = !locked();
+  updateDtnControls();
   updateHdtnControls();
+  updateAdapterTabBadges();
   const tx = agents.find(a => a.agentId === $('dtn-sender').value);
   const rx = agents.find(a => a.agentId === $('dtn-receiver').value);
   $('dtn-start').disabled = locked() || gnssState.state !== 'CONNECTED' || gnssState.capturing || ! $('dtn-port').value || tx?.state !== 'READY';
@@ -614,7 +833,7 @@ for (const button of document.querySelectorAll('.transport-mode-button')) button
     other.classList.toggle('active', other === button); other.setAttribute('aria-pressed', String(other === button));
   }
   $('dtn-transport-mode-state').textContent = senderMode + ' → ' + receiverMode + ' · 전송 요청에 포함';
-  updateInputSummary(); updateHdtnControls();
+  updateInputSummary(); updateDtnControls(); updateHdtnControls(); updateAdapterTabBadges();
 };
 for (const button of document.querySelectorAll('.pvt-constellation-button')) button.onclick = async () => {
   pvtConstellation = button.dataset.constellation || 'GPS';
@@ -666,10 +885,19 @@ function showPorts(ports) {
 $('dtn-refresh').onclick = refreshPorts;
 $('dtn-send').onclick = async () => {
   if (locked() || $('dtn-send').disabled) return;
-  let hdtnConfig;
+  let dtnConfig, hdtnConfig;
+  try { if (usesDtn()) dtnConfig = readDtnConfig(); }
+  catch (error) {
+    showSettings(true);
+    switchAdapterTab('dtn');
+    if (error.field) $('dtn-' + error.field).focus();
+    $('dtn-config-state').textContent = error.message;
+    log(error.message, 'ERROR'); return;
+  }
   try { if (usesHdtn()) hdtnConfig = readHdtnConfig(); }
   catch (error) {
     showSettings(true);
+    switchAdapterTab('hdtn');
     if (hdtnRules[error.field]?.advanced) $('hdtn-advanced').open = true;
     if (error.field) $('hdtn-' + error.field).focus();
     $('hdtn-config-state').textContent = error.message;
@@ -680,7 +908,7 @@ $('dtn-send').onclick = async () => {
   busy = true; resetResult(); updateControls();
   try {
     job = await post('/dtn/tests', {inputId: selectedType === 'IQ_SAMPLE' ? null : inputId, iqFileId: iqJob?.id, senderAgentId: $('dtn-sender').value,
-      receiverAgentId: $('dtn-receiver').value, sendUrl: $('dtn-send-url').value.trim(), testType: selectedType, senderMode, receiverMode, pvtConstellation, ...delayRequest, ...(hdtnConfig ? {hdtnConfig} : {})});
+      receiverAgentId: $('dtn-receiver').value, sendUrl: $('dtn-send-url').value.trim(), testType: selectedType, senderMode, receiverMode, pvtConstellation, ...delayRequest, ...(dtnConfig ? {dtnConfig} : {}), ...(hdtnConfig ? {hdtnConfig} : {})});
     log('전송시험 시작 · ' + job.testId);
     renderSummary();
     historyPage = 0; $('dtn-test-filter').value = ''; await refreshHistory();
@@ -844,7 +1072,9 @@ function socket() {
   ws.onclose = () => setTimeout(socket, 3000);
 }
 async function initialize() {
+  initializeDtnConfig();
   initializeHdtnConfig();
+  updateAdapterTabBadges();
   try {
     config = await request('/dtn/config');
     if (config.iqEnabled) await loadIqFiles();
