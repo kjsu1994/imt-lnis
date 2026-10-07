@@ -1,4 +1,4 @@
-import {renderTrialSettings, trialOption, colorTrialSelection, initWaitingCancellation} from './dtn-settings.js?v=20261001-review';
+import {renderTrialSettings, trialOption, colorTrialSelection, initWaitingCancellation, initTrialSettingsDialog} from './dtn-settings.js?v=20261007-clean-layout';
 import {requestJson} from '../common/http.js?v=20261001-review';
 import {initGnssControls} from './dtn-gnss.js?v=20261001-review';
 import {createDtnLog} from './dtn-log.js?v=20261001-review';
@@ -191,9 +191,42 @@ function renderClockAnalysis(delta, reference, pvt) {
 function renderEpoch() {
   observations.select(Number($('pvt-epoch').value));
   const pvt = epochs[Number($('pvt-epoch').value)];
-  const delta = pvt && comparisonEpochs.find(e=>e.week===pvt.week && e.towSeconds===pvt.towSeconds);
-  $('pvt-differences').textContent = '위치 차이 '+positionDifference(delta?.positionDifferenceMeters)+' · 속도 차이 '+measured(delta?.velocityDifferenceMetersPerSecond,6,'m/s')
+  const delta = pvt && (delayComparison ? comparisonEpochs[0] : comparisonEpochs.find(e => e.week === pvt.week && e.towSeconds === pvt.towSeconds));
+  const deltaR = delta?.positionDifferenceMeters;
+  const deltaV = delta?.velocityDifferenceMetersPerSecond;
+  $('pvt-differences').textContent = '위치 차이 '+positionDifference(deltaR)+' · 속도 차이 '+measured(deltaV,6,'m/s')
     + (delayComparison ? '' : ' · 시계오차 차이 '+number(delta?.clockDifferenceSeconds,12)+' s');
+
+  const gaugePill = $('pvt-gauge-pill');
+  if (gaugePill) {
+    if (pvt && Number.isFinite(deltaR)) {
+      gaugePill.hidden = false;
+      $('pvt-delta-r-val').textContent = positionDifference(deltaR);
+      $('pvt-delta-v-val').textContent = measured(deltaV, 6, 'm/s');
+      const bar = $('pvt-gauge-bar');
+      const verdict = $('pvt-gauge-verdict');
+      if (deltaR < 0.05) {
+        bar.className = 'pvt-gauge-bar level-perfect';
+        bar.style.width = '100%';
+        verdict.className = 'pvt-gauge-badge badge-perfect';
+        verdict.textContent = '🟢 완벽 일치 (Identical)';
+      } else if (deltaR <= 1.0) {
+        bar.className = 'pvt-gauge-bar level-acceptable';
+        const pct = Math.max(15, Math.min(85, (1.0 - deltaR) * 100));
+        bar.style.width = pct + '%';
+        verdict.className = 'pvt-gauge-badge badge-acceptable';
+        verdict.textContent = '🟡 양호 (Acceptable)';
+      } else {
+        bar.className = 'pvt-gauge-bar level-warning';
+        bar.style.width = '100%';
+        verdict.className = 'pvt-gauge-badge badge-warning';
+        verdict.textContent = '🔴 오차 발생 (Warning)';
+      }
+    } else {
+      gaugePill.hidden = true;
+    }
+  }
+
   const reference = pvt && (delayComparison ? referenceEpochs[0] : referenceEpochs.find(value => value.week === pvt.week && value.towSeconds === pvt.towSeconds));
   renderClockAnalysis(delta, reference, pvt);
   ['x', 'y', 'z'].forEach((axis, index) => {
@@ -227,39 +260,133 @@ function setEpochs(values, preserve = false) {
   renderEpoch();
 }
 
+function formatElapsed(ms) {
+  if (!Number.isFinite(ms) || ms < 0) return '';
+  if (ms < 1000) return Math.round(ms) + 'ms';
+  return (ms / 1000).toFixed(2) + 's';
+}
+
+function updateReceiverFlow(job) {
+  const regEl = $('step-register'), recvEl = $('step-receive'), procEl = $('step-process');
+  if (!regEl || !recvEl || !procEl) return;
+
+  if (!job) {
+    regEl.className = '';
+    regEl.querySelector('.step-icon').textContent = '①';
+    regEl.querySelector('.step-text').textContent = '시험 등록';
+    $('step-register-time').textContent = '';
+
+    recvEl.className = '';
+    recvEl.querySelector('.step-icon').textContent = '②';
+    recvEl.querySelector('.step-text').textContent = '번들 수신';
+    $('step-receive-time').textContent = '';
+
+    procEl.className = '';
+    procEl.querySelector('.step-icon').textContent = '③';
+    procEl.querySelector('.step-text').textContent = '복원·PVT 계산';
+    $('step-process-time').textContent = '';
+    return;
+  }
+
+  const failed = ['FAILED', 'CANCELLED'].includes(job.state);
+  const completed = ['COMPLETED', 'INCONCLUSIVE'].includes(job.state);
+  const received = !!job.dtnReceived;
+  const calculating = job.state === 'CALCULATING' || job.state === 'WAITING_RECEIVER';
+  const iq = job.testType === 'IQ_SAMPLE';
+
+  const tReg = Date.parse(job.createdAt);
+  const tRecv = Date.parse(job.receivedAt || job.stageStartedAt);
+  const tDone = Date.parse(job.updatedAt);
+
+  // Step 1: 등록
+  regEl.className = 'done';
+  regEl.querySelector('.step-icon').textContent = '✔';
+  regEl.querySelector('.step-text').textContent = '① 시험 등록';
+  $('step-register-time').textContent = '';
+
+  // Step 2: 번들 수신
+  if (received) {
+    recvEl.className = 'done';
+    recvEl.querySelector('.step-icon').textContent = '✔';
+    recvEl.querySelector('.step-text').textContent = '② 번들 수신';
+    const recvMs = Number.isFinite(tRecv) && Number.isFinite(tReg) ? Math.max(0, tRecv - tReg) : null;
+    $('step-receive-time').textContent = recvMs != null ? '(' + formatElapsed(recvMs) + ')' : '';
+  } else if (failed) {
+    recvEl.className = 'failed';
+    recvEl.querySelector('.step-icon').textContent = '✕';
+    recvEl.querySelector('.step-text').textContent = '② 수신 실패';
+    $('step-receive-time').textContent = '';
+  } else {
+    recvEl.className = 'active';
+    recvEl.querySelector('.step-icon').textContent = '⟳';
+    recvEl.querySelector('.step-text').textContent = '② 번들 수신 대기';
+    $('step-receive-time').textContent = '';
+  }
+
+  // Step 3: 계산
+  const procTitle = iq ? 'I/Q 추적·PVT' : '복원·PVT 계산';
+  if (completed) {
+    procEl.className = 'done';
+    procEl.querySelector('.step-icon').textContent = '✔';
+    procEl.querySelector('.step-text').textContent = '③ ' + procTitle;
+    const procMs = Number.isFinite(tDone) && Number.isFinite(tRecv) ? Math.max(0, tDone - tRecv) : null;
+    $('step-process-time').textContent = procMs != null ? '(' + formatElapsed(procMs) + ')' : '';
+  } else if (failed && received) {
+    procEl.className = 'failed';
+    procEl.querySelector('.step-icon').textContent = '✕';
+    procEl.querySelector('.step-text').textContent = '③ 계산 실패';
+    $('step-process-time').textContent = '';
+  } else if (calculating) {
+    procEl.className = 'active';
+    procEl.querySelector('.step-icon').textContent = '⟳';
+    procEl.querySelector('.step-text').textContent = '③ 계산 중...';
+    $('step-process-time').textContent = '';
+  } else {
+    procEl.className = '';
+    procEl.querySelector('.step-icon').textContent = '③';
+    procEl.querySelector('.step-text').textContent = procTitle;
+    $('step-process-time').textContent = '';
+  }
+}
+
+let trialDialogHandler = null;
 function renderSummary(job) {
   waitingCancellation.update();
   $('dtn-cancel').disabled = cancelling || !['PREPARING', 'WAITING_DTN', 'WAITING_RECEIVER', 'CALCULATING'].includes(job?.state);
   $('dtn-cancel').textContent = job?.state === 'CALCULATING' ? '계산 중지' : job?.state === 'WAITING_DTN' ? '대기 종료' : '시험 중지';
-  renderTrialSettings($('trial-settings'), job);
+  if ($('trial-settings')) renderTrialSettings($('trial-settings'), job);
+  trialDialogHandler?.updateDialog(job);
   $('dtn-observations').hidden = job?.testType === 'IQ_SAMPLE' && !job?.receivedEpochs;
   $('received-observation-card').hidden = $('dtn-observations').hidden && $('reference-panel').hidden;
   const types = {GNSS_RAW: 'GNSS RAW', AFS_METADATA: 'AFS Frame', IQ_SAMPLE: 'I/Q Sample'};
   $('receiver-type').textContent = types[job?.testType] || '시험 선택 대기';
   $('receiver-mode').textContent = job?.senderMode && job?.receiverMode ? job.senderMode + ' → ' + job.receiverMode : '경로 정보 없음';
+  if ($('receiver-constellation')) $('receiver-constellation').textContent = job?.pvtConstellation || 'GPS';
   $('receiver-iq').hidden = job?.testType !== 'IQ_SAMPLE';
   renderIqFile($('receiver-iq-result'), job?.fileResult, job?.state === 'FAILED' ? 'I/Q 파일 검증 실패 · 로그를 확인하세요.' : 'I/Q 파일 수신·검증 대기');
   const failed = ['FAILED', 'CANCELLED'].includes(job?.state);
   const completed = ['COMPLETED', 'INCONCLUSIVE'].includes(job?.state);
-  const received = !!job?.dtnReceived;
-  const iq = job?.testType === 'IQ_SAMPLE';
-  $('step-process').textContent = iq ? '③ I/Q 검증·추적·PVT' : '③ 복원·PVT 계산';
   const states = {
-    PREPARING: '시험 준비 중', WAITING_DTN: '외부 JSON 수신 대기',
-    WAITING_RECEIVER: '수신 실행기 대기', CALCULATING: iq ? 'I/Q 검증·추적·PVT 처리 중' : '복원·PVT 계산 중',
-    COMPLETED: iq ? 'I/Q 처리 완료' : '수신 계산 완료', FAILED: '처리 실패', CANCELLED: '시험 취소',
-    INCONCLUSIVE: '수신·복원 완료 · PVT 비교 불가'
+    PREPARING: '시험 준비 중', WAITING_DTN: '외부 번들 수신 대기',
+    WAITING_RECEIVER: '수신 실행기 대기', CALCULATING: job?.testType === 'IQ_SAMPLE' ? 'I/Q 추적·PVT 처리 중' : '복원·PVT 계산 중',
+    COMPLETED: '수신 계산 완료', FAILED: '처리 실패', CANCELLED: '시험 취소',
+    INCONCLUSIVE: '수신·복원 완료 (PVT 비교 불가)'
   };
-  $('receive-state').textContent = job ? (job.lateReceivedAt ? '대기 종료 · 이후 수신됨' : job.state === 'WAITING_DTN' && job.message?.startsWith('수신 검증 실패') ? '검증 실패 · 재수신 대기' : states[job.state] || job.state) : '수신 대기';
-  $('receive-state').className = failed ? 'receiver-error' : '';
-  $('receive-message').textContent = job?.message || '송신 측 시험 시작을 기다립니다.';
+  const statusText = job ? (job.lateReceivedAt ? '대기 종료 후 도착' : states[job.state] || job.state) : '수신 대기';
+  $('receive-state').textContent = statusText;
+  $('receive-state').className = failed ? 'receiver-error' : completed ? 'receiver-success' : '';
+
+  // 중복 문구 제거 (예: '수신 계산 완료'인데 '지연 반영 PVT 측정 완료'가 중복 노출되는 현상 방지)
+  const msg = job?.message || '';
+  const isRedundant = completed && (msg.includes('PVT 측정 완료') || msg.includes('수신 완료') || msg.includes('계산 완료') || msg === statusText);
+  $('receive-message').textContent = isRedundant ? '' : msg;
   $('test-id').textContent = job?.testId || '-';
-  $('test-updated').textContent = time(job?.updatedAt);
-  // 서버가 복호화/계산의 개별 진척률을 제공하지 않으므로 하나의 처리 단계로 표시한다.
-  const classes = [job ? 'done' : '', received ? 'done' : job && !failed ? 'active' : '',
-    completed ? 'done' : received && !failed ? 'active' : ''];
-  if (failed) classes[received ? 2 : 1] = 'failed';
-  ['step-register', 'step-receive', 'step-process'].forEach((id, index) => $(id).className = classes[index]);
+  if ($('test-id')) $('test-id').title = job?.testId || '';
+  const updatedStr = time(job?.updatedAt);
+  $('test-updated').textContent = updatedStr;
+  if ($('test-updated')) $('test-updated').title = updatedStr;
+
+  updateReceiverFlow(job);
 }
 
 async function renderTest(force = false) {
@@ -349,6 +476,7 @@ async function poll(force = false) {
       : [new Option('등록된 시험 없음', '')]));
     if (newlyReceived && !selectionPinned && historyPage === 0) $('dtn-tests').value = newlyReceived.testId;
     else if (tests.some(job => job.testId === selected)) $('dtn-tests').value = selected;
+    else if (!selectionPinned && tests.length) $('dtn-tests').value = tests[0].testId;
     colorTrialSelection($('dtn-tests'), tests.find(job => job.testId === $('dtn-tests').value));
     await renderTest(force);
     const receiptTestId = selectedId;
@@ -370,6 +498,7 @@ async function poll(force = false) {
 }
 
 async function initialize() {
+  trialDialogHandler = initTrialSettingsDialog(() => tests.find(item => item.testId === $('dtn-tests').value));
   await gnss.poll();
   void gnss.listPorts();
   try { const config = await get('/dtn/config'); initAdapterHealth(config.adapterUrl || '', log); }

@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>LNIS DTN Receiver</title>
   <link rel="stylesheet" href="/lnis/assets/common/app.css?v=20260918-admin-icon">
-  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20261006-pvt-filter">
+  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20261007-h34-w295">
 </head>
 <body data-page="dtn-receiver">
 <header>
@@ -24,10 +24,21 @@
 </header>
 <main>
   <section class="status-strip" aria-label="연결 상태">
+    <small id="gnss-summary" role="status">시스템 시간 사용 · GNSS 시간 미확인</small>
     <span id="dtn-server-status" class="pill warning">서버 연결 확인 중</span>
     <span id="dtn-sender-status" class="pill">송신 처리기 확인 중</span>
     <span id="dtn-receiver-status" class="pill">수신 처리기 확인 중</span>
     <span id="dtn-clock-skew-warning" class="pill warning" hidden title="노드 간 시각이 어긋나 있습니다. 시간 맞추기 버튼으로 보정하세요.">⚠️ 시계 오차 <strong id="clock-skew-val">0.0s</strong> · 동기화 필요</span>
+    <div class="service-clock-pill" title="시험 기준시각 및 보정 상태">
+      <span class="clock-label">기준시각</span>
+      <time id="service-clock-value">—</time>
+      <span id="service-clock-state" class="pill mini">미보정</span>
+      <button id="service-clock-sync" type="button" class="clock-sync-btn" title="내부 시험 시각 보정">시간 맞추기</button>
+      <details class="service-clock-dropdown">
+        <summary title="시각 상세">상세</summary>
+        <pre id="service-clock-detail"></pre>
+      </details>
+    </div>
   </section>
 
   <section class="card receiver-overview">
@@ -35,8 +46,9 @@
       <h2>수신 시험</h2>
       <strong id="receiver-type">시험 선택 대기</strong>
       <span class="receiver-route"><span>전송 경로</span><strong id="receiver-mode">경로 정보 없음</strong></span>
+      <span class="receiver-constellation"><span>PVT 대상</span><strong id="receiver-constellation">GPS</strong></span>
+      <button id="dtn-trial-config-btn" type="button" class="trial-config-btn" title="이 시험의 어댑터 요청 설정 상세 확인">어댑터 설정 상세 ⚙️</button>
     </div>
-    <section id="trial-settings" class="trial-config" aria-label="시험 요청 설정"></section>
     <div class="receiver-connections">
       <div>
         <div class="receiver-connection-heading"><label for="sender-address">상대 송신 서비스</label>
@@ -71,46 +83,37 @@
           <label><input id="gnss-dtr" type="checkbox">DTR</label><label><input id="gnss-rts" type="checkbox">RTS</label>
           <pre id="gnss-time-detail"></pre>
         </details>
-      </div>
-    </div>
-    <div class="service-clock-row">
-      <span>시험 기준시각 <time id="service-clock-value">—</time><small>UTC+09:00</small></span>
-      <span id="service-clock-state">미보정</span>
-      <button id="service-clock-sync" type="button">시간 맞추기</button>
-      <details class="service-clock-detail"><summary>상세</summary><pre id="service-clock-detail"></pre></details>
-      <small id="gnss-summary" role="status">시스템 시간 사용 · GNSS 시간 미확인</small>
     </div>
 
-    <div class="receiver-trial-grid">
-    <div>
-    <div class="receiver-selection">
-      <label for="dtn-tests">시험 기록</label>
-      <select id="dtn-test-filter" aria-label="시험 상태"><option value="">전체</option><option value="WAITING_DTN">수신 대기</option></select>
-      <select id="dtn-tests"><option value="">등록된 시험 없음</option></select>
-      <button id="dtn-tests-prev" type="button" disabled aria-label="이전 시험 목록">이전</button>
-      <span id="dtn-tests-page">1</span>
-      <button id="dtn-tests-next" type="button" disabled aria-label="다음 시험 목록">다음</button>
-      <button id="dtn-cancel-waiting" type="button" title="목록 페이지와 관계없이 수신 대기 시험 전체를 종료합니다. 전송·계산 중인 시험과 기록은 유지됩니다.">대기 전체 종료</button>
-      <span class="receiver-history-actions"><button id="dtn-refresh" type="button">새로고침</button>
-      <button id="dtn-cancel" type="button" disabled>대기 종료</button></span>
-    </div>
-    <div class="receiver-meta">
-      <span>시험 ID <code id="test-id">-</code></span>
-      <span>갱신 시각 <span id="test-updated">-</span></span>
-      <span id="last-updated">2초마다 자동 갱신</span>
-    </div>
-    </div>
-    <div>
-    <ol class="receiver-flow" aria-label="수신 처리 단계">
-      <li id="step-register">① 시험 등록</li>
-      <li id="step-receive">② JSON 수신</li>
-      <li id="step-process">③ AFS 복호화·PVT 계산</li>
-    </ol>
-    <div class="receiver-result-line">
-      <strong id="receive-state" role="status" aria-live="polite">수신 대기</strong>
-      <span id="receive-message">송신 측 시험 시작을 기다립니다.</span>
-    </div>
-    </div>
+    <div class="receiver-trial-toolbar">
+      <div class="receiver-selection" aria-label="시험 기록">
+        <label for="dtn-tests">시험 기록</label>
+        <select id="dtn-test-filter" aria-label="시험 상태"><option value="">전체</option><option value="WAITING_DTN">수신 대기</option></select>
+        <select id="dtn-tests"><option value="">등록된 시험 없음</option></select>
+        <button id="dtn-tests-prev" type="button" disabled aria-label="이전 시험 목록">이전</button>
+        <span id="dtn-tests-page">1</span>
+        <button id="dtn-tests-next" type="button" disabled aria-label="다음 시험 목록">다음</button>
+        <button id="dtn-cancel-waiting" type="button" title="목록 페이지와 관계없이 수신 대기 시험 전체를 종료합니다. 전송·계산 중인 시험과 기록은 유지됩니다.">대기 전체 종료</button>
+        <button id="dtn-refresh" type="button">새로고침</button>
+        <button id="dtn-cancel" type="button" disabled>대기 종료</button>
+      </div>
+
+      <div class="receiver-flow-container">
+        <ol class="receiver-flow" aria-label="수신 처리 단계">
+          <li id="step-register"><span class="step-icon">①</span><span class="step-text">시험 등록</span><small class="step-time" id="step-register-time"></small></li>
+          <li id="step-receive"><span class="step-icon">②</span><span class="step-text">번들 수신</span><small class="step-time" id="step-receive-time"></small></li>
+          <li id="step-process"><span class="step-icon">③</span><span class="step-text" id="step-process-text">복원·PVT 계산</span><small class="step-time" id="step-process-time"></small></li>
+        </ol>
+        <div class="receiver-result-inline">
+          <strong id="receive-state" role="status" aria-live="polite">수신 대기</strong>
+          <span id="receive-message">송신 측 시험 시작 대기</span>
+        </div>
+        <div class="receiver-meta-inline">
+          <span>시험 ID <code id="test-id">-</code></span>
+          <span>갱신 시각 <span id="test-updated">-</span></span>
+          <span id="last-updated">2초마다 자동 갱신</span>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -133,10 +136,27 @@
       <span id="pvt-sync-note" class="pill warning" hidden>PC 시계 동기화 미확인</span>
     </div>
     <div class="receiver-epoch-row">
-      <label for="pvt-epoch">관측 시각</label>
-      <select id="pvt-epoch" disabled><option value="">계산 결과 없음</option></select>
-      <span id="pvt-count">0개 관측</span>
-      <span id="pvt-validity" class="pill">결과 대기</span>
+      <div class="receiver-epoch-controls">
+        <label for="pvt-epoch">관측 시각</label>
+        <select id="pvt-epoch" disabled><option value="">계산 결과 없음</option></select>
+        <span id="pvt-count">0개 관측</span>
+        <span id="pvt-validity" class="pill">결과 대기</span>
+      </div>
+      <div id="pvt-gauge-pill" class="pvt-gauge-pill" hidden>
+        <div class="pvt-gauge-item">
+          <span class="gauge-title">3D 위치 오차 ΔR</span>
+          <strong id="pvt-delta-r-val" class="gauge-num">0.000 mm</strong>
+        </div>
+        <div class="pvt-gauge-bar-wrap" title="3D 위치 오차 신뢰도 게이지">
+          <div id="pvt-gauge-bar" class="pvt-gauge-bar level-perfect" style="width: 100%;"></div>
+        </div>
+        <span id="pvt-gauge-verdict" class="pvt-gauge-badge badge-perfect">🟢 완벽 일치</span>
+        <span class="pvt-gauge-sep">|</span>
+        <div class="pvt-gauge-item">
+          <span class="gauge-title">속도 오차 ΔV</span>
+          <strong id="pvt-delta-v-val" class="gauge-num">0.000000 m/s</strong>
+        </div>
+      </div>
     </div>
     <div id="dtn-clock-analysis" class="pvt-delay-analysis" hidden>
       <div class="pvt-delay-metrics">
@@ -146,7 +166,7 @@
       </div>
       <small id="pvt-delay-reason" role="status"></small>
     </div>
-    <p id="pvt-differences" class="pvt-difference-summary" title="원본 Reference 대비 재계산 결과의 차이이며 실제 위치 정확도가 아닙니다.">위치 차이 — · 속도 차이 —</p>
+    <p id="pvt-differences" class="pvt-difference-summary" hidden title="원본 Reference 대비 재계산 결과의 차이이며 실제 위치 정확도가 아닙니다.">위치 차이 — · 속도 차이 —</p>
     <div class="receiver-pvt-pair">
     <div><h3>송신 기준 지구 PVT</h3><div class="pvt-grid">
       <div class="pvt-value"><span>ECEF X</span><strong id="reference-x">-</strong><small>m</small></div>
@@ -184,7 +204,14 @@
     <pre id="dtn-log" class="log"></pre>
   </section>
   </div>
+  <dialog id="trial-settings-dialog" class="trial-settings-dialog" aria-labelledby="trial-settings-dialog-title">
+    <div class="trial-dialog-header">
+      <h2 id="trial-settings-dialog-title">이 시험의 어댑터 요청 설정 상세</h2>
+      <button id="trial-settings-dialog-close" type="button" class="trial-dialog-close" aria-label="닫기">✕</button>
+    </div>
+    <div id="trial-settings-dialog-body" class="trial-dialog-content"></div>
+  </dialog>
 </main>
-<script type="module" src="/lnis/assets/dtn/dtn-receiver.js?v=20261006-pvt-filter"></script>
+<script type="module" src="/lnis/assets/dtn/dtn-receiver.js?v=20261007-meta-inline-fix"></script>
 </body>
 </html>

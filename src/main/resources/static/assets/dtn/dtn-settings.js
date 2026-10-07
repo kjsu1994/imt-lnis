@@ -25,46 +25,253 @@ export function colorTrialSelection(select, job) {
   select.setAttribute('data-trial-tone', trialStatus(job).tone);
 }
 
-const fields = {
-  maxNumberOfBundlesInPipeline: ['동시 번들', '개'],
-  maxSumOfBundleBytesInPipeline: ['동시 용량', 'Bytes'],
-  maxBundleSizeBytes: ['번들 크기', 'Bytes'],
-  tcpclMaxSegmentSizeBytes: ['TCPCL 크기', 'Bytes'],
-  neighborDepletedStorageDelaySeconds: ['혼잡 대기', '초'],
-  enforceBundlePriority: ['우선순위', ''],
-  storageDeletionPolicy: ['삭제 정책', ''],
-  totalStorageCapacityBytes: ['저장 용량', 'Bytes'],
-  maxLtpReceiveUdpPacketSizeBytes: ['LTP 수신 크기', 'Bytes'],
-  acsSendPeriodMilliseconds: ['ACS 주기', 'ms']
+const hdtnStandardFields = {
+  maxNumberOfBundlesInPipeline: ['최대 동시 번들 수', '개'],
+  maxSumOfBundleBytesInPipeline: ['최대 동시 번들 용량', 'Bytes'],
+  maxBundleSizeBytes: ['최대 번들 크기', 'Bytes'],
+  tcpclMaxSegmentSizeBytes: ['TCPCL 세그먼트 크기', 'Bytes'],
+  neighborDepletedStorageDelaySeconds: ['저장 공간 부족 시 대기', '초'],
+  enforceBundlePriority: ['번들 우선순위 준수', ''],
+  storageDeletionPolicy: ['스토리지 삭제 정책', '']
 };
+
+const hdtnAdvancedFields = {
+  totalStorageCapacityBytes: ['전체 저장 용량', 'Bytes'],
+  acsSendPeriodMilliseconds: ['ACS 전송 주기', 'ms']
+};
+
+const fields = {
+  ...hdtnStandardFields,
+  ...hdtnAdvancedFields
+};
+
 const dtnFields = {
-  sdrHeapSizeBytes: ['SDR 힙', 'Bytes'],
+  sdrHeapSizeBytes: ['SDR 힙 크기', 'Bytes'],
   sdrWorkingMemorySizeBytes: ['SDR 작업 메모리', 'Bytes'],
-  sdrTransientMode: ['SDR 모드', ''],
-  maxBundleSizeBytes: ['번들 크기', 'Bytes'],
+  sdrTransientMode: ['SDR 임시(Transient) 모드', ''],
+  maxBundleSizeBytes: ['최대 번들 크기', 'Bytes'],
   contactRateBytesPerSec: ['접촉 전송 속도', 'Bytes/s'],
-  maxProductionRateBytesPerSec: ['생성 속도', 'Bytes/s'],
-  maxConsumptionRateBytesPerSec: ['소비 속도', 'Bytes/s'],
-  tcpclMaxSegmentSizeBytes: ['TCPCL 크기', 'Bytes'],
-  stcpMaxSegmentSizeBytes: ['STCP 크기', 'Bytes'],
+  maxProductionRateBytesPerSec: ['최대 생성 속도', 'Bytes/s'],
+  maxConsumptionRateBytesPerSec: ['최대 소비 속도', 'Bytes/s'],
+  tcpclMaxSegmentSizeBytes: ['TCPCL 세그먼트 크기', 'Bytes'],
   routingMode: ['라우팅 모드', '']
 };
-const policies = {never: '자동 삭제 안 함 (never)', on_forward: '전달 완료 시 삭제', on_delivery: '인도 완료 시 삭제', DELETE_AFTER_FORWARDING: '어댑터 기본', on_expiration: '수명 만료 시', on_storage_full: '저장소 부족 시'};
-function valueText(key, value, compact = false) {
-  if (value == null) return '기록 없음';
-  if (key === 'enforceBundlePriority') return value ? '사용' : '사용 안 함';
-  if (key === 'sdrTransientMode') return value ? '순수 RAM (Transient)' : '디스크 기반';
-  if (key === 'storageDeletionPolicy') return policies[value] || String(value);
-  if (key === 'routingMode') return String(value);
+
+const policies = {
+  never: '자동 삭제 안 함 (never)',
+  on_forward: '전달 완료 시 삭제 (on_forward)',
+  on_delivery: '인도 완료 시 삭제 (on_delivery)',
+  DELETE_AFTER_FORWARDING: '어댑터 기본 (DELETE_AFTER_FORWARDING)',
+  on_expiration: '수명 만료 시 삭제',
+  on_storage_full: '저장소 부족 시 삭제'
+};
+
+function formatParam(key, value) {
+  if (value == null) return { primary: '기록 없음', secondary: '' };
+  if (key === 'enforceBundlePriority') {
+    return { primary: value ? '사용' : '사용 안 함 (속도 최적화)', secondary: '' };
+  }
+  if (key === 'sdrTransientMode') {
+    return { primary: value ? '순수 RAM (고속)' : '디스크 기반 (권장)', secondary: '' };
+  }
+  if (key === 'storageDeletionPolicy') {
+    return { primary: policies[value] || String(value), secondary: '' };
+  }
+  if (key === 'routingMode') {
+    return { primary: String(value), secondary: '' };
+  }
   const def = fields[key] || dtnFields[key] || ['', ''];
   const unit = def[1];
-  const exact = Number(value).toLocaleString('ko-KR') + (unit ? ' ' + unit : '');
-  if (unit !== 'Bytes' && unit !== 'Bytes/s') return exact;
-  const baseUnit = unit === 'Bytes/s' ? 'B/s' : 'Bytes';
-  const scale = value >= 1e9 ? 1e9 : value >= 1e6 ? 1e6 : value >= 1e3 ? 1e3 : 1;
-  const label = {1: baseUnit, 1000: 'K' + baseUnit, 1000000: 'M' + baseUnit, 1000000000: 'G' + baseUnit}[scale];
-  const readable = Number((value / scale).toFixed(3)).toLocaleString('ko-KR') + ' ' + label;
-  return compact ? readable : exact + (scale > 1 ? ' · ' + readable : '');
+  const num = Number(value);
+  if (isNaN(num)) return { primary: String(value), secondary: '' };
+
+  if (unit === 'Bytes' || unit === 'Bytes/s') {
+    const isRate = unit === 'Bytes/s';
+    const baseUnit = isRate ? 'B/s' : 'Bytes';
+    const scale = num >= 1e9 ? 1e9 : num >= 1e6 ? 1e6 : num >= 1e3 ? 1e3 : 1;
+    const label = { 1: baseUnit, 1000: 'KB' + (isRate ? '/s' : ''), 1000000: 'MB' + (isRate ? '/s' : ''), 1000000000: 'GB' + (isRate ? '/s' : '') }[scale];
+    const readable = scale > 1 ? Number((num / scale).toFixed(3)).toLocaleString('ko-KR') + ' ' + label : '';
+    const exact = num.toLocaleString('ko-KR') + ' ' + (isRate ? 'Bytes/s' : 'Bytes');
+    return {
+      primary: readable || exact,
+      secondary: scale > 1 ? exact : ''
+    };
+  }
+  return {
+    primary: num.toLocaleString('ko-KR') + (unit ? ' ' + unit : ''),
+    secondary: ''
+  };
+}
+
+function getRoles(job) {
+  const sMode = job?.senderMode || '';
+  const rMode = job?.receiverMode || '';
+  let dtnRole = 'DTN';
+  let hdtnRole = 'HDTN';
+  let dtnBadge = 'badge-both';
+  let hdtnBadge = 'badge-both';
+
+  if (sMode === 'DTN' && rMode === 'HDTN') {
+    dtnRole = '송신 DTN';
+    hdtnRole = '수신 HDTN';
+    dtnBadge = 'badge-sender';
+    hdtnBadge = 'badge-receiver';
+  } else if (sMode === 'HDTN' && rMode === 'DTN') {
+    hdtnRole = '송신 HDTN';
+    dtnRole = '수신 DTN';
+    hdtnBadge = 'badge-sender';
+    dtnBadge = 'badge-receiver';
+  } else if (sMode === 'DTN' && rMode === 'DTN') {
+    dtnRole = '송·수신 DTN';
+    dtnBadge = 'badge-both';
+  } else if (sMode === 'HDTN' && rMode === 'HDTN') {
+    hdtnRole = '송·수신 HDTN';
+    hdtnBadge = 'badge-both';
+  }
+  return { dtnRole, hdtnRole, dtnBadge, hdtnBadge };
+}
+
+function createChip(typeClass, roleText, badgeClass, text) {
+  const chip = document.createElement('span');
+  chip.className = 'trial-chip ' + typeClass;
+  const roleBadge = document.createElement('span');
+  roleBadge.className = 'adapter-tab-badge ' + badgeClass;
+  roleBadge.textContent = roleText;
+  const textSpan = document.createElement('span');
+  textSpan.textContent = text;
+  chip.append(roleBadge, textSpan);
+  return chip;
+}
+
+export function renderTrialSettingsInDialog(target, job) {
+  if (!target) return;
+  const hdtn = job?.hdtnConfig;
+  const dtn = job?.dtnConfig;
+  target.replaceChildren();
+
+  if (!job || (!hdtn && !dtn)) {
+    const empty = document.createElement('div');
+    empty.className = 'trial-dialog-empty';
+    empty.textContent = !job ? '선택된 시험이 없습니다. 시험 기록을 먼저 선택하세요.' : '이 시험에는 기록된 어댑터 요청 설정이 없습니다.';
+    target.append(empty);
+    return;
+  }
+
+  const { dtnRole, hdtnRole, dtnBadge, hdtnBadge } = getRoles(job);
+
+  const groups = document.createElement('div');
+  groups.className = 'trial-groups';
+
+  if (dtn) {
+    const dtnGroup = document.createElement('div');
+    dtnGroup.className = 'trial-group trial-group-dtn';
+    dtnGroup.innerHTML = `
+      <div class="trial-group-header">
+        <span class="adapter-tab-badge ${dtnBadge}">${dtnRole}</span>
+        <strong>DTN (NASA JPL ION) 설정</strong>
+        <small>SDR 공유 메모리 · 대역폭 · 라우팅</small>
+      </div>
+    `;
+    const dtnGrid = document.createElement('div');
+    dtnGrid.className = 'trial-param-grid';
+    for (const [key, [label]] of Object.entries(dtnFields)) {
+      const { primary, secondary } = formatParam(key, dtn[key]);
+      const card = document.createElement('div');
+      card.className = 'trial-param-card';
+      card.title = key + ': ' + primary + (secondary ? ' (' + secondary + ')' : '');
+      const labelSpan = document.createElement('span');
+      labelSpan.className = 'trial-param-label';
+      labelSpan.textContent = label;
+      const valStrong = document.createElement('strong');
+      valStrong.className = 'trial-param-val';
+      valStrong.textContent = primary;
+      card.append(labelSpan, valStrong);
+      if (secondary) {
+        const subSmall = document.createElement('small');
+        subSmall.className = 'trial-param-sub';
+        subSmall.textContent = secondary;
+        card.append(subSmall);
+      }
+      dtnGrid.append(card);
+    }
+    dtnGroup.append(dtnGrid);
+    groups.append(dtnGroup);
+  }
+
+  if (hdtn) {
+    const hdtnGroup = document.createElement('div');
+    hdtnGroup.className = 'trial-group trial-group-hdtn';
+    hdtnGroup.innerHTML = `
+      <div class="trial-group-header">
+        <span class="adapter-tab-badge ${hdtnBadge}">${hdtnRole}</span>
+        <strong>HDTN (NASA High-Speed DTN) 설정</strong>
+        <small>파이프라인 · 큐 · 세그먼트 MTU</small>
+      </div>
+    `;
+    const hdtnGrid = document.createElement('div');
+    hdtnGrid.className = 'trial-param-grid';
+    for (const [key, [label]] of Object.entries(hdtnStandardFields)) {
+      const { primary, secondary } = formatParam(key, hdtn[key]);
+      const card = document.createElement('div');
+      card.className = 'trial-param-card';
+      card.title = key + ': ' + primary + (secondary ? ' (' + secondary + ')' : '');
+      const labelSpan = document.createElement('span');
+      labelSpan.className = 'trial-param-label';
+      labelSpan.textContent = label;
+      const valStrong = document.createElement('strong');
+      valStrong.className = 'trial-param-val';
+      valStrong.textContent = primary;
+      card.append(labelSpan, valStrong);
+      if (secondary) {
+        const subSmall = document.createElement('small');
+        subSmall.className = 'trial-param-sub';
+        subSmall.textContent = secondary;
+        card.append(subSmall);
+      }
+      hdtnGrid.append(card);
+    }
+    hdtnGroup.append(hdtnGrid);
+
+    const hasAdvanced = Object.keys(hdtnAdvancedFields).some(k => hdtn[k] != null);
+    if (hasAdvanced) {
+      const advDetails = document.createElement('details');
+      advDetails.className = 'trial-sub-details';
+      advDetails.open = true;
+      advDetails.innerHTML = '<summary>HDTN 고급 설정 (저장 용량 · ACS)</summary>';
+      const advGrid = document.createElement('div');
+      advGrid.className = 'trial-param-grid';
+      for (const [key, [label]] of Object.entries(hdtnAdvancedFields)) {
+        const { primary, secondary } = formatParam(key, hdtn[key]);
+        const card = document.createElement('div');
+        card.className = 'trial-param-card';
+        card.title = key + ': ' + primary + (secondary ? ' (' + secondary + ')' : '');
+        const labelSpan = document.createElement('span');
+        labelSpan.className = 'trial-param-label';
+        labelSpan.textContent = label;
+        const valStrong = document.createElement('strong');
+        valStrong.className = 'trial-param-val';
+        valStrong.textContent = primary;
+        card.append(labelSpan, valStrong);
+        if (secondary) {
+          const subSmall = document.createElement('small');
+          subSmall.className = 'trial-param-sub';
+          subSmall.textContent = secondary;
+          card.append(subSmall);
+        }
+        advGrid.append(card);
+      }
+      advDetails.append(advGrid);
+      hdtnGroup.append(advDetails);
+    }
+
+    groups.append(hdtnGroup);
+  }
+
+  const note = document.createElement('small');
+  note.className = 'trial-config-note';
+  note.textContent = '시험 시작 시 어댑터에 요청된 파라미터 값입니다.';
+
+  target.append(groups, note);
 }
 
 export function renderTrialSettings(target, job) {
@@ -76,51 +283,210 @@ export function renderTrialSettings(target, job) {
   target.dataset.signature = signature;
   const open = target.querySelector('details')?.open || false;
   target.replaceChildren();
+
+  const headerRow = document.createElement('div');
+  headerRow.className = 'trial-config-header';
   const heading = document.createElement('strong');
   heading.textContent = '이 시험의 어댑터 요청 설정';
-  heading.title = '시험에 기록된 요청값입니다. 어댑터 실제 적용값은 미확인입니다.';
-  target.append(heading);
+  heading.title = '시험 시작 시 어댑터에 전달된 요청 파라미터입니다.';
+  headerRow.append(heading);
+
   if (!job || (!hdtn && !dtn)) {
     const empty = document.createElement('span');
+    empty.className = 'trial-config-empty';
     empty.textContent = !job ? '시험 선택 대기' : '기록된 설정 없음';
-    target.append(empty);
+    headerRow.append(empty);
+    target.append(headerRow);
     return;
   }
-  const chips = document.createElement('div'); chips.className = 'trial-config-chips';
+
+  const { dtnRole, hdtnRole, dtnBadge, hdtnBadge } = getRoles(job);
+  const chips = document.createElement('div');
+  chips.className = 'trial-config-chips';
+
   if (dtn) {
-    const chip = document.createElement('span');
-    chip.textContent = 'DTN 힙 ' + valueText('sdrHeapSizeBytes', dtn.sdrHeapSizeBytes, true);
-    chip.title = 'DTN SDR 힙: ' + valueText('sdrHeapSizeBytes', dtn.sdrHeapSizeBytes);
-    chips.append(chip);
-  }
-  if (hdtn) {
-    for (const key of ['maxNumberOfBundlesInPipeline', 'maxSumOfBundleBytesInPipeline', 'tcpclMaxSegmentSizeBytes']) {
-      const chip = document.createElement('span');
-      chip.textContent = 'HDTN ' + fields[key][0] + ' ' + valueText(key, hdtn[key], true);
-      chip.title = valueText(key, hdtn[key]); chips.append(chip);
+    if (dtn.sdrHeapSizeBytes != null) {
+      chips.append(createChip('chip-dtn', dtnRole, dtnBadge, 'SDR 힙 ' + formatParam('sdrHeapSizeBytes', dtn.sdrHeapSizeBytes).primary));
+    }
+    if (dtn.maxBundleSizeBytes != null) {
+      chips.append(createChip('chip-dtn', dtnRole, dtnBadge, '최대 번들 ' + formatParam('maxBundleSizeBytes', dtn.maxBundleSizeBytes).primary));
+    }
+    if (dtn.contactRateBytesPerSec != null) {
+      chips.append(createChip('chip-dtn', dtnRole, dtnBadge, '접촉 속도 ' + formatParam('contactRateBytesPerSec', dtn.contactRateBytesPerSec).primary));
     }
   }
-  const detail = document.createElement('details'); detail.open = open;
-  const summary = document.createElement('summary'); summary.textContent = '전체 설정';
-  const list = document.createElement('dl'); list.className = 'trial-config-values';
+
+  if (hdtn) {
+    if (hdtn.maxNumberOfBundlesInPipeline != null) {
+      chips.append(createChip('chip-hdtn', hdtnRole, hdtnBadge, '동시 ' + formatParam('maxNumberOfBundlesInPipeline', hdtn.maxNumberOfBundlesInPipeline).primary));
+    }
+    if (hdtn.maxSumOfBundleBytesInPipeline != null) {
+      chips.append(createChip('chip-hdtn', hdtnRole, hdtnBadge, '용량 ' + formatParam('maxSumOfBundleBytesInPipeline', hdtn.maxSumOfBundleBytesInPipeline).primary));
+    }
+    if (hdtn.maxBundleSizeBytes != null) {
+      chips.append(createChip('chip-hdtn', hdtnRole, hdtnBadge, '번들 ' + formatParam('maxBundleSizeBytes', hdtn.maxBundleSizeBytes).primary));
+    }
+    if (hdtn.tcpclMaxSegmentSizeBytes != null) {
+      chips.append(createChip('chip-hdtn', hdtnRole, hdtnBadge, 'TCPCL ' + formatParam('tcpclMaxSegmentSizeBytes', hdtn.tcpclMaxSegmentSizeBytes).primary));
+    }
+  }
+
+  headerRow.append(chips);
+
+  const detail = document.createElement('details');
+  detail.className = 'trial-config-details';
+  detail.open = open;
+
+  const summary = document.createElement('summary');
+  summary.className = 'trial-config-summary';
+  summary.innerHTML = '<span>전체 어댑터 설정 상세</span><small>클릭하여 펼치기/접기</small>';
+
+  const groups = document.createElement('div');
+  groups.className = 'trial-groups';
+
   if (dtn) {
+    const dtnGroup = document.createElement('div');
+    dtnGroup.className = 'trial-group trial-group-dtn';
+    dtnGroup.innerHTML = `
+      <div class="trial-group-header">
+        <span class="adapter-tab-badge ${dtnBadge}">${dtnRole}</span>
+        <strong>DTN (NASA JPL ION) 설정</strong>
+        <small>SDR 공유 메모리 · 대역폭 · 라우팅</small>
+      </div>
+    `;
+    const dtnGrid = document.createElement('div');
+    dtnGrid.className = 'trial-param-grid';
     for (const [key, [label]] of Object.entries(dtnFields)) {
-      const item = document.createElement('div');
-      const dt = document.createElement('dt'); dt.textContent = '[DTN] ' + label; dt.title = key;
-      const dd = document.createElement('dd'); dd.textContent = valueText(key, dtn[key]);
-      item.append(dt, dd); list.append(item);
+      const { primary, secondary } = formatParam(key, dtn[key]);
+      const card = document.createElement('div');
+      card.className = 'trial-param-card';
+      card.title = key + ': ' + primary + (secondary ? ' (' + secondary + ')' : '');
+      const labelSpan = document.createElement('span');
+      labelSpan.className = 'trial-param-label';
+      labelSpan.textContent = label;
+      const valStrong = document.createElement('strong');
+      valStrong.className = 'trial-param-val';
+      valStrong.textContent = primary;
+      card.append(labelSpan, valStrong);
+      if (secondary) {
+        const subSmall = document.createElement('small');
+        subSmall.className = 'trial-param-sub';
+        subSmall.textContent = secondary;
+        card.append(subSmall);
+      }
+      dtnGrid.append(card);
     }
+    dtnGroup.append(dtnGrid);
+    groups.append(dtnGroup);
   }
+
   if (hdtn) {
-    for (const [key, [label]] of Object.entries(fields)) {
-      const item = document.createElement('div');
-      const dt = document.createElement('dt'); dt.textContent = '[HDTN] ' + label; dt.title = key;
-      const dd = document.createElement('dd'); dd.textContent = valueText(key, hdtn[key]);
-      item.append(dt, dd); list.append(item);
+    const hdtnGroup = document.createElement('div');
+    hdtnGroup.className = 'trial-group trial-group-hdtn';
+    hdtnGroup.innerHTML = `
+      <div class="trial-group-header">
+        <span class="adapter-tab-badge ${hdtnBadge}">${hdtnRole}</span>
+        <strong>HDTN (NASA High-Speed DTN) 설정</strong>
+        <small>파이프라인 · 큐 · 세그먼트 MTU</small>
+      </div>
+    `;
+    const hdtnGrid = document.createElement('div');
+    hdtnGrid.className = 'trial-param-grid';
+    for (const [key, [label]] of Object.entries(hdtnStandardFields)) {
+      const { primary, secondary } = formatParam(key, hdtn[key]);
+      const card = document.createElement('div');
+      card.className = 'trial-param-card';
+      card.title = key + ': ' + primary + (secondary ? ' (' + secondary + ')' : '');
+      const labelSpan = document.createElement('span');
+      labelSpan.className = 'trial-param-label';
+      labelSpan.textContent = label;
+      const valStrong = document.createElement('strong');
+      valStrong.className = 'trial-param-val';
+      valStrong.textContent = primary;
+      card.append(labelSpan, valStrong);
+      if (secondary) {
+        const subSmall = document.createElement('small');
+        subSmall.className = 'trial-param-sub';
+        subSmall.textContent = secondary;
+        card.append(subSmall);
+      }
+      hdtnGrid.append(card);
     }
+    hdtnGroup.append(hdtnGrid);
+
+    const hasAdvanced = Object.keys(hdtnAdvancedFields).some(k => hdtn[k] != null);
+    if (hasAdvanced) {
+      const advDetails = document.createElement('details');
+      advDetails.className = 'trial-sub-details';
+      advDetails.innerHTML = '<summary>HDTN 고급 설정 (저장 용량 · ACS)</summary>';
+      const advGrid = document.createElement('div');
+      advGrid.className = 'trial-param-grid';
+      for (const [key, [label]] of Object.entries(hdtnAdvancedFields)) {
+        const { primary, secondary } = formatParam(key, hdtn[key]);
+        const card = document.createElement('div');
+        card.className = 'trial-param-card';
+        card.title = key + ': ' + primary + (secondary ? ' (' + secondary + ')' : '');
+        const labelSpan = document.createElement('span');
+        labelSpan.className = 'trial-param-label';
+        labelSpan.textContent = label;
+        const valStrong = document.createElement('strong');
+        valStrong.className = 'trial-param-val';
+        valStrong.textContent = primary;
+        card.append(labelSpan, valStrong);
+        if (secondary) {
+          const subSmall = document.createElement('small');
+          subSmall.className = 'trial-param-sub';
+          subSmall.textContent = secondary;
+          card.append(subSmall);
+        }
+        advGrid.append(card);
+      }
+      advDetails.append(advGrid);
+      hdtnGroup.append(advDetails);
+    }
+
+    groups.append(hdtnGroup);
   }
-  const note = document.createElement('small'); note.textContent = '요청값 · 실제 적용 여부 미확인';
-  detail.append(summary, list, note); target.append(chips, detail);
+
+  const note = document.createElement('small');
+  note.className = 'trial-config-note';
+  note.textContent = '시험 시작 시 어댑터에 요청된 파라미터 값입니다.';
+
+  detail.append(summary, groups, note);
+  target.append(headerRow, detail);
+}
+
+export function initTrialSettingsDialog(getJob) {
+  const btn = document.getElementById('dtn-trial-config-btn');
+  const dialog = document.getElementById('trial-settings-dialog');
+  const body = document.getElementById('trial-settings-dialog-body');
+  const closeBtn = document.getElementById('trial-settings-dialog-close');
+
+  const updateDialog = (job) => {
+    if (dialog && dialog.open && body) {
+      renderTrialSettingsInDialog(body, job);
+    }
+  };
+
+  if (btn && dialog && body) {
+    btn.onclick = () => {
+      const job = typeof getJob === 'function' ? getJob() : null;
+      renderTrialSettingsInDialog(body, job);
+      dialog.showModal();
+    };
+  }
+
+  if (closeBtn && dialog) {
+    closeBtn.onclick = () => dialog.close();
+  }
+
+  if (dialog) {
+    dialog.addEventListener('click', (event) => {
+      if (event.target === dialog) dialog.close();
+    });
+  }
+
+  return { updateDialog };
 }
 
 export function initPresetControls({read, apply, isLocked}) {

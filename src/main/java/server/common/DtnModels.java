@@ -122,7 +122,9 @@ public final class DtnModels {
         @jakarta.validation.constraints.NotNull private Long maxConsumptionRateBytesPerSec;
         @jakarta.validation.constraints.NotNull private Long maxBundleSizeBytes;
         @jakarta.validation.constraints.NotNull private Integer tcpclMaxSegmentSizeBytes;
-        @jakarta.validation.constraints.NotNull private Integer stcpMaxSegmentSizeBytes;
+        @com.fasterxml.jackson.annotation.JsonInclude(
+                com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+        private Integer stcpMaxSegmentSizeBytes;
         @jakarta.validation.constraints.NotBlank private String routingMode;
     }
 

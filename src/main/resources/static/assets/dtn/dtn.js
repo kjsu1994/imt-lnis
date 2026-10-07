@@ -1,4 +1,4 @@
-import {initPresetControls, renderTrialSettings, trialOption, colorTrialSelection, initWaitingCancellation} from './dtn-settings.js?v=20261001-review';
+import {initPresetControls, renderTrialSettings, trialOption, colorTrialSelection, initWaitingCancellation, initTrialSettingsDialog} from './dtn-settings.js?v=20261007-clean-layout';
 import {requestJson} from '../common/http.js?v=20261001-review';
 import {initGnssControls} from './dtn-gnss.js?v=20261001-review';
 import {createDtnLog} from './dtn-log.js?v=20261001-review';
@@ -88,11 +88,6 @@ const hdtnRules = {
   "totalStorageCapacityBytes": {
     "label": "전체 저장 용량",
     "default": 8589934592,
-    "advanced": true
-  },
-  "maxLtpReceiveUdpPacketSizeBytes": {
-    "label": "LTP 최대 수신 패킷 크기",
-    "default": 65536,
     "advanced": true
   },
   "acsSendPeriodMilliseconds": {
@@ -236,10 +231,6 @@ const dtnRules = {
   "tcpclMaxSegmentSizeBytes": {
     "label": "TCPCL 세그먼트 크기",
     "default": 20000
-  },
-  "stcpMaxSegmentSizeBytes": {
-    "label": "STCP 세그먼트 크기",
-    "default": 200000
   },
   "routingMode": {
     "label": "라우팅 모드",
@@ -464,30 +455,75 @@ const presets = initPresetControls({read: () => ({
 
 let mainScrollY = 0;
 function showSettings(open) {
-  if (open && $('dtn-settings-view').hidden) { mainScrollY = window.scrollY; void presets.refresh(); }
-  $('dtn-settings-view').hidden = !open;
-  $('dtn-main-view').hidden = open;
-  $('dtn-settings-open').setAttribute('aria-expanded', String(open));
-  (open ? $('dtn-settings-title') : $('dtn-settings-open')).focus({preventScroll: true});
-  window.scrollTo({top: open ? 0 : mainScrollY, behavior: 'instant'});
+  const view = $('dtn-settings-view');
+  const backdrop = $('dtn-drawer-backdrop');
+  if (open) {
+    mainScrollY = window.scrollY;
+    view.removeAttribute('hidden');
+    view.classList.add('drawer-open');
+    if (backdrop) {
+      backdrop.removeAttribute('hidden');
+      requestAnimationFrame(() => backdrop.classList.add('backdrop-open'));
+    }
+    $('dtn-settings-open').setAttribute('aria-expanded', 'true');
+    $('dtn-settings-close').focus({preventScroll: true});
+    void presets.refresh();
+  } else {
+    view.classList.remove('drawer-open');
+    if (backdrop) {
+      backdrop.classList.remove('backdrop-open');
+      setTimeout(() => { if (!view.classList.contains('drawer-open')) backdrop.setAttribute('hidden', ''); }, 240);
+    }
+    $('dtn-settings-open').setAttribute('aria-expanded', 'false');
+    $('dtn-settings-open').focus({preventScroll: true});
+  }
+  $('dtn-main-view').hidden = false;
 }
-$('dtn-settings-open').onclick = () => showSettings($('dtn-settings-view').hidden);
+$('dtn-settings-open').onclick = () => showSettings(!($('dtn-settings-view').classList.contains('drawer-open')));
 $('dtn-settings-close').onclick = () => showSettings(false);
+if ($('dtn-drawer-backdrop')) $('dtn-drawer-backdrop').onclick = () => showSettings(false);
+if ($('dtn-config-hud')) $('dtn-config-hud').onclick = () => showSettings(true);
+window.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && $('dtn-settings-view')?.classList.contains('drawer-open')) {
+    showSettings(false);
+  }
+});
+
 function updateInputSummary() {
   const type = {GNSS_RAW: 'GNSS RAW', AFS_METADATA: 'AFS Frame', IQ_SAMPLE: 'I/Q Sample'}[selectedType];
   const sysLabel = pvtConstellation !== 'GPS' ? ' (' + pvtConstellation + ')' : '';
-  $('dtn-condition-summary').textContent = type + sysLabel + ' · ' + senderMode + ' → ' + receiverMode + (delayMode() ? ' · 지연 반영 1 Epoch' : '');
+  if ($('dtn-condition-summary')) {
+    $('dtn-condition-summary').textContent = type + sysLabel + ' · ' + senderMode + ' → ' + receiverMode + (delayMode() ? ' · 지연 반영 1 Epoch' : '');
+  }
   const source = inputMode === 'capture' ? 'COM ' + ($('dtn-port').value || '미선택') : 'GNSS 파일';
   const epoch = delayMode() ? selectedDelayEpoch()?.epoch : null;
-  $('dtn-input-summary').textContent = source + ' · ' + $('dtn-input-state').textContent
-    + (epoch ? ' · 시험 TOW ' + numeric(epoch.towSeconds) + ' s' : '');
-  $('dtn-input-summary').title = epoch ? '다음 전송: Week ' + epoch.week + ' / TOW ' + epoch.towSeconds + ' s' : '';
+  if ($('dtn-input-summary')) {
+    $('dtn-input-summary').textContent = source + ' · ' + ($('dtn-input-state')?.textContent || '준비 대기');
+    $('dtn-input-summary').title = epoch ? '다음 전송: Week ' + epoch.week + ' / TOW ' + epoch.towSeconds + ' s' : '';
+  }
+
+  if ($('hud-type')) $('hud-type').textContent = type;
+  if ($('hud-route')) $('hud-route').textContent = senderMode + ' → ' + receiverMode;
+  if ($('hud-constellation')) $('hud-constellation').textContent = pvtConstellation;
+  if ($('hud-engine')) {
+    const parts = [];
+    if (senderMode === 'DTN' || receiverMode === 'DTN') {
+      const heapVal = $('dtn-sdrHeapSizeBytes')?.value;
+      if (heapVal) parts.push('ION 힙 ' + (Number(heapVal) / 1e9).toFixed(1) + 'GB');
+    }
+    if (senderMode === 'HDTN' || receiverMode === 'HDTN') {
+      const pipeVal = $('hdtn-maxSumOfBundleBytesInPipeline')?.value;
+      if (pipeVal) parts.push('HDTN ' + (Number(pipeVal) / 1e9).toFixed(1) + 'GB');
+    }
+    $('hud-engine').textContent = parts.join(' · ') || '설정 완료';
+  }
 }
 function pill(id, text, state = '') { $(id).textContent = text; $(id).className = 'pill ' + state; }
 function destination(text, state = 'unknown') {
-  $('destination-state').textContent = text; $('destination-dot').className = 'connection-dot ' + state;
-  $('dtn-peer-summary').textContent = text;
-  $('dtn-peer-summary-dot').className = 'connection-dot ' + state;
+  if ($('destination-state')) $('destination-state').textContent = text;
+  if ($('destination-dot')) $('destination-dot').className = 'connection-dot ' + state;
+  if ($('dtn-peer-summary')) $('dtn-peer-summary').textContent = text;
+  if ($('dtn-peer-summary-dot')) $('dtn-peer-summary-dot').className = 'connection-dot ' + state;
 }
 function updateClockSkewWarning(connection) {
   const warning = $('dtn-clock-skew-warning');
@@ -569,6 +605,122 @@ async function loadDelayEpochs() {
   }
 
 }
+function getSendReadiness() {
+  const tx = agents.find(a => a.agentId === $('dtn-sender').value);
+  const rx = agents.find(a => a.agentId === $('dtn-receiver').value);
+  const isLocked = locked();
+  const hasInput = selectedType === 'IQ_SAMPLE' ? iqJob?.state === 'READY' : !!inputId;
+  const isUrlValid = urlValid();
+  const isPeerReady = rx && !['OFFLINE', 'ERROR'].includes(rx.state);
+  const isTxReady = tx?.state === 'READY';
+  const noAfs = selectedType === 'AFS_METADATA' && selectedDelayEpoch()?.afsReady === false;
+  const isPvtReady = !delayMode() || acceptedCapture || !!selectedDelayEpoch()?.reference?.positionValid;
+
+  const items = [
+    {
+      id: 'input',
+      label: selectedType === 'IQ_SAMPLE' ? 'I/Q 파일 준비 완료' : 'GNSS 데이터 적용 (UBX/GRAW)',
+      ready: hasInput,
+      hint: selectedType === 'IQ_SAMPLE' ? '설정에서 90초 I/Q 생성을 완료하세요.' : 'GNSS 파일 적용 또는 COM 포트 연결이 필요합니다.'
+    },
+    {
+      id: 'url',
+      label: '송신 어댑터 주소 (URL) 입력',
+      ready: isUrlValid,
+      hint: '어댑터 서버 주소(예: http://IP:포트)를 입력하세요.'
+    },
+    {
+      id: 'peer',
+      label: '상대 수신 서비스 연결 정상',
+      ready: isPeerReady,
+      hint: '수신 서비스 IP 및 포트(기본 8091) 연결을 확인하세요.'
+    },
+    {
+      id: 'agent',
+      label: '송신 처리기 (Agent) 정상',
+      ready: isTxReady,
+      hint: '송신 노드 처리기가 READY 상태여야 합니다.'
+    }
+  ];
+
+  if (selectedType === 'AFS_METADATA') {
+    items.push({
+      id: 'afs',
+      label: 'AFS 항법 데이터 (GPS LNAV) 준비',
+      ready: !noAfs,
+      hint: '항법정보가 부족하면 상단에서 GNSS RAW 모드로 전송할 수 있습니다.'
+    });
+  } else if (delayMode()) {
+    items.push({
+      id: 'pvt',
+      label: '기준 PVT 위치 계산 완료',
+      ready: isPvtReady,
+      hint: '위성 위치 계산이 완료되어야 전송할 수 있습니다.'
+    });
+  }
+
+  if (isLocked) {
+    items.unshift({
+      id: 'busy',
+      label: '이전 작업 종료 대기',
+      ready: false,
+      hint: '현재 다른 전송 또는 I/Q 생성이 진행 중입니다.'
+    });
+  }
+
+  const allReady = items.every(i => i.ready);
+  return { allReady, items, noAfs };
+}
+
+function updateSendGuide(readiness) {
+  const guideList = $('send-guide-list');
+  if (!guideList) return;
+  guideList.replaceChildren();
+
+  const missing = readiness.items.filter(i => !i.ready);
+  const icon = $('send-guide-icon');
+  const title = $('send-guide-title');
+  const sendBtn = $('dtn-send');
+  const wrapper = $('dtn-send-wrapper');
+
+  if (readiness.allReady) {
+    if (icon) icon.textContent = '✔';
+    if (title) title.textContent = '전송 준비 완료 (시작 가능)';
+    sendBtn.classList.add('ready-pulse');
+    if (wrapper) wrapper.title = '모든 조건이 충족되었습니다. 전송을 시작할 수 있습니다.';
+  } else {
+    if (icon) icon.textContent = '⚠️';
+    if (title) title.textContent = '전송 준비 조건 미충족 (' + missing.length + '건)';
+    sendBtn.classList.remove('ready-pulse');
+    if (wrapper) wrapper.title = '미충족 조건 ' + missing.length + '건: 마우스를 올려 확인하세요.';
+  }
+
+  for (const item of readiness.items) {
+    const li = document.createElement('li');
+    li.className = 'send-guide-item ' + (item.ready ? 'ready' : 'not-ready');
+
+    const iconSpan = document.createElement('span');
+    iconSpan.className = 'send-guide-item-icon';
+    iconSpan.textContent = item.ready ? '✔' : '✕';
+
+    const wrap = document.createElement('div');
+    const label = document.createElement('span');
+    label.className = 'send-guide-item-label';
+    label.textContent = item.label;
+    wrap.append(label);
+
+    if (!item.ready && item.hint) {
+      const hint = document.createElement('small');
+      hint.className = 'send-guide-item-hint';
+      hint.textContent = item.hint;
+      wrap.append(hint);
+    }
+
+    li.append(iconSpan, wrap);
+    guideList.append(li);
+  }
+}
+
 function updateControls() {
   waitingCancellation.update();
   presets.update();
@@ -584,8 +736,10 @@ function updateControls() {
   $('dtn-tests').disabled = busy || !!pendingCapture;
   $('dtn-cancel').disabled = busy || !(active() || job?.state === 'FAILED' || job?.cancelPending);
   $('dtn-cancel').textContent = job?.cancelPending ? '종료 전달 중' : job?.state === 'WAITING_DTN' ? '대기 종료' : job?.state === 'CALCULATING' ? '계산 중지' : '시험 중지';
-  const noAfs = selectedType === 'AFS_METADATA' && selectedDelayEpoch()?.afsReady === false;
-  $('dtn-send').disabled = locked() || (selectedType === 'IQ_SAMPLE' ? iqJob?.state !== 'READY' : !inputId) || (delayMode() && !acceptedCapture && !selectedDelayEpoch()?.reference?.positionValid) || noAfs || !urlValid() || tx?.state !== 'READY' || !rx || ['OFFLINE', 'ERROR'].includes(rx.state);
+  const readiness = getSendReadiness();
+  $('dtn-send').disabled = !readiness.allReady;
+  updateSendGuide(readiness);
+  const noAfs = readiness.noAfs;
   $('iq-generate').disabled = locked() || !config.iqEnabled || !inputId || (acceptedCapture && !inputPvt.some(v => v.positionValid && v.velocityValid));
   for (const id of ['capture-use', 'capture-retry', 'capture-discard']) $(id).disabled = busy;
   $('iq-cancel').disabled = !generatingIq();
@@ -869,6 +1023,8 @@ $('dtn-connection-test').onclick = () => connectPeer(false);
 $('dtn-connection-save').onclick = () => connectPeer(true);
 for (const id of ['dtn-receiver-ip', 'dtn-receiver-port']) $(id).oninput = () => { destination('주소 변경 · 미확인'); $('dtn-connection-message').textContent = ''; };
 $('dtn-send-url').oninput = updateControls;
+$('dtn-sdrHeapSizeBytes').oninput = updateInputSummary;
+$('hdtn-maxSumOfBundleBytesInPipeline').oninput = updateInputSummary;
 
 async function refreshPorts() {
   await gnss.listPorts();
@@ -926,8 +1082,10 @@ $('dtn-cancel').onclick = async () => {
   } catch (error) { log('시험 중지 요청 실패 · ' + error.message, 'ERROR'); }
   finally { busy = false; updateControls(); }
 };
+let trialDialogHandler = null;
 function renderSummary() {
-  renderTrialSettings($('trial-settings'), job);
+  if ($('trial-settings')) renderTrialSettings($('trial-settings'), job);
+  trialDialogHandler?.updateDialog(job);
   $('dtn-iq-result').hidden = job?.testType !== 'IQ_SAMPLE';
   renderIqFile($('dtn-iq-result'), job?.testType === 'IQ_SAMPLE' ? job.fileResult : null,
     job?.state === 'FAILED' ? '수신 파일 검증 실패 · 로그를 확인하세요.' : '수신 파일 검증 대기');
@@ -1076,12 +1234,13 @@ async function initialize() {
   initializeHdtnConfig();
   updateAdapterTabBadges();
   try {
+    trialDialogHandler = initTrialSettingsDialog(() => job);
     config = await request('/dtn/config');
     if (config.iqEnabled) await loadIqFiles();
     $('dtn-send-url').value = config.defaultSendUrl || '';
     initAdapterHealth(config.adapterUrl || config.defaultSendUrl || '', log, (text, className) => {
-      $('dtn-adapter-summary').textContent = text;
-      $('dtn-adapter-summary-dot').className = className;
+      if ($('dtn-adapter-summary')) $('dtn-adapter-summary').textContent = text;
+      if ($('dtn-adapter-summary-dot')) $('dtn-adapter-summary-dot').className = className;
     });
       $('dtn-transport-mode-state').textContent = senderMode + ' → ' + receiverMode + ' · 전송 요청에 포함';
     try {

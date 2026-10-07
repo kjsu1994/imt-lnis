@@ -140,7 +140,6 @@ public class DtnPresetService {
         HdtnConfig config = request.settings().hdtnConfig();
         if (config.getTcpclMaxSegmentSizeBytes() == null
                 || config.getTotalStorageCapacityBytes() == null
-                || config.getMaxLtpReceiveUdpPacketSizeBytes() == null
                 || config.getAcsSendPeriodMilliseconds() == null) {
             throw bad("고급 설정을 포함한 HDTN 전체 값을 입력하세요.");
         }

@@ -43,7 +43,32 @@ export function renderCnoCell(cell, cno) {
   cell.append(container);
 }
 
-const constellation = id => ['GPS', 'SBAS', 'Galileo', 'BeiDou', 'IMES', 'QZSS', 'GLONASS', 'NavIC'][id] || ('GNSS ' + id);
+export const constellation = id => ['GPS', 'SBAS', 'Galileo', 'BeiDou', 'IMES', 'QZSS', 'GLONASS', 'NavIC'][id] || ('GNSS ' + id);
+
+export function satelliteBadgeText(constellationId, satelliteId) {
+  const pad = String(satelliteId).padStart(2, '0');
+  switch (constellationId) {
+    case 0: return 'GPS ' + pad;
+    case 1: return 'SBAS ' + pad;
+    case 2: return 'GAL ' + pad;
+    case 3: return 'BDS ' + pad;
+    case 5: return 'QZS ' + pad;
+    case 6: return 'GLO ' + pad;
+    default: return 'SAT ' + pad;
+  }
+}
+
+export function constellationClass(constellationId) {
+  switch (constellationId) {
+    case 0: return 'constellation-badge-gps';
+    case 1: return 'constellation-badge-sbas';
+    case 2: return 'constellation-badge-gal';
+    case 3: return 'constellation-badge-bds';
+    case 5: return 'constellation-badge-qzss';
+    case 6: return 'constellation-badge-glo';
+    default: return 'constellation-badge-other';
+  }
+}
 export function navigationCells(item, iq = false) {
   const n = item.message;
   return [item.sequence, item.capturedAt, constellation(n.constellationId), n.satelliteId,
@@ -330,6 +355,7 @@ export function createObservationView(container, onSelect = () => {}, role = '')
       </details>` : ''}</div>
     <div class="observation-header-row">
       <h3 data-observation-title>관측값 · RAWX</h3>
+      <div class="multi-gnss-summary-bar" data-constellation-summary hidden></div>
       <label class="pvt-filter-toggle"><input type="checkbox" data-pvt-filter> <span>PVT 계산 위성만 보기</span></label>
     </div>
     <p data-delay-summary hidden></p>
@@ -429,7 +455,21 @@ export function createObservationView(container, onSelect = () => {}, role = '')
   }
 
   function linkSatellite(row, observation) {
-    if (!linkedNavigation) return;
+    const cell = row.children[1];
+    const cid = observation.constellationId;
+    const sid = observation.satelliteId;
+    const badgeText = satelliteBadgeText(cid, sid);
+    const badgeClass = constellationClass(cid);
+
+    if (!linkedNavigation) {
+      const badge = document.createElement('span');
+      badge.className = 'satellite-badge constellation-badge ' + badgeClass;
+      badge.textContent = badgeText;
+      badge.title = satelliteName(observation);
+      cell.replaceChildren(badge);
+      return;
+    }
+
     const selected = !showAllNavigation && satelliteKey(observation) === selectedSatellite;
     if (row.classList?.toggle) {
       row.classList.toggle('satellite-selected', selected);
@@ -437,15 +477,11 @@ export function createObservationView(container, onSelect = () => {}, role = '')
       row.className = (row.className || '').replace(/\bsatellite-selected\b/g, '').trim();
       if (selected) row.className = (row.className ? row.className + ' ' : '') + 'satellite-selected';
     }
-    const cell = row.children[1];
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = 'satellite-select';
-    button.textContent = observation.constellationId === 0
-      ? 'G' + String(observation.satelliteId).padStart(2, '0') : String(observation.satelliteId);
-    button.title = observation.constellationId === 0
-      ? 'GPS PRN ' + observation.satelliteId + ' · 클릭하면 이 위성의 항법정보 표시'
-      : satelliteName(observation) + ' · 클릭하면 이 위성의 항법정보 표시';
+    button.className = 'satellite-select constellation-badge ' + badgeClass;
+    button.textContent = badgeText;
+    button.title = satelliteName(observation) + ' · 클릭하면 이 위성의 항법정보 표시';
     button.setAttribute('aria-pressed', String(selected));
     button.setAttribute('aria-label', satelliteName(observation) + ' 항법정보 보기');
     button.onclick = () => {
@@ -537,7 +573,16 @@ export function createObservationView(container, onSelect = () => {}, role = '')
       const timing = frame ? '프레임 복원' : iq ? '복호·보조 정보'
         : position == null || epochPosition == null ? '순서 확인 불가'
         : position < epochPosition ? '선택 Epoch 이전 수신' : '선택 Epoch 이후 수신';
-      for (const text of [satelliteName(item.message), label, timing]) {
+      const cellSat = document.createElement('td');
+      const badge = document.createElement('span');
+      const cid = item.message.constellationId;
+      const sid = item.message.satelliteId;
+      badge.className = 'satellite-badge constellation-badge ' + constellationClass(cid);
+      badge.textContent = satelliteBadgeText(cid, sid);
+      badge.title = satelliteName(item.message);
+      cellSat.append(badge);
+      row.append(cellSat);
+      for (const text of [label, timing]) {
         const cell = document.createElement('td');
         cell.textContent = text;
         row.append(cell);
@@ -623,6 +668,49 @@ export function createObservationView(container, onSelect = () => {}, role = '')
       : '변환 후 값 표시 불가 · ' + (delayEvidence.error || '원본 Epoch와 계산 근거 불일치')) : '';
     summary.title = '변환 후 의사거리 = 원본 의사거리 + 299,792,458 × 측정 지연(초). 표시값은 저장된 계산 근거이며 원문과 JSON 다운로드는 실제 수신 원본 그대로 유지됩니다. 최종 채택 위성 수는 PVT 결과에서 확인하세요.';
     selectSatellite(epoch?.observations || []);
+    const constellationSummaryEl = container.querySelector('[data-constellation-summary]');
+    if (constellationSummaryEl) {
+      if (!epoch || !epoch.observations?.length) {
+        constellationSummaryEl.hidden = true;
+      } else {
+        const counts = {};
+        for (const obs of epoch.observations) {
+          const cid = obs.constellationId;
+          if (!counts[cid]) counts[cid] = new Set();
+          counts[cid].add(obs.satelliteId);
+        }
+        constellationSummaryEl.replaceChildren();
+        const configMap = [
+          { id: 0, key: 'gps', label: 'GPS' },
+          { id: 3, key: 'bds', label: 'BDS' },
+          { id: 2, key: 'gal', label: 'GAL' },
+          { id: 5, key: 'qzss', label: 'QZS' },
+          { id: 6, key: 'glo', label: 'GLO' }
+        ];
+        let hasAny = false;
+        for (const conf of configMap) {
+          if (counts[conf.id] && counts[conf.id].size > 0) {
+            hasAny = true;
+            const chip = document.createElement('span');
+            chip.className = 'constellation-chip chip-' + conf.key;
+            chip.textContent = conf.label + ': ' + counts[conf.id].size;
+            chip.title = conf.label + ' 위성 ' + counts[conf.id].size + '개 수신됨';
+            constellationSummaryEl.append(chip);
+          }
+        }
+        for (const [cidStr, set] of Object.entries(counts)) {
+          const cid = Number(cidStr);
+          if (!configMap.some(c => c.id === cid) && set.size > 0) {
+            hasAny = true;
+            const chip = document.createElement('span');
+            chip.className = 'constellation-chip chip-other';
+            chip.textContent = constellation(cid) + ': ' + set.size;
+            constellationSummaryEl.append(chip);
+          }
+        }
+        constellationSummaryEl.hidden = !hasAny;
+      }
+    }
     body.replaceChildren();
     if (!epoch || !epoch.observations?.length) {
       const row = document.createElement('tr'), cell = document.createElement('td');
