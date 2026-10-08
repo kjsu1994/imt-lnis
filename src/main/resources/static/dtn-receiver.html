@@ -25,9 +25,9 @@
 <main>
   <section class="status-strip" aria-label="연결 상태">
     <small id="gnss-summary" role="status">시스템 시간 사용 · GNSS 시간 미확인</small>
-    <span id="dtn-server-status" class="pill warning">서버 연결 확인 중</span>
-    <span id="dtn-sender-status" class="pill">송신 처리기 확인 중</span>
     <span id="dtn-receiver-status" class="pill">수신 처리기 확인 중</span>
+    <span id="dtn-sender-status" class="pill">송신 처리기 확인 중</span>
+    <span id="dtn-adapter-strip-status" class="pill warning" title="수신 어댑터 연결 상태">어댑터 확인 중</span>
     <span id="dtn-clock-skew-warning" class="pill warning" hidden title="노드 간 시각이 어긋나 있습니다. 시간 맞추기 버튼으로 보정하세요.">⚠️ 시계 오차 <strong id="clock-skew-val">0.0s</strong> · 동기화 필요</span>
     <div class="service-clock-pill" title="시험 기준시각 및 보정 상태">
       <span class="clock-label">기준시각</span>

@@ -483,11 +483,28 @@ $('dtn-settings-open').onclick = () => showSettings(!($('dtn-settings-view').cla
 $('dtn-settings-close').onclick = () => showSettings(false);
 if ($('dtn-drawer-backdrop')) $('dtn-drawer-backdrop').onclick = () => showSettings(false);
 if ($('dtn-config-hud')) $('dtn-config-hud').onclick = () => showSettings(true);
+if ($('dtn-adapter-strip-status')) {
+  $('dtn-adapter-strip-status').onclick = () => {
+    showSettings(true);
+    $('dtn-send-url')?.focus();
+  };
+}
 window.addEventListener('keydown', event => {
   if (event.key === 'Escape' && $('dtn-settings-view')?.classList.contains('drawer-open')) {
     showSettings(false);
   }
 });
+
+let adapterOnline = false;
+let adapterStatusText = '확인 대기';
+
+function updateAdapterStripPill(text, tone, className) {
+  const pillEl = $('dtn-adapter-strip-status');
+  if (!pillEl) return;
+  const stateClass = tone || (className?.includes('online') ? 'online' : className?.includes('offline') ? 'error' : 'warning');
+  const label = text.startsWith('어댑터') ? text : '어댑터 ' + text;
+  pill('dtn-adapter-strip-status', label, stateClass);
+}
 
 function updateInputSummary() {
   const type = {GNSS_RAW: 'GNSS RAW', AFS_METADATA: 'AFS Frame', IQ_SAMPLE: 'I/Q Sample'}[selectedType];
@@ -515,10 +532,15 @@ function updateInputSummary() {
       const pipeVal = $('hdtn-maxSumOfBundleBytesInPipeline')?.value;
       if (pipeVal) parts.push('HDTN ' + (Number(pipeVal) / 1e9).toFixed(1) + 'GB');
     }
-    $('hud-engine').textContent = parts.join(' · ') || '설정 완료';
+    const engineText = parts.join(' · ') || '설정 완료';
+    $('hud-engine').textContent = engineText + (adapterOnline ? ' (어댑터 정상)' : ' (어댑터 ' + (adapterStatusText || '오류') + ')');
+    $('hud-engine').style.color = adapterOnline ? '' : '#ef4444';
   }
 }
-function pill(id, text, state = '') { $(id).textContent = text; $(id).className = 'pill ' + state; }
+function pill(id, text, state = '') {
+  const el = $(id);
+  if (el) { el.textContent = text; el.className = 'pill ' + state; }
+}
 function destination(text, state = 'unknown') {
   if ($('destination-state')) $('destination-state').textContent = text;
   if ($('destination-dot')) $('destination-dot').className = 'connection-dot ' + state;
@@ -611,6 +633,7 @@ function getSendReadiness() {
   const isLocked = locked();
   const hasInput = selectedType === 'IQ_SAMPLE' ? iqJob?.state === 'READY' : !!inputId;
   const isUrlValid = urlValid();
+  const isAdapterReady = isUrlValid && adapterOnline;
   const isPeerReady = rx && !['OFFLINE', 'ERROR'].includes(rx.state);
   const isTxReady = tx?.state === 'READY';
   const noAfs = selectedType === 'AFS_METADATA' && selectedDelayEpoch()?.afsReady === false;
@@ -624,10 +647,14 @@ function getSendReadiness() {
       hint: selectedType === 'IQ_SAMPLE' ? '설정에서 90초 I/Q 생성을 완료하세요.' : 'GNSS 파일 적용 또는 COM 포트 연결이 필요합니다.'
     },
     {
-      id: 'url',
-      label: '송신 어댑터 주소 (URL) 입력',
-      ready: isUrlValid,
-      hint: '어댑터 서버 주소(예: http://IP:포트)를 입력하세요.'
+      id: 'adapter',
+      label: isAdapterReady ? '송신 어댑터 연결 정상 (온라인)' : '송신 어댑터 통신 연결 확인',
+      ready: isAdapterReady,
+      hint: !isUrlValid
+        ? '어댑터 서버 주소(예: http://IP:포트)를 입력하세요.'
+        : (adapterStatusText === '확인 중'
+            ? '어댑터 서버 연결 상태를 확인하고 있습니다.'
+            : '어댑터 서버 연결 실패 · 설정(우측 하단 ⚙️)에서 주소 및 데몬 기동 여부를 확인하세요.')
     },
     {
       id: 'peer',
@@ -751,9 +778,9 @@ function updateControls() {
   for (const button of document.querySelectorAll('.test-type-button,.transport-mode-button,.pvt-constellation-button,.input-mode')) button.disabled = locked();
   for (const id of ['dtn-connection-test', 'dtn-connection-save', 'dtn-receiver-ip', 'dtn-receiver-port']) $(id).disabled = busy || (!pendingCapture && locked()) || !peerConfig?.editable;
   $('dtn-message').textContent = selectedType !== 'IQ_SAMPLE'
-    ? active() ? (locked() ? '송신 준비·어댑터 요청 중입니다.' : '이전 시험 수신 대기 · 다음 시험을 전송할 수 있습니다.') : !inputId ? 'GNSS 입력을 준비하세요.' : !urlValid() ? '어댑터 전송 URL을 입력하세요.' : ''
+    ? active() ? (locked() ? '송신 준비·어댑터 요청 중입니다.' : '이전 시험 수신 대기 · 다음 시험을 전송할 수 있습니다.') : !inputId ? 'GNSS 입력을 준비하세요.' : !urlValid() ? '어댑터 전송 URL을 입력하세요.' : !adapterOnline ? '송신 어댑터 데몬 연결을 확인하세요.' : ''
     : active() ? (locked() ? '송신 준비·어댑터 요청 중입니다.' : '이전 시험 수신 대기 · 다음 시험을 전송할 수 있습니다.') : generatingIq() ? '90초 I/Q 생성 중입니다.'
-      : iqJob?.state === 'READY' ? '선택한 I/Q 파일을 전송합니다.' : 'GNSS 입력 적용 후 90초 I/Q를 생성하세요.';
+      : iqJob?.state === 'READY' ? (!adapterOnline ? '송신 어댑터 데몬 연결을 확인하세요.' : '선택한 I/Q 파일을 전송합니다.') : 'GNSS 입력 적용 후 90초 I/Q를 생성하세요.';
   if (pendingCapture) $('dtn-message').textContent = '확보한 데이터의 사용 여부를 선택하세요.';
   else if (acceptedCapture && noAfs) $('dtn-message').textContent = 'AFS 생성에 필요한 GPS LNAV 항법정보 부족 · GNSS RAW로 전송 가능';
   else if (acceptedCapture && selectedType === 'IQ_SAMPLE' && !inputPvt.some(v => v.positionValid && v.velocityValid)) $('dtn-message').textContent = 'I/Q 생성에는 유효한 위치·속도 PVT가 필요합니다.';
@@ -1204,7 +1231,8 @@ async function poll() {
       }
     }
   } catch (e) {
-    agents = []; pill('dtn-server-status', '서버 확인 실패', 'error');
+    agents = [];
+    pill('dtn-sender-status', '송신 서버 연결 끊김', 'error');
     destination('미확인'); log(e.message, 'ERROR');
   } finally { polling = false; updateControls(); }
 }
@@ -1238,9 +1266,12 @@ async function initialize() {
     config = await request('/dtn/config');
     if (config.iqEnabled) await loadIqFiles();
     $('dtn-send-url').value = config.defaultSendUrl || '';
-    initAdapterHealth(config.adapterUrl || config.defaultSendUrl || '', log, (text, className) => {
-      if ($('dtn-adapter-summary')) $('dtn-adapter-summary').textContent = text;
-      if ($('dtn-adapter-summary-dot')) $('dtn-adapter-summary-dot').className = className;
+    initAdapterHealth(config.adapterUrl || config.defaultSendUrl || '', log, (text, className, tone) => {
+      adapterStatusText = text;
+      adapterOnline = (tone === 'online' || className?.includes('online'));
+      updateAdapterStripPill(text, tone, className);
+      updateInputSummary();
+      updateControls();
     });
       $('dtn-transport-mode-state').textContent = senderMode + ' → ' + receiverMode + ' · 전송 요청에 포함';
     try {

@@ -1017,10 +1017,71 @@ body[data-page="dtn-sender"] .capture-decision small { flex-basis: 100%; overflo
 body[data-page="dtn-sender"] .capture-decision .actions { margin: 0; }
 body[data-page="dtn-sender"] #dtn-message { margin: 4px 0 0; font-size: 12px; color: var(--muted); }
 body[data-page="dtn-sender"] #dtn-message:empty { display: none; }
-body[data-page="dtn-sender"] #dtn-settings-open[aria-expanded="true"] { background: #d9f3eb; color: #06725d; }
+/* Floating Action Button (FAB) for Settings on Sender Page */
+body[data-page="dtn-sender"] #dtn-settings-open {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 9990;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 42px;
+  padding: 0 18px;
+  border-radius: 999px;
+  background: #0f172a;
+  color: #f8fafc;
+  font-size: 13.5px;
+  font-weight: 600;
+  border: 1px solid #334155;
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.35), 0 2px 6px rgba(15, 23, 42, 0.2);
+  cursor: pointer;
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.18s ease, background-color 0.18s ease, border-color 0.18s ease;
+  user-select: none;
+  white-space: nowrap;
+}
+body[data-page="dtn-sender"] #dtn-settings-open:hover {
+  background: #1e293b;
+  border-color: #475569;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.45), 0 4px 10px rgba(15, 23, 42, 0.25);
+}
+body[data-page="dtn-sender"] #dtn-settings-open:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.3);
+}
+body[data-page="dtn-sender"] #dtn-settings-open:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 3px;
+}
+body[data-page="dtn-sender"] #dtn-settings-open[aria-expanded="true"] {
+  background: #0284c7;
+  border-color: #38bdf8;
+  color: #ffffff;
+}
+body[data-page="dtn-sender"] #dtn-settings-open .fab-gear-icon {
+  font-size: 15px;
+  line-height: 1;
+  display: inline-block;
+  transition: transform 0.3s ease;
+}
+body[data-page="dtn-sender"] #dtn-settings-open:hover .fab-gear-icon {
+  transform: rotate(30deg);
+}
+body[data-page="dtn-sender"] #dtn-settings-open[aria-expanded="true"] .fab-gear-icon {
+  transform: rotate(90deg);
+}
 @media (max-width: 600px) {
   body[data-page="dtn-sender"] header { flex-wrap: wrap; }
   body[data-page="dtn-sender"] .role-nav { margin-left: auto; }
+  body[data-page="dtn-sender"] #dtn-settings-open {
+    bottom: 16px;
+    right: 16px;
+    height: 38px;
+    padding: 0 14px;
+    font-size: 12.5px;
+  }
 }
 
 /* Receiver-only layout */
@@ -2414,4 +2475,15 @@ button.satellite-select.constellation-badge[aria-pressed="true"] {
 .constellation-chip.chip-qzss { background: #fffbeb; color: #b45309; border-color: #fde68a; }
 .constellation-chip.chip-glo { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
 .constellation-chip.chip-other { background: #f3f4f6; color: #4b5563; border-color: #e5e7eb; }
+
+#dtn-adapter-strip-status {
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.15s ease, filter 0.15s ease, box-shadow 0.15s ease;
+}
+#dtn-adapter-strip-status:hover {
+  filter: brightness(0.95);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
 

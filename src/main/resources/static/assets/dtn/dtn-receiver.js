@@ -131,8 +131,11 @@ $('sender-address-save').onclick = () => saveSenderAddress(true);
 $('sender-address-test').onclick = () => saveSenderAddress(false);
 
 function pill(id, text, state = '') {
-  $(id).textContent = text;
-  $(id).className = ('pill ' + state).trim();
+  const el = $(id);
+  if (el) {
+    el.textContent = text;
+    el.className = ('pill ' + state).trim();
+  }
 }
 
 function number(value, digits = 3) {
@@ -468,7 +471,6 @@ async function poll(force = false) {
     $('sender-address-save').disabled = peerSaving || !!connection.busy || !connection.editable;
     $('sender-address-test').disabled = peerSaving || !connection.editable;
     $('sender-address').disabled = peerSaving || !!connection.busy || !connection.editable;
-    pill('dtn-server-status', '서버 연결됨', 'online');
     renderAgents(agents);
     const selected = $('dtn-tests').value;
     $('dtn-tests').replaceChildren(...(clearScreen ? [new Option('시험 선택 · 화면 초기화됨', '')] : []), ...(tests.length ? tests.map(job =>
@@ -487,9 +489,8 @@ async function poll(force = false) {
     }
     $('last-updated').textContent = '최근 확인 ' + new Date().toLocaleTimeString('ko-KR') + ' · 자동 갱신';
   } catch (error) {
-    pill('dtn-server-status', '갱신 실패 · 재시도 중', 'error');
+    pill('dtn-receiver-status', '수신 서버 연결 끊김', 'error');
     pill('dtn-sender-status', '송신 노드 확인 불가', 'warning');
-    pill('dtn-receiver-status', '수신 실행기 확인 불가', 'warning');
     log('조회 실패 · ' + error.message);
   } finally {
     polling = false;
@@ -497,12 +498,36 @@ async function poll(force = false) {
   }
 }
 
+function updateAdapterStripPill(text, tone, className) {
+  const pillEl = $('dtn-adapter-strip-status');
+  if (!pillEl) return;
+  const stateClass = tone || (className?.includes('online') ? 'online' : className?.includes('offline') ? 'error' : 'warning');
+  const label = text.startsWith('어댑터') ? text : '어댑터 ' + text;
+  pill('dtn-adapter-strip-status', label, stateClass);
+}
+
 async function initialize() {
   trialDialogHandler = initTrialSettingsDialog(() => tests.find(item => item.testId === $('dtn-tests').value));
+  if ($('dtn-adapter-strip-status')) {
+    $('dtn-adapter-strip-status').style.cursor = 'pointer';
+    $('dtn-adapter-strip-status').onclick = () => {
+      $('dtn-send-url')?.focus();
+      $('dtn-send-url')?.scrollIntoView({behavior: 'smooth', block: 'center'});
+    };
+  }
   await gnss.poll();
   void gnss.listPorts();
-  try { const config = await get('/dtn/config'); initAdapterHealth(config.adapterUrl || '', log); }
-  catch (error) { initAdapterHealth('', log); log(error.message); }
+  try {
+    const config = await get('/dtn/config');
+    initAdapterHealth(config.adapterUrl || '', log, (text, className, tone) => {
+      updateAdapterStripPill(text, tone, className);
+    });
+  } catch (error) {
+    initAdapterHealth('', log, (text, className, tone) => {
+      updateAdapterStripPill(text, tone, className);
+    });
+    log(error.message);
+  }
   try {
     const connection = await get('/node/connection');
     $('sender-address').value = connection.baseUrl || '';

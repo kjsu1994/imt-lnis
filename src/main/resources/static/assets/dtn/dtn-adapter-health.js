@@ -27,9 +27,10 @@ export function initAdapterHealth(defaultUrl, log = () => {}, onStatus = () => {
     lastState = state;
   };
   const status = (text, tone = '') => {
-    $('dtn-adapter-status').textContent = text;
-    $('dtn-adapter-dot').className = 'connection-dot ' + (tone === 'online' ? 'online' : tone === 'error' ? 'offline' : 'unknown');
-    onStatus(text, $('dtn-adapter-dot').className);
+    if ($('dtn-adapter-status')) $('dtn-adapter-status').textContent = text;
+    const dotClass = 'connection-dot ' + (tone === 'online' ? 'online' : tone === 'error' ? 'offline' : 'unknown');
+    if ($('dtn-adapter-dot')) $('dtn-adapter-dot').className = dotClass;
+    onStatus(text, dotClass, tone);
   };
   const previousInput = input.oninput;
   input.oninput = event => {
@@ -89,5 +90,6 @@ export function initAdapterHealth(defaultUrl, log = () => {}, onStatus = () => {
       await check(false);
     } catch (error) { log('어댑터 주소 저장 실패 · ' + error.message); }
   };
+  void check(true);
   setInterval(() => { if (document.visibilityState !== 'hidden') check(true); }, 10000);
 }

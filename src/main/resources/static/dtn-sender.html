@@ -5,7 +5,7 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>LNIS DTN Sender</title>
   <link rel="stylesheet" href="/lnis/assets/common/app.css?v=20260918-admin-icon">
-  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20261007-clean-layout">
+  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20261008-fab-settings">
 </head>
 <body data-page="dtn-sender">
 <header>
@@ -17,15 +17,15 @@
   <nav class="role-nav">
     <a class="active" href="/lnis/dtntest/sender" hidden>Sender</a>
     <a href="/lnis/dtntest/receiver" hidden>Receiver</a>
-    <button id="dtn-settings-open" type="button" aria-controls="dtn-settings-view" aria-expanded="false">설정</button>
+    <button id="dtn-settings-open" type="button" aria-controls="dtn-settings-view" aria-expanded="false" title="송수신 시험 및 어댑터 설정 열기"><span class="fab-gear-icon" aria-hidden="true">⚙️</span><span class="fab-label">설정</span></button>
   </nav>
 </header>
 <main>
   <section class="status-strip">
     <small id="gnss-summary" role="status">시스템 시간 사용 · GNSS 시간 미확인</small>
-    <span id="dtn-server-status" class="pill warning">서버 확인 중</span>
     <span id="dtn-sender-status" class="pill">송신 처리기 확인 중</span>
     <span id="dtn-receiver-status" class="pill">수신 처리기 확인 중</span>
+    <span id="dtn-adapter-strip-status" class="pill warning" title="클릭하여 어댑터 설정 열기">어댑터 확인 중</span>
     <span id="dtn-test-status" class="pill">시험 대기</span>
     <span id="dtn-clock-skew-warning" class="pill warning" hidden title="노드 간 시각이 어긋나 있습니다. 시간 맞추기 버튼으로 보정하세요.">⚠️ 시계 오차 <strong id="clock-skew-val">0.0s</strong> · 동기화 필요</span>
     <div class="service-clock-pill" title="시험 기준시각 및 보정 상태">
