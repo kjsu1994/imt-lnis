@@ -6,7 +6,7 @@
 typedef struct {
     nav_t nav;
     uint8_t gps_frames[32][150];
-1    uint8_t bds_frames[64][190];
+    uint8_t bds_frames[64][190];
     uint8_t gal_frames[36][128];
 } lnis_pvt_context;
 
@@ -28,35 +28,30 @@ void lnis_pvt_destroy(void *context) {
     free(ctx);
 }
 
-/* Galileo UBX-RXM-SFRBX 8 word (Even 128 bit + Odd 128 bit)에서
- * RTKLIB decode_gal_inav가 기대하는 128-bit (16 byte) 단일 I/NAV word를 추출한다. */
-static void pack_gal_inav(const uint32_t *dwrd, uint8_t *data) {
-    uint8_t even[16] = {0}, odd[16] = {0};
-    int i;
-    for (i = 0; i < 4; i++) {
-        even[i*4]   = (uint8_t)(dwrd[i] >> 24);
-        even[i*4+1] = (uint8_t)(dwrd[i] >> 16);
-        even[i*4+2] = (uint8_t)(dwrd[i] >> 8);
-        even[i*4+3] = (uint8_t)dwrd[i];
+/* Galileo UBX-RXM-SFRBX 8 word (Even 128 bit + Odd 128 bit) CRC24Q 검증 */
+static int unpack_gal_inav(const uint32_t *dwrd, uint8_t *buff) {
+    uint8_t crc_buff[26] = {0};
+    int i, j;
+
+    for (i = 0; i < 8; i++) {
+        buff[i*4]   = (uint8_t)(dwrd[i] >> 24);
+        buff[i*4+1] = (uint8_t)(dwrd[i] >> 16);
+        buff[i*4+2] = (uint8_t)(dwrd[i] >> 8);
+        buff[i*4+3] = (uint8_t)dwrd[i];
     }
-    for (i = 0; i < 4; i++) {
-        odd[i*4]   = (uint8_t)(dwrd[i+4] >> 24);
-        odd[i*4+1] = (uint8_t)(dwrd[i+4] >> 16);
-        odd[i*4+2] = (uint8_t)(dwrd[i+4] >> 8);
-        odd[i*4+3] = (uint8_t)dwrd[i+4];
+
+    /* Even-Odd nominal page 순서 (0, 1) 및 Alert flag (0, 0) 검사 */
+    if (getbitu(buff, 0, 1) != 0 || getbitu(buff + 16, 0, 1) != 1) return 0;
+    if (getbitu(buff, 1, 1) != 0 || getbitu(buff + 16, 1, 1) != 0) return 0;
+
+    /* CRC24Q 검증: Even 114 bit + Odd 82 bit (4 bit pad 포함 25 byte) */
+    for (i = 0, j = 4; i < 15; i++, j += 8) setbitu(crc_buff, j, 8, getbitu(buff, i*8, 8));
+    for (i = 0, j = 118; i < 11; i++, j += 8) setbitu(crc_buff, j, 8, getbitu(buff + 16, i*8, 8));
+
+    if (rtk_crc24q(crc_buff, 25) != getbitu(buff + 16, 82, 24)) {
+        return 0; /* CRC 에러 패킷 폐기 */
     }
-    memset(data, 0, 16);
-    /* Even half-page: bit 2부터 112 bit 복사 (앞 2 bit는 sync/page bit 제외) */
-    for (i = 0; i < 112; i++) {
-        int b = (even[(i + 2) / 8] >> (7 - ((i + 2) % 8))) & 1;
-        if (b) data[i / 8] |= (1 << (7 - (i % 8)));
-    }
-    /* Odd half-page: bit 2부터 16 bit 복사하여 data 112..127 bit에 연결 */
-    for (i = 0; i < 16; i++) {
-        int b = (odd[(i + 2) / 8] >> (7 - ((i + 2) % 8))) & 1;
-        int dst = 112 + i;
-        if (b) data[dst / 8] |= (1 << (7 - (dst % 8)));
-    }
+    return 1;
 }
 
 int32_t lnis_pvt_navigation(void *context, int32_t sys, int32_t prn,
@@ -121,19 +116,38 @@ int32_t lnis_pvt_navigation(void *context, int32_t sys, int32_t prn,
         return 1;
     }
     else if (sys == LNIS_SYS_GAL) {
-        uint8_t data[16] = {0};
-        int type, sat, decoded_week, shift;
+        uint8_t buff[32] = {0};
+        int i, j, k, type, sat, decoded_week, shift;
         eph_t eph = {0};
         if (count != 8 || prn < 1 || prn > 36) return -1;
-        /* RTKLIB ubx.c decode_enav와 동일: even(0) + odd(1) 순서의 nominal page만 사용 */
-        if ((words[0] >> 31) != 0 || (words[4] >> 31) != 1) return 0;
-        if (((words[0] >> 30) & 1) || ((words[4] >> 30) & 1)) return 0; /* alert page */
-        pack_gal_inav(words, data);
-        type = getbitu(data, 0, 6);
+        if (!unpack_gal_inav(words, buff)) return 0;
+
+        type = getbitu(buff, 2, 6); /* word type (bits 2..7 of even page) */
         if (type < 1 || type > 5) return 0;
-        memcpy(ctx->gal_frames[prn-1] + 16 * type, data, 16);
-        if (type == 5) decode_gal_inav(ctx->gal_frames[prn-1], NULL, ctx->nav.ion_gal, NULL);
+
+        /* Word 2는 서브프레임의 시작(t=0s, 14s)이므로 새 주기 플래그 초기화 */
+        if (type == 2) ctx->gal_frames[prn-1][112] = 0;
+
+        /* 128-bit (112 bit from Even, 16 bit from Odd) 추출하여 프레임 버퍼에 저장 */
+        k = type * 16;
+        for (i = 0, j = 2; i < 14; i++, j += 8) ctx->gal_frames[prn-1][k++] = (uint8_t)getbitu(buff, j, 8);
+        for (i = 0, j = 2; i <  2; i++, j += 8) ctx->gal_frames[prn-1][k++] = (uint8_t)getbitu(buff + 16, j, 8);
+
+        /* word 수신 플래그 기록 (bit 1~5) */
+        ctx->gal_frames[prn-1][112] |= (1 << type);
+
+        /* Word 5 수신 시 이온층 파라미터 디코딩 */
+        if (type == 5) {
+            decode_gal_inav(ctx->gal_frames[prn-1], NULL, ctx->nav.ion_gal, NULL);
+        }
+
+        /* Word 1, 2, 3, 4, 5 (마스크 0x3E)가 모두 온전히 수신되었을 때만 에페머리스 디코딩 */
+        if ((ctx->gal_frames[prn-1][112] & 0x3E) != 0x3E) return 0;
         if (!decode_gal_inav(ctx->gal_frames[prn-1], &eph, NULL, NULL)) return 0;
+
+        /* 에페머리스 완성 후 플래그 초기화하여 중복/오염 디코딩 방지 */
+        ctx->gal_frames[prn-1][112] = 0;
+
         time2gpst(eph.ttr, &decoded_week);
         shift = (int)floor((observation_week - decoded_week + 512.0) / 1024.0) * 1024;
         eph.week += shift;
