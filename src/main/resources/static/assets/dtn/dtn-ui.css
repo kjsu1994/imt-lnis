@@ -1411,6 +1411,26 @@ body[data-page="dtn-sender"] .sender-summary-row #service-clock-sync { padding: 
   body[data-page="dtn-receiver"] .receiver-adapter .adapter-url-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .receiver-adapter .adapter-url-controls > input { grid-column: 1 / -1; }
 }
+.pvt-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin-bottom: 12px;
+}
+.pvt-header-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.pvt-header-left h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text, #0f172a);
+}
 .receiver-epoch-row {
   display: flex;
   align-items: center;
@@ -1424,10 +1444,16 @@ body[data-page="dtn-sender"] .sender-summary-row #service-clock-sync { padding: 
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  font-size: 12px;
+}
+.receiver-epoch-controls label {
+  font-weight: 600;
+  color: #475569;
 }
 .receiver-epoch-controls select {
-  width: 260px;
-  max-width: 340px;
+  width: auto;
+  min-width: 220px;
+  max-width: 320px;
   margin: 0;
 }
 .pvt-gauge-pill {
@@ -2486,4 +2512,556 @@ button.satellite-select.constellation-badge[aria-pressed="true"] {
   transform: translateY(-1px);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
 }
+
+/* =========================================================
+ * WGS-84 지리좌표 & ENU 오차 방향성 타깃 시각화 (통합 HUD 레이아웃)
+ * ========================================================= */
+.pvt-geodetic-visualizer {
+  margin-top: 14px;
+  margin-bottom: 14px;
+}
+
+.pvt-visualizer-card {
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--line, #e2e8f0);
+  border-radius: 10px;
+  padding: 16px 18px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.pvt-visualizer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line, #e2e8f0);
+}
+
+.visualizer-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.visualizer-icon {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.visualizer-title-group h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text, #1e293b);
+}
+
+.visualizer-desc {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: #64748b;
+}
+
+.visualizer-header-badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.target-scale-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: #1e40af;
+  background: #eff6ff;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid #bfdbfe;
+}
+
+.pvt-visualizer-layout {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 22px;
+  align-items: center;
+}
+
+@media (max-width: 960px) {
+  .pvt-visualizer-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --- 좌측 (1/3): 고시인성 ENU 레이더 타깃 --- */
+.enu-radar-section {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+.enu-radar-container {
+  width: 100%;
+  max-width: 330px;
+  height: 330px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.enu-radar-container svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.enu-ring {
+  fill: none;
+  stroke: #cbd5e1;
+  stroke-width: 1;
+}
+
+.enu-ring.ring-outer {
+  stroke: #94a3b8;
+  stroke-width: 1.4;
+  stroke-dasharray: 4, 4;
+}
+
+.enu-ring.ring-mid {
+  stroke: #cbd5e1;
+  stroke-dasharray: 3, 3;
+}
+
+.enu-diagonal {
+  stroke: #e2e8f0;
+  stroke-width: 1;
+  stroke-dasharray: 2, 4;
+}
+
+.enu-axis {
+  stroke: #64748b;
+  stroke-width: 1.5;
+  stroke-dasharray: 4, 3;
+}
+
+.enu-ring-label {
+  font-size: 11px;
+  fill: #64748b;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-weight: 600;
+  dominant-baseline: central;
+}
+
+.enu-pointer-n {
+  fill: #2563eb;
+}
+
+.enu-pointer-e, .enu-pointer-s, .enu-pointer-w {
+  fill: #64748b;
+}
+
+.enu-cardinal-label {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  fill: #334155;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+.enu-cardinal-label.cardinal-n {
+  fill: #1d4ed8;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.enu-cardinal-label.cardinal-e {
+  text-anchor: start;
+}
+
+.enu-cardinal-label.cardinal-w {
+  text-anchor: end;
+}
+
+.enu-center-halo {
+  fill: none;
+  stroke: #3b82f6;
+  stroke-width: 1.5;
+  opacity: 0.5;
+}
+
+.enu-center-point {
+  fill: #2563eb;
+  stroke: #ffffff;
+  stroke-width: 1.5;
+}
+
+.enu-vector-line {
+  stroke: #10b981;
+  stroke-width: 3.2;
+  stroke-linecap: round;
+  transition: all 0.25s ease;
+}
+
+.enu-target-pulse {
+  fill: rgba(16, 185, 129, 0.25);
+  transition: all 0.25s ease;
+}
+
+.enu-target-point {
+  fill: #10b981;
+  stroke: #ffffff;
+  stroke-width: 2.5;
+  filter: drop-shadow(0 0 5px rgba(16, 185, 129, 0.7));
+  transition: all 0.25s ease;
+}
+
+.enu-target-point.level-warning {
+  fill: #ef4444;
+  filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.8));
+}
+
+.enu-radar-summary-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  width: 100%;
+  margin: 0;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
+@media (max-width: 1100px) {
+  .enu-radar-summary-strip {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.radar-summary-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 11px;
+}
+
+.radar-summary-item .summary-label {
+  color: #64748b;
+}
+
+.radar-summary-item .summary-val {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+/* --- 우측: WGS-84 대조 및 국소 ENU 성분 분해 --- */
+.pvt-details-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.section-sub-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+
+.section-sub-header h4 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.sub-header-note {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.wgs84-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.wgs84-table th {
+  background: #f1f5f9;
+  padding: 9px 12px;
+  text-align: left;
+  font-weight: 700;
+  color: #475569;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.wgs84-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid #f1f5f9;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+}
+
+.wgs84-table td strong {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: #334155;
+}
+
+.wgs84-table .diff-highlight {
+  color: #047857;
+  font-weight: 700;
+}
+
+.enu-comp-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.enu-comp-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  text-align: center;
+}
+
+.enu-comp-card .comp-label {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.enu-comp-card .comp-val {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 15px;
+  font-weight: 800;
+  color: #0f172a;
+  display: block;
+}
+
+.enu-comp-card .comp-desc {
+  font-size: 10px;
+  color: #94a3b8;
+  margin-top: 2px;
+  display: block;
+}
+
+/* =========================================================
+ * ECEF 원시 수치 상세 대조표 (접힘 아코디언 & 컴팩트 테이블)
+ * ========================================================= */
+.pvt-raw-details {
+  background: #ffffff;
+  border: 1px solid var(--line, #e2e8f0);
+  border-radius: 8px;
+  margin-top: 14px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.pvt-raw-summary {
+  cursor: pointer;
+  padding: 11px 16px;
+  background: #f8fafc;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  user-select: none;
+  transition: background 0.15s ease;
+}
+
+.pvt-raw-summary:hover {
+  background: #f1f5f9;
+}
+
+.pvt-raw-summary-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pvt-raw-summary-icon {
+  font-size: 16px;
+}
+
+.pvt-raw-summary-text strong {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.pvt-raw-summary-desc {
+  font-size: 11.5px;
+  color: #64748b;
+  margin-left: 6px;
+  font-weight: 400;
+}
+
+.pvt-raw-toggle-badge {
+  font-size: 11.5px;
+  color: #2563eb;
+  font-weight: 600;
+}
+
+.pvt-raw-collapse-badge {
+  display: none;
+  font-size: 11.5px;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.pvt-raw-details[open] .pvt-raw-toggle-badge {
+  display: none;
+}
+
+.pvt-raw-details[open] .pvt-raw-collapse-badge {
+  display: inline-block;
+}
+
+.pvt-raw-table-wrap {
+  padding: 12px 14px;
+  overflow-x: auto;
+}
+
+.pvt-diff-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.pvt-diff-table th {
+  background: #f8fafc;
+  padding: 10px 14px;
+  text-align: left;
+  font-weight: 700;
+  color: #475569;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.pvt-diff-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid #e2e8f0;
+  vertical-align: middle;
+}
+
+.pvt-diff-table .col-param {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: #1e293b;
+}
+
+.pvt-diff-table .col-param small {
+  color: #64748b;
+  margin-left: 4px;
+}
+
+.pvt-diff-table td strong,
+.pvt-diff-table td span {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 13px;
+}
+
+.pvt-diff-table .col-diff strong {
+  font-size: 13px;
+  font-weight: 700;
+  color: #047857;
+}
+
+.pvt-diff-table .v-main {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.pvt-diff-table .v-sub-coords {
+  font-size: 11px;
+  color: #64748b;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  margin-top: 3px;
+}
+
+.pvt-table-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.pvt-table-badge.badge-perfect {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}
+
+.pvt-table-badge.badge-acceptable {
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+
+.pvt-table-badge.badge-warning {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+/* --- 수치 대조표 내부 DTN 지연 및 시계오차 계산 근거 박스 --- */
+.pvt-delay-evidence-box {
+  margin-top: 14px;
+  padding: 12px 14px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.evidence-box-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px dashed #cbd5e1;
+}
+
+.evidence-box-icon {
+  font-size: 16px;
+}
+
+.evidence-box-title strong {
+  font-size: 12px;
+  color: #1e293b;
+  font-weight: 700;
+}
+
+.evidence-box-formula {
+  display: block;
+  font-size: 11px;
+  color: #047857;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  margin-top: 2px;
+}
+
+.evidence-pre {
+  margin: 0;
+  padding: 10px 12px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11.5px;
+  line-height: 1.65;
+  color: #334155;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+
 

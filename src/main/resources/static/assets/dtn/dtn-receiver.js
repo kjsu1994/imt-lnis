@@ -44,17 +44,9 @@ function setComparison(report = {}) {
   renderReference(report);
   delayComparison = report.comparisonMode === 'DELAY';
   $('receiver-pvt-title').textContent = delayComparison ? '수신 지연 반영 PVT · Reference 비교' : '수신 지구 PVT · 송신 기준 비교';
-  $('received-pvt-label').textContent = delayComparison ? '수신 지연 반영 지구 PVT' : '수신 복원 지구 PVT';
+  if ($('received-pvt-label')) $('received-pvt-label').textContent = delayComparison ? '수신 지연 반영 지구 PVT' : '수신 복원 지구 PVT';
   delayEvidence = report.delayEvidence ?? null;
   $('dtn-clock-analysis').hidden = !delayComparison;
-  $('pvt-sync-note').hidden = !delayComparison;
-  const timingKnown = report.senderClock?.source && report.receiverClock?.source
-    && report.senderClock.source !== 'SYSTEM' && report.receiverClock.source !== 'SYSTEM';
-  $('pvt-sync-note').textContent = report.clockWarning || (timingKnown ? '내부 시각 근사 보정 적용' : '시험 시각 보정 미확인');
-  $('pvt-sync-note').title = report.senderClock && report.receiverClock
-    ? '송신: ' + report.senderClock.source + ' / 수신: ' + report.receiverClock.source
-      + '\n송신 보정량 ' + report.senderClock.offsetSeconds + ' s / 수신 보정량 ' + report.receiverClock.offsetSeconds + ' s'
-    : '과거 시험 또는 미보정 시각';
   $('pvt-delay-details').hidden = !delayComparison;
   renderClockAnalysis(null);
   referenceEpochs = Array.isArray(report.referencePvt) ? report.referencePvt : [];
@@ -159,6 +151,215 @@ function positionDifference(value) {
     ? measured(value * 1000, 3, 'mm') : measured(value, 6, 'm');
 }
 
+// --- WGS-84 & ENU Coordinate Calculations (100% Offline) ---
+const WGS84_A = 6378137.0;
+const WGS84_F = 1.0 / 298.257223563;
+const WGS84_E2 = WGS84_F * (2.0 - WGS84_F);
+
+function ecefToGeodetic(x, y, z) {
+  if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return null;
+  const p = Math.hypot(x, y);
+  if (p < 1e-6) {
+    const lat = z >= 0 ? 90.0 : -90.0;
+    return { lat, lon: 0.0, alt: Math.abs(z) - 6356752.3142 };
+  }
+  const lon = Math.atan2(y, x);
+  let lat = Math.atan2(z, p * (1 - WGS84_E2));
+  for (let i = 0; i < 5; i++) {
+    const sinLat = Math.sin(lat);
+    const n = WGS84_A / Math.sqrt(1 - WGS84_E2 * sinLat * sinLat);
+    lat = Math.atan2(z + WGS84_E2 * n * sinLat, p);
+  }
+  const sinLat = Math.sin(lat);
+  const n = WGS84_A / Math.sqrt(1 - WGS84_E2 * sinLat * sinLat);
+  const alt = p / Math.cos(lat) - n;
+  return {
+    lat: lat * 180 / Math.PI,
+    lon: lon * 180 / Math.PI,
+    alt: alt
+  };
+}
+
+function ecefDeltaToEnu(dx, dy, dz, refLatDeg, refLonDeg) {
+  const phi = refLatDeg * Math.PI / 180;
+  const lam = refLonDeg * Math.PI / 180;
+  const sPhi = Math.sin(phi), cPhi = Math.cos(phi);
+  const sLam = Math.sin(lam), cLam = Math.cos(lam);
+  const e = -sLam * dx + cLam * dy;
+  const n = -sPhi * cLam * dx - sPhi * sLam * dy + cPhi * dz;
+  const u =  cPhi * cLam * dx + cPhi * sLam * dy + sPhi * dz;
+  return { e, n, u };
+}
+
+function formatGeoCoord(deg, isLat) {
+  if (!Number.isFinite(deg)) return '—';
+  const hemi = isLat ? (deg >= 0 ? 'N' : 'S') : (deg >= 0 ? 'E' : 'W');
+  const abs = Math.abs(deg);
+  const d = Math.floor(abs);
+  const m = Math.floor((abs - d) * 60);
+  const s = ((abs - d) * 60 - m) * 60;
+  return `${d}° ${m}' ${s.toFixed(4)}" ${hemi} (${abs.toFixed(7)}°)`;
+}
+
+function formatGeoDelta(deg) {
+  if (!Number.isFinite(deg)) return '—';
+  const abs = Math.abs(deg);
+  if (abs < 1e-9) return '0.0000000°';
+  return (deg >= 0 ? '+' : '-') + abs.toFixed(7) + '°';
+}
+
+function renderGeodeticVisualizer(reference, pvt) {
+  const container = $('pvt-geodetic-visualizer');
+  if (!container) return;
+  const refEcef = reference?.positionValid ? reference.ecefMeters : null;
+  const recEcef = pvt?.positionValid ? pvt.ecefMeters : null;
+  if (!refEcef || !recEcef) {
+    container.hidden = true;
+    return;
+  }
+  container.hidden = false;
+
+  const refGeo = ecefToGeodetic(refEcef[0], refEcef[1], refEcef[2]);
+  const recGeo = ecefToGeodetic(recEcef[0], recEcef[1], recEcef[2]);
+  if (!refGeo || !recGeo) {
+    container.hidden = true;
+    return;
+  }
+
+  $('ref-geo-lat').textContent = formatGeoCoord(refGeo.lat, true);
+  $('ref-geo-lon').textContent = formatGeoCoord(refGeo.lon, false);
+  $('ref-geo-alt').textContent = measured(refGeo.alt, 4, 'm');
+
+  $('rec-geo-lat').textContent = formatGeoCoord(recGeo.lat, true);
+  $('rec-geo-lon').textContent = formatGeoCoord(recGeo.lon, false);
+  $('rec-geo-alt').textContent = measured(recGeo.alt, 4, 'm');
+
+  const dLat = recGeo.lat - refGeo.lat;
+  const dLon = recGeo.lon - refGeo.lon;
+  const dAlt = recGeo.alt - refGeo.alt;
+
+  $('geo-delta-lat').textContent = formatGeoDelta(dLat);
+  $('geo-delta-lon').textContent = formatGeoDelta(dLon);
+  $('geo-delta-alt').textContent = positionDifference(Math.abs(dAlt));
+
+  const dx = recEcef[0] - refEcef[0];
+  const dy = recEcef[1] - refEcef[1];
+  const dz = recEcef[2] - refEcef[2];
+  const enu = ecefDeltaToEnu(dx, dy, dz, refGeo.lat, refGeo.lon);
+
+  const deltaH = Math.hypot(enu.e, enu.n);
+  const deltaU = enu.u;
+  const deltaR = Math.sqrt(dx*dx + dy*dy + dz*dz);
+
+  $('enu-delta-h').textContent = positionDifference(deltaH);
+  $('enu-delta-u').textContent = (deltaU >= 0 ? '+' : '-') + positionDifference(Math.abs(deltaU));
+  if ($('enu-delta-u-card')) $('enu-delta-u-card').textContent = (deltaU >= 0 ? '+' : '-') + positionDifference(Math.abs(deltaU));
+  $('enu-delta-e').textContent = (enu.e >= 0 ? '+' : '-') + positionDifference(Math.abs(enu.e));
+  $('enu-delta-n').textContent = (enu.n >= 0 ? '+' : '-') + positionDifference(Math.abs(enu.n));
+  if ($('enu-delta-r')) $('enu-delta-r').textContent = positionDifference(deltaR);
+
+  let azimuth = (Math.atan2(enu.e, enu.n) * 180 / Math.PI + 360) % 360;
+  let dirText = '— (중심 일치)';
+  if (deltaH >= 0.00005) {
+    const sector = azimuth >= 337.5 || azimuth < 22.5 ? '북 (N)'
+      : azimuth < 67.5 ? '북동 (NE)'
+      : azimuth < 112.5 ? '동 (E)'
+      : azimuth < 157.5 ? '남동 (SE)'
+      : azimuth < 202.5 ? '남 (S)'
+      : azimuth < 247.5 ? '남서 (SW)'
+      : azimuth < 292.5 ? '서 (W)' : '북서 (NW)';
+    dirText = azimuth.toFixed(1) + '° (' + sector + ')';
+  }
+  $('enu-azimuth').textContent = dirText;
+
+  let scaleMeters = 0.001;
+  let scaleLabel = '반경 1.0 mm (초정밀)';
+  if (deltaH > 0.05) {
+    scaleMeters = Math.max(0.1, Math.ceil(deltaH * 1.5 * 10) / 10);
+    scaleLabel = '반경 ' + measured(scaleMeters, 2, 'm');
+  } else if (deltaH > 0.01) {
+    scaleMeters = 0.05;
+    scaleLabel = '반경 50 mm';
+  } else if (deltaH > 0.002) {
+    scaleMeters = 0.01;
+    scaleLabel = '반경 10 mm';
+  } else if (deltaH > 0.001) {
+    scaleMeters = 0.002;
+    scaleLabel = '반경 2.0 mm';
+  }
+  if ($('enu-target-scale')) $('enu-target-scale').textContent = scaleLabel;
+
+  const formatRingDist = (m) => {
+    if (m < 0.01) return (m * 1000).toFixed(m * 1000 >= 1 ? 1 : 2) + ' mm';
+    if (m < 1) return (m * 100).toFixed(1) + ' cm';
+    return m.toFixed(2) + ' m';
+  };
+  if ($('enu-ring-outer-label')) $('enu-ring-outer-label').textContent = formatRingDist(scaleMeters);
+  if ($('enu-ring-mid-label')) $('enu-ring-mid-label').textContent = formatRingDist(scaleMeters * (75/110));
+  if ($('enu-ring-inner-label')) $('enu-ring-inner-label').textContent = formatRingDist(scaleMeters * (40/110));
+
+  const pxX = Math.max(-110, Math.min(110, (enu.e / scaleMeters) * 110));
+  const pxY = Math.max(-110, Math.min(110, (-enu.n / scaleMeters) * 110));
+
+  const vectorLine = $('enu-vector-line');
+  const targetPoint = $('enu-target-point');
+  const targetPulse = $('enu-target-pulse');
+  const verdictBadge = $('geo-match-verdict');
+
+  if (vectorLine && targetPoint) {
+    vectorLine.setAttribute('x1', '0');
+    vectorLine.setAttribute('y1', '0');
+    vectorLine.setAttribute('x2', String(pxX));
+    vectorLine.setAttribute('y2', String(pxY));
+    targetPoint.setAttribute('cx', String(pxX));
+    targetPoint.setAttribute('cy', String(pxY));
+    if (targetPulse) {
+      targetPulse.setAttribute('cx', String(pxX));
+      targetPulse.setAttribute('cy', String(pxY));
+    }
+
+    if (deltaH < 0.00005) {
+      vectorLine.style.opacity = '0';
+      if (targetPulse) targetPulse.style.opacity = '0';
+      targetPoint.setAttribute('class', 'enu-target-point');
+      if (verdictBadge) {
+        verdictBadge.className = 'pvt-gauge-badge badge-perfect';
+        verdictBadge.textContent = '🟢 좌표 완벽 일치';
+      }
+    } else if (deltaR <= 0.05) {
+      vectorLine.style.opacity = '1';
+      vectorLine.style.stroke = '#10b981';
+      vectorLine.setAttribute('marker-end', 'url(#arrow)');
+      if (targetPulse) targetPulse.style.opacity = '1';
+      targetPoint.setAttribute('class', 'enu-target-point');
+      if (verdictBadge) {
+        verdictBadge.className = 'pvt-gauge-badge badge-perfect';
+        verdictBadge.textContent = '🟢 mm급 정밀 일치 (ΔR: ' + positionDifference(deltaR) + ')';
+      }
+    } else if (deltaR <= 1.0) {
+      vectorLine.style.opacity = '1';
+      vectorLine.style.stroke = '#f59e0b';
+      vectorLine.setAttribute('marker-end', 'url(#arrow)');
+      if (targetPulse) targetPulse.style.opacity = '1';
+      targetPoint.setAttribute('class', 'enu-target-point');
+      if (verdictBadge) {
+        verdictBadge.className = 'pvt-gauge-badge badge-acceptable';
+        verdictBadge.textContent = '🟡 양호 (ΔR: ' + positionDifference(deltaR) + ')';
+      }
+    } else {
+      vectorLine.style.opacity = '1';
+      vectorLine.style.stroke = '#ef4444';
+      vectorLine.setAttribute('marker-end', 'url(#arrow-warn)');
+      if (targetPulse) targetPulse.style.opacity = '1';
+      targetPoint.setAttribute('class', 'enu-target-point level-warning');
+      if (verdictBadge) {
+        verdictBadge.className = 'pvt-gauge-badge badge-warning';
+        verdictBadge.textContent = '🔴 편차 발생 (ΔR: ' + positionDifference(deltaR) + ')';
+      }
+    }
+  }
+}
+
 function renderClockAnalysis(delta, reference, pvt) {
   const available = delayComparison && !delayEvidence?.error;
   const seconds = available ? delta?.clockResidualSeconds : null;
@@ -191,6 +392,17 @@ function renderClockAnalysis(delta, reference, pvt) {
   ].join('\n');
 }
 
+function formatCoordDiff(diff) {
+  if (!Number.isFinite(diff)) return '—';
+  const abs = Math.abs(diff);
+  if (abs < 1e-6) return '0.0 mm';
+  const sign = diff >= 0 ? '+' : '-';
+  if (abs < 1.0) {
+    return `${sign}${(abs * 1000).toFixed(1)} mm`;
+  }
+  return `${sign}${abs.toFixed(3)} m`;
+}
+
 function renderEpoch() {
   observations.select(Number($('pvt-epoch').value));
   const pvt = epochs[Number($('pvt-epoch').value)];
@@ -200,55 +412,137 @@ function renderEpoch() {
   $('pvt-differences').textContent = '위치 차이 '+positionDifference(deltaR)+' · 속도 차이 '+measured(deltaV,6,'m/s')
     + (delayComparison ? '' : ' · 시계오차 차이 '+number(delta?.clockDifferenceSeconds,12)+' s');
 
-  const gaugePill = $('pvt-gauge-pill');
-  if (gaugePill) {
-    if (pvt && Number.isFinite(deltaR)) {
-      gaugePill.hidden = false;
-      $('pvt-delta-r-val').textContent = positionDifference(deltaR);
-      $('pvt-delta-v-val').textContent = measured(deltaV, 6, 'm/s');
-      const bar = $('pvt-gauge-bar');
-      const verdict = $('pvt-gauge-verdict');
-      if (deltaR < 0.05) {
-        bar.className = 'pvt-gauge-bar level-perfect';
-        bar.style.width = '100%';
-        verdict.className = 'pvt-gauge-badge badge-perfect';
-        verdict.textContent = '🟢 완벽 일치 (Identical)';
-      } else if (deltaR <= 1.0) {
-        bar.className = 'pvt-gauge-bar level-acceptable';
-        const pct = Math.max(15, Math.min(85, (1.0 - deltaR) * 100));
-        bar.style.width = pct + '%';
-        verdict.className = 'pvt-gauge-badge badge-acceptable';
-        verdict.textContent = '🟡 양호 (Acceptable)';
+  const reference = pvt && (delayComparison ? referenceEpochs[0] : referenceEpochs.find(value => value.week === pvt.week && value.towSeconds === pvt.towSeconds));
+  renderClockAnalysis(delta, reference, pvt);
+  renderGeodeticVisualizer(reference, pvt);
+
+  const position = pvt?.positionValid === true;
+  const velocity = pvt?.velocityValid === true;
+
+  // ECEF X, Y, Z 및 편차 계산
+  ['x', 'y', 'z'].forEach((axis, index) => {
+    const refVal = reference?.positionValid ? reference.ecefMeters?.[index] : null;
+    const recVal = position ? pvt.ecefMeters?.[index] : null;
+    $('reference-' + axis).textContent = number(refVal);
+    $('pvt-' + axis).textContent = number(recVal);
+
+    const diffEl = $('pvt-diff-' + axis);
+    const statusEl = $('pvt-status-' + axis);
+    if (diffEl && statusEl) {
+      if (refVal != null && recVal != null) {
+        const diff = recVal - refVal;
+        diffEl.textContent = formatCoordDiff(diff);
+        const absDiff = Math.abs(diff);
+        if (absDiff <= 0.005) {
+          statusEl.className = 'pvt-table-badge badge-perfect';
+          statusEl.textContent = '🟢 일치';
+        } else if (absDiff <= 0.05) {
+          statusEl.className = 'pvt-table-badge badge-acceptable';
+          statusEl.textContent = '🟡 허용치';
+        } else {
+          statusEl.className = 'pvt-table-badge badge-warning';
+          statusEl.textContent = '🔴 편차';
+        }
       } else {
-        bar.className = 'pvt-gauge-bar level-warning';
-        bar.style.width = '100%';
-        verdict.className = 'pvt-gauge-badge badge-warning';
-        verdict.textContent = '🔴 오차 발생 (Warning)';
+        diffEl.textContent = '—';
+        statusEl.className = 'pvt-table-badge';
+        statusEl.textContent = '—';
+      }
+    }
+  });
+
+  // 수신기 시계 오차 (Clock Bias) 및 지연 흡수 판정
+  const refClock = reference?.positionValid ? reference.receiverClockBiasSeconds : null;
+  const recClock = position ? pvt.receiverClockBiasSeconds : null;
+  renderClockBias($('reference-clock'), refClock);
+  renderClockBias($('pvt-clock'), recClock);
+  const diffClockEl = $('pvt-diff-clock');
+  const statusClockEl = $('pvt-status-clock');
+  if (diffClockEl && statusClockEl) {
+    if (refClock != null && recClock != null) {
+      const diff = recClock - refClock;
+      const sign = diff >= 0 ? '+' : '-';
+      if (delayComparison) {
+        diffClockEl.textContent = `${sign}${Math.abs(diff).toFixed(9)} s (지연 흡수)`;
+        statusClockEl.className = 'pvt-table-badge badge-perfect';
+        statusClockEl.textContent = '🟢 지연 정상 흡수';
+      } else {
+        diffClockEl.textContent = `${sign}${Math.abs(diff).toFixed(9)} s`;
+        if (Math.abs(diff) < 1e-7) {
+          statusClockEl.className = 'pvt-table-badge badge-perfect';
+          statusClockEl.textContent = '🟢 동기 일치';
+        } else {
+          statusClockEl.className = 'pvt-table-badge badge-acceptable';
+          statusClockEl.textContent = '🟡 클록 편차';
+        }
       }
     } else {
-      gaugePill.hidden = true;
+      diffClockEl.textContent = '—';
+      statusClockEl.className = 'pvt-table-badge';
+      statusClockEl.textContent = '—';
     }
   }
 
-  const reference = pvt && (delayComparison ? referenceEpochs[0] : referenceEpochs.find(value => value.week === pvt.week && value.towSeconds === pvt.towSeconds));
-  renderClockAnalysis(delta, reference, pvt);
+  // 속도 (Velocity) X, Y, Z 및 3D 합성치
   ['x', 'y', 'z'].forEach((axis, index) => {
-    $('reference-' + axis).textContent = number(reference?.positionValid ? reference.ecefMeters?.[index] : null);
     $('reference-v' + axis).textContent = number(reference?.velocityValid ? reference.velocityMetersPerSecond?.[index] : null);
-  });
-  renderClockBias($('reference-clock'), reference?.positionValid ? reference.receiverClockBiasSeconds : null);
-  $('reference-satellites').textContent = reference?.satellitesUsed ?? '-';
-  const position = pvt?.positionValid === true;
-  const velocity = pvt?.velocityValid === true;
-  ['x', 'y', 'z'].forEach((axis, index) => {
-    $('pvt-' + axis).textContent = number(position ? pvt.ecefMeters?.[index] : null);
     $('pvt-v' + axis).textContent = number(velocity ? pvt.velocityMetersPerSecond?.[index] : null);
   });
-  $('pvt-satellites').textContent = pvt?.satellitesUsed ?? '-';
-  renderClockBias($('pvt-clock'), position ? pvt.receiverClockBiasSeconds : null);
+  const refV3D = reference?.velocityValid ? Math.hypot(...reference.velocityMetersPerSecond) : null;
+  const recV3D = velocity ? Math.hypot(...pvt.velocityMetersPerSecond) : null;
+  if ($('reference-v-total')) $('reference-v-total').textContent = number(refV3D, 3);
+  if ($('pvt-v-total')) $('pvt-v-total').textContent = number(recV3D, 3);
+  const diffVEl = $('pvt-diff-v');
+  const statusVEl = $('pvt-status-v');
+  if (diffVEl && statusVEl) {
+    if (refV3D != null && recV3D != null) {
+      const vDiff = delta?.velocityDifferenceMetersPerSecond ?? Math.abs(recV3D - refV3D);
+      diffVEl.textContent = measured(vDiff, 6, 'm/s');
+      if (vDiff < 0.001) {
+        statusVEl.className = 'pvt-table-badge badge-perfect';
+        statusVEl.textContent = '🟢 일치';
+      } else if (vDiff < 0.1) {
+        statusVEl.className = 'pvt-table-badge badge-acceptable';
+        statusVEl.textContent = '🟡 양호';
+      } else {
+        statusVEl.className = 'pvt-table-badge badge-warning';
+        statusVEl.textContent = '🔴 편차';
+      }
+    } else {
+      diffVEl.textContent = '—';
+      statusVEl.className = 'pvt-table-badge';
+      statusVEl.textContent = '—';
+    }
+  }
+
+  // 사용 위성수
+  const refSats = reference?.satellitesUsed;
+  const recSats = pvt?.satellitesUsed;
+  $('reference-satellites').textContent = refSats ?? '-';
+  $('pvt-satellites').textContent = recSats ?? '-';
+  const diffSatsEl = $('pvt-diff-satellites');
+  const statusSatsEl = $('pvt-status-satellites');
+  if (diffSatsEl && statusSatsEl) {
+    if (refSats != null && recSats != null) {
+      const satDiff = recSats - refSats;
+      diffSatsEl.textContent = satDiff === 0 ? '동일 (0개)' : (satDiff > 0 ? `+${satDiff}개` : `${satDiff}개`);
+      if (satDiff === 0) {
+        statusSatsEl.className = 'pvt-table-badge badge-perfect';
+        statusSatsEl.textContent = `🟢 ${refSats}기 동일`;
+      } else {
+        statusSatsEl.className = 'pvt-table-badge badge-acceptable';
+        statusSatsEl.textContent = `🟡 ${Math.abs(satDiff)}기 차이`;
+      }
+    } else {
+      diffSatsEl.textContent = '—';
+      statusSatsEl.className = 'pvt-table-badge';
+      statusSatsEl.textContent = '—';
+    }
+  }
+
   pill('pvt-validity', !pvt ? '결과 대기' : '위치 ' + (position ? '유효' : '무효') + ' · 속도 ' + (velocity ? '유효' : '무효'),
     !pvt ? '' : position && velocity ? 'online' : 'warning');
-  $('pvt-message').textContent = pvt?.message || '지구 ECEF · GPS L1 C/A';
+  if ($('pvt-message')) $('pvt-message').textContent = pvt?.message || '지구 ECEF · GPS L1 C/A';
 }
 
 function setEpochs(values, preserve = false) {
@@ -423,7 +717,7 @@ async function renderTest(force = false) {
     if (version !== renderVersion) return;
     setComparison();
     setEpochs([]);
-    $('pvt-message').textContent = 'PVT 조회 실패 · ' + error.message;
+    if ($('pvt-message')) $('pvt-message').textContent = 'PVT 조회 실패 · ' + error.message;
     log('PVT 조회 실패 · ' + error.message);
   }
 }
