@@ -2580,39 +2580,482 @@ button.satellite-select.constellation-badge[aria-pressed="true"] {
 
 .pvt-visualizer-layout {
   display: grid;
-  grid-template-columns: 1fr 2fr;
+  grid-template-columns: minmax(430px, 1.15fr) 2fr;
   gap: 22px;
   align-items: center;
 }
 
-@media (max-width: 960px) {
+@media (max-width: 1100px) {
   .pvt-visualizer-layout {
     grid-template-columns: 1fr;
+    gap: 16px;
   }
 }
 
-/* --- 좌측 (1/3): 고시인성 ENU 레이더 타깃 --- */
+/* --- 좌측: 고시인성 ENU 레이더 타깃 & 3D 큐브 --- */
 .enu-radar-section {
   display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  gap: 10px;
+  position: relative;
+}
+
+/* 좌측 수직 세로 모드 전환 탭 바 */
+.target-view-toggle-bar {
+  display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
+  flex-shrink: 0;
+}
+
+.target-view-toggle {
+  display: flex;
+  flex-direction: column;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  padding: 4px;
+  border-radius: 10px;
+  gap: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.target-toggle-btn {
+  border: 1px solid transparent;
+  background: transparent;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 10px 5px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  line-height: 1.15;
+  text-align: center;
+  width: 48px;
+}
+
+.target-toggle-btn .toggle-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.target-toggle-btn .toggle-text {
+  font-size: 10px;
+  letter-spacing: -0.5px;
+}
+
+.target-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.7);
+  color: #1e293b;
+}
+
+.target-toggle-btn.active {
+  background: #ffffff;
+  color: #1e293b;
+  border-color: #cbd5e1;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
+  font-weight: 800;
+}
+
+.target-content-area {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+}
+
+.target-view-pane {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.target-view-pane[hidden] {
+  display: none !important;
+}
+
+.hud-composite-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
   width: 100%;
 }
 
 .enu-radar-container {
-  width: 100%;
-  max-width: 330px;
-  height: 330px;
+  width: 310px;
+  height: 310px;
+  max-width: 100%;
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
 .enu-radar-container svg {
   width: 100%;
   height: 100%;
   overflow: visible;
+}
+
+/* 수직 고도(ΔU) 슬림 게이지 */
+.hud-alt-gauge-wrap {
+  width: 72px;
+  height: 310px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 4px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.alt-gauge-header, .alt-gauge-footer {
+  width: 100%;
+  text-align: center;
+}
+
+.alt-axis-tag {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #64748b;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.alt-gauge-body {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 6px 0;
+}
+
+.alt-gauge-ticks-col {
+  position: absolute;
+  left: 2px;
+  top: 6px;
+  bottom: 6px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.alt-tick-lbl {
+  font-size: 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: #94a3b8;
+  line-height: 1;
+}
+
+.alt-tick-lbl.mid {
+  font-size: 7.5px;
+  color: #cbd5e1;
+}
+
+.alt-tick-lbl.zero {
+  color: #64748b;
+  font-weight: 700;
+}
+
+.alt-gauge-track {
+  position: relative;
+  width: 9px;
+  height: 94%;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 5px;
+  margin-left: 18px;
+}
+
+.alt-gauge-tick-line {
+  position: absolute;
+  left: -3px;
+  right: -3px;
+  height: 1px;
+  background: #cbd5e1;
+  z-index: 1;
+}
+
+.alt-gauge-tick-line.tick-75 {
+  top: 25%;
+}
+
+.alt-gauge-tick-line.tick-25 {
+  top: 75%;
+}
+
+.alt-gauge-zero-line {
+  position: absolute;
+  top: 50%;
+  left: -5px;
+  right: -5px;
+  height: 2px;
+  background: #475569;
+  z-index: 2;
+  transform: translateY(-50%);
+}
+
+.alt-gauge-bar {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  background: #10b981;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.alt-gauge-thumb {
+  position: absolute;
+  left: 10px;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  z-index: 4;
+  white-space: nowrap;
+}
+
+.alt-thumb-arrow {
+  font-size: 8.5px;
+  color: #0f172a;
+  margin-right: -1px;
+}
+
+.alt-thumb-badge {
+  background: #0f172a;
+  color: #ffffff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 9.5px;
+  font-weight: 800;
+  padding: 2px 4px;
+  border-radius: 4px;
+  letter-spacing: -0.3px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+/* --- 3D 큐브 인터랙티브 뷰 --- */
+.cube-3d-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  max-width: 390px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  margin-bottom: 6px;
+}
+
+.cube-3d-presets {
+  display: inline-flex;
+  gap: 3px;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  padding: 2px;
+  border-radius: 6px;
+}
+
+.cube-preset-btn {
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.cube-preset-btn:hover {
+  background: #e2e8f0;
+  color: #1e293b;
+}
+
+.cube-preset-btn.active {
+  background: #ffffff;
+  color: #1e293b;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  font-weight: 800;
+}
+
+.cube-3d-zoom-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10.5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: #475569;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  padding: 2px 7px;
+  border-radius: 4px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.cube-3d-zoom-badge:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.cube-3d-zoom-badge .zoom-icon {
+  font-size: 10px;
+}
+
+.cube-reset-btn {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #475569;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin-left: 4px;
+}
+
+.cube-reset-btn:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.cube-3d-container {
+  width: 390px;
+  height: 310px;
+  max-width: 100%;
+  background: radial-gradient(circle at 50% 50%, #ffffff 0%, #f8fafc 65%, #f1f5f9 100%);
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  position: relative;
+  cursor: grab;
+  user-select: none;
+  overflow: hidden;
+  touch-action: none;
+}
+
+.cube-3d-container:active {
+  cursor: grabbing;
+}
+
+.cube-3d-container svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.cube-3d-legend {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #475569;
+  margin-top: 6px;
+  width: 100%;
+  max-width: 390px;
+  flex-wrap: wrap;
+}
+
+.cube-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.legend-color-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+/* 타깃 정밀 오차 호버 인스펙터 */
+.pvt-target-tooltip {
+  position: absolute;
+  z-index: 1000;
+  background: rgba(15, 23, 42, 0.94);
+  color: #f8fafc;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 11px;
+  line-height: 1.5;
+  pointer-events: none;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(4px);
+  white-space: nowrap;
+  transform: translate(-50%, -105%);
+  transition: opacity 0.15s ease;
+}
+
+.pvt-target-tooltip .tooltip-title {
+  font-weight: 800;
+  font-size: 11.5px;
+  color: #38bdf8;
+  border-bottom: 1px solid #334155;
+  padding-bottom: 3px;
+  margin-bottom: 5px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.pvt-target-tooltip .tooltip-row {
+  display: flex;
+  gap: 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.pvt-target-tooltip .tooltip-label {
+  color: #94a3b8;
+}
+
+.pvt-target-tooltip .tooltip-val {
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.pvt-target-tooltip .highlight-u {
+  color: #fbbf24;
+}
+
+.pvt-target-tooltip .highlight-r {
+  color: #34d399;
+}
+
+.cube-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.legend-color-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
 }
 
 .enu-ring {
@@ -2662,25 +3105,36 @@ button.satellite-select.constellation-badge[aria-pressed="true"] {
 
 .enu-cardinal-label {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  font-size: 13px;
+  font-size: 11.5px;
   font-weight: 700;
-  fill: #334155;
+  fill: #475569;
   text-anchor: middle;
   dominant-baseline: central;
 }
 
 .enu-cardinal-label.cardinal-n {
   fill: #1d4ed8;
-  font-size: 14px;
+  font-size: 12.5px;
   font-weight: 800;
+  text-anchor: middle;
 }
 
 .enu-cardinal-label.cardinal-e {
-  text-anchor: start;
+  text-anchor: end;
+  fill: #2563eb;
+  font-weight: 700;
 }
 
 .enu-cardinal-label.cardinal-w {
-  text-anchor: end;
+  text-anchor: start;
+  fill: #64748b;
+  font-weight: 700;
+}
+
+.enu-cardinal-label.cardinal-s {
+  text-anchor: middle;
+  fill: #64748b;
+  font-weight: 700;
 }
 
 .enu-center-halo {
@@ -2741,20 +3195,22 @@ button.satellite-select.constellation-badge[aria-pressed="true"] {
 
 .radar-summary-item {
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  font-size: 11px;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .radar-summary-item .summary-label {
   color: #64748b;
+  font-size: 11px;
+  white-space: nowrap;
 }
 
 .radar-summary-item .summary-val {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 800;
   color: #0f172a;
+  white-space: nowrap;
 }
 
 /* --- 우측: WGS-84 대조 및 국소 ENU 성분 분해 --- */
@@ -2800,6 +3256,7 @@ button.satellite-select.constellation-badge[aria-pressed="true"] {
   font-weight: 700;
   color: #475569;
   border-bottom: 1px solid #e2e8f0;
+  font-size: 12px;
 }
 
 .wgs84-table td {

@@ -208,6 +208,333 @@ function formatGeoDelta(deg) {
   return (deg >= 0 ? '+' : '-') + abs.toFixed(7) + '°';
 }
 
+// --- 3D 및 HUD 뷰 상태 변수 ---
+let targetViewMode = 'hud'; // 'hud' | '3d'
+let cubeYaw = 0.65; // 약 37도
+let cubePitch = 0.42; // 약 24도
+let cubeZoom = 1.0; // 줌 배율 (0.5x ~ 4.0x)
+let lastEnuData = null; // { e, n, u, deltaH, deltaU, deltaR, dx, dy, dz }
+
+function setTargetViewMode(mode) {
+  targetViewMode = mode;
+  const isHud = mode === 'hud';
+  const btnHud = $('btn-view-hud');
+  const btn3d = $('btn-view-3d');
+  const paneHud = $('target-view-hud');
+  const pane3d = $('target-view-3d');
+
+  if (btnHud) {
+    btnHud.classList.toggle('active', isHud);
+    btnHud.setAttribute('aria-selected', isHud ? 'true' : 'false');
+  }
+  if (btn3d) {
+    btn3d.classList.toggle('active', !isHud);
+    btn3d.setAttribute('aria-selected', !isHud ? 'true' : 'false');
+  }
+  if (paneHud) paneHud.hidden = !isHud;
+  if (pane3d) pane3d.hidden = isHud;
+
+  if (!isHud && lastEnuData) {
+    render3DCube(lastEnuData);
+  }
+}
+
+function project3D(xn, yn, zn, yaw, pitch, cx, cy, rPx) {
+  const x1 = xn * Math.cos(yaw) - yn * Math.sin(yaw);
+  const y1 = xn * Math.sin(yaw) + yn * Math.cos(yaw);
+  const z1 = zn;
+  const sx = cx + x1 * rPx;
+  const sy = cy - (z1 * Math.cos(pitch) + y1 * Math.sin(pitch)) * rPx;
+  return { x: sx, y: sy };
+}
+
+function buildTooltipHtml(data) {
+  if (!data) return '';
+  return `
+    <div class="tooltip-title">
+      <span>🎯 타깃 정밀 오차 인스펙터</span>
+      <span class="highlight-r">ΔR ${positionDifference(data.deltaR)}</span>
+    </div>
+    <div class="tooltip-row"><span class="tooltip-label">국소 동서 (E):</span><span class="tooltip-val">${(data.e >= 0 ? '+' : '-') + positionDifference(Math.abs(data.e))}</span></div>
+    <div class="tooltip-row"><span class="tooltip-label">국소 남북 (N):</span><span class="tooltip-val">${(data.n >= 0 ? '+' : '-') + positionDifference(Math.abs(data.n))}</span></div>
+    <div class="tooltip-row"><span class="tooltip-label">국소 고도 (U):</span><span class="tooltip-val highlight-u">${(data.u >= 0 ? '+' : '-') + positionDifference(Math.abs(data.u))}</span></div>
+    <div class="tooltip-row"><span class="tooltip-label">수평 편차 (ΔH):</span><span class="tooltip-val">${positionDifference(data.deltaH)}</span></div>
+    ${data.dx != null ? `<div class="tooltip-row" style="margin-top:3px;border-top:1px dashed #334155;padding-top:3px;"><span class="tooltip-label">ECEF ΔX/Y/Z:</span><span class="tooltip-val">${(data.dx*1000).toFixed(1)} / ${(data.dy*1000).toFixed(1)} / ${(data.dz*1000).toFixed(1)} mm</span></div>` : ''}
+  `;
+}
+
+function showTargetTooltip(e, data) {
+  const tooltip = $('pvt-target-tooltip');
+  if (!tooltip || !data) return;
+  tooltip.innerHTML = buildTooltipHtml(data);
+  tooltip.hidden = false;
+  const container = $('pvt-geodetic-visualizer') || document.body;
+  const rect = container.getBoundingClientRect();
+  tooltip.style.left = (e.clientX - rect.left) + 'px';
+  tooltip.style.top = (e.clientY - rect.top - 12) + 'px';
+}
+
+function hideTargetTooltip() {
+  const tooltip = $('pvt-target-tooltip');
+  if (tooltip) tooltip.hidden = true;
+}
+
+function render3DCube(data) {
+  const svg = $('cube-3d-svg');
+  if (!svg || !data) return;
+
+  const cx = 195, cy = 155;
+  const rPx = 110 * cubeZoom;
+
+  const maxC = Math.max(Math.abs(data.e), Math.abs(data.n), Math.abs(data.u), 0.0001);
+  let boxRange = 0.001;
+  if (maxC > 0.05) boxRange = Math.max(0.1, Math.ceil(maxC * 1.3 * 10) / 10);
+  else if (maxC > 0.01) boxRange = 0.05;
+  else if (maxC > 0.005) boxRange = 0.01;
+  else if (maxC > 0.002) boxRange = 0.005;
+  else if (maxC > 0.001) boxRange = 0.002;
+
+  const formatRingDist = (m) => {
+    if (m < 0.01) return (m * 1000).toFixed(m * 1000 >= 1 ? 1 : 2) + ' mm';
+    if (m < 1) return (m * 100).toFixed(1) + ' cm';
+    return m.toFixed(2) + ' m';
+  };
+
+  const project = (xn, yn, zn) => project3D(xn, yn, zn, cubeYaw, cubePitch, cx, cy, rPx);
+
+  const en = Math.max(-1.18, Math.min(1.18, data.e / boxRange));
+  const nn = Math.max(-1.18, Math.min(1.18, data.n / boxRange));
+  const un = Math.max(-1.18, Math.min(1.18, data.u / boxRange));
+
+  const p0 = project(0, 0, 0);
+  const pE = project(1.18, 0, 0);
+  const pN = project(0, 1.18, 0);
+  const pU = project(0, 0, 1.18);
+
+  // Wireframe box 8 corners
+  const c000 = project(-1, -1, -1);
+  const c100 = project(1, -1, -1);
+  const c110 = project(1, 1, -1);
+  const c010 = project(-1, 1, -1);
+  const c001 = project(-1, -1, 1);
+  const c101 = project(1, -1, 1);
+  const c111 = project(1, 1, 1);
+  const c011 = project(-1, 1, 1);
+
+  // Ground plane 4 corners (Z = 0)
+  const g00 = project(-1, -1, 0);
+  const g10 = project(1, -1, 0);
+  const g11 = project(1, 1, 0);
+  const g01 = project(-1, 1, 0);
+
+  // Ground sub-grid lines
+  const gridLines = [];
+  for (const t of [-0.5, 0.5]) {
+    const l1a = project(t, -1, 0);
+    const l1b = project(t, 1, 0);
+    gridLines.push(`<line x1="${l1a.x.toFixed(1)}" y1="${l1a.y.toFixed(1)}" x2="${l1b.x.toFixed(1)}" y2="${l1b.y.toFixed(1)}" stroke="#cbd5e1" stroke-width="0.8" stroke-dasharray="2,2"/>`);
+    const l2a = project(-1, t, 0);
+    const l2b = project(1, t, 0);
+    gridLines.push(`<line x1="${l2a.x.toFixed(1)}" y1="${l2a.y.toFixed(1)}" x2="${l2b.x.toFixed(1)}" y2="${l2b.y.toFixed(1)}" stroke="#cbd5e1" stroke-width="0.8" stroke-dasharray="2,2"/>`);
+  }
+
+  // Target points
+  const pTarget = project(en, nn, un);
+  const pGround = project(en, nn, 0);
+
+  const isWarn = data.deltaR > 0.05;
+  const isErr = data.deltaR > 1.0;
+  const targetColor = isErr ? '#ef4444' : isWarn ? '#f59e0b' : '#10b981';
+
+  svg.innerHTML = `
+    <defs>
+      <marker id="arrow-3d-e" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+        <path d="M 0 1.5 L 10 5 L 0 8.5 z" fill="#2563eb"/>
+      </marker>
+      <marker id="arrow-3d-n" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+        <path d="M 0 1.5 L 10 5 L 0 8.5 z" fill="#059669"/>
+      </marker>
+      <marker id="arrow-3d-u" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+        <path d="M 0 1.5 L 10 5 L 0 8.5 z" fill="#d97706"/>
+      </marker>
+      <marker id="arrow-3d-vec" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M 0 1.5 L 10 5 L 0 8.5 z" fill="${targetColor}"/>
+      </marker>
+    </defs>
+
+    <!-- Bounding Wireframe Box -->
+    <g stroke="#cbd5e1" stroke-width="1" stroke-dasharray="3,3" opacity="0.6">
+      <line x1="${c000.x.toFixed(1)}" y1="${c000.y.toFixed(1)}" x2="${c100.x.toFixed(1)}" y2="${c100.y.toFixed(1)}" />
+      <line x1="${c100.x.toFixed(1)}" y1="${c100.y.toFixed(1)}" x2="${c110.x.toFixed(1)}" y2="${c110.y.toFixed(1)}" />
+      <line x1="${c110.x.toFixed(1)}" y1="${c110.y.toFixed(1)}" x2="${c010.x.toFixed(1)}" y2="${c010.y.toFixed(1)}" />
+      <line x1="${c010.x.toFixed(1)}" y1="${c010.y.toFixed(1)}" x2="${c000.x.toFixed(1)}" y2="${c000.y.toFixed(1)}" />
+      <line x1="${c000.x.toFixed(1)}" y1="${c000.y.toFixed(1)}" x2="${c001.x.toFixed(1)}" y2="${c001.y.toFixed(1)}" />
+      <line x1="${c100.x.toFixed(1)}" y1="${c100.y.toFixed(1)}" x2="${c101.x.toFixed(1)}" y2="${c101.y.toFixed(1)}" />
+      <line x1="${c110.x.toFixed(1)}" y1="${c110.y.toFixed(1)}" x2="${c111.x.toFixed(1)}" y2="${c111.y.toFixed(1)}" />
+      <line x1="${c010.x.toFixed(1)}" y1="${c010.y.toFixed(1)}" x2="${c011.x.toFixed(1)}" y2="${c011.y.toFixed(1)}" />
+      <line x1="${c001.x.toFixed(1)}" y1="${c001.y.toFixed(1)}" x2="${c101.x.toFixed(1)}" y2="${c101.y.toFixed(1)}" />
+      <line x1="${c101.x.toFixed(1)}" y1="${c101.y.toFixed(1)}" x2="${c111.x.toFixed(1)}" y2="${c111.y.toFixed(1)}" />
+      <line x1="${c111.x.toFixed(1)}" y1="${c111.y.toFixed(1)}" x2="${c011.x.toFixed(1)}" y2="${c011.y.toFixed(1)}" />
+      <line x1="${c011.x.toFixed(1)}" y1="${c011.y.toFixed(1)}" x2="${c001.x.toFixed(1)}" y2="${c001.y.toFixed(1)}" />
+    </g>
+
+    <!-- Ground Plane (Z = 0) -->
+    <polygon points="${g00.x.toFixed(1)},${g00.y.toFixed(1)} ${g10.x.toFixed(1)},${g10.y.toFixed(1)} ${g11.x.toFixed(1)},${g11.y.toFixed(1)} ${g01.x.toFixed(1)},${g01.y.toFixed(1)}" fill="rgba(241, 245, 249, 0.75)" stroke="#94a3b8" stroke-width="1.2" />
+    ${gridLines.join('\n')}
+
+    <!-- Principal Axes at Origin -->
+    <line x1="${p0.x.toFixed(1)}" y1="${p0.y.toFixed(1)}" x2="${pE.x.toFixed(1)}" y2="${pE.y.toFixed(1)}" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow-3d-e)" />
+    <text x="${(pE.x + 6).toFixed(1)}" y="${(pE.y + 3).toFixed(1)}" fill="#2563eb" font-size="11" font-weight="800" font-family="sans-serif">+E</text>
+
+    <line x1="${p0.x.toFixed(1)}" y1="${p0.y.toFixed(1)}" x2="${pN.x.toFixed(1)}" y2="${pN.y.toFixed(1)}" stroke="#059669" stroke-width="2" marker-end="url(#arrow-3d-n)" />
+    <text x="${(pN.x - 6).toFixed(1)}" y="${(pN.y - 4).toFixed(1)}" fill="#059669" font-size="11" font-weight="800" font-family="sans-serif">+N</text>
+
+    <line x1="${p0.x.toFixed(1)}" y1="${p0.y.toFixed(1)}" x2="${pU.x.toFixed(1)}" y2="${pU.y.toFixed(1)}" stroke="#d97706" stroke-width="2" marker-end="url(#arrow-3d-u)" />
+    <text x="${pU.x.toFixed(1)}" y="${(pU.y - 6).toFixed(1)}" fill="#d97706" font-size="11" font-weight="800" font-family="sans-serif" text-anchor="middle">+U</text>
+
+    <!-- Reference Origin Point (0,0,0) -->
+    <circle cx="${p0.x.toFixed(1)}" cy="${p0.y.toFixed(1)}" r="3.5" fill="#2563eb" stroke="#ffffff" stroke-width="1.5" />
+    <text x="${(p0.x - 6).toFixed(1)}" y="${(p0.y + 12).toFixed(1)}" fill="#475569" font-size="9" font-weight="700" font-family="sans-serif">기준(0,0,0)</text>
+
+    <!-- Target Ground Footprint & Projection Shadow -->
+    <line x1="${p0.x.toFixed(1)}" y1="${p0.y.toFixed(1)}" x2="${pGround.x.toFixed(1)}" y2="${pGround.y.toFixed(1)}" stroke="#94a3b8" stroke-width="1.2" stroke-dasharray="3,2" />
+    <ellipse cx="${pGround.x.toFixed(1)}" cy="${pGround.y.toFixed(1)}" rx="4.5" ry="3" fill="rgba(16, 185, 129, 0.35)" stroke="${targetColor}" stroke-width="1" stroke-dasharray="2,2" />
+
+    <!-- Vertical Drop Line from Ground (en, nn, 0) to Target (en, nn, un) -->
+    <line x1="${pGround.x.toFixed(1)}" y1="${pGround.y.toFixed(1)}" x2="${pTarget.x.toFixed(1)}" y2="${pTarget.y.toFixed(1)}" stroke="${targetColor}" stroke-width="1.8" stroke-dasharray="3,2" />
+
+    <!-- 3D Direct Deviation Vector (0,0,0) -> (en, nn, un) -->
+    <line x1="${p0.x.toFixed(1)}" y1="${p0.y.toFixed(1)}" x2="${pTarget.x.toFixed(1)}" y2="${pTarget.y.toFixed(1)}" stroke="${targetColor}" stroke-width="2.2" marker-end="url(#arrow-3d-vec)" />
+
+    <!-- Target Point Dot -->
+    <circle cx="${pTarget.x.toFixed(1)}" cy="${pTarget.y.toFixed(1)}" r="10" fill="${targetColor}" fill-opacity="0.2" />
+    <circle id="cube-target-dot" cx="${pTarget.x.toFixed(1)}" cy="${pTarget.y.toFixed(1)}" r="5.5" fill="${targetColor}" stroke="#ffffff" stroke-width="1.8" style="cursor: pointer;" />
+
+    <!-- Floating Target Badge -->
+    <g transform="translate(${(pTarget.x + 8).toFixed(1)}, ${(pTarget.y - 18).toFixed(1)})">
+      <rect x="0" y="0" width="86" height="26" rx="4" fill="rgba(15, 23, 42, 0.88)" />
+      <text x="6" y="11" fill="#f8fafc" font-size="8.5" font-family="monospace" font-weight="700">ΔR ${positionDifference(data.deltaR)}</text>
+      <text x="6" y="21" fill="#38bdf8" font-size="8" font-family="monospace">ΔU ${(data.deltaU >= 0 ? '+' : '')}${positionDifference(Math.abs(data.deltaU))}</text>
+    </g>
+
+    <!-- Top Left Range Marker -->
+    <text x="10" y="18" fill="#64748b" font-size="10" font-family="monospace" font-weight="600">격자: ±${formatRingDist(boxRange)} (${cubeZoom.toFixed(1)}x)</text>
+  `;
+
+  // Attach hover inspector on cube target dot
+  const dot = svg.querySelector('#cube-target-dot');
+  if (dot) {
+    dot.addEventListener('mouseenter', (e) => showTargetTooltip(e, data));
+    dot.addEventListener('mousemove', (e) => showTargetTooltip(e, data));
+    dot.addEventListener('mouseleave', hideTargetTooltip);
+  }
+}
+
+let cubeDragInitialized = false;
+function initCubeInteraction() {
+  if (cubeDragInitialized) return;
+  cubeDragInitialized = true;
+
+  const btnHud = $('btn-view-hud');
+  const btn3d = $('btn-view-3d');
+  const btnReset = $('btn-reset-3d');
+  const btnIso = $('btn-preset-iso');
+  const btnTop = $('btn-preset-top');
+  const btnSide = $('btn-preset-side');
+  const zoomBadge = $('cube-zoom-container');
+  const wrap = $('cube-3d-wrap');
+
+  if (btnHud) btnHud.onclick = () => setTargetViewMode('hud');
+  if (btn3d) btn3d.onclick = () => setTargetViewMode('3d');
+
+  const updatePresetButtons = (activePreset) => {
+    [btnIso, btnTop, btnSide].forEach(btn => btn?.classList.remove('active'));
+    if (activePreset === 'iso') btnIso?.classList.add('active');
+    else if (activePreset === 'top') btnTop?.classList.add('active');
+    else if (activePreset === 'side') btnSide?.classList.add('active');
+  };
+
+  if (btnIso) btnIso.onclick = () => {
+    cubeYaw = 0.65; cubePitch = 0.42; updatePresetButtons('iso');
+    if (lastEnuData) render3DCube(lastEnuData);
+  };
+  if (btnTop) btnTop.onclick = () => {
+    cubeYaw = 0.0; cubePitch = 1.55; updatePresetButtons('top');
+    if (lastEnuData) render3DCube(lastEnuData);
+  };
+  if (btnSide) btnSide.onclick = () => {
+    cubeYaw = 0.0; cubePitch = 0.04; updatePresetButtons('side');
+    if (lastEnuData) render3DCube(lastEnuData);
+  };
+
+  const resetView = () => {
+    cubeYaw = 0.65; cubePitch = 0.42; cubeZoom = 1.0;
+    if ($('cube-zoom-val')) $('cube-zoom-val').textContent = '1.0x';
+    updatePresetButtons('iso');
+    if (lastEnuData) render3DCube(lastEnuData);
+  };
+
+  if (btnReset) btnReset.onclick = resetView;
+  if (zoomBadge) zoomBadge.ondblclick = resetView;
+
+  if (wrap) {
+    let isDragging = false;
+    let startX = 0;
+    let startY = 0;
+
+    wrap.addEventListener('pointerdown', (e) => {
+      isDragging = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      try { wrap.setPointerCapture?.(e.pointerId); } catch {}
+    });
+
+    wrap.addEventListener('pointermove', (e) => {
+      if (!isDragging) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      startX = e.clientX;
+      startY = e.clientY;
+
+      cubeYaw += dx * 0.015;
+      cubePitch = Math.max(0.04, Math.min(1.55, cubePitch + dy * 0.015));
+      updatePresetButtons(null);
+
+      if (lastEnuData) render3DCube(lastEnuData);
+    });
+
+    const stopDrag = (e) => {
+      if (!isDragging) return;
+      isDragging = false;
+      try { wrap.releasePointerCapture?.(e.pointerId); } catch {}
+    };
+
+    wrap.addEventListener('pointerup', stopDrag);
+    wrap.addEventListener('pointercancel', stopDrag);
+
+    // Mouse wheel zoom
+    wrap.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const factor = e.deltaY < 0 ? 1.15 : 0.87;
+      cubeZoom = Math.max(0.5, Math.min(4.0, cubeZoom * factor));
+      if ($('cube-zoom-val')) $('cube-zoom-val').textContent = cubeZoom.toFixed(1) + 'x';
+      if (lastEnuData) render3DCube(lastEnuData);
+    }, { passive: false });
+  }
+
+  // Hover inspector on 2D radar point
+  const radarPoint = $('enu-target-point');
+  if (radarPoint) {
+    radarPoint.addEventListener('mouseenter', (e) => {
+      if (lastEnuData) showTargetTooltip(e, lastEnuData);
+    });
+    radarPoint.addEventListener('mousemove', (e) => {
+      if (lastEnuData) showTargetTooltip(e, lastEnuData);
+    });
+    radarPoint.addEventListener('mouseleave', hideTargetTooltip);
+  }
+}
+
 function renderGeodeticVisualizer(reference, pvt) {
   const container = $('pvt-geodetic-visualizer');
   if (!container) return;
@@ -294,12 +621,13 @@ function renderGeodeticVisualizer(reference, pvt) {
     if (m < 1) return (m * 100).toFixed(1) + ' cm';
     return m.toFixed(2) + ' m';
   };
+  const outerRadius = 140;
   if ($('enu-ring-outer-label')) $('enu-ring-outer-label').textContent = formatRingDist(scaleMeters);
-  if ($('enu-ring-mid-label')) $('enu-ring-mid-label').textContent = formatRingDist(scaleMeters * (75/110));
-  if ($('enu-ring-inner-label')) $('enu-ring-inner-label').textContent = formatRingDist(scaleMeters * (40/110));
+  if ($('enu-ring-mid-label')) $('enu-ring-mid-label').textContent = formatRingDist(scaleMeters * (95/140));
+  if ($('enu-ring-inner-label')) $('enu-ring-inner-label').textContent = formatRingDist(scaleMeters * (50/140));
 
-  const pxX = Math.max(-110, Math.min(110, (enu.e / scaleMeters) * 110));
-  const pxY = Math.max(-110, Math.min(110, (-enu.n / scaleMeters) * 110));
+  const pxX = Math.max(-outerRadius, Math.min(outerRadius, (enu.e / scaleMeters) * outerRadius));
+  const pxY = Math.max(-outerRadius, Math.min(outerRadius, (-enu.n / scaleMeters) * outerRadius));
 
   const vectorLine = $('enu-vector-line');
   const targetPoint = $('enu-target-point');
@@ -357,6 +685,57 @@ function renderGeodeticVisualizer(reference, pvt) {
         verdictBadge.textContent = '🔴 편차 발생 (ΔR: ' + positionDifference(deltaR) + ')';
       }
     }
+  }
+
+  // 수직 고도(ΔU) 슬림 게이지 업데이트 - 5단계 눈금 틱
+  let altRange = 0.005;
+  if (Math.abs(deltaU) > 0.05) {
+    altRange = Math.max(0.1, Math.ceil(Math.abs(deltaU) * 1.3 * 10) / 10);
+  } else if (Math.abs(deltaU) > 0.01) {
+    altRange = 0.05;
+  } else if (Math.abs(deltaU) > 0.005) {
+    altRange = 0.01;
+  } else if (Math.abs(deltaU) > 0.002) {
+    altRange = 0.005;
+  } else if (Math.abs(deltaU) > 0.001) {
+    altRange = 0.002;
+  }
+
+  if ($('alt-tick-top')) $('alt-tick-top').textContent = '+' + formatRingDist(altRange);
+  if ($('alt-tick-mid-top')) $('alt-tick-mid-top').textContent = '+' + formatRingDist(altRange * 0.5);
+  if ($('alt-tick-mid-bottom')) $('alt-tick-mid-bottom').textContent = '-' + formatRingDist(altRange * 0.5);
+  if ($('alt-tick-bottom')) $('alt-tick-bottom').textContent = '-' + formatRingDist(altRange);
+
+  const altBar = $('alt-gauge-bar');
+  const altThumb = $('alt-gauge-thumb');
+  const altThumbVal = $('alt-gauge-thumb-val');
+
+  if (altThumbVal) {
+    altThumbVal.textContent = (deltaU >= 0 ? '+' : '-') + positionDifference(Math.abs(deltaU));
+  }
+
+  const uNorm = Math.max(-1, Math.min(1, deltaU / altRange));
+  const thumbTopPct = 50 - uNorm * 46;
+  if (altThumb) {
+    altThumb.style.top = thumbTopPct.toFixed(1) + '%';
+  }
+
+  if (altBar) {
+    if (deltaU >= 0) {
+      altBar.style.top = thumbTopPct.toFixed(1) + '%';
+      altBar.style.height = (50 - thumbTopPct).toFixed(1) + '%';
+      altBar.style.background = deltaR <= 0.05 ? '#10b981' : deltaR <= 1.0 ? '#f59e0b' : '#ef4444';
+    } else {
+      altBar.style.top = '50%';
+      altBar.style.height = (thumbTopPct - 50).toFixed(1) + '%';
+      altBar.style.background = deltaR <= 0.05 ? '#3b82f6' : deltaR <= 1.0 ? '#f59e0b' : '#ef4444';
+    }
+  }
+
+  // 3D 큐브 데이터 갱신 및 렌더링
+  lastEnuData = { e: enu.e, n: enu.n, u: deltaU, deltaH, deltaU, deltaR, dx, dy, dz };
+  if (targetViewMode === '3d') {
+    render3DCube(lastEnuData);
   }
 }
 
@@ -801,6 +1180,7 @@ function updateAdapterStripPill(text, tone, className) {
 }
 
 async function initialize() {
+  initCubeInteraction();
   trialDialogHandler = initTrialSettingsDialog(() => tests.find(item => item.testId === $('dtn-tests').value));
   if ($('dtn-adapter-strip-status')) {
     $('dtn-adapter-strip-status').style.cursor = 'pointer';

@@ -156,68 +156,148 @@
     <div id="pvt-geodetic-visualizer" class="pvt-geodetic-visualizer" hidden>
       <div class="pvt-visualizer-card">
         <div class="pvt-visualizer-layout">
-          <!-- 좌측 (1/3): 고시인성 국소 ENU 레이더 타깃 -->
+          <!-- 좌측 (1/3): 고시인성 국소 ENU 레이더 타깃 & 3D 큐브 -->
           <div class="enu-radar-section">
-            <div class="enu-radar-container">
-              <svg id="enu-target-svg" viewBox="-185 -185 370 370" aria-label="ENU 편차 타깃">
-                <defs>
-                  <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                    <path d="M 0 1.5 L 10 5 L 0 8.5 z" fill="#10b981"/>
-                  </marker>
-                  <marker id="arrow-warn" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                    <path d="M 0 1.5 L 10 5 L 0 8.5 z" fill="#ef4444"/>
-                  </marker>
-                  <radialGradient id="radar-bg" cx="50%" cy="50%" r="50%">
-                    <stop offset="0%" stop-color="#ffffff" stop-opacity="0.95" />
-                    <stop offset="70%" stop-color="#f8fafc" stop-opacity="0.85" />
-                    <stop offset="100%" stop-color="#e2e8f0" stop-opacity="0.9" />
-                  </radialGradient>
-                </defs>
-
-                <!-- 레이더 배경 바탕 원 -->
-                <circle cx="0" cy="0" r="115" fill="url(#radar-bg)" />
-
-                <!-- 동심원 링 (110, 75, 40) -->
-                <circle cx="0" cy="0" r="110" class="enu-ring ring-outer" />
-                <circle cx="0" cy="0" r="75" class="enu-ring ring-mid" />
-                <circle cx="0" cy="0" r="40" class="enu-ring ring-inner" />
-
-                <!-- 45도 보조 점선 축 -->
-                <line x1="-78" y1="-78" x2="78" y2="78" class="enu-diagonal" />
-                <line x1="-78" y1="78" x2="78" y2="-78" class="enu-diagonal" />
-
-                <!-- 십자 주 축선 -->
-                <line x1="-115" y1="0" x2="115" y2="0" class="enu-axis" />
-                <line x1="0" y1="-115" x2="0" y2="115" class="enu-axis" />
-
-                <!-- 동심원 반경 눈금 라벨 -->
-                <text id="enu-ring-outer-label" x="5" y="-112" class="enu-ring-label">1.0 mm</text>
-                <text id="enu-ring-mid-label" x="5" y="-77" class="enu-ring-label">0.67 mm</text>
-                <text id="enu-ring-inner-label" x="5" y="-42" class="enu-ring-label">0.33 mm</text>
-
-                <!-- 방위 지시 화살표 & 라벨 (초대형 고시인성) -->
-                <polygon points="0,-142 -6,-132 6,-132" class="enu-pointer-n" />
-                <text x="0" y="-120" class="enu-cardinal-label cardinal-n">▲ N (+North)</text>
-
-                <polygon points="142,0 132,-6 132,6" class="enu-pointer-e" />
-                <text x="118" y="3" class="enu-cardinal-label cardinal-e">E (+East) ▶</text>
-
-                <polygon points="0,142 -6,132 6,132" class="enu-pointer-s" />
-                <text x="0" y="122" class="enu-cardinal-label cardinal-s">▼ S (-South)</text>
-
-                <polygon points="-142,0 -132,-6 -132,6" class="enu-pointer-w" />
-                <text x="-118" y="3" class="enu-cardinal-label cardinal-w">◀ W (-West)</text>
-
-                <!-- 송신 기준 중심점 (0,0) -->
-                <circle cx="0" cy="0" r="7" class="enu-center-halo" />
-                <circle cx="0" cy="0" r="3.5" class="enu-center-point" title="송신 기준 원점 (0, 0)" />
-
-                <!-- 편차 벡터 선 및 수신 복원 타깃 점 -->
-                <line id="enu-vector-line" x1="0" y1="0" x2="0" y2="0" class="enu-vector-line" />
-                <circle id="enu-target-pulse" cx="0" cy="0" r="12" class="enu-target-pulse" />
-                <circle id="enu-target-point" cx="0" cy="0" r="6" class="enu-target-point" title="수신 복원 위치" />
-              </svg>
+            <!-- 좌측 세로 모드 전환 탭 바 -->
+            <div class="target-view-toggle-bar">
+              <div class="target-view-toggle" role="tablist" aria-label="타깃 표시 모드">
+                <button type="button" id="btn-view-hud" class="target-toggle-btn active" role="tab" aria-selected="true" title="수평 2D 레이더 + 수직 고도 게이지 동시 판독">
+                  <span class="toggle-icon">🎯</span>
+                  <span class="toggle-text">레이더<br>HUD</span>
+                </button>
+                <button type="button" id="btn-view-3d" class="target-toggle-btn" role="tab" aria-selected="false" title="3D 입체 공간 및 360° 마우스 드래그 회전">
+                  <span class="toggle-icon">🧊</span>
+                  <span class="toggle-text">3D<br>큐브</span>
+                </button>
+              </div>
             </div>
+
+            <!-- 메인 시각화 영역 (대형화) -->
+            <div class="target-content-area">
+              <!-- View 1: 레이더 HUD (수평 원형 레이더 + 수직 고도 바 복합 뷰) -->
+              <div id="target-view-hud" class="target-view-pane active">
+                <div class="hud-composite-wrap">
+                  <div class="enu-radar-container">
+                    <svg id="enu-target-svg" viewBox="-185 -185 370 370" aria-label="ENU 편차 타깃">
+                      <defs>
+                        <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                          <path d="M 0 1.5 L 10 5 L 0 8.5 z" fill="#10b981"/>
+                        </marker>
+                        <marker id="arrow-warn" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                          <path d="M 0 1.5 L 10 5 L 0 8.5 z" fill="#ef4444"/>
+                        </marker>
+                        <radialGradient id="radar-bg" cx="50%" cy="50%" r="50%">
+                          <stop offset="0%" stop-color="#ffffff" stop-opacity="0.95" />
+                          <stop offset="70%" stop-color="#f8fafc" stop-opacity="0.85" />
+                          <stop offset="100%" stop-color="#e2e8f0" stop-opacity="0.9" />
+                        </radialGradient>
+                      </defs>
+
+                      <!-- 레이더 배경 바탕 원 -->
+                      <circle cx="0" cy="0" r="145" fill="url(#radar-bg)" />
+
+                      <!-- 동심원 링 (140, 95, 50) -->
+                      <circle cx="0" cy="0" r="140" class="enu-ring ring-outer" />
+                      <circle cx="0" cy="0" r="95" class="enu-ring ring-mid" />
+                      <circle cx="0" cy="0" r="50" class="enu-ring ring-inner" />
+
+                      <!-- 45도 보조 점선 축 -->
+                      <line x1="-100" y1="-100" x2="100" y2="100" class="enu-diagonal" />
+                      <line x1="-100" y1="100" x2="100" y2="-100" class="enu-diagonal" />
+
+                      <!-- 십자 주 축선 -->
+                      <line x1="-165" y1="0" x2="165" y2="0" class="enu-axis" />
+                      <line x1="0" y1="-165" x2="0" y2="165" class="enu-axis" />
+
+                      <!-- 동심원 반경 눈금 라벨 (축 우측에 깔끔 배치) -->
+                      <text id="enu-ring-outer-label" x="6" y="-128" class="enu-ring-label">1.0 mm</text>
+                      <text id="enu-ring-mid-label" x="6" y="-83" class="enu-ring-label">0.67 mm</text>
+                      <text id="enu-ring-inner-label" x="6" y="-38" class="enu-ring-label">0.33 mm</text>
+
+                      <!-- 방위 지시 화살표 & 라벨 (화살표와 글씨 겹침 완전 방지) -->
+                      <polygon points="0,-176 -6,-164 6,-164" class="enu-pointer-n" />
+                      <text x="0" y="-148" class="enu-cardinal-label cardinal-n">N (+North)</text>
+
+                      <polygon points="176,0 164,-6 164,6" class="enu-pointer-e" />
+                      <text x="156" y="-9" class="enu-cardinal-label cardinal-e">E (+East)</text>
+
+                      <polygon points="0,176 -6,164 6,164" class="enu-pointer-s" />
+                      <text x="0" y="156" class="enu-cardinal-label cardinal-s">S (-South)</text>
+
+                      <polygon points="-176,0 -164,-6 -164,6" class="enu-pointer-w" />
+                      <text x="-156" y="-9" class="enu-cardinal-label cardinal-w">W (-West)</text>
+
+                      <!-- 송신 기준 중심점 (0,0) -->
+                      <circle cx="0" cy="0" r="7" class="enu-center-halo" />
+                      <circle cx="0" cy="0" r="3.5" class="enu-center-point" title="송신 기준 원점 (0, 0)" />
+
+                      <!-- 편차 벡터 선 및 수신 복원 타깃 점 -->
+                      <line id="enu-vector-line" x1="0" y1="0" x2="0" y2="0" class="enu-vector-line" />
+                      <circle id="enu-target-pulse" cx="0" cy="0" r="12" class="enu-target-pulse" />
+                      <circle id="enu-target-point" cx="0" cy="0" r="6" class="enu-target-point" title="수신 복원 위치" />
+                    </svg>
+                  </div>
+
+                  <!-- 수직 고도 편차 슬림 게이지 (ΔU: Up/Down) -->
+                  <div class="hud-alt-gauge-wrap" title="국소 수직 고도 편차 (ΔU: Up/Down)">
+                    <div class="alt-gauge-header">
+                      <span class="alt-axis-tag">▲ +Up</span>
+                    </div>
+                    <div class="alt-gauge-body">
+                      <div class="alt-gauge-ticks-col">
+                        <span id="alt-tick-top" class="alt-tick-lbl">+5.0 mm</span>
+                        <span id="alt-tick-mid-top" class="alt-tick-lbl mid">+2.5 mm</span>
+                        <span class="alt-tick-lbl zero">0</span>
+                        <span id="alt-tick-mid-bottom" class="alt-tick-lbl mid">-2.5 mm</span>
+                        <span id="alt-tick-bottom" class="alt-tick-lbl">-5.0 mm</span>
+                      </div>
+                      <div class="alt-gauge-track">
+                        <div class="alt-gauge-tick-line tick-75"></div>
+                        <div class="alt-gauge-zero-line"></div>
+                        <div class="alt-gauge-tick-line tick-25"></div>
+                        <div id="alt-gauge-bar" class="alt-gauge-bar"></div>
+                        <div id="alt-gauge-thumb" class="alt-gauge-thumb">
+                          <span class="alt-thumb-arrow">◀</span>
+                          <span id="alt-gauge-thumb-val" class="alt-thumb-badge">+0.0 mm</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="alt-gauge-footer">
+                      <span class="alt-axis-tag">▼ -Dn</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- View 2: 3D 인터랙티브 큐브 -->
+              <div id="target-view-3d" class="target-view-pane" hidden>
+                <div class="cube-3d-toolbar">
+                  <div class="cube-3d-presets" role="group" aria-label="시점 프리셋">
+                    <button type="button" class="cube-preset-btn active" id="btn-preset-iso" title="기본 3D 입체 시각 (Isometric)">입체</button>
+                    <button type="button" class="cube-preset-btn" id="btn-preset-top" title="수평 평면 뷰 (Top View / North 상단)">평면</button>
+                    <button type="button" class="cube-preset-btn" id="btn-preset-side" title="수직 측면 뷰 (Side View / Up 수직)">측면</button>
+                    <button type="button" id="btn-reset-3d" class="cube-reset-btn" title="초기 각도 및 1.0x 줌 복귀">⟲ 리셋</button>
+                  </div>
+                  <div class="cube-3d-zoom-badge" id="cube-zoom-container" title="마우스 휠로 줌 확대/축소 (더블클릭 시 1.0x 리셋)">
+                    <span class="zoom-icon">🔍</span>
+                    <span id="cube-zoom-val">1.0x</span>
+                  </div>
+                </div>
+                <div class="cube-3d-container" id="cube-3d-wrap">
+                  <svg id="cube-3d-svg" viewBox="0 0 390 310" aria-label="3D ENU 편차 큐브">
+                    <!-- 동적 3D 렌더링 -->
+                  </svg>
+                </div>
+                <div class="cube-3d-legend">
+                  <span class="cube-legend-item legend-e"><span class="legend-color-dot" style="background:#2563eb;"></span> East (+E)</span>
+                  <span class="cube-legend-item legend-n"><span class="legend-color-dot" style="background:#059669;"></span> North (+N)</span>
+                  <span class="cube-legend-item legend-u"><span class="legend-color-dot" style="background:#d97706;"></span> Up (+U)</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 타깃 정밀 오차 호버 인스펙터 팝오버 -->
+            <div id="pvt-target-tooltip" class="pvt-target-tooltip" hidden></div>
           </div>
 
           <!-- 우측 (2/3): 편차 지표 요약 + WGS-84 대조표 + ENU 축별 성분 분해 -->
