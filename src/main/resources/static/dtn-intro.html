@@ -112,9 +112,17 @@
     .deep-dive-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 8px; background: white; border-radius: 6px; overflow: hidden; }
     .deep-dive-table th, .deep-dive-table td { padding: 6px 8px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
     .deep-dive-table th { background: #e9f1f8; color: #1a4971; font-weight: 600; text-align: left; }
-    .deep-dive-table td:first-child { font-weight: 600; width: 20%; white-space: nowrap; color: #102a43; }
-    .deep-dive-table td:nth-child(2) { width: 40%; background: #fbfcfe; color: #334e68; }
-    .deep-dive-table td:nth-child(3) { width: 40%; background: #f5fbf7; color: #1b4d3e; }
+    .deep-dive-table:not(.nasa-compare-table) th { width: 20%; }
+    .deep-dive-table:not(.nasa-compare-table) td:nth-child(2) { width: 40%; background: #fbfcfe; color: #334e68; }
+    .deep-dive-table:not(.nasa-compare-table) td:nth-child(3) { width: 40%; background: #f5fbf7; color: #1b4d3e; }
+
+    .nasa-compare-table { table-layout: fixed; width: 100%; }
+    .nasa-compare-table th, .nasa-compare-table td { word-break: keep-all; overflow-wrap: break-word; line-height: 1.5; }
+    .nasa-compare-table th:nth-child(1), .nasa-compare-table td:nth-child(1) { width: 14%; font-weight: 600; color: #102a43; }
+    .nasa-compare-table th:nth-child(2), .nasa-compare-table td:nth-child(2) { width: 27%; background: #fbfcfe; color: #334e68; }
+    .nasa-compare-table th:nth-child(3), .nasa-compare-table td:nth-child(3) { width: 19%; background: #f8fafc; color: #475569; }
+    .nasa-compare-table th:nth-child(4), .nasa-compare-table td:nth-child(4) { width: 27%; background: #f5fbf7; color: #165b40; }
+    .nasa-compare-table th:nth-child(5), .nasa-compare-table td:nth-child(5) { width: 13%; background: #fcfbfa; color: #0f172a; text-align: center; font-weight: 600; }
     .bit-table td:nth-child(5) { font-size: 10.5px; color: #1e3a8a; }
     .delay-control { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 0 0 10px; }
     .delay-control input { width: 90px; padding: 4px 8px; border-radius: 6px; border: 1px solid #b9c8d5; }
@@ -373,6 +381,67 @@
                     </table>
                   </div>
                   <p class="fine">연구실 환경에서 실시간 획득 가능한 신호원(지상 u-blox GPS 수신 신호)과 글로벌 표준 항법 솔버(RTKLIB)의 수치적 검증 신뢰성을 확보하기 위해 GPS LNAV를 채택하였으며, 달 궤도선 운용 시에는 섭동 계수만 달 중력장 모델로 치환되어 동일한 수식 구조로 동작합니다.</p>
+
+                  <h4>NASA AFS 공식 표준(LSIS Vol-A) 대비 준수 및 독자 확장 분석</h4>
+                  <p><strong>공식 표준과의 일치점 및 시험베드 확장 분석:</strong> 무선 물리 계층(Layer 1)은 NASA 최신 권고안을 100% 준수하며, 상위 데이터 계층(Layer 2)의 미할당 영역(SB3·SB4)을 지상 검증 목적에 맞추어 독자 확장한 구조 분석입니다.</p>
+                  <div class="table-scroll">
+                    <table class="deep-dive-table nasa-compare-table">
+                      <colgroup>
+                        <col style="width: 14%;">
+                        <col style="width: 27%;">
+                        <col style="width: 19%;">
+                        <col style="width: 27%;">
+                        <col style="width: 13%;">
+                      </colgroup>
+                      <thead>
+                        <tr>
+                          <th scope="col">계층 / 구분</th>
+                          <th scope="col">NASA 공식 규격 (LSIS Vol-A)</th>
+                          <th scope="col">기존 오픈소스 (LANS-AFS-SIM)</th>
+                          <th scope="col">LNIS 지상 시험베드 구현</th>
+                          <th scope="col" style="text-align: center;">규격 판정</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <th scope="row">물리 계층 (L1)<br>공통 프레임 규격</th>
+                          <td>• 6,000 bits (750 bytes), 12초 주기<br>• 프레임 동기 부호 68 bits<br>• BCH(52,8), LDPC SF2(1/2), LDPC SF3(1/2 천공)<br>• 98×60 블록 인터리빙 (5,880 bits)</td>
+                          <td>NASA 공식 규격과 동일</td>
+                          <td>NASA 공식 규격과 동일</td>
+                          <td><strong>100% 완전 일치</strong><br>(표준 준수)</td>
+                        </tr>
+                        <tr>
+                          <th scope="row">SB1 (L2)<br>프레임 식별</th>
+                          <td>• Frame ID (FID = 0, 항법 메시지)<br>• Time of Interval (TOI, 0~99)</td>
+                          <td>NASA 공식 규격과 동일</td>
+                          <td>NASA 공식 규격과 동일</td>
+                          <td><strong>100% 완전 일치</strong><br>(표준 준수)</td>
+                        </tr>
+                        <tr>
+                          <th scope="row">SB2 (L2)<br>핵심 궤도력</th>
+                          <td>• 달 궤도선 Ephemeris & Clock (MCMF 좌표계)</td>
+                          <td>10개 핵심 요소 탑재 (eph2sbf, 262 bits)<br>단, 나머지 892비트는 0101 패딩 방치</td>
+                          <td>10개 핵심 요소 비트 위치 100% 보존<br>(지상 시험 검증용 WGS-84 매핑)</td>
+                          <td><strong>비트 형식 일치</strong><br>(하위 호환성 유지)</td>
+                        </tr>
+                        <tr>
+                          <th scope="row">SB3 (L2)<br>보충 궤도력</th>
+                          <td>• 달 중력장(Mascon) 섭동 계수<br>• 위성 무결성 경보 (Alert Flag)</td>
+                          <td><strong>미구현</strong><br>(0101 더미 데이터 방치)</td>
+                          <td><strong>Type 63 헤더 + LNAV 잔여 459비트 탑재</strong><br>→ LNAV 720비트 100% 무손실 복원 달성</td>
+                          <td><strong>시험용 독자 확장</strong><br>(무손실 궤도 완성)</td>
+                        </tr>
+                        <tr>
+                          <th scope="row">SB4 (L2)<br>시험 관측값</th>
+                          <td>• 달 조난 탐색구조 (Lunar SAR)<br>• 사용자 방송 / 저속 과학 데이터</td>
+                          <td><strong>미구현</strong><br>(0101 더미 데이터 방치)</td>
+                          <td><strong>가상 송신 시각(T*ᵢ) + u-blox 정답 관측값</strong><br>→ DTN 통신 지연 에뮬레이션 주입</td>
+                          <td><strong>시험용 독자 확장</strong><br>(지상 시험 전용)</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <p class="fine">물리 계층(L1)은 NASA 최신 표준을 엄격히 준수하며, 오픈소스에서 더미(0101)로 방치되었던 SB3·SB4 유휴 공간을 활용하여 지상 시험베드의 핵심 목표인 '지구 궤도 무손실 복원(SB3)'과 'DTN 지연 에뮬레이션(SB4)'을 완벽히 달성하도록 설계되었습니다.</p>
                 </div>
               </div>
               <div id="delay-example" hidden>
@@ -477,12 +546,8 @@
               : '6,000-bit AFS에 항법정보와 보정 송신 시각을 담습니다. 수신측은 도착 시각을 이용해 의사거리를 계산합니다.',
             summary: '프레임 크기와 부호화',
             detail: [
-              '한 프레임은 6,000 bits(750 bytes)입니다. 동기 68 + SB1 52 + SB2 2,400 + SB3 1,740 + SB4 1,740 bits로 구성됩니다. 실제 물리 비트열에서는 SB2·SB3·SB4의 5,880 부호화 비트가 98 × 60 블록 인터리빙됩니다.',
+              '한 프레임은 6,000 bits(750 bytes)입니다. 동기 68 + SB1 52 + SB2 2,400 + SB3 1,740 + SB4 1,740 bits로 구성됩니다.',
               'SB1은 BCH 부호화 후 52 bits입니다. SB2는 정보 1,176 + CRC 24 bits를 2,400 bits로 부호화합니다. SB3·SB4는 각각 정보 846 + CRC 24 bits를 부호화·천공해 1,740 bits로 만듭니다.',
-              (iq
-                ? 'SB3는 517/846 bits, I/Q용 SB4는 506/846 bits를 사용합니다. SB4 원본 관측값은 수신측의 RF 추적 결과를 대신하지 않습니다.'
-                : 'SB3는 517/846 bits, 지연 시험용 SB4는 670/846 bits를 사용합니다. SB4에는 원본 의사거리 대신 보정 송신 시각·시험 시작 시각·Doppler·C/N0·관측 시각·유효성을 담습니다.')
-                + ' SB3·SB4는 LNIS 시험용 확장이며 공식 표준 메시지 할당을 뜻하지 않습니다. 미사용 정보 비트는 0101…로 채웁니다.',
               '표준 오픈소스 afs_sim.c는 SB3와 SB4에 0101 더미 데이터만 송신했으나, LNIS는 SB2에 10개 핵심 궤도요소, SB3에 잔여 459비트 LNAV 궤도 파라미터를 담아 무손실 복원이 가능하도록 구현했습니다.'
             ].join('\n\n')
           };
@@ -814,11 +879,12 @@
       3: () => ({
         title: 'SB3 (서브블록 3) · LNAV 보충 궤도력 (무손실 궤도 복원용)',
         badges: [
-          { text: 'LNIS 고유 확장', cls: 'badge-ext' },
+          { text: 'NASA 표준 L1 준수', cls: 'badge-std' },
+          { text: 'L2 사설 확장 (무손실 LNAV)', cls: 'badge-ext' },
           { text: '정보 846b + CRC 24b', cls: 'badge-std' },
           { text: 'LDPC SF3 부호화 (1,740 bits)', cls: 'badge-std' }
         ],
-        note: '기존 오픈소스가 버렸던 섭동 파라미터(459비트)를 수록하여, 수신단에서 LNAV 1~3 서브프레임(720비트)을 무손실 복원합니다.',
+        note: 'NASA 공식 규격은 달 중력장(Mascon) 및 Alert용으로 지정하고 있으나, 기존 오픈소스는 미구현(0101 패딩) 상태였습니다. LNIS는 이 공간에 LNAV 459비트를 탑재하여 무손실 궤도 복원을 구현했습니다.',
         fields: [
           ['Type 63 헤더', '57 bits', 'header', 'Type 63, Version 3, TOW, Week, PRN 공통 헤더', '동일 제공 (공통 헤더)'],
           ['navPresent 플래그', '1 bit', 'boolean', '1 = LNAV 잔여 궤도 파라미터 유효', '동일 제공 (보충 궤도 파라미터 유효 플래그)'],
@@ -838,18 +904,20 @@
           title: 'SB4 (서브블록 4) · 관측값 전송 및 DTN 지연 에뮬레이션',
           badges: isIq
             ? [
+                { text: 'NASA 표준 L1 준수', cls: 'badge-std' },
                 { text: 'I/Q 신호 검증용', cls: 'badge-std' },
                 { text: '506 / 846 bits 사용', cls: 'badge-std' },
                 { text: 'LDPC SF3 부호화 (1,740 bits)', cls: 'badge-std' }
               ]
             : [
-                { text: '정답 주입 & 가상시각 변환', cls: 'badge-gt' },
+                { text: 'NASA 표준 L1 준수', cls: 'badge-std' },
+                { text: 'L2 사설 확장 (지연 에뮬레이션)', cls: 'badge-ext' },
                 { text: '670 / 846 bits 사용', cls: 'badge-ext' },
                 { text: 'LDPC SF3 부호화 (1,740 bits)', cls: 'badge-std' }
               ],
           note: isIq
             ? 'I/Q 신호 시험용: 506비트를 사용하여 원본 관측값을 기록하나, 수신측은 신호 추적 결과를 PVT 입력으로 사용합니다.'
-            : '표준 오픈소스는 미구현(0101 더미). LNIS는 DTN 통신 지연 검증을 위해 원본 의사거리로부터 계산한 가상 송신 시각(T*ᵢ)과 u-blox 정답 관측값을 탑재했습니다.',
+            : 'NASA 공식 규격은 Lunar SAR(조난신호)용이며 실제 위성은 수신기 관측값을 보내지 않습니다. LNIS는 지상 DTN 지연 시험을 위해 가상 송신 시각(T*ᵢ)과 정답 관측값을 주입하는 시험베드 컨테이너로 활용했습니다.',
           fields: isIq
             ? [
                 ['Type 63 헤더', '57 bits', 'header', 'Type 63, Version 3, TOW, Week, PRN 공통 헤더', '동일 제공 (공통 헤더)'],
