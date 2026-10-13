@@ -171,14 +171,14 @@ assert.ok(!html.includes('id="dtn-process"'));
 console.log('PASS: receiver empty/completed/invalid/failed states, epochs, stale-response guard and read-only UI without endpoint controls');
 
 nextTests = [done];
-const cleared = vm.createContext({...context, location: {...context.location, pathname: '/lnis/dtntest/receiver/clear'}});
+const cleared = vm.createContext({...context, location: {...context.location, pathname: '/lnis/dtntest/receiver'}});
 elements.get('dtn-tests').value = '';
 vm.runInContext(source, cleared);
 await cleared.ready;
-assert.equal(elements.get('dtn-tests').value, '', 'clear must not auto-select stored tests');
+assert.equal(elements.get('dtn-tests').value, '', 'normal entry must not auto-select stored tests');
 await cleared.poll();
 assert.equal(elements.get('dtn-tests').value, '', 'polling must preserve cleared selection');
-console.log('PASS: receiver clear preserves empty selection through polling');
+console.log('PASS: receiver default entry preserves empty selection through polling');
 
 // New registrations keep the current selection; actual receipts select automatically.
 nextTests = [waiting, done];
@@ -202,10 +202,11 @@ assert.equal(elements.get('dtn-tests').value, late.testId, 'latest receipt wins 
 assert.equal(elements.get('test-id').textContent, late.testId);
 assert.equal(elements.get('pvt-x').textContent, '1.000');
 const reopened = vm.createContext({...context});
+elements.get('dtn-tests').value = '';
 vm.runInContext(source, reopened);
 await reopened.ready;
-assert.equal(elements.get('dtn-tests').value, late.testId, 'normal initial load selects latest received test');
-console.log('PASS: automatic receipt selection, waiting-to-received transition, manual history, clear and arrival ordering');
+assert.equal(elements.get('dtn-tests').value, '', 'newly opened window starts empty without auto-selecting past test');
+console.log('PASS: automatic receipt selection, waiting-to-received transition, manual history, default clear and arrival ordering');
 
 // Different source/shifted epochs must still compare the selected reference.
 context.setComparison({comparisonMode:'DELAY', referencePvt:[{week:2400,towSeconds:100,positionValid:true,ecefMeters:[1,2,3]}],

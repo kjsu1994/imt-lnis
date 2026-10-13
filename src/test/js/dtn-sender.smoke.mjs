@@ -473,21 +473,19 @@ assert.match(html, /실측 GNSS 10에폭 불러오기/);
 console.log('PASS: selected real-data epoch reaches request and invalid selection is not substituted');
 
 let clearedHistoryRequests = 0;
-const cleared = vm.createContext({...context, location: {...context.location, pathname: '/lnis/dtntest/sender/clear'},
+const cleared = vm.createContext({...context, location: {...context.location, pathname: '/lnis/dtntest/sender'},
   fetch: async (url, options) => {
     if (url.endsWith('/dtn/tests')) { clearedHistoryRequests++; return {ok: true, json: async () => [{testId:'previous',state:'COMPLETED'}]}; }
     return context.fetch(url, options);
   }});
 vm.runInContext(source, cleared);
 await cleared.ready;
-assert.equal(clearedHistoryRequests, 0);
-assert.equal(savedAddresses.has('lnis.hdtnConfig.v1'), false);
-assert.equal(elements.get('hdtn-maxNumberOfBundlesInPipeline').value, '50');
-assert.equal(savedAddresses.has('lnis.adapter-url.dtn'), false);
-assert.equal(elements.get('dtn-send-url').value, 'http://sender.default:8080');
+assert.equal(clearedHistoryRequests, 0, 'initial load must not auto-request recent tests');
+assert.equal(savedAddresses.has('lnis.hdtnConfig.v1'), true, 'localStorage config must be preserved');
+assert.equal(savedAddresses.has('lnis.adapter-url.dtn'), true, 'localStorage adapter URL must be preserved');
 assert.equal(vm.runInContext('job', cleared), null);
 assert.equal(vm.runInContext('inputId', cleared), null);
-console.log('PASS: sender clear starts without previous job or input');
+console.log('PASS: sender starts in default cleared state preserving stored config without previous job or input');
 
 // A pending receipt does not block another send, even while the receiver computes.
 vm.runInContext("busy=false; config.sendBusy=false; selectedType='IQ_SAMPLE'; iqJob={state:'READY'}; job={testId:'old',state:'WAITING_DTN',sendStatus:'ACCEPTED'};", context);

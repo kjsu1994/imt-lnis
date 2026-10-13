@@ -146,7 +146,6 @@ function saveHdtnConfig(settings) {
 function initializeHdtnConfig() {
   let saved = {}, restored = [];
   try {
-    if (location.pathname?.endsWith('/clear')) localStorage.removeItem(hdtnStorageKey);
     saved = JSON.parse(localStorage.getItem(hdtnStorageKey) || '{}') || {};
   } catch { /* Use defaults for unavailable or malformed storage. */ }
   for (const [key, rule] of Object.entries(hdtnRules)) {
@@ -290,7 +289,6 @@ function saveDtnConfig(settings) {
 function initializeDtnConfig() {
   let saved = {}, restored = [];
   try {
-    if (location.pathname?.endsWith('/clear')) localStorage.removeItem(dtnStorageKey);
     saved = JSON.parse(localStorage.getItem(dtnStorageKey) || '{}') || {};
   } catch { /* Use defaults for unavailable or malformed storage. */ }
   for (const [key, rule] of Object.entries(dtnRules)) {
@@ -1282,9 +1280,6 @@ async function initialize() {
       peerConfig = await request('/node/connection');
       $('dtn-receiver-ip').value = peerConfig.ip || ''; $('dtn-receiver-port').value = peerConfig.port;
     } catch { $('dtn-connection-message').textContent = '상대 서비스 주소 설정을 사용할 수 없습니다.'; }
-    if (!location.pathname?.endsWith('/clear')) {
-      const recent = await request('/dtn/tests'); job = recent[0] || null;
-    }
     await poll(); socket();
     log('DTN 송신 화면 준비 완료');
   } catch (e) { log(e.message, 'ERROR'); }

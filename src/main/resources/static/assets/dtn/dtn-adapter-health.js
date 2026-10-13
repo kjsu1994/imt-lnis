@@ -18,7 +18,6 @@ export function initAdapterHealth(defaultUrl, log = () => {}, onStatus = () => {
   const storageKey = 'lnis.adapter-url.' + (document.body?.dataset?.page || 'dtn');
   input.value = defaultUrl;
   try {
-    if (location.pathname?.endsWith('/clear')) localStorage.removeItem(storageKey);
     input.value = localStorage.getItem(storageKey) || defaultUrl;
   } catch { /* Storage may be disabled. */ }
   let checking = false, revision = 0, lastState = '';

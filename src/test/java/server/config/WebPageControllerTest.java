@@ -48,8 +48,8 @@ class WebPageControllerTest {
                     .andExpect(redirectedUrl("/lnis/assets/" + alias.getValue()));
             mvc.perform(get("/lnis/assets/" + alias.getValue())).andExpect(status().isOk());
         }
-        mvc.perform(get("/lnis/dtntest/sender/clear")).andExpect(status().isOk());
-        mvc.perform(get("/lnis/dtntest/receiver/clear")).andExpect(status().isOk());
+        mvc.perform(get("/lnis/dtntest/sender/clear")).andExpect(status().isNotFound());
+        mvc.perform(get("/lnis/dtntest/receiver/clear")).andExpect(status().isNotFound());
     }
 
     @Test

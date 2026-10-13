@@ -34,7 +34,6 @@ $('reference-retry').onclick = async () => {
   } catch (error) { log(error.message, 'ERROR'); }
   finally { $('reference-retry').disabled = false; }
 };
-const clearScreen = location.pathname?.endsWith('/clear') === true;
 let tests = [], epochs = [], selectedId = '', renderVersion = 0, polling = false;
 let reportKey = '';
 let receivedIds = null;
@@ -1129,7 +1128,7 @@ async function poll(force = false) {
       if (selectedJob) nextTests.push(selectedJob);
     }
     const newlyReceived = nextTests.filter(job => job.dtnReceived &&
-      (receivedIds === null ? !clearScreen : !receivedIds.has(job.testId)))
+      (receivedIds !== null && !receivedIds.has(job.testId)))
       .sort((a, b) => (Date.parse(b.receivedAt) || 0) - (Date.parse(a.receivedAt) || 0))[0];
     receivedIds = new Set(nextTests.filter(job => job.dtnReceived).map(job => job.testId));
     tests = nextTests;
@@ -1146,12 +1145,10 @@ async function poll(force = false) {
     $('sender-address').disabled = peerSaving || !!connection.busy || !connection.editable;
     renderAgents(agents);
     const selected = $('dtn-tests').value;
-    $('dtn-tests').replaceChildren(...(clearScreen ? [new Option('시험 선택 · 화면 초기화됨', '')] : []), ...(tests.length ? tests.map(job =>
-      trialOption(job, time(job.createdAt)))
-      : [new Option('등록된 시험 없음', '')]));
+    $('dtn-tests').replaceChildren(new Option(tests.length ? '시험 선택' : '등록된 시험 없음', ''), ...(tests.length ? tests.map(job =>
+      trialOption(job, time(job.createdAt))) : []));
     if (newlyReceived && !selectionPinned && historyPage === 0) $('dtn-tests').value = newlyReceived.testId;
     else if (tests.some(job => job.testId === selected)) $('dtn-tests').value = selected;
-    else if (!selectionPinned && !clearScreen && tests.length) $('dtn-tests').value = tests[0].testId;
     colorTrialSelection($('dtn-tests'), tests.find(job => job.testId === $('dtn-tests').value));
     await renderTest(force);
     const receiptTestId = selectedId;
