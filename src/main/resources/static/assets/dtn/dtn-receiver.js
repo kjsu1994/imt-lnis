@@ -4,7 +4,7 @@ import {initGnssControls} from './dtn-gnss.js?v=20261001-review';
 import {createDtnLog} from './dtn-log.js?v=20261001-review';
 import {initAdapterHealth} from './dtn-adapter-health.js?v=20260922-compact-structure';
 import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20261001-review';
-import {createObservationView, numeric, renderClockBias} from './dtn-observations.js?v=20261006-pvt-filter';
+import {createObservationView, numeric, renderClockBias} from './dtn-observations.js?v=20261013-nav-params';
 
 const $ = id => document.getElementById(id);
 const payloadViewer = createPayloadViewer($('dtn-payload'), {receivedOnly: true});
@@ -785,13 +785,13 @@ function formatCoordDiff(diff) {
 function renderEpoch() {
   observations.select(Number($('pvt-epoch').value));
   const pvt = epochs[Number($('pvt-epoch').value)];
-  const delta = pvt && (delayComparison ? comparisonEpochs[0] : comparisonEpochs.find(e => e.week === pvt.week && e.towSeconds === pvt.towSeconds));
+  const delta = pvt && comparisonEpochs.find(e => e.week === pvt.week && Math.abs(e.towSeconds - pvt.towSeconds) < 0.001);
   const deltaR = delta?.positionDifferenceMeters;
   const deltaV = delta?.velocityDifferenceMetersPerSecond;
   $('pvt-differences').textContent = '위치 차이 '+positionDifference(deltaR)+' · 속도 차이 '+measured(deltaV,6,'m/s')
     + (delayComparison ? '' : ' · 시계오차 차이 '+number(delta?.clockDifferenceSeconds,12)+' s');
 
-  const reference = pvt && (delayComparison ? referenceEpochs[0] : referenceEpochs.find(value => value.week === pvt.week && value.towSeconds === pvt.towSeconds));
+  const reference = pvt && (delayComparison ? (delta ? referenceEpochs[0] : null) : referenceEpochs.find(value => value.week === pvt.week && value.towSeconds === pvt.towSeconds));
   renderClockAnalysis(delta, reference, pvt);
   renderGeodeticVisualizer(reference, pvt);
 
@@ -1151,7 +1151,7 @@ async function poll(force = false) {
       : [new Option('등록된 시험 없음', '')]));
     if (newlyReceived && !selectionPinned && historyPage === 0) $('dtn-tests').value = newlyReceived.testId;
     else if (tests.some(job => job.testId === selected)) $('dtn-tests').value = selected;
-    else if (!selectionPinned && tests.length) $('dtn-tests').value = tests[0].testId;
+    else if (!selectionPinned && !clearScreen && tests.length) $('dtn-tests').value = tests[0].testId;
     colorTrialSelection($('dtn-tests'), tests.find(job => job.testId === $('dtn-tests').value));
     await renderTest(force);
     const receiptTestId = selectedId;
@@ -1183,7 +1183,7 @@ async function initialize() {
   initCubeInteraction();
   trialDialogHandler = initTrialSettingsDialog(() => tests.find(item => item.testId === $('dtn-tests').value));
   if ($('dtn-adapter-strip-status')) {
-    $('dtn-adapter-strip-status').style.cursor = 'pointer';
+    if ($('dtn-adapter-strip-status').style) $('dtn-adapter-strip-status').style.cursor = 'pointer';
     $('dtn-adapter-strip-status').onclick = () => {
       $('dtn-send-url')?.focus();
       $('dtn-send-url')?.scrollIntoView({behavior: 'smooth', block: 'center'});

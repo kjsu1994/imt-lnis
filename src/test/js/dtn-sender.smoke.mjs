@@ -28,11 +28,29 @@ for (const key of ['maxNumberOfBundlesInPipeline', 'maxSumOfBundleBytesInPipelin
 }
 const source = pageSource('dtn.js');
 class Element {
-  constructor() { this.value = ''; this.options = []; this.files = []; this.textContent = ''; this.classList = {toggle() {}}; }
+  constructor() {
+    this.value = ''; this.options = []; this.files = []; this.textContent = '';
+    const classes = new Set();
+    this.classList = {
+      add(...c) { c.forEach(x => classes.add(x)); },
+      remove(...c) { c.forEach(x => classes.delete(x)); },
+      toggle(c, f) { if (f === undefined) { classes.has(c) ? classes.delete(c) : classes.add(c); } else { f ? classes.add(c) : classes.delete(c); } },
+      contains(c) { return classes.has(c); }
+    };
+  }
   replaceChildren(...children) { this.options = children; this.value = children[0]?.value ?? ''; }
   add(option) { this.options.push(option); }
+  append(...children) {}
   addEventListener() {}
-  setAttribute() {} removeAttribute(key) { delete this[key]; } reportValidity() { return true; }
+  setAttribute(key, value) {
+    this[key] = value ?? true;
+    if (key === 'hidden') this.hidden = true;
+  }
+  removeAttribute(key) {
+    delete this[key];
+    if (key === 'hidden') this.hidden = false;
+  }
+  reportValidity() { return true; }
   focus() { this.focused = true; }
 }
 const elements = new Map([...html.matchAll(/id="([^"]+)"/g)].map(([, id]) => [id, new Element()]));
@@ -43,15 +61,29 @@ elements.get('dtn-development').hidden = true;
 elements.get('dtn-settings-view').hidden = true;
 let loaded = null, currentJob = null, failUpload = false, starts = 0, lastStartBody, cancels = 0;
 let observationSelection, displayedPvt;
-let healthFetch, healthCalls = 0, healthUrl;
+let healthFetch = () => ({ok: true, json: async () => ({adapter: {status: 'ready'}})}), healthCalls = 0, healthUrl;
 let gnssStatus = {state: 'DISCONNECTED', timeState: 'UNAVAILABLE'};
 const intervals = [];
 const tx = {agentId: 'sender-1', role: 'SENDER', state: 'READY'}, rx = {agentId: 'receiver-1', role: 'RECEIVER', state: 'READY'};
 const observations = {receiverInfo:{model:'ZED-F9T-20B',firmware:'TIM 2.25',protocol:'29.25',supportedConstellations:['GPS','BeiDou']},epochs: [{observation: {week: 2400, receiverTowSeconds: 1, observations: []}}]};
+const removedIds = new Set([
+  'dtn-condition-summary', 'dtn-adapter-summary', 'dtn-adapter-summary-dot',
+  'dtn-peer-summary', 'dtn-peer-summary-dot', 'trial-settings', 'dtn-config-hud', 'hud-engine',
+  'dtn-server-status'
+]);
 const context = {
   renderIqFile() {},
   createDtnLog: () => ({write() {},setContext() {},refresh() {}}),
-  document: {visibilityState: 'visible', getElementById: id => { assert.ok(elements.has(id), 'missing ' + id); return elements.get(id); }, querySelectorAll: () => []},
+  document: {
+    visibilityState: 'visible',
+    getElementById: id => {
+      if (removedIds.has(id)) return null;
+      assert.ok(elements.has(id), 'missing ' + id);
+      return elements.get(id);
+    },
+    createElement: () => new Element(),
+    querySelectorAll: () => []
+  },
   createPayloadViewer: () => ({setJob() {}}),
   createObservationView: (_container, onSelect) => {
     observationSelection = onSelect;
@@ -61,7 +93,8 @@ const context = {
   URLSearchParams,
   Option: function(text, value) { this.value = value; },
   location: {protocol: 'http:', host: '127.0.0.1:18090'}, WebSocket: class {},
-  window: {scrollY: 250, scrollTo({top}) { this.scrollY = top; }},
+  window: {scrollY: 250, scrollTo({top}) { this.scrollY = top; }, addEventListener() {}},
+  requestAnimationFrame: fn => fn(),
   URL, AbortSignal, setInterval(callback, delay) { intervals.push({callback, delay}); }, setTimeout() {},
   fetch: async (url, options) => {
     if (url.includes('/adapter-health?')) {
@@ -116,9 +149,9 @@ const file = {name: 'capture.graw', size: 10, arrayBuffer: async () => new Array
 elements.get('dtn-graw-file').files = [file];
 const timerCount = intervals.length;
 await elements.get('dtn-settings-open').onclick();
-assert.equal(elements.get('dtn-main-view').hidden, true);
 assert.equal(elements.get('dtn-settings-view').hidden, false);
-assert.equal(elements.get('dtn-settings-title').focused, true);
+assert.equal(elements.get('dtn-settings-view').classList.contains('drawer-open'), true);
+assert.equal(elements.get('dtn-settings-close').focused, true);
 const uploading = context.upload(file);
 assert.equal(elements.get('dtn-settings-lock').hidden, false);
 assert.equal(elements.get('dtn-graw-file').disabled, true);
@@ -127,6 +160,7 @@ assert.equal(elements.get('dtn-settings-view').hidden, false, 'file apply stays 
 assert.match(elements.get('dtn-settings-feedback').textContent, /입력 완료/);
 assert.match(elements.get('dtn-input-summary').textContent, /capture.graw/);
 await elements.get('dtn-settings-close').onclick();
+assert.equal(elements.get('dtn-settings-view').classList.contains('drawer-open'), false);
 assert.equal(elements.get('dtn-main-view').hidden, false);
 assert.equal(context.window.scrollY, 250);
 assert.equal(elements.get('dtn-graw-file').files[0], file, 'selected file survives navigation');
@@ -136,12 +170,13 @@ assert.equal(loaded, observations);
 assert.equal(elements.get('dtn-receiver-info').hidden,false);
 assert.match(elements.get('dtn-receiver-info-body').textContent,/29.25/);
 assert.equal(displayedPvt[0].positionValid, true);
+vm.runInContext("adapterOnline = true; updateControls();", context);
 assert.equal(elements.get('dtn-send').disabled, false);
 await elements.get('dtn-send').onclick();
 assert.equal(starts, 1);
 assert.equal(lastStartBody.hdtnConfig.maxNumberOfBundlesInPipeline, 50);
 assert.equal(lastStartBody.hdtnConfig.enforceBundlePriority, false);
-assert.equal(lastStartBody.hdtnConfig.tcpclMaxSegmentSizeBytes, 20000);
+assert.equal(lastStartBody.hdtnConfig.tcpclMaxSegmentSizeBytes, 200000);
 assert.equal(elements.get('hdtn-maxBundleSizeBytes').disabled, true);
 assert.equal(elements.get('dtn-upload').disabled, true);
 await elements.get('dtn-settings-open').onclick();
@@ -181,6 +216,7 @@ await elements.get('dtn-send').onclick();
 assert.ok(intervals.some(value => value.delay === 10000), 'adapter health polls every 10 seconds');
 let resolveHealth;
 healthFetch = () => new Promise(resolve => { resolveHealth = resolve; });
+healthCalls = 0;
 
 const checking = elements.get('dtn-adapter-health').onclick();
 assert.equal(elements.get('dtn-adapter-health').disabled, true);
@@ -199,8 +235,8 @@ await checking;
 assert.match(healthUrl, /adapterUrl=http%3A%2F%2F127\.0\.0\.1%3A18092$/);
 assert.equal(elements.get('dtn-adapter-status').textContent, '연결됨');
 assert.equal(elements.get('dtn-adapter-dot').className, 'connection-dot online');
-assert.equal(elements.get('dtn-adapter-summary').textContent, '연결됨');
-assert.equal(elements.get('dtn-adapter-summary-dot').className, 'connection-dot online');
+assert.equal(elements.get('dtn-adapter-strip-status').textContent, '어댑터 연결됨');
+assert.equal(elements.get('dtn-adapter-strip-status').className, 'pill online');
 assert.match(elements.get('dtn-adapter-health-json').textContent, /"rawResponse": "{\\"status\\":\\"ready\\"}"/);
 assert.match(elements.get('dtn-adapter-health-time').textContent, /마지막 확인/);
 assert.equal(elements.get('dtn-adapter-health').disabled, false);
@@ -268,7 +304,7 @@ console.log('PASS: adapter address browser persistence, restore and invalid addr
 savedAddresses.set('lnis.hdtnConfig.v1', JSON.stringify({maxNumberOfBundlesInPipeline: 65}));
 context.initializeHdtnConfig();
 assert.equal(elements.get('hdtn-maxNumberOfBundlesInPipeline').value, '65');
-assert.equal(elements.get('hdtn-tcpclMaxSegmentSizeBytes').value, '20000', 'old saved settings gain only the new default');
+assert.equal(elements.get('hdtn-tcpclMaxSegmentSizeBytes').value, '200000', 'old saved settings gain only the new default');
 elements.get('hdtn-tcpclMaxSegmentSizeBytes').value = '100000';
 elements.get('hdtn-maxNumberOfBundlesInPipeline').value = '75';
 elements.get('hdtn-enforceBundlePriority').value = 'false';
@@ -284,8 +320,9 @@ for (const [txMode, rxMode] of [['DTN', 'HDTN'], ['HDTN', 'DTN'], ['HDTN', 'HDTN
   context.updateControls();
   await elements.get('dtn-send').onclick();
   const usesHdtn = txMode === 'HDTN' || rxMode === 'HDTN';
+  const usesDtn = txMode === 'DTN' || rxMode === 'DTN';
   assert.equal(Object.hasOwn(lastStartBody, 'hdtnConfig'), usesHdtn);
-  assert.equal(Object.hasOwn(lastStartBody, 'dtnConfig'), false);
+  assert.equal(Object.hasOwn(lastStartBody, 'dtnConfig'), usesDtn);
   if (usesHdtn) {
     assert.equal(lastStartBody.hdtnConfig.maxNumberOfBundlesInPipeline, 75);
     assert.equal(lastStartBody.hdtnConfig.tcpclMaxSegmentSizeBytes, 100000);
@@ -301,7 +338,7 @@ for (const invalid of ['', '-1', '0', '1.5', '9007199254740992']) {
   assert.equal(starts, before, 'invalid setting must not start/reset a trial');
 }
 context.initializeHdtnConfig();
-for (const invalid of ['', '1399', '1000001', '1400.5']) {
+for (const invalid of ['', '-1', '0', '1400.5']) {
   elements.get('hdtn-tcpclMaxSegmentSizeBytes').value = invalid;
   const before = starts;
   await elements.get('dtn-send').onclick();
@@ -313,10 +350,10 @@ for (const boundary of ['20000', '200000']) {
 }
 context.initializeHdtnConfig();
 // A single invalid legacy value must not discard valid user settings.
-savedAddresses.set('lnis.hdtnConfig.v1', JSON.stringify({maxNumberOfBundlesInPipeline:75,tcpclMaxSegmentSizeBytes:300000,enforceBundlePriority:true}));
+savedAddresses.set('lnis.hdtnConfig.v1', JSON.stringify({maxNumberOfBundlesInPipeline:75,tcpclMaxSegmentSizeBytes:-1,enforceBundlePriority:true}));
 context.initializeHdtnConfig();
 assert.equal(elements.get('hdtn-maxNumberOfBundlesInPipeline').value,'75');
-assert.equal(elements.get('hdtn-tcpclMaxSegmentSizeBytes').value,'20000');
+assert.equal(elements.get('hdtn-tcpclMaxSegmentSizeBytes').value,'200000');
 assert.equal(elements.get('hdtn-enforceBundlePriority').value,'true');
 assert.equal(elements.get('hdtn-config-notice').hidden,false);
 elements.get('hdtn-acsSendPeriodMilliseconds').value='0';
@@ -340,15 +377,23 @@ for (const [key, rule] of Object.entries(vm.runInContext('hdtnRules',context))) 
   if (typeof rule.default !== 'number') continue;
   const control = elements.get('hdtn-' + key);
   const tag = html.match(new RegExp('<input id="hdtn-' + key + '"[^>]+>'))[0];
-  assert.ok(tag.includes('min="' + rule.min + '"'));
-  assert.ok(tag.includes('max="' + rule.max + '"'));
-  for (const valid of [rule.min,rule.max]) {
-    control.value=String(valid);
-    assert.equal(context.readHdtnConfig()[key],valid);
-  }
-  for (const invalid of ['',String(rule.min-1),String(rule.max+1),'1.5']) {
-    control.value=invalid;
-    assert.throws(()=>context.readHdtnConfig());
+  assert.ok(tag.includes('type="number"'));
+  if (rule.min !== undefined && rule.max !== undefined) {
+    assert.ok(tag.includes('min="' + rule.min + '"'));
+    assert.ok(tag.includes('max="' + rule.max + '"'));
+    for (const valid of [rule.min,rule.max]) {
+      control.value=String(valid);
+      assert.equal(context.readHdtnConfig()[key],valid);
+    }
+    for (const invalid of ['',String(rule.min-1),String(rule.max+1),'1.5']) {
+      control.value=invalid;
+      assert.throws(()=>context.readHdtnConfig());
+    }
+  } else {
+    for (const invalid of ['', '-1', '1.5']) {
+      control.value=invalid;
+      assert.throws(()=>context.readHdtnConfig());
+    }
   }
   control.value=String(rule.default);
 }
@@ -527,10 +572,10 @@ await assert.rejects(context.upload({name: 'large.ubx', size: 64 * 1024 * 1024 +
 context.fetch = previousFetch;
 console.log('PASS: direct UBX upload reuses observation/PVT preview and retains GRAW compatibility');
 
-assert.match(html, /class="sender-summary-row">[\s\S]*?id="dtn-condition-summary"[\s\S]*?class="service-clock-row"/);
+assert.match(html, /class="service-clock-pill"/);
 assert.equal((html.match(/id="service-clock-value"/g) || []).length, 1);
-assert.ok(html.indexOf('id="service-clock-sync"') > html.indexOf('id="dtn-main-view"'));
-console.log('PASS: sender clock shares the trial summary row with unique existing controls');
+assert.ok(html.includes('id="service-clock-sync"'));
+console.log('PASS: sender clock shares the status strip with unique existing controls');
 
 const originalGnssPoll = vm.runInContext('gnss', context).poll;
 vm.runInContext('gnss', context).poll = async () => { throw new Error('GNSS view update failed'); };

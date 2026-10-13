@@ -8,23 +8,30 @@ import vm from 'node:vm';
 const html = readFileSync(new URL('../../main/resources/static/dtn-receiver.html', import.meta.url), 'utf8');
 const source = pageSource('dtn-receiver.js');
 const elements = new Map([...html.matchAll(/id="([^"]+)"/g)].map(([, id]) => [id, {
-  value: '', options: [], textContent: '', hidden: false, disabled: false,
+  value: '', options: [], textContent: '', hidden: false, disabled: false, style: {},
   addEventListener() {}, add(option) { this.options.push(option); },
   setAttribute(key, value) { this[key] = value; },
   replaceChildren(...options) { this.options = options; this.value = options[0]?.value ?? ''; },
-  removeAttribute(key) { delete this[key]; }, focus() {}, select() {}
+  removeAttribute(key) { delete this[key]; }, focus() {}, select() {},
+  querySelector(sel) { if (!this.subs) this.subs = {}; if (!this.subs[sel]) this.subs[sel] = { textContent: '', className: '' }; return this.subs[sel]; }
 }]));
 let nextTests = [], report = {}, reportRequest = null, shownReceipts = null;
 const requests = [];
-const removedHealth = new Set(['dtn-adapter-health-results','dtn-adapter-detail','dtn-adapter-health-time','dtn-adapter-health-json']);
+const removedHealth = new Set([
+  'dtn-adapter-health-results','dtn-adapter-detail','dtn-adapter-health-time','dtn-adapter-health-json'
+]);
+const optionalElements = new Set([
+  'trial-settings','received-pvt-label','pvt-message',
+  'enu-target-scale','geo-match-verdict'
+]);
 let healthState = 'ready';
 let peerAddress = 'http://192.168.1.72:8090', peerSaves = 0, peerProbes = 0;
 const healthIntervals = [];
 const context = {
   numeric, renderClockBias, URL, AbortSignal,
   renderIqFile() {},
-  createDtnLog: () => ({write() {},setContext() {},refresh() {}}),
-  document: {visibilityState:'visible', getElementById(id) { if (removedHealth.has(id)) return null; assert.ok(elements.has(id), 'DOM missing: ' + id); return elements.get(id); }},
+  createDtnLog: () => ({write(msg) { console.log('DTN LOG:', msg); },setContext() {},refresh() {}}),
+  document: {visibilityState:'visible', getElementById(id) { if (removedHealth.has(id) || optionalElements.has(id)) return null; assert.ok(elements.has(id), 'DOM missing: ' + id); return elements.get(id); }},
   createPayloadViewer(container, options) { assert.equal(options.receivedOnly, true); return {setJob() {},setReceipts(values) {shownReceipts = values;}}; },
   createObservationView() { return {setData() {}, select() {}}; },
   URLSearchParams,
@@ -87,8 +94,8 @@ assert.match(elements.get('dtn-receiver-status').textContent, /처리 중/);
 vm.runInContext("renderSummary({testType:'IQ_SAMPLE',state:'COMPLETED'})",context);
 assert.equal(elements.get('receiver-type').textContent,'I/Q Sample');
 assert.ok(!html.includes('class="test-type-selector"') && !html.includes('class="transport-mode-selector"'), 'receiver displays only the received selection, without option buttons');
-assert.equal(elements.get('step-process').textContent,'③ I/Q 검증·추적·PVT');
-assert.equal(elements.get('receive-state').textContent,'I/Q 처리 완료');
+assert.equal(elements.get('step-process').querySelector('.step-text').textContent,'③ I/Q 추적·PVT');
+assert.equal(elements.get('receive-state').textContent,'수신 계산 완료');
 context.renderSummary({testType:'IQ_SAMPLE',state:'COMPLETED',receivedEpochs:69});
 assert.equal(elements.get('dtn-observations').hidden,false);
 context.setComparison({comparison:{verdict:'MEASURED'}});
@@ -154,7 +161,7 @@ await context.renderTest();
 release(report);
 await pending;
 assert.equal(elements.get('pvt-x').textContent, '-');
-assert.equal(elements.get('receive-state').textContent, '외부 JSON 수신 대기');
+assert.equal(elements.get('receive-state').textContent, '외부 번들 수신 대기');
 reportRequest = null;
 nextTests = [{testId: 'failed', state: 'FAILED', dtnReceived: true, receivedEpochs: 0, message: 'AFS 검증 실패'}];
 await context.poll();
@@ -232,7 +239,7 @@ assert.equal(elements.get('pvt-delay-residual').textContent,'—');
 assert.match(elements.get('pvt-delay-reason').textContent,/음수 지연/);
 context.setComparison();
 assert.equal(elements.get('dtn-clock-analysis').hidden,true);
-assert.equal(elements.get('pvt-sync-note').hidden,true);
+if (elements.has('pvt-sync-note')) assert.equal(elements.get('pvt-sync-note').hidden,true);
 assert.equal(elements.get('pvt-delay-details').hidden,true);
 assert.equal(elements.get('pvt-delay-evidence').textContent,'');
 assert.equal(elements.get('pvt-clock-change').textContent,'—');

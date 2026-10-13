@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {numeric, clockBias, renderClockBias, observationCells, navigationCells, createObservationView, transmitTime, pvtInputStatus, lockTime, unclassifiedNavigation, navigationLabel, receiverInformation, observationCounts} from '../../main/resources/static/assets/dtn/dtn-observations.js';
+import {numeric, clockBias, renderClockBias, observationCells, navigationCells, createObservationView, transmitTime, pvtInputStatus, lockTime, unclassifiedNavigation, navigationLabel, receiverInformation, observationCounts, decodeNavigationParameters, renderNavigationParametersDetails} from '../../main/resources/static/assets/dtn/dtn-observations.js';
 
 assert.equal(numeric(null), '—');
 assert.equal(numeric(NaN), '—');
@@ -298,3 +298,78 @@ assert.match(receiverInformation(device),/2개/);
 assert.match(receiverInformation({epochs:[]}),/미기록/);
 assert.equal(receiverInformation(null),'');
 console.log('PASS: counts do not conflate input/nav presence/solver use, device metadata and week rollover span');
+
+// Test GPS LNAV parameter decoding (SB2/SB3)
+const sampleSf1 = ['22C18609','906AA963','1864006E','91A2C9FF','28055365','B84137BF','2A8ABDB8','30CCBE8D','8000007A','822266D8'].map(h => parseInt(h, 16));
+const sampleSf2 = ['22C18609','906ACAF3','30C0BA0D','8C45772E','88DBDB96','8093C0A7','024A190E','83996865','834E1EBC','0CBE9F7B'].map(h => parseInt(h, 16));
+const sampleSf3 = ['22C18609','906AEB7B','00058E9F','2352E562','BFF9C9C1','A82EB216','87EF625A','903A6FC3','3FEA12EF','30C40B90'].map(h => parseInt(h, 16));
+
+const decSf1 = decodeNavigationParameters({message: {constellationId: 0, satelliteId: 4, words: sampleSf1}});
+assert.equal(decSf1.constellation, 'GPS');
+assert.equal(decSf1.subframeId, 1);
+assert.equal(decSf1.elements.find(e => e.name === 't_oc').value, 208800);
+assert.equal(decSf1.elements.find(e => e.name === 't_oc').target, 'SB2');
+assert.equal(decSf1.elements.find(e => e.name === 't_oc').wordOrigin, 'Word 8');
+assert.equal(decSf1.elements.find(e => e.name === 'a_f0').target, 'SB2');
+assert.equal(decSf1.elements.find(e => e.name === 'a_f0').wordOrigin, 'Word 10');
+assert.equal(decSf1.elements.find(e => e.name === 'a_f1').target, 'SB2');
+assert.equal(decSf1.elements.find(e => e.name === 'a_f1').wordOrigin, 'Word 9');
+assert.equal(decSf1.elements.find(e => e.name === 'a_f2').target, 'SB3');
+assert.equal(decSf1.elements.find(e => e.name === 'a_f2').wordOrigin, 'Word 9');
+assert.equal(decSf1.elements.find(e => e.name === 'T_GD').target, 'SB3');
+assert.equal(decSf1.elements.find(e => e.name === 'T_GD').wordOrigin, 'Word 7');
+assert.equal(decSf1.elements.find(e => e.name === 'IODC').value, 451);
+
+const decSf2 = decodeNavigationParameters({message: {constellationId: 0, satelliteId: 4, words: sampleSf2}});
+assert.equal(decSf2.subframeId, 2);
+assert.equal(decSf2.elements.find(e => e.name === 't_oe').value, 208800);
+assert.equal(decSf2.elements.find(e => e.name === 't_oe').target, 'SB2');
+assert.equal(decSf2.elements.find(e => e.name === 't_oe').wordOrigin, 'Word 10');
+assert.equal(decSf2.elements.find(e => e.name === '√a').target, 'SB2');
+assert.equal(decSf2.elements.find(e => e.name === '√a').wordOrigin, 'Word 8~9');
+assert.equal(decSf2.elements.find(e => e.name === 'e').target, 'SB2');
+assert.equal(decSf2.elements.find(e => e.name === 'e').wordOrigin, 'Word 6~7');
+assert.equal(decSf2.elements.find(e => e.name === 'M_0').target, 'SB2');
+assert.equal(decSf2.elements.find(e => e.name === 'M_0').wordOrigin, 'Word 4~5');
+assert.equal(decSf2.elements.find(e => e.name === 'C_rs').target, 'SB3');
+assert.equal(decSf2.elements.find(e => e.name === 'C_rs').wordOrigin, 'Word 3');
+assert.equal(decSf2.elements.find(e => e.name === 'C_uc').target, 'SB3');
+assert.equal(decSf2.elements.find(e => e.name === 'C_uc').wordOrigin, 'Word 6');
+assert.equal(decSf2.elements.find(e => e.name === 'C_us').target, 'SB3');
+assert.equal(decSf2.elements.find(e => e.name === 'C_us').wordOrigin, 'Word 8');
+assert.equal(decSf2.elements.find(e => e.name === 'Δn').target, 'SB3');
+assert.equal(decSf2.elements.find(e => e.name === 'Δn').wordOrigin, 'Word 4');
+
+const decSf3 = decodeNavigationParameters({message: {constellationId: 0, satelliteId: 4, words: sampleSf3}});
+assert.equal(decSf3.subframeId, 3);
+assert.equal(decSf3.elements.find(e => e.name === 'i_0').target, 'SB2');
+assert.equal(decSf3.elements.find(e => e.name === 'i_0').wordOrigin, 'Word 5~6');
+assert.equal(decSf3.elements.find(e => e.name === 'Ω_0').target, 'SB2');
+assert.equal(decSf3.elements.find(e => e.name === 'Ω_0').wordOrigin, 'Word 3~4');
+assert.equal(decSf3.elements.find(e => e.name === 'ω').target, 'SB2');
+assert.equal(decSf3.elements.find(e => e.name === 'ω').wordOrigin, 'Word 7~8');
+assert.equal(decSf3.elements.find(e => e.name === 'C_rc').target, 'SB3');
+assert.equal(decSf3.elements.find(e => e.name === 'C_rc').wordOrigin, 'Word 7');
+assert.equal(decSf3.elements.find(e => e.name === 'C_ic').target, 'SB3');
+assert.equal(decSf3.elements.find(e => e.name === 'C_ic').wordOrigin, 'Word 3');
+assert.equal(decSf3.elements.find(e => e.name === 'C_is').target, 'SB3');
+assert.equal(decSf3.elements.find(e => e.name === 'C_is').wordOrigin, 'Word 5');
+assert.equal(decSf3.elements.find(e => e.name === 'Ω̇').target, 'SB3');
+assert.equal(decSf3.elements.find(e => e.name === 'Ω̇').wordOrigin, 'Word 9');
+assert.equal(decSf3.elements.find(e => e.name === 'IDOT').target, 'SB3');
+assert.equal(decSf3.elements.find(e => e.name === 'IDOT').wordOrigin, 'Word 10');
+
+// Test QZSS decoding
+const decQzss = decodeNavigationParameters({message: {constellationId: 5, satelliteId: 193, words: sampleSf1}});
+assert.equal(decQzss.constellation, 'QZSS');
+assert.equal(decQzss.subframeId, 1);
+assert.match(decQzss.title, /QZSS/);
+
+// Test details DOM rendering
+globalThis.document = {createElement: element};
+const detailsEl = renderNavigationParametersDetails(decSf1);
+assert.ok(detailsEl);
+assert.equal(detailsEl.className, 'nav-param-details');
+assert.ok(detailsEl.children.length >= 2);
+delete globalThis.document;
+console.log('PASS: GPS LNAV / QZSS parameter decoding, SB2/SB3 mappings, originating words and DOM inspector');

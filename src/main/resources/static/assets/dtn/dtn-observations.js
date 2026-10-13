@@ -188,6 +188,533 @@ export function navigationLabel(item) {
   return unclassifiedNavigation(msg);
 }
 
+function extractLnavBits(words, startBit, numBits, signed = false, iq = false) {
+  let val = 0n;
+  for (let i = 0; i < numBits; i++) {
+    const b = startBit + i;
+    const w = Math.floor(b / 24);
+    if (w >= words.length) return null;
+    const bitInWord = b % 24;
+    const shift = iq ? (23 - bitInWord) : (29 - bitInWord);
+    const bit = (BigInt(words[w]) >> BigInt(shift)) & 1n;
+    val = (val << 1n) | bit;
+  }
+  if (signed) {
+    const signBit = 1n << BigInt(numBits - 1);
+    if ((val & signBit) !== 0n) {
+      val = val - (1n << BigInt(numBits));
+    }
+  }
+  return Number(val);
+}
+
+function decodeGpsLnavParameters(words, iq, constellationName = 'GPS') {
+  const sfId = extractLnavBits(words, 43, 3, false, iq);
+  if (![1, 2, 3].includes(sfId)) return null;
+
+  if (sfId === 1) {
+    const week = extractLnavBits(words, 48, 10, false, iq);
+    const health = extractLnavBits(words, 64, 6, false, iq);
+    const iodcMsb = extractLnavBits(words, 70, 2, false, iq);
+    const tgdRaw = extractLnavBits(words, 160, 8, true, iq);
+    const iodcLsb = extractLnavBits(words, 168, 8, false, iq);
+    const tocRaw = extractLnavBits(words, 176, 16, false, iq);
+    const af2Raw = extractLnavBits(words, 192, 8, true, iq);
+    const af1Raw = extractLnavBits(words, 200, 16, true, iq);
+    const af0Raw = extractLnavBits(words, 216, 22, true, iq);
+
+    const iodc = (iodcMsb << 8) | iodcLsb;
+    const tgd = tgdRaw * Math.pow(2, -31);
+    const toc = tocRaw * 16;
+    const af2 = af2Raw * Math.pow(2, -55);
+    const af1 = af1Raw * Math.pow(2, -43);
+    const af0 = af0Raw * Math.pow(2, -31);
+
+    return {
+      constellation: constellationName,
+      subframeId: 1,
+      title: 'SF1 · 위성 시계·상태 (' + constellationName + ')',
+      elements: [
+        { target: 'SB2', name: 't_oc', fullName: 't_oc (시계 기준시각)', meaning: '위성 시계 기준시각', wordOrigin: 'Word 8', value: toc, formatted: toc.toLocaleString() + ' s' },
+        { target: 'SB2', name: 'a_f0', fullName: 'a_f0 (시계 편차)', meaning: '위성 시계 편차 (Bias)', wordOrigin: 'Word 10', value: af0, formatted: (Math.abs(af0) < 1e-3 ? (af0 * 1e6).toFixed(3) + ' µs (' + af0.toExponential(4) + ' s)' : af0.toFixed(6) + ' s') },
+        { target: 'SB2', name: 'a_f1', fullName: 'a_f1 (시계 표류율)', meaning: '위성 시계 표류율 (Drift)', wordOrigin: 'Word 9', value: af1, formatted: af1.toExponential(4) + ' s/s' },
+        { target: 'SB3', name: 'a_f2', fullName: 'a_f2 (시계 드리프트율)', meaning: '2차 시계 가속도', wordOrigin: 'Word 9', value: af2, formatted: af2 === 0 ? '0.0 s/s²' : af2.toExponential(4) + ' s/s²' },
+        { target: 'SB3', name: 'T_GD', fullName: 'T_GD (전송 지연차)', meaning: 'L1/L2 군지연차', wordOrigin: 'Word 7', value: tgd, formatted: (tgd * 1e9).toFixed(3) + ' ns (' + tgd.toExponential(4) + ' s)' },
+        { target: 'SB3', name: 'IODC', fullName: 'IODC (시계 데이터 번호)', meaning: '시계 이슈 번호', wordOrigin: 'Word 3 & 8', value: iodc, formatted: String(iodc) },
+        { target: 'SB3', name: 'Week', fullName: 'GPS Week', meaning: '기준 주차 번호', wordOrigin: 'Word 3', value: week, formatted: 'Week ' + week },
+        { target: 'SB3', name: 'SV Health', fullName: 'SV Health (위성 건전성)', meaning: '위성 신호 정상 여부', wordOrigin: 'Word 3', value: health, formatted: health === 0 ? '0 (정상)' : '0x' + health.toString(16) + ' (비정상)' }
+      ]
+    };
+  }
+
+  if (sfId === 2) {
+    const iode = extractLnavBits(words, 48, 8, false, iq);
+    const crsRaw = extractLnavBits(words, 56, 16, true, iq);
+    const dnRaw = extractLnavBits(words, 72, 16, true, iq);
+    const m0Raw = extractLnavBits(words, 88, 32, true, iq);
+    const cucRaw = extractLnavBits(words, 120, 16, true, iq);
+    const eRaw = extractLnavBits(words, 136, 32, false, iq);
+    const cusRaw = extractLnavBits(words, 168, 16, true, iq);
+    const sqrtaRaw = extractLnavBits(words, 184, 32, false, iq);
+    const toeRaw = extractLnavBits(words, 216, 16, false, iq);
+
+    const crs = crsRaw * Math.pow(2, -5);
+    const dn = dnRaw * Math.pow(2, -43) * Math.PI;
+    const m0 = m0Raw * Math.pow(2, -31) * Math.PI;
+    const cuc = cucRaw * Math.pow(2, -29);
+    const ecc = eRaw * Math.pow(2, -33);
+    const cus = cusRaw * Math.pow(2, -29);
+    const sqrta = sqrtaRaw * Math.pow(2, -19);
+    const toe = toeRaw * 16;
+    const aKm = Math.pow(sqrta, 2) / 1000;
+
+    return {
+      constellation: constellationName,
+      subframeId: 2,
+      title: 'SF2 · 궤도정보 ① (' + constellationName + ')',
+      elements: [
+        { target: 'SB2', name: 't_oe', fullName: 't_oe (궤도 기준시각)', meaning: 'Ephemeris 기준시각', wordOrigin: 'Word 10', value: toe, formatted: toe.toLocaleString() + ' s' },
+        { target: 'SB2', name: '√a', fullName: '√a (장반경 제곱근)', meaning: '궤도 장반경 제곱근 (크기)', wordOrigin: 'Word 8~9', value: sqrta, formatted: sqrta.toFixed(4) + ' m^(1/2) (a ≈ ' + aKm.toFixed(1) + ' km)' },
+        { target: 'SB2', name: 'e', fullName: 'e (이심률)', meaning: '궤도 이심률 (찌그러짐)', wordOrigin: 'Word 6~7', value: ecc, formatted: ecc.toFixed(8) },
+        { target: 'SB2', name: 'M_0', fullName: 'M_0 (평균근점각)', meaning: '기준 평균근점각 (위치)', wordOrigin: 'Word 4~5', value: m0, formatted: (m0 * 180 / Math.PI).toFixed(2) + '° (' + m0.toFixed(4) + ' rad)' },
+        { target: 'SB3', name: 'C_rs', fullName: 'C_rs (반경 Sine 섭동)', meaning: '궤도 반경 Sine 조화 섭동', wordOrigin: 'Word 3', value: crs, formatted: (crs >= 0 ? '+' : '') + crs.toFixed(3) + ' m' },
+        { target: 'SB3', name: 'C_uc', fullName: 'C_uc (위도 Cos 섭동)', meaning: '궤도 위도 Cosine 조화 섭동', wordOrigin: 'Word 6', value: cuc, formatted: (cuc >= 0 ? '+' : '') + cuc.toExponential(4) + ' rad' },
+        { target: 'SB3', name: 'C_us', fullName: 'C_us (위도 Sin 섭동)', meaning: '궤도 위도 Sine 조화 섭동', wordOrigin: 'Word 8', value: cus, formatted: (cus >= 0 ? '+' : '') + cus.toExponential(4) + ' rad' },
+        { target: 'SB3', name: 'Δn', fullName: 'Δn (평균운동량 보정)', meaning: '평균 운동량 섭동 보정치', wordOrigin: 'Word 4', value: dn, formatted: (dn >= 0 ? '+' : '') + dn.toExponential(4) + ' rad/s' },
+        { target: 'SB3', name: 'IODE', fullName: 'IODE (궤도 데이터 번호)', meaning: '궤도 이슈 번호', wordOrigin: 'Word 3', value: iode, formatted: String(iode) + ' (0x' + iode.toString(16).toUpperCase() + ')' }
+      ]
+    };
+  }
+
+  if (sfId === 3) {
+    const cicRaw = extractLnavBits(words, 48, 16, true, iq);
+    const omg0Raw = extractLnavBits(words, 64, 32, true, iq);
+    const cisRaw = extractLnavBits(words, 96, 16, true, iq);
+    const inc0Raw = extractLnavBits(words, 112, 32, true, iq);
+    const crcRaw = extractLnavBits(words, 144, 16, true, iq);
+    const aopRaw = extractLnavBits(words, 160, 32, true, iq);
+    const omgDotRaw = extractLnavBits(words, 192, 24, true, iq);
+    const iode = extractLnavBits(words, 216, 8, false, iq);
+    const idotRaw = extractLnavBits(words, 224, 14, true, iq);
+
+    const cic = cicRaw * Math.pow(2, -29);
+    const omg0 = omg0Raw * Math.pow(2, -31) * Math.PI;
+    const cis = cisRaw * Math.pow(2, -29);
+    const inc0 = inc0Raw * Math.pow(2, -31) * Math.PI;
+    const crc = crcRaw * Math.pow(2, -5);
+    const aop = aopRaw * Math.pow(2, -31) * Math.PI;
+    const omgDot = omgDotRaw * Math.pow(2, -43) * Math.PI;
+    const idot = idotRaw * Math.pow(2, -43) * Math.PI;
+
+    return {
+      constellation: constellationName,
+      subframeId: 3,
+      title: 'SF3 · 궤도정보 ② (' + constellationName + ')',
+      elements: [
+        { target: 'SB2', name: 'i_0', fullName: 'i_0 (궤도 경사각)', meaning: '기준 궤도 경사각 (기울기)', wordOrigin: 'Word 5~6', value: inc0, formatted: (inc0 * 180 / Math.PI).toFixed(4) + '° (' + inc0.toFixed(4) + ' rad)' },
+        { target: 'SB2', name: 'Ω_0', fullName: 'Ω_0 (승교점 적경)', meaning: '승교점 적경 (경도 위치)', wordOrigin: 'Word 3~4', value: omg0, formatted: (omg0 * 180 / Math.PI).toFixed(2) + '° (' + omg0.toFixed(4) + ' rad)' },
+        { target: 'SB2', name: 'ω', fullName: 'ω (근지점 인수)', meaning: '근지점 인수 (타원 방향)', wordOrigin: 'Word 7~8', value: aop, formatted: (aop * 180 / Math.PI).toFixed(2) + '° (' + aop.toFixed(4) + ' rad)' },
+        { target: 'SB3', name: 'C_rc', fullName: 'C_rc (반경 Cos 섭동)', meaning: '궤도 반경 Cosine 조화 섭동', wordOrigin: 'Word 7', value: crc, formatted: (crc >= 0 ? '+' : '') + crc.toFixed(3) + ' m' },
+        { target: 'SB3', name: 'C_ic', fullName: 'C_ic (경사각 Cos 섭동)', meaning: '경사각 Cosine 조화 섭동', wordOrigin: 'Word 3', value: cic, formatted: (cic >= 0 ? '+' : '') + cic.toExponential(4) + ' rad' },
+        { target: 'SB3', name: 'C_is', fullName: 'C_is (경사각 Sin 섭동)', meaning: '경사각 Sine 조화 섭동', wordOrigin: 'Word 5', value: cis, formatted: (cis >= 0 ? '+' : '') + cis.toExponential(4) + ' rad' },
+        { target: 'SB3', name: 'Ω̇', fullName: 'Ω̇ (승교점 세차율)', meaning: '승교점 세차율 (궤도면 회전)', wordOrigin: 'Word 9', value: omgDot, formatted: (omgDot >= 0 ? '+' : '') + omgDot.toExponential(4) + ' rad/s' },
+        { target: 'SB3', name: 'IDOT', fullName: 'IDOT (경사각 변화율)', meaning: '경사각 시간 변화율', wordOrigin: 'Word 10', value: idot, formatted: (idot >= 0 ? '+' : '') + idot.toExponential(4) + ' rad/s' },
+        { target: 'SB3', name: 'IODE', fullName: 'IODE (궤도 데이터 번호)', meaning: '궤도 이슈 번호', wordOrigin: 'Word 10', value: iode, formatted: String(iode) + ' (0x' + iode.toString(16).toUpperCase() + ')' }
+      ]
+    };
+  }
+
+  return null;
+}
+
+function decodeBdsD1Parameters(words, iq) {
+  const w0 = Number(words[0]);
+  const frn = (w0 >>> 12) & 0x7;
+  if (![1, 2, 3].includes(frn)) return null;
+
+  const extractBds = (startBit, numBits, signed = false) => {
+    let val = 0n;
+    for (let i = 0; i < numBits; i++) {
+      const b = startBit + i;
+      const w = Math.floor(b / 30);
+      if (w >= words.length) return null;
+      const bitInWord = b % 30;
+      const shift = 29 - bitInWord;
+      const bit = (BigInt(words[w]) >> BigInt(shift)) & 1n;
+      val = (val << 1n) | bit;
+    }
+    if (signed) {
+      const signBit = 1n << BigInt(numBits - 1);
+      if ((val & signBit) !== 0n) val = val - (1n << BigInt(numBits));
+    }
+    return Number(val);
+  };
+
+  if (frn === 1) {
+    const tocRaw = extractBds(60, 17, false);
+    const af2Raw = extractBds(77, 11, true);
+    const af0Raw = extractBds(90, 24, true);
+    const af1Raw = extractBds(120, 22, true);
+    const tgd1Raw = extractBds(160, 10, true);
+    const tgd2Raw = extractBds(170, 10, true);
+
+    const toc = tocRaw * 8;
+    const af2 = af2Raw * Math.pow(2, -66);
+    const af0 = af0Raw * Math.pow(2, -33);
+    const af1 = af1Raw * Math.pow(2, -50);
+    const tgd1 = tgd1Raw * 0.1 * 1e-9;
+    const tgd2 = tgd2Raw * 0.1 * 1e-9;
+
+    return {
+      constellation: 'BeiDou',
+      subframeId: 1,
+      title: 'SF1 · 위성 시계·상태 (BDS B1I)',
+      elements: [
+        { target: 'SB2', name: 't_oc', fullName: 't_oc (시계 기준시각)', meaning: '위성 시계 기준시각', wordOrigin: 'Word 3', value: toc, formatted: toc.toLocaleString() + ' s' },
+        { target: 'SB2', name: 'a_f0', fullName: 'a_f0 (시계 편차)', meaning: '위성 시계 편차 (Bias)', wordOrigin: 'Word 4', value: af0, formatted: (Math.abs(af0) < 1e-3 ? (af0 * 1e6).toFixed(3) + ' µs (' + af0.toExponential(4) + ' s)' : af0.toFixed(6) + ' s') },
+        { target: 'SB2', name: 'a_f1', fullName: 'a_f1 (시계 표류율)', meaning: '위성 시계 표류율 (Drift)', wordOrigin: 'Word 5', value: af1, formatted: af1.toExponential(4) + ' s/s' },
+        { target: 'SB3', name: 'a_f2', fullName: 'a_f2 (시계 드리프트율)', meaning: '2차 시계 가속도', wordOrigin: 'Word 3', value: af2, formatted: af2 === 0 ? '0.0 s/s²' : af2.toExponential(4) + ' s/s²' },
+        { target: 'SB3', name: 'T_GD1', fullName: 'T_GD1 (B1/B3 전송지연차)', meaning: 'B1 하드웨어 군지연차', wordOrigin: 'Word 6', value: tgd1, formatted: (tgd1 * 1e9).toFixed(1) + ' ns' },
+        { target: 'SB3', name: 'T_GD2', fullName: 'T_GD2 (B2/B3 전송지연차)', meaning: 'B2 하드웨어 군지연차', wordOrigin: 'Word 6', value: tgd2, formatted: (tgd2 * 1e9).toFixed(1) + ' ns' }
+      ]
+    };
+  }
+
+  if (frn === 2) {
+    const dnRaw = extractBds(60, 16, true);
+    const cucRaw = extractBds(76, 18, true);
+    const m0Raw = extractBds(90, 32, true);
+    const eRaw = extractBds(120, 32, false);
+    const cusRaw = extractBds(150, 18, true);
+    const crcRaw = extractBds(168, 18, true);
+    const crsRaw = extractBds(180, 18, true);
+    const sqrtaRaw = extractBds(198, 32, false);
+    const toeRaw = extractBds(210, 17, false);
+
+    const dn = dnRaw * Math.pow(2, -43) * Math.PI;
+    const cuc = cucRaw * Math.pow(2, -31);
+    const m0 = m0Raw * Math.pow(2, -31) * Math.PI;
+    const ecc = eRaw * Math.pow(2, -33);
+    const cus = cusRaw * Math.pow(2, -31);
+    const crc = crcRaw * Math.pow(2, -6);
+    const crs = crsRaw * Math.pow(2, -6);
+    const sqrta = sqrtaRaw * Math.pow(2, -19);
+    const toe = toeRaw * 8;
+    const aKm = Math.pow(sqrta, 2) / 1000;
+
+    return {
+      constellation: 'BeiDou',
+      subframeId: 2,
+      title: 'SF2 · 궤도정보 ① (BDS B1I)',
+      elements: [
+        { target: 'SB2', name: 't_oe', fullName: 't_oe (궤도 기준시각)', meaning: 'Ephemeris 기준시각', wordOrigin: 'Word 8', value: toe, formatted: toe.toLocaleString() + ' s' },
+        { target: 'SB2', name: '√a', fullName: '√a (장반경 제곱근)', meaning: '궤도 장반경 제곱근 (크기)', wordOrigin: 'Word 7', value: sqrta, formatted: sqrta.toFixed(4) + ' m^(1/2) (a ≈ ' + aKm.toFixed(1) + ' km)' },
+        { target: 'SB2', name: 'e', fullName: 'e (이심률)', meaning: '궤도 이심률 (찌그러짐)', wordOrigin: 'Word 5', value: ecc, formatted: ecc.toFixed(8) },
+        { target: 'SB2', name: 'M_0', fullName: 'M_0 (평균근점각)', meaning: '기준 평균근점각 (위치)', wordOrigin: 'Word 4', value: m0, formatted: (m0 * 180 / Math.PI).toFixed(2) + '° (' + m0.toFixed(4) + ' rad)' },
+        { target: 'SB3', name: 'C_rs', fullName: 'C_rs (반경 Sine 섭동)', meaning: '궤도 반경 Sine 조화 섭동', wordOrigin: 'Word 7', value: crs, formatted: (crs >= 0 ? '+' : '') + crs.toFixed(3) + ' m' },
+        { target: 'SB3', name: 'C_uc', fullName: 'C_uc (위도 Cos 섭동)', meaning: '궤도 위도 Cosine 조화 섭동', wordOrigin: 'Word 3', value: cuc, formatted: (cuc >= 0 ? '+' : '') + cuc.toExponential(4) + ' rad' },
+        { target: 'SB3', name: 'C_us', fullName: 'C_us (위도 Sin 섭동)', meaning: '궤도 위도 Sine 조화 섭동', wordOrigin: 'Word 6', value: cus, formatted: (cus >= 0 ? '+' : '') + cus.toExponential(4) + ' rad' },
+        { target: 'SB3', name: 'C_rc', fullName: 'C_rc (반경 Cos 섭동)', meaning: '궤도 반경 Cosine 조화 섭동', wordOrigin: 'Word 6', value: crc, formatted: (crc >= 0 ? '+' : '') + crc.toFixed(3) + ' m' },
+        { target: 'SB3', name: 'Δn', fullName: 'Δn (평균운동량 보정)', meaning: '평균 운동량 섭동 보정치', wordOrigin: 'Word 3', value: dn, formatted: (dn >= 0 ? '+' : '') + dn.toExponential(4) + ' rad/s' }
+      ]
+    };
+  }
+
+  if (frn === 3) {
+    const inc0Raw = extractBds(60, 32, true);
+    const cicRaw = extractBds(90, 18, true);
+    const cisRaw = extractBds(108, 18, true);
+    const omgDotRaw = extractBds(120, 24, true);
+    const omg0Raw = extractBds(150, 32, true);
+    const aopRaw = extractBds(180, 32, true);
+    const idotRaw = extractBds(210, 14, true);
+
+    const inc0 = inc0Raw * Math.pow(2, -31) * Math.PI;
+    const cic = cicRaw * Math.pow(2, -31);
+    const cis = cisRaw * Math.pow(2, -31);
+    const omgDot = omgDotRaw * Math.pow(2, -43) * Math.PI;
+    const omg0 = omg0Raw * Math.pow(2, -31) * Math.PI;
+    const aop = aopRaw * Math.pow(2, -31) * Math.PI;
+    const idot = idotRaw * Math.pow(2, -43) * Math.PI;
+
+    return {
+      constellation: 'BeiDou',
+      subframeId: 3,
+      title: 'SF3 · 궤도정보 ② (BDS B1I)',
+      elements: [
+        { target: 'SB2', name: 'i_0', fullName: 'i_0 (궤도 경사각)', meaning: '기준 궤도 경사각 (기울기)', wordOrigin: 'Word 3', value: inc0, formatted: (inc0 * 180 / Math.PI).toFixed(4) + '° (' + inc0.toFixed(4) + ' rad)' },
+        { target: 'SB2', name: 'Ω_0', fullName: 'Ω_0 (승교점 적경)', meaning: '승교점 적경 (경도 위치)', wordOrigin: 'Word 6', value: omg0, formatted: (omg0 * 180 / Math.PI).toFixed(2) + '° (' + omg0.toFixed(4) + ' rad)' },
+        { target: 'SB2', name: 'ω', fullName: 'ω (근지점 인수)', meaning: '근지점 인수 (타원 방향)', wordOrigin: 'Word 7', value: aop, formatted: (aop * 180 / Math.PI).toFixed(2) + '° (' + aop.toFixed(4) + ' rad)' },
+        { target: 'SB3', name: 'C_ic', fullName: 'C_ic (경사각 Cos 섭동)', meaning: '경사각 Cosine 조화 섭동', wordOrigin: 'Word 4', value: cic, formatted: (cic >= 0 ? '+' : '') + cic.toExponential(4) + ' rad' },
+        { target: 'SB3', name: 'C_is', fullName: 'C_is (경사각 Sin 섭동)', meaning: '경사각 Sine 조화 섭동', wordOrigin: 'Word 4', value: cis, formatted: (cis >= 0 ? '+' : '') + cis.toExponential(4) + ' rad' },
+        { target: 'SB3', name: 'Ω̇', fullName: 'Ω̇ (승교점 세차율)', meaning: '승교점 세차율 (궤도면 회전)', wordOrigin: 'Word 5', value: omgDot, formatted: (omgDot >= 0 ? '+' : '') + omgDot.toExponential(4) + ' rad/s' },
+        { target: 'SB3', name: 'IDOT', fullName: 'IDOT (경사각 변화율)', meaning: '경사각 시간 변화율', wordOrigin: 'Word 8', value: idot, formatted: (idot >= 0 ? '+' : '') + idot.toExponential(4) + ' rad/s' }
+      ]
+    };
+  }
+
+  return null;
+}
+
+function decodeGalileoInavParameters(words, iq) {
+  const w0 = Number(words[0]);
+  const type = (w0 >>> 24) & 0x3f;
+  if (![1, 2, 3, 4].includes(type)) return null;
+
+  const extractGal = (startWord, startBit, numBits, signed = false) => {
+    let val = 0n;
+    for (let i = 0; i < numBits; i++) {
+      const bitIdx = startBit + i;
+      const w = startWord + Math.floor(bitIdx / 32);
+      if (w >= words.length) return null;
+      const shift = 31 - (bitIdx % 32);
+      const bit = (BigInt(words[w]) >> BigInt(shift)) & 1n;
+      val = (val << 1n) | bit;
+    }
+    if (signed) {
+      const signBit = 1n << BigInt(numBits - 1);
+      if ((val & signBit) !== 0n) val = val - (1n << BigInt(numBits));
+    }
+    return Number(val);
+  };
+
+  if (type === 1) {
+    const iodNav = extractGal(0, 8, 10, false);
+    const toeRaw = extractGal(0, 18, 14, false);
+    const m0Raw = extractGal(1, 0, 32, true);
+    const eRaw = extractGal(2, 0, 32, false);
+    const sqrtaRaw = extractGal(3, 0, 32, false);
+
+    const toe = toeRaw * 60;
+    const m0 = m0Raw * Math.pow(2, -31) * Math.PI;
+    const ecc = eRaw * Math.pow(2, -33);
+    const sqrta = sqrtaRaw * Math.pow(2, -19);
+    const aKm = Math.pow(sqrta, 2) / 1000;
+
+    return {
+      constellation: 'Galileo',
+      subframeId: 1,
+      title: 'Word 1 · 궤도정보 ① (GAL I/NAV)',
+      elements: [
+        { target: 'SB2', name: 't_oe', fullName: 't_oe (궤도 기준시각)', meaning: 'Ephemeris 기준시각', wordOrigin: 'Word 1', value: toe, formatted: toe.toLocaleString() + ' s' },
+        { target: 'SB2', name: '√a', fullName: '√a (장반경 제곱근)', meaning: '궤도 장반경 제곱근 (크기)', wordOrigin: 'Word 3', value: sqrta, formatted: sqrta.toFixed(4) + ' m^(1/2) (a ≈ ' + aKm.toFixed(1) + ' km)' },
+        { target: 'SB2', name: 'e', fullName: 'e (이심률)', meaning: '궤도 이심률 (찌그러짐)', wordOrigin: 'Word 2', value: ecc, formatted: ecc.toFixed(8) },
+        { target: 'SB2', name: 'M_0', fullName: 'M_0 (평균근점각)', meaning: '기준 평균근점각 (위치)', wordOrigin: 'Word 1~2', value: m0, formatted: (m0 * 180 / Math.PI).toFixed(2) + '° (' + m0.toFixed(4) + ' rad)' },
+        { target: 'SB3', name: 'IODnav', fullName: 'IODnav (궤도 데이터 번호)', meaning: 'Galileo 궤도/시계 이슈 번호', wordOrigin: 'Word 1', value: iodNav, formatted: String(iodNav) }
+      ]
+    };
+  }
+
+  if (type === 2) {
+    const omg0Raw = extractGal(0, 8, 32, true);
+    const inc0Raw = extractGal(1, 8, 32, true);
+    const aopRaw = extractGal(2, 8, 32, true);
+    const dnRaw = extractGal(3, 8, 16, true);
+
+    const omg0 = omg0Raw * Math.pow(2, -31) * Math.PI;
+    const inc0 = inc0Raw * Math.pow(2, -31) * Math.PI;
+    const aop = aopRaw * Math.pow(2, -31) * Math.PI;
+    const dn = dnRaw * Math.pow(2, -43) * Math.PI;
+
+    return {
+      constellation: 'Galileo',
+      subframeId: 2,
+      title: 'Word 2 · 궤도정보 ② (GAL I/NAV)',
+      elements: [
+        { target: 'SB2', name: 'i_0', fullName: 'i_0 (궤도 경사각)', meaning: '기준 궤도 경사각 (기울기)', wordOrigin: 'Word 2', value: inc0, formatted: (inc0 * 180 / Math.PI).toFixed(4) + '° (' + inc0.toFixed(4) + ' rad)' },
+        { target: 'SB2', name: 'Ω_0', fullName: 'Ω_0 (승교점 적경)', meaning: '승교점 적경 (경도 위치)', wordOrigin: 'Word 1', value: omg0, formatted: (omg0 * 180 / Math.PI).toFixed(2) + '° (' + omg0.toFixed(4) + ' rad)' },
+        { target: 'SB2', name: 'ω', fullName: 'ω (근지점 인수)', meaning: '근지점 인수 (타원 방향)', wordOrigin: 'Word 3', value: aop, formatted: (aop * 180 / Math.PI).toFixed(2) + '° (' + aop.toFixed(4) + ' rad)' },
+        { target: 'SB3', name: 'Δn', fullName: 'Δn (평균운동량 보정)', meaning: '평균 운동량 섭동 보정치', wordOrigin: 'Word 4', value: dn, formatted: (dn >= 0 ? '+' : '') + dn.toExponential(4) + ' rad/s' }
+      ]
+    };
+  }
+
+  if (type === 3) {
+    const omgDotRaw = extractGal(0, 8, 24, true);
+    const cucRaw = extractGal(1, 0, 16, true);
+    const cusRaw = extractGal(1, 16, 16, true);
+    const crcRaw = extractGal(2, 0, 16, true);
+    const crsRaw = extractGal(2, 16, 16, true);
+    const idotRaw = extractGal(3, 0, 14, true);
+
+    const omgDot = omgDotRaw * Math.pow(2, -43) * Math.PI;
+    const cuc = cucRaw * Math.pow(2, -29);
+    const cus = cusRaw * Math.pow(2, -29);
+    const crc = crcRaw * Math.pow(2, -5);
+    const crs = crsRaw * Math.pow(2, -5);
+    const idot = idotRaw * Math.pow(2, -43) * Math.PI;
+
+    return {
+      constellation: 'Galileo',
+      subframeId: 3,
+      title: 'Word 3 · 섭동정보 (GAL I/NAV)',
+      elements: [
+        { target: 'SB3', name: 'C_rs', fullName: 'C_rs (반경 Sine 섭동)', meaning: '궤도 반경 Sine 조화 섭동', wordOrigin: 'Word 3', value: crs, formatted: (crs >= 0 ? '+' : '') + crs.toFixed(3) + ' m' },
+        { target: 'SB3', name: 'C_rc', fullName: 'C_rc (반경 Cos 섭동)', meaning: '궤도 반경 Cosine 조화 섭동', wordOrigin: 'Word 3', value: crc, formatted: (crc >= 0 ? '+' : '') + crc.toFixed(3) + ' m' },
+        { target: 'SB3', name: 'C_uc', fullName: 'C_uc (위도 Cos 섭동)', meaning: '궤도 위도 Cosine 조화 섭동', wordOrigin: 'Word 2', value: cuc, formatted: (cuc >= 0 ? '+' : '') + cuc.toExponential(4) + ' rad' },
+        { target: 'SB3', name: 'C_us', fullName: 'C_us (위도 Sin 섭동)', meaning: '궤도 위도 Sine 조화 섭동', wordOrigin: 'Word 2', value: cus, formatted: (cus >= 0 ? '+' : '') + cus.toExponential(4) + ' rad' },
+        { target: 'SB3', name: 'Ω̇', fullName: 'Ω̇ (승교점 세차율)', meaning: '승교점 세차율 (궤도면 회전)', wordOrigin: 'Word 1', value: omgDot, formatted: (omgDot >= 0 ? '+' : '') + omgDot.toExponential(4) + ' rad/s' },
+        { target: 'SB3', name: 'IDOT', fullName: 'IDOT (경사각 변화율)', meaning: '경사각 시간 변화율', wordOrigin: 'Word 4', value: idot, formatted: (idot >= 0 ? '+' : '') + idot.toExponential(4) + ' rad/s' }
+      ]
+    };
+  }
+
+  if (type === 4) {
+    const cicRaw = extractGal(0, 8, 16, true);
+    const cisRaw = extractGal(0, 24, 16, true);
+    const tocRaw = extractGal(1, 8, 14, false);
+    const af0Raw = extractGal(1, 22, 31, true);
+    const af1Raw = extractGal(2, 21, 21, true);
+    const af2Raw = extractGal(3, 10, 6, true);
+
+    const cic = cicRaw * Math.pow(2, -29);
+    const cis = cisRaw * Math.pow(2, -29);
+    const toc = tocRaw * 60;
+    const af0 = af0Raw * Math.pow(2, -34);
+    const af1 = af1Raw * Math.pow(2, -46);
+    const af2 = af2Raw * Math.pow(2, -59);
+
+    return {
+      constellation: 'Galileo',
+      subframeId: 4,
+      title: 'Word 4 · 시계·경사각섭동 (GAL I/NAV)',
+      elements: [
+        { target: 'SB2', name: 't_oc', fullName: 't_oc (시계 기준시각)', meaning: '위성 시계 기준시각', wordOrigin: 'Word 2', value: toc, formatted: toc.toLocaleString() + ' s' },
+        { target: 'SB2', name: 'a_f0', fullName: 'a_f0 (시계 편차)', meaning: '위성 시계 편차 (Bias)', wordOrigin: 'Word 2~3', value: af0, formatted: (Math.abs(af0) < 1e-3 ? (af0 * 1e6).toFixed(3) + ' µs (' + af0.toExponential(4) + ' s)' : af0.toFixed(6) + ' s') },
+        { target: 'SB2', name: 'a_f1', fullName: 'a_f1 (시계 표류율)', meaning: '위성 시계 표류율 (Drift)', wordOrigin: 'Word 3', value: af1, formatted: af1.toExponential(4) + ' s/s' },
+        { target: 'SB3', name: 'a_f2', fullName: 'a_f2 (시계 드리프트율)', meaning: '2차 시계 가속도', wordOrigin: 'Word 4', value: af2, formatted: af2 === 0 ? '0.0 s/s²' : af2.toExponential(4) + ' s/s²' },
+        { target: 'SB3', name: 'C_ic', fullName: 'C_ic (경사각 Cos 섭동)', meaning: '경사각 Cosine 조화 섭동', wordOrigin: 'Word 1', value: cic, formatted: (cic >= 0 ? '+' : '') + cic.toExponential(4) + ' rad' },
+        { target: 'SB3', name: 'C_is', fullName: 'C_is (경사각 Sin 섭동)', meaning: '경사각 Sine 조화 섭동', wordOrigin: 'Word 1', value: cis, formatted: (cis >= 0 ? '+' : '') + cis.toExponential(4) + ' rad' }
+      ]
+    };
+  }
+
+  return null;
+}
+
+export function decodeNavigationParameters(item, iq = false) {
+  const msg = item?.message || item;
+  if (!msg || !Array.isArray(msg.words)) return null;
+  const cid = msg.constellationId;
+  const words = msg.words;
+
+  if (cid === 0 || cid === 5) {
+    if (words.length !== 10) return null;
+    return decodeGpsLnavParameters(words, iq, cid === 5 ? 'QZSS' : 'GPS');
+  }
+
+  if (cid === 3) {
+    if (words.length !== 10) return null;
+    return decodeBdsD1Parameters(words, iq);
+  }
+
+  if (cid === 2) {
+    if (words.length !== 8) return null;
+    return decodeGalileoInavParameters(words, iq);
+  }
+
+  return null;
+}
+
+export function renderNavigationParametersDetails(parsed) {
+  if (!parsed || !parsed.elements || !parsed.elements.length) return null;
+  const doc = typeof document !== 'undefined' ? document : (typeof globalThis !== 'undefined' ? globalThis.document : null);
+  if (!doc || typeof doc.createElement !== 'function') return null;
+
+  const details = doc.createElement('details');
+  details.className = 'nav-param-details';
+
+  const summary = doc.createElement('summary');
+  summary.className = 'nav-param-summary';
+
+  const icon = doc.createElement('span');
+  icon.className = 'nav-param-toggle-icon';
+  icon.textContent = '📐';
+
+  const title = doc.createElement('span');
+  title.className = 'nav-param-title';
+  title.textContent = 'AFS 프레임 매핑 파라미터 (' + (parsed.title || parsed.constellation) + ')';
+
+  summary.append(icon);
+  summary.append(title);
+
+  const sb2Count = parsed.elements.filter(e => e.target === 'SB2').length;
+  const sb3Count = parsed.elements.filter(e => e.target === 'SB3').length;
+
+  if (sb2Count > 0) {
+    const pillSb2 = doc.createElement('span');
+    pillSb2.className = 'nav-badge-pill badge-sb2';
+    pillSb2.textContent = 'SB2 ' + sb2Count + '항목';
+    summary.append(pillSb2);
+  }
+  if (sb3Count > 0) {
+    const pillSb3 = doc.createElement('span');
+    pillSb3.className = 'nav-badge-pill badge-sb3';
+    pillSb3.textContent = 'SB3 ' + sb3Count + '항목';
+    summary.append(pillSb3);
+  }
+
+  const arrow = doc.createElement('span');
+  arrow.className = 'nav-toggle-arrow';
+  arrow.textContent = '▾';
+  summary.append(arrow);
+  details.append(summary);
+
+  const grid = doc.createElement('div');
+  grid.className = 'nav-param-grid';
+
+  for (const el of parsed.elements) {
+    const card = doc.createElement('div');
+    card.className = 'nav-param-card target-' + (el.target === 'SB2' ? 'sb2' : 'sb3');
+
+    const header = doc.createElement('div');
+    header.className = 'nav-param-card-header';
+
+    const nameSpan = doc.createElement('span');
+    nameSpan.className = 'nav-param-name';
+    nameSpan.textContent = el.name;
+    if (el.meaning) {
+      const small = doc.createElement('small');
+      small.textContent = ' (' + el.meaning + ')';
+      nameSpan.append(small);
+    }
+
+    const tagSpan = doc.createElement('span');
+    tagSpan.className = 'nav-tag nav-tag-' + (el.target === 'SB2' ? 'sb2' : 'sb3');
+    tagSpan.textContent = el.target;
+
+    header.append(nameSpan);
+    header.append(tagSpan);
+
+    const valDiv = doc.createElement('div');
+    valDiv.className = 'nav-param-card-value';
+    valDiv.textContent = el.formatted;
+    valDiv.title = el.fullName + ': ' + el.formatted + '\n물리적 의미: ' + el.meaning + '\n출처: ' + el.wordOrigin;
+
+    const meta = doc.createElement('div');
+    meta.className = 'nav-param-card-meta';
+
+    const origin = doc.createElement('span');
+    origin.className = 'nav-param-origin';
+    origin.textContent = el.wordOrigin;
+
+    const desc = doc.createElement('span');
+    desc.className = 'nav-param-desc';
+    desc.textContent = el.meaning;
+    desc.title = el.meaning;
+
+    meta.append(origin);
+    meta.append(desc);
+    card.append(header);
+    card.append(valDiv);
+    card.append(meta);
+    grid.append(card);
+  }
+
+  details.append(grid);
+  return details;
+}
+
 export function isObservationEligible(o, targetConstellation = 'GPS') {
   const prValid = (o.trackingStatus & 1) !== 0;
   if (!prValid || !Number.isFinite(o.pseudorangeMeters) || o.pseudorangeMeters <= 0 || !Number.isFinite(o.dopplerHz)) {
@@ -594,7 +1121,13 @@ export function createObservationView(container, onSelect = () => {}, role = '')
         + ' · ' + (item.capturedAt ?? '시각 없음') + ' · 신호 ID ' + (item.message.signalId ?? '—')
         + ' · 주파수 ID ' + (item.message.frequencyId ?? '—') + ' · 버전 ' + (item.message.sfrbxVersion ?? '—') + ' · ')
         + values[7] + ' words · HEX ' + (iq ? '24 bit (패리티 제외)' : '32 bit') + '\n' + values[8];
-      cell.append(content); row.append(cell); target.append(row);
+      cell.append(content);
+      const parsed = decodeNavigationParameters(item, iq);
+      if (parsed && parsed.elements && parsed.elements.length > 0) {
+        const details = renderNavigationParametersDetails(parsed);
+        if (details) cell.append(details);
+      }
+      row.append(cell); target.append(row);
     }
     shown.forEach(item => appendMessage(navigationBody, item));
     if (!shown.length) {

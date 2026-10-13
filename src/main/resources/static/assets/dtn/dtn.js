@@ -4,7 +4,7 @@ import {initGnssControls} from './dtn-gnss.js?v=20261001-review';
 import {createDtnLog} from './dtn-log.js?v=20261001-review';
 import {initAdapterHealth, validAdapterUrl} from './dtn-adapter-health.js?v=20260922-compact-settings';
 import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20261001-review';
-import {createObservationView, numeric, renderClockBias, receiverInformation} from './dtn-observations.js?v=20261006-pvt-filter';
+import {createObservationView, numeric, renderClockBias, receiverInformation} from './dtn-observations.js?v=20261013-nav-params';
 
 const $ = id => document.getElementById(id);
 const payload = createPayloadViewer($('dtn-payload'), {sentOnly: true});
@@ -105,9 +105,10 @@ function hdtnValue(key, raw) {
   const rule = hdtnRules[key];
   if (!rule) return raw;
   if (typeof rule.default === 'number') {
-    if (!raw || !/^\d+$/.test(raw))
+    const value = Number(raw);
+    if (!raw || !/^\d+$/.test(raw) || !Number.isSafeInteger(value) || (key !== 'neighborDepletedStorageDelaySeconds' && value <= 0))
       throw new Error(rule.label + ': 양의 정수를 입력하세요.');
-    return Number(raw);
+    return value;
   }
   if (typeof rule.default === 'boolean') {
     if (!['true', 'false'].includes(raw)) throw new Error('우선순위 사용 여부를 선택하세요.');
@@ -245,9 +246,10 @@ function dtnValue(key, raw) {
   const rule = dtnRules[key];
   if (!rule) return raw;
   if (typeof rule.default === 'number') {
-    if (!raw || !/^\d+$/.test(raw))
+    const value = Number(raw);
+    if (!raw || !/^\d+$/.test(raw) || !Number.isSafeInteger(value) || value <= 0)
       throw new Error(rule.label + ': 양의 정수를 입력하세요.');
-    return Number(raw);
+    return value;
   }
   if (typeof rule.default === 'boolean') {
     if (!['true', 'false'].includes(raw)) throw new Error('임시(Transient) 모드 여부를 선택하세요.');
@@ -489,11 +491,13 @@ if ($('dtn-adapter-strip-status')) {
     $('dtn-send-url')?.focus();
   };
 }
-window.addEventListener('keydown', event => {
-  if (event.key === 'Escape' && $('dtn-settings-view')?.classList.contains('drawer-open')) {
-    showSettings(false);
-  }
-});
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+  window.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && $('dtn-settings-view')?.classList.contains('drawer-open')) {
+      showSettings(false);
+    }
+  });
+}
 
 let adapterOnline = false;
 let adapterStatusText = '확인 대기';
