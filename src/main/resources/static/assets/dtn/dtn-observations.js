@@ -188,6 +188,52 @@ export function navigationLabel(item) {
   return unclassifiedNavigation(msg);
 }
 
+export function navigationSubframeKey(item) {
+  const msg = item?.message || item || {};
+  const cid = msg.constellationId;
+  const words = msg.words;
+  if (!words || !words.length) return null;
+
+  if (cid === 0 || cid === 5) {
+    const sf = item?.display?.subframeId ?? ((Number(words[1]) >>> 8) & 0x7);
+    if (sf >= 1 && sf <= 4) return 'SF' + sf;
+    return null;
+  }
+  if (cid === 3) {
+    if (words.length === 10) {
+      const frn = (Number(words[0]) >>> 12) & 0x7;
+      if (frn >= 1 && frn <= 4) return 'SF' + frn;
+    }
+    return null;
+  }
+  if (cid === 2) {
+    if (words.length === 8) {
+      const type = (Number(words[0]) >>> 24) & 0x3f;
+      if (type >= 1 && type <= 5) return 'W' + type;
+    }
+    return null;
+  }
+  return null;
+}
+
+export function getActivePvtNavigationItems(navigation, navigationPositions, epochPosition) {
+  const latestByKey = new Map();
+  if (!Array.isArray(navigation)) return new Set();
+  for (let i = 0; i < navigation.length; i++) {
+    const item = navigation[i];
+    const pos = navigationPositions ? navigationPositions[i] : null;
+    if (epochPosition != null && pos != null && pos >= epochPosition) {
+      continue;
+    }
+    const msg = item?.message || item || {};
+    const satKey = msg.constellationId + ':' + msg.satelliteId;
+    const sfKey = navigationSubframeKey(item);
+    if (!sfKey) continue;
+    latestByKey.set(satKey + ':' + sfKey, item);
+  }
+  return new Set(latestByKey.values());
+}
+
 function extractLnavBits(words, startBit, numBits, signed = false, iq = false) {
   let val = 0n;
   for (let i = 0; i < numBits; i++) {
@@ -931,7 +977,11 @@ export function createObservationView(container, onSelect = () => {}, role = '')
     </details>
     <div class="navigation-heading"><h3 data-navigation-title>항법정보 · SFRBX</h3>
       <div data-association hidden><button type="button" data-navigation-all>전체 보기</button>
-        <span data-navigation-summary></span></div></div>
+        <span data-navigation-summary></span></div>
+      <label class="navigation-filter-label" title="현재 선택된 Epoch의 위성 위치 및 시계(PVT) 계산에 실제 사용된 최신 항법정보 1세트만 필터링하여 표시합니다.">
+        <input type="checkbox" data-navigation-pvt-active checked>
+        <span>선택 epoch</span>
+      </label></div>
     <div class="epoch-table-viewport" tabindex="0" aria-label="GNSS 항법정보 표">
       <table class="epoch-observation-table" data-navigation-table><caption data-navigation-caption>항법정보 · SFRBX · 수집된 전체 메시지</caption><thead><tr data-navigation-head>
         <th title="원본 레코드의 수집 순번이며 총 건수가 아닙니다. 0~95는 96건입니다.">수집 순번</th><th>수집 시각 <small>UTC</small></th><th>GNSS</th><th>위성</th>
@@ -989,11 +1039,26 @@ export function createObservationView(container, onSelect = () => {}, role = '')
   };
   const association = container.querySelector('[data-association]');
   association.hidden = !linkedNavigation;
+  const navFilterLabel = container.querySelector('.navigation-filter-label');
+  if (navFilterLabel) navFilterLabel.hidden = !linkedNavigation;
   const allNavigation = container.querySelector('[data-navigation-all]');
   allNavigation.onclick = () => {
     showAllNavigation = true;
     render(false);
   };
+  const navFilterCheckbox = container.querySelector('[data-navigation-pvt-active]');
+  if (navFilterCheckbox && navFilterCheckbox.checked === undefined) {
+    navFilterCheckbox.checked = true;
+  }
+  let showPvtActiveOnly = navFilterCheckbox ? !!navFilterCheckbox.checked : true;
+  if (navFilterCheckbox) {
+    const handleNavFilter = () => {
+      showPvtActiveOnly = !!navFilterCheckbox.checked;
+      renderAssociation(data?.epochs?.[Number(select.value)]?.observation?.observations || []);
+    };
+    navFilterCheckbox.onchange = handleNavFilter;
+    navFilterCheckbox.oninput = handleNavFilter;
+  }
 
   function selectSatellite(observations) {
     if (!linkedNavigation) return;
@@ -1052,54 +1117,6 @@ export function createObservationView(container, onSelect = () => {}, role = '')
     const frame = !!data?.receivedValues && !data.receivedValues.records;
     const selected = observations.find(o => satelliteKey(o) === selectedSatellite);
     const matching = navigation.filter(item => satelliteKey(item.message) === selectedSatellite);
-    const shown = !selected || showAllNavigation ? navigation : matching;
-    container.querySelector('[data-navigation-title]').textContent =
-      selected && !showAllNavigation ? satelliteName(selected) + '에서 받은 항법정보 · ' + shown.length + '건'
-        : '전체 항법정보 · ' + shown.length + '건';
-    allNavigation.textContent = '전체 보기';
-    allNavigation.hidden = showAllNavigation || !selected;
-    allNavigation.disabled = !selected;
-    allNavigation.setAttribute('aria-pressed', String(showAllNavigation));
-    const summary = container.querySelector('[data-navigation-summary]');
-    if (selected && !showAllNavigation) {
-      if (selected.constellationId === 0) {
-        const counts = [1, 2, 3].map(sf => 'SF' + sf + ' ' + matching.filter(n => n.display?.subframeId === sf).length + '건');
-        summary.textContent = counts.join(' · ') + ' · GPS LNAV 메시지 보유 현황';
-        summary.title = 'SF1~3이 모두 있어도 시각·궤도 유효성과 PVT 채택은 별도입니다.';
-      } else if (selected.constellationId === 3) {
-        const bdsSf = sf => matching.filter(n => {
-          const w = n.message?.words;
-          return w && w.length === 10 && ((Number(w[0]) >>> 12) & 0x7) === sf;
-        }).length;
-        const counts = [1, 2, 3, 4, 5].map(sf => 'SF' + sf + ' ' + bdsSf(sf) + '건');
-        summary.textContent = counts.join(' · ') + ' · BDS B1I 메시지 보유 현황';
-        summary.title = 'BDS B1I SF1~3(시계 및 궤도) 수신 현황입니다. 실제 계산 성공 여부는 PVT 상태를 확인하세요.';
-      } else if (selected.constellationId === 2) {
-        const galType = type => matching.filter(n => {
-          const w = n.message?.words;
-          return w && w.length === 8 && ((Number(w[0]) >>> 24) & 0x3f) === type;
-        }).length;
-        const counts = [1, 2, 3, 4, 5].map(t => 'W' + t + ' ' + galType(t) + '건');
-        summary.textContent = counts.join(' · ') + ' · GAL I/NAV 메시지 보유 현황';
-        summary.title = 'Galileo Word 1~4(궤도·시계) 및 Word 5(보정) 수신 현황입니다. Word 1~4가 모두 있어야 궤도가 복원됩니다.';
-      } else if (selected.constellationId === 5) {
-        const qzssSf = sf => matching.filter(n => {
-          const w = n.message?.words;
-          return w && w.length === 10 && ((Number(w[1]) >>> 8) & 0x7) === sf;
-        }).length;
-        const counts = [1, 2, 3].map(sf => 'SF' + sf + ' ' + qzssSf(sf) + '건');
-        summary.textContent = counts.join(' · ') + ' · QZSS L1 메시지 보유 현황';
-        summary.title = 'QZSS L1 SF1~3 수신 현황입니다.';
-      } else {
-        summary.textContent = '수신 항법 메시지 ' + matching.length + '건';
-        summary.title = '';
-      }
-    } else {
-      summary.textContent = '';
-      summary.title = '';
-    }
-    container.querySelector('[data-navigation-caption]').textContent = iq ? (data.assistance || 'I/Q 복호 항법정보')
-      : frame ? 'AFS 프레임 복원 · 원본 수집 순번·시각 없음' : '원본 레코드 순서 기준 · 관측 이후 메시지는 해당 시점 계산과 구분';
 
     // Raw processing order, not UTC or a sorted sequence number, determines availability.
     const records = data?.records || [];
@@ -1109,6 +1126,64 @@ export function createObservationView(container, onSelect = () => {}, role = '')
       if (record.type === 'NAVIGATION_UPDATE') navigationPositions.push(index);
     });
     const epochPosition = epochPositions[Number(select.value)];
+    const activeSet = getActivePvtNavigationItems(navigation, navigationPositions, epochPosition);
+
+    const baseShown = !selected || showAllNavigation ? navigation : matching;
+    const shown = showPvtActiveOnly ? baseShown.filter(item => activeSet.has(item)) : baseShown;
+
+    container.querySelector('[data-navigation-title]').textContent =
+      selected && !showAllNavigation
+        ? satelliteName(selected) + (showPvtActiveOnly ? '의 PVT 계산 활성 항법정보 · ' : '에서 받은 항법정보 · ') + shown.length + '건'
+        : '전체 항법정보' + (showPvtActiveOnly ? ' (PVT 계산 활성) · ' : ' · ') + shown.length + '건';
+    allNavigation.textContent = '전체 보기';
+    allNavigation.hidden = showAllNavigation || !selected;
+    allNavigation.disabled = !selected;
+    allNavigation.setAttribute('aria-pressed', String(showAllNavigation));
+    const summary = container.querySelector('[data-navigation-summary]');
+    if (selected && !showAllNavigation) {
+      if (selected.constellationId === 0) {
+        const counts = [1, 2, 3].map(sf => 'SF' + sf + ' ' + (showPvtActiveOnly
+          ? shown.filter(n => (n.display?.subframeId ?? ((Number(n.message?.words?.[1]) >>> 8) & 0x7)) === sf).length
+          : matching.filter(n => n.display?.subframeId === sf).length) + '건');
+        summary.textContent = counts.join(' · ') + ' · GPS LNAV ' + (showPvtActiveOnly ? 'PVT 활성 세트' : '메시지 보유 현황');
+        summary.title = 'SF1~3이 모두 있어야 시각·궤도가 완성되어 PVT 계산에 채택됩니다.';
+      } else if (selected.constellationId === 3) {
+        const bdsSf = sf => (showPvtActiveOnly ? shown : matching).filter(n => {
+          const w = n.message?.words;
+          return w && w.length === 10 && ((Number(w[0]) >>> 12) & 0x7) === sf;
+        }).length;
+        const counts = [1, 2, 3, 4, 5].map(sf => 'SF' + sf + ' ' + bdsSf(sf) + '건');
+        summary.textContent = counts.join(' · ') + ' · BDS B1I ' + (showPvtActiveOnly ? 'PVT 활성 세트' : '메시지 보유 현황');
+        summary.title = 'BDS B1I SF1~3(시계 및 궤도) 수신 현황입니다. 실제 계산 성공 여부는 PVT 상태를 확인하세요.';
+      } else if (selected.constellationId === 2) {
+        const galType = type => (showPvtActiveOnly ? shown : matching).filter(n => {
+          const w = n.message?.words;
+          return w && w.length === 8 && ((Number(w[0]) >>> 24) & 0x3f) === type;
+        }).length;
+        const counts = [1, 2, 3, 4, 5].map(t => 'W' + t + ' ' + galType(t) + '건');
+        summary.textContent = counts.join(' · ') + ' · GAL I/NAV ' + (showPvtActiveOnly ? 'PVT 활성 세트' : '메시지 보유 현황');
+        summary.title = 'Galileo Word 1~4(궤도·시계) 및 Word 5(보정) 수신 현황입니다. Word 1~4가 모두 있어야 궤도가 복원됩니다.';
+      } else if (selected.constellationId === 5) {
+        const qzssSf = sf => (showPvtActiveOnly ? shown : matching).filter(n => {
+          const w = n.message?.words;
+          return w && w.length === 10 && ((Number(w[1]) >>> 8) & 0x7) === sf;
+        }).length;
+        const counts = [1, 2, 3].map(sf => 'SF' + sf + ' ' + qzssSf(sf) + '건');
+        summary.textContent = counts.join(' · ') + ' · QZSS L1 ' + (showPvtActiveOnly ? 'PVT 활성 세트' : '메시지 보유 현황');
+        summary.title = 'QZSS L1 SF1~3 수신 현황입니다.';
+      } else {
+        summary.textContent = (showPvtActiveOnly ? 'PVT 계산 활성 항법 ' : '수신 항법 메시지 ') + shown.length + '건';
+        summary.title = '';
+      }
+    } else {
+      summary.textContent = showPvtActiveOnly ? '활성 세트 필터 적용 (' + shown.length + '건)' : '';
+      summary.title = '';
+    }
+    container.querySelector('[data-navigation-caption]').textContent = iq ? (data.assistance || 'I/Q 복호 항법정보')
+      : frame ? 'AFS 프레임 복원 · 원본 수집 순번·시각 없음'
+      : showPvtActiveOnly ? '현재 에폭 PVT 계산에 채택된 활성 항법 메시지만 필터링하여 표시합니다.'
+      : '원본 레코드 순서 기준 · 관측 이후 메시지는 해당 시점 계산과 구분';
+
     const navigationBody = container.querySelector('[data-navigation]');
     const headings = container.querySelector('[data-navigation-head]');
     headings.innerHTML = '<th>방송 위성</th><th>내용</th><th>관측 기준</th><th>원문</th>';
@@ -1119,9 +1194,35 @@ export function createObservationView(container, onSelect = () => {}, role = '')
       const row = document.createElement('tr');
       const label = navigationLabel(item);
       const position = navigationPositions[navigation.indexOf(item)];
-      const timing = frame ? '프레임 복원' : iq ? '복호·보조 정보'
-        : position == null || epochPosition == null ? '순서 확인 불가'
-        : position < epochPosition ? '선택 Epoch 이전 수신' : '선택 Epoch 이후 수신';
+      const isActive = activeSet.has(item);
+      let timingText = '';
+      let timingClass = '';
+      if (frame) {
+        timingText = isActive ? '프레임 복원 · PVT 활성' : '프레임 복원';
+        timingClass = isActive ? 'timing-active-pvt' : '';
+      } else if (iq) {
+        timingText = isActive ? '복호·보조 정보 · PVT 활성' : '복호·보조 정보';
+        timingClass = isActive ? 'timing-active-pvt' : '';
+      } else if (position == null || epochPosition == null) {
+        timingText = '순서 확인 불가';
+      } else if (position < epochPosition) {
+        if (isActive) {
+          timingText = '선택 Epoch PVT 계산 활성';
+          timingClass = 'timing-active-pvt';
+        } else {
+          timingText = '선택 Epoch 이전 수신 (이전 이력)';
+          timingClass = 'timing-history-pvt';
+        }
+      } else {
+        timingText = '선택 Epoch 이후 수신 (계산 제외)';
+        timingClass = 'timing-future-pvt';
+      }
+
+      if (isActive) {
+        if (row.classList?.add) row.classList.add('nav-row-active');
+        else row.className = 'nav-row-active';
+      }
+
       const cellSat = document.createElement('td');
       const badge = document.createElement('span');
       const cid = item.message.constellationId;
@@ -1131,11 +1232,22 @@ export function createObservationView(container, onSelect = () => {}, role = '')
       badge.title = satelliteName(item.message);
       cellSat.append(badge);
       row.append(cellSat);
-      for (const text of [label, timing]) {
-        const cell = document.createElement('td');
-        cell.textContent = text;
-        row.append(cell);
+
+      const cellLabel = document.createElement('td');
+      cellLabel.textContent = label;
+      row.append(cellLabel);
+
+      const cellTiming = document.createElement('td');
+      if (timingClass) {
+        const badgeSpan = document.createElement('span');
+        badgeSpan.className = 'timing-badge ' + timingClass;
+        badgeSpan.textContent = timingText;
+        cellTiming.append(badgeSpan);
+      } else {
+        cellTiming.textContent = timingText;
       }
+      row.append(cellTiming);
+
       const cell = document.createElement('td');
       const content = document.createElement('pre');
       const values = navigationCells(item, iq);
@@ -1155,7 +1267,9 @@ export function createObservationView(container, onSelect = () => {}, role = '')
     if (!shown.length) {
       const row = document.createElement('tr'), cell = document.createElement('td');
       cell.colSpan = 4;
-      cell.textContent = selected ? '이 위성에서 받은 항법 메시지가 없습니다.' : '표시할 항법정보가 없습니다.';
+      cell.textContent = selected
+        ? (showPvtActiveOnly ? satelliteName(selected) + '의 현재 에폭 PVT 계산 활성 항법정보가 없습니다.' : '이 위성에서 받은 항법 메시지가 없습니다.')
+        : (showPvtActiveOnly ? '현재 에폭 PVT 계산에 사용된 항법정보가 없습니다.' : '표시할 항법정보가 없습니다.');
       row.append(cell); navigationBody.append(row);
     }
     const common = navigation.filter(item => item.display?.commonCorrection && !shown.includes(item));

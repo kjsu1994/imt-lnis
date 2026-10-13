@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {numeric, clockBias, renderClockBias, observationCells, navigationCells, createObservationView, transmitTime, pvtInputStatus, lockTime, unclassifiedNavigation, navigationLabel, receiverInformation, observationCounts, decodeNavigationParameters, renderNavigationParametersDetails} from '../../main/resources/static/assets/dtn/dtn-observations.js';
+import {numeric, clockBias, renderClockBias, observationCells, navigationCells, createObservationView, transmitTime, pvtInputStatus, lockTime, unclassifiedNavigation, navigationLabel, receiverInformation, observationCounts, decodeNavigationParameters, renderNavigationParametersDetails, navigationSubframeKey, getActivePvtNavigationItems} from '../../main/resources/static/assets/dtn/dtn-observations.js';
 
 assert.equal(numeric(null), '—');
 assert.equal(numeric(NaN), '—');
@@ -470,5 +470,45 @@ const detailsElGal = renderNavigationParametersDetails(decGalW1);
 assert.ok(detailsElGal);
 assert.equal(detailsElGal.className, 'nav-param-details');
 
+// Test active navigation subframe key extraction
+assert.equal(navigationSubframeKey({message: {constellationId: 0, satelliteId: 4, words: [0, (1 << 8)]}}), 'SF1');
+assert.equal(navigationSubframeKey({message: {constellationId: 0, satelliteId: 4, words: [0, (2 << 8)]}}), 'SF2');
+assert.equal(navigationSubframeKey({message: {constellationId: 0, satelliteId: 4, words: [0, (3 << 8)]}}), 'SF3');
+assert.equal(navigationSubframeKey({message: {constellationId: 0, satelliteId: 4, words: [0, (5 << 8)]}}), null); // Almanac excluded
+assert.equal(navigationSubframeKey({message: {constellationId: 3, satelliteId: 10, words: [(1 << 12), ...new Array(9).fill(0)]}}), 'SF1');
+assert.equal(navigationSubframeKey({message: {constellationId: 3, satelliteId: 10, words: [(2 << 12), ...new Array(9).fill(0)]}}), 'SF2');
+assert.equal(navigationSubframeKey({message: {constellationId: 3, satelliteId: 10, words: [(5 << 12), ...new Array(9).fill(0)]}}), null); // Almanac excluded
+assert.equal(navigationSubframeKey({message: {constellationId: 2, satelliteId: 5, words: [(1 << 24), ...new Array(7).fill(0)]}}), 'W1');
+assert.equal(navigationSubframeKey({message: {constellationId: 2, satelliteId: 5, words: [(4 << 24), ...new Array(7).fill(0)]}}), 'W4');
+assert.equal(navigationSubframeKey({message: {constellationId: 2, satelliteId: 5, words: [(7 << 24), ...new Array(7).fill(0)]}}), null); // Almanac excluded
+
+// Test getActivePvtNavigationItems chronology & replacement
+const navGpsOld1 = {message: {constellationId: 0, satelliteId: 4, words: [0, (1 << 8)]}};
+const navGpsOld2 = {message: {constellationId: 0, satelliteId: 4, words: [0, (2 << 8)]}};
+const navGpsNew1 = {message: {constellationId: 0, satelliteId: 4, words: [0, (1 << 8)], seq: 2}};
+const navGpsNew2 = {message: {constellationId: 0, satelliteId: 4, words: [0, (2 << 8)], seq: 2}};
+const navGpsNew3 = {message: {constellationId: 0, satelliteId: 4, words: [0, (3 << 8)], seq: 2}};
+const navGpsFuture = {message: {constellationId: 0, satelliteId: 4, words: [0, (1 << 8)], seq: 3}};
+
+const sampleNav = [navGpsOld1, navGpsOld2, navGpsNew1, navGpsNew2, navGpsNew3, navGpsFuture];
+const sampleNavPos = [0, 1, 3, 4, 5, 8];
+// At epoch at index 2: only Old1 and Old2 exist
+const activeAt2 = getActivePvtNavigationItems(sampleNav, sampleNavPos, 2);
+assert.equal(activeAt2.size, 2);
+assert.ok(activeAt2.has(navGpsOld1));
+assert.ok(activeAt2.has(navGpsOld2));
+
+// At epoch at index 6: New1, New2, New3 exist and overwrite Old1, Old2. Future (index 8) is ignored.
+const activeAt6 = getActivePvtNavigationItems(sampleNav, sampleNavPos, 6);
+assert.equal(activeAt6.size, 3);
+assert.ok(activeAt6.has(navGpsNew1));
+assert.ok(!activeAt6.has(navGpsOld1)); // Overwritten by New1!
+assert.ok(activeAt6.has(navGpsNew2));
+assert.ok(!activeAt6.has(navGpsOld2)); // Overwritten by New2!
+assert.ok(activeAt6.has(navGpsNew3));
+assert.ok(!activeAt6.has(navGpsFuture)); // Future ignored!
+
 delete globalThis.document;
 console.log('PASS: GPS LNAV / QZSS / BDS B1I / GAL I/NAV parameter decoding, SB2/SB3 mappings, originating words and DOM inspector');
+console.log('PASS: Active navigation subframe keys, multi-epoch history replacement and PVT active filter');
+
