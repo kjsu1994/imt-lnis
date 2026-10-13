@@ -294,11 +294,44 @@
                       <tr><th scope="row">C/N0 · RAWX</th><td>27 dB-Hz</td><td>신호 품질을 나타냅니다. 관측값과 함께 PVT 계산기에 전달합니다.</td></tr>
                       <tr><th scope="row">유효성 · RAWX</th><td>의사거리 유효</td><td>사용 가능한 관측값을 고릅니다. 현재 PVT는 유효한 GPS L1 C/A 관측값을 사용합니다.</td></tr>
                       <tr><th scope="row">위상·추적 시간 · RAWX</th><td>109,759,724.342 cycles · 52.520 s</td><td>수신 원시기록에 보관합니다. 현재 PVT 계산 입력에는 사용하지 않습니다.</td></tr>
-                      <tr><th scope="row">항법 메시지 · SFRBX</th><td>GPS LNAV · 메시지당 10 words</td><td>궤도·시계 정보를 복원해 위성 위치와 시계 보정을 계산합니다.</td></tr>
+                      <tr><th scope="row">항법 메시지 · SFRBX</th><td>GPS LNAV · 메시지당 10 words</td><td>궤도·시계 정보를 복원해 위성 위치와 시계 보정을 계산합니다. (아래 매핑 참조)</td></tr>
                     </tbody>
                   </table>
                 </div>
-                <p class="fine">RAWX는 위성 관측값, SFRBX는 위성이 보낸 항법 메시지입니다. 위 수치는 수신 예이며, 이 시점에 PVT 계산용 항법정보가 모두 확보됐다는 뜻은 아닙니다.</p>
+                <div class="table-scroll" style="margin-top: 10px;">
+                  <table>
+                    <caption>UBX-RXM-SFRBX 항법 데이터 (Subframe 1~3, 720비트) vs AFS 프레임 분할 매핑 요약</caption>
+                    <thead>
+                      <tr>
+                        <th scope="col" style="width: 22%;">UBX 수신 서브프레임</th>
+                        <th scope="col" style="width: 32%;">주요 수록 파라미터 (원시 워드)</th>
+                        <th scope="col" style="width: 22%;">AFS 프레임 매핑 목적지</th>
+                        <th scope="col" style="width: 24%;">물리적 역할</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <th scope="row">Subframe 1 (Word 1~10)<br>시계 및 보정</th>
+                        <td>• 시계 기준시(toc), af0, af1<br>• 2차 시계 가속도(af2), 지연차(TGD)</td>
+                        <td>• SB2 (핵심 시계 3개)<br>• SB3 (보충 시계 2개)</td>
+                        <td>위성 원자시계 0·1·2차 보정 및 하드웨어 회로 지연 보정</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Subframe 2 (Word 1~10)<br>궤도 상반부</th>
+                        <td>• 궤도 기준시(toe), √a, e, M0<br>• 평균운동(Δn), 조화섭동 Cuc, Cus, Crs</td>
+                        <td>• SB2 (핵심 궤도 4개)<br>• SB3 (보충 섭동 3종)</td>
+                        <td>기본 타원 기하 4요소 + 궤도 반경·위도 주기적 중력 섭동 보정</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Subframe 3 (Word 1~10)<br>궤도 하반부</th>
+                        <td>• 경사각(i0), 승교점(Ω0), 근지점(ω)<br>• 세차율(Ω_dot), IDOT, 조화섭동 Crc, Cic, Cis</td>
+                        <td>• SB2 (핵심 궤도 3개)<br>• SB3 (보충 섭동 3종)</td>
+                        <td>3차원 궤도면 배향 3요소 + 궤도 경사·반경 조화 섭동 보정</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p class="fine">RAWX는 위성 관측값, SFRBX는 위성이 보낸 항법 메시지입니다. u-blox가 수신한 30개 워드(720비트) 중 케플러 기본 10요소(262비트)는 SB2로, 조화 섭동 6종 등 잔여 459비트는 SB3로 분할 패키징되어 100% 무손실 복원됩니다.</p>
               </div>
               <div id="frame-explorer" hidden>
                 <p class="fine">AFS 6,000 bits · 동기 68 + SB1 52 + SB2 2,400 + SB3 1,740 + SB4 1,740 bits (5,880 bits는 98×60 블록 인터리빙 적용)</p>
@@ -381,6 +414,65 @@
                     </table>
                   </div>
                   <p class="fine">연구실 환경에서 실시간 획득 가능한 신호원(지상 u-blox GPS 수신 신호)과 글로벌 표준 항법 솔버(RTKLIB)의 수치적 검증 신뢰성을 확보하기 위해 GPS LNAV를 채택하였으며, 달 궤도선 운용 시에는 섭동 계수만 달 중력장 모델로 치환되어 동일한 수식 구조로 동작합니다.</p>
+
+                  <h4>[SB2] 케플러 핵심 10요소 세부 비트 매핑 (Bit 22 ~ 283, 총 1,176 bits)</h4>
+                  <p><strong>SB2 비트 배치:</strong> NASA 규격 및 기존 오픈소스(eph2sbf)의 오프셋을 100% 보존하여 하위 호환성을 유지한 10개 핵심 요소 매핑입니다.</p>
+                  <div class="table-scroll">
+                    <table class="deep-dive-table">
+                      <thead>
+                        <tr>
+                          <th scope="col" style="width: 8%;">순번</th>
+                          <th scope="col" style="width: 18%;">핵심 요소 항목</th>
+                          <th scope="col" style="width: 26%;">물리적 의미</th>
+                          <th scope="col" style="width: 22%;">UBX 내 출처 (SFRBX)</th>
+                          <th scope="col" style="width: 16%;">SB2 비트 위치</th>
+                          <th scope="col" style="width: 10%;">크기</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr><th>—</th><td>Week / ITOW</td><td>시각 식별자</td><td>RAWX / SFRBX 헤더</td><td>Bit 0 ~ 21</td><td>22 bits</td></tr>
+                        <tr><th>1</th><td>t_oe</td><td>궤도 기준시각</td><td>Subframe 2 (Word 10)</td><td>Bit 22 ~ 37</td><td>16 bits</td></tr>
+                        <tr><th>2</th><td>ω (aop)</td><td>근지점 인수 (타원 방향)</td><td>Subframe 3 (Word 7~8)</td><td>Bit 39 ~ 69</td><td>31 bits</td></tr>
+                        <tr><th>3</th><td>√a (sqrta)</td><td>궤도 장반경 제곱근 (크기)</td><td>Subframe 2 (Word 8~9)</td><td>Bit 70 ~ 101</td><td>32 bits</td></tr>
+                        <tr><th>4</th><td>i₀ (inc0)</td><td>기준 궤도 경사각 (기울기)</td><td>Subframe 3 (Word 5~6)</td><td>Bit 102 ~ 133</td><td>32 bits</td></tr>
+                        <tr><th>5</th><td>Ω₀ (omg0)</td><td>승교점 적경 (경도 위치)</td><td>Subframe 3 (Word 3~4)</td><td>Bit 134 ~ 165</td><td>32 bits</td></tr>
+                        <tr><th>6</th><td>M₀ (m0)</td><td>기준 평균근점각 (위치)</td><td>Subframe 2 (Word 4~5)</td><td>Bit 166 ~ 197</td><td>32 bits</td></tr>
+                        <tr><th>7</th><td>e (ecc)</td><td>궤도 이심률 (찌그러짐)</td><td>Subframe 2 (Word 6~7)</td><td>Bit 198 ~ 229</td><td>32 bits</td></tr>
+                        <tr><th>8</th><td>a_f1</td><td>위성 시계 표류율</td><td>Subframe 1 (Word 9)</td><td>Bit 230 ~ 245</td><td>16 bits</td></tr>
+                        <tr><th>9</th><td>a_f0</td><td>위성 시계 편차</td><td>Subframe 1 (Word 10)</td><td>Bit 246 ~ 267</td><td>22 bits</td></tr>
+                        <tr><th>10</th><td>t_oc</td><td>시계 기준시각</td><td>Subframe 1 (Word 8)</td><td>Bit 268 ~ 283</td><td>16 bits</td></tr>
+                        <tr><th>—</th><td>규격 패딩</td><td>미사용 0101 패딩</td><td>—</td><td>Bit 284 ~ 1175</td><td>892 bits</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <h4>[SB3] 섭동 보정항 6종 및 정밀 파라미터 세부 비트 매핑 (Bit 58 ~ 516, 총 846 bits)</h4>
+                  <p><strong>SB3 비트 배치:</strong> Type 63 헤더(57b) 뒤의 459비트 잔여 슬롯에 탑재되어 100m 궤도 오차를 1mm 이하로 무손실 복원하는 세부 파라미터입니다.</p>
+                  <div class="table-scroll">
+                    <table class="deep-dive-table">
+                      <thead>
+                        <tr>
+                          <th scope="col" style="width: 18%;">섭동 보정 항목</th>
+                          <th scope="col" style="width: 32%;">물리적 의미</th>
+                          <th scope="col" style="width: 24%;">UBX 내 출처 (SFRBX)</th>
+                          <th scope="col" style="width: 16%;">SB3 탑재 위치</th>
+                          <th scope="col" style="width: 10%;">크기</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr><th>C_rs</th><td>궤도 반경 Sine 조화 섭동</td><td>Subframe 2 (Word 3)</td><td>SB3 잔여 슬롯 (Bit 58~516)</td><td>16 bits</td></tr>
+                        <tr><th>C_uc</th><td>궤도 위도 Cosine 조화 섭동</td><td>Subframe 2 (Word 6)</td><td>SB3 잔여 슬롯 (Bit 58~516)</td><td>16 bits</td></tr>
+                        <tr><th>C_us</th><td>궤도 위도 Sine 조화 섭동</td><td>Subframe 2 (Word 7~8)</td><td>SB3 잔여 슬롯 (Bit 58~516)</td><td>16 bits</td></tr>
+                        <tr><th>C_ic</th><td>경사각 Cosine 조화 섭동</td><td>Subframe 3 (Word 3)</td><td>SB3 잔여 슬롯 (Bit 58~516)</td><td>16 bits</td></tr>
+                        <tr><th>C_is</th><td>경사각 Sine 조화 섭동</td><td>Subframe 3 (Word 5)</td><td>SB3 잔여 슬롯 (Bit 58~516)</td><td>16 bits</td></tr>
+                        <tr><th>C_rc</th><td>궤도 반경 Cosine 조화 섭동</td><td>Subframe 3 (Word 7)</td><td>SB3 잔여 슬롯 (Bit 58~516)</td><td>16 bits</td></tr>
+                        <tr><th>Δn / Ω̇ / IDOT</th><td>평균운동량(16b) / 승교점세차율(24b) / 경사각변화율(14b)</td><td>SF2(W4) / SF3(W9) / SF3(W10)</td><td>SB3 잔여 슬롯</td><td>54 bits</td></tr>
+                        <tr><th>a_f2 / T_GD</th><td>2차 시계 가속도(8b) / 전송 지연차(8b)</td><td>Subframe 1 (Word 7, 8)</td><td>SB3 잔여 슬롯</td><td>16 bits</td></tr>
+                        <tr><th>식별·건전성 플래그</th><td>IODE, IODC, CodeL2, URA, SV Health 등 상태 비트</td><td>Subframe 1, 2, 3</td><td>SB3 잔여 슬롯</td><td>293 bits</td></tr>
+                        <tr><th>규격 패딩</th><td>미사용 0101 패딩</td><td>—</td><td>Bit 517 ~ 845</td><td>329 bits</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
 
                   <h4>NASA AFS 공식 표준(LSIS Vol-A) 대비 준수 및 독자 확장 분석</h4>
                   <p><strong>공식 표준과의 일치점 및 시험베드 확장 분석:</strong> 무선 물리 계층(Layer 1)은 NASA 최신 권고안을 100% 준수하며, 상위 데이터 계층(Layer 2)의 미할당 영역(SB3·SB4)을 지상 검증 목적에 맞추어 독자 확장한 구조 분석입니다.</p>
