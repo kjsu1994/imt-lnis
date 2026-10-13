@@ -365,11 +365,110 @@ assert.equal(decQzss.constellation, 'QZSS');
 assert.equal(decQzss.subframeId, 1);
 assert.match(decQzss.title, /QZSS/);
 
+// Test BeiDou B1I D1 decoding
+const sampleBdsSf1 = [0x38901313, 0x0fe010e5, 0x087462e2, 0x1c0040c7, 0x041e01b7, 0x3d0591fe, 0x0e227ea4, 0x100031dc, 0x2f0d9f6f, 0x3b1f8136];
+const sampleBdsSf2 = [0x38902311, 0x0ff8abba, 0x2efd3882, 0x317c9cc5, 0x3b980163, 0x1abe3594, 0x05d670cc, 0x2021fe58, 0x0c7a513c, 0x1558907b];
+const decBdsSf1 = decodeNavigationParameters({message: {constellationId: 3, satelliteId: 25, words: sampleBdsSf1}});
+assert.ok(decBdsSf1);
+assert.equal(decBdsSf1.constellation, 'BeiDou');
+assert.equal(decBdsSf1.subframeId, 1);
+assert.match(decBdsSf1.title, /BDS B1I/);
+assert.equal(decBdsSf1.elements.find(e => e.name === 't_oc').target, 'SB2');
+assert.equal(decBdsSf1.elements.find(e => e.name === 't_oc').wordOrigin, 'Word 3~4');
+assert.equal(decBdsSf1.elements.find(e => e.name === 'a_f0').target, 'SB2');
+assert.equal(decBdsSf1.elements.find(e => e.name === 'a_f0').wordOrigin, 'Word 8~9');
+assert.equal(decBdsSf1.elements.find(e => e.name === 'a_f1').target, 'SB2');
+assert.equal(decBdsSf1.elements.find(e => e.name === 'a_f1').wordOrigin, 'Word 9~10');
+assert.equal(decBdsSf1.elements.find(e => e.name === 'a_f2').target, 'SB3');
+assert.equal(decBdsSf1.elements.find(e => e.name === 'a_f2').wordOrigin, 'Word 8');
+assert.equal(decBdsSf1.elements.find(e => e.name === 'T_GD1').target, 'SB3');
+assert.equal(decBdsSf1.elements.find(e => e.name === 'T_GD1').wordOrigin, 'Word 4');
+
+const decBdsSf2 = decodeNavigationParameters({message: {constellationId: 3, satelliteId: 25, words: sampleBdsSf2}});
+assert.ok(decBdsSf2);
+assert.equal(decBdsSf2.constellation, 'BeiDou');
+assert.equal(decBdsSf2.subframeId, 2);
+assert.equal(decBdsSf2.elements.find(e => e.name === '√a').target, 'SB2');
+assert.equal(decBdsSf2.elements.find(e => e.name === '√a').wordOrigin, 'Word 9~10');
+assert.equal(decBdsSf2.elements.find(e => e.name === 'e').target, 'SB2');
+assert.equal(decBdsSf2.elements.find(e => e.name === 'e').wordOrigin, 'Word 5~6');
+assert.equal(decBdsSf2.elements.find(e => e.name === 'M_0').target, 'SB2');
+assert.equal(decBdsSf2.elements.find(e => e.name === 'M_0').wordOrigin, 'Word 4~5');
+assert.equal(decBdsSf2.elements.find(e => e.name === 'C_rs').target, 'SB3');
+assert.equal(decBdsSf2.elements.find(e => e.name === 'C_rs').wordOrigin, 'Word 8~9');
+assert.equal(decBdsSf2.elements.find(e => e.name === 'Δn').target, 'SB3');
+assert.equal(decBdsSf2.elements.find(e => e.name === 'Δn').wordOrigin, 'Word 2~3');
+
+// Test Galileo E1B I/NAV decoding
+const sampleGalW1 = [0x052a7fd8, 0x0280437a, 0x17d5cbb3, 0x7f174000, 0xa63572c7, 0x83fcf92a, 0xaaaa744e, 0xcdc10000];
+const sampleGalW3 = [0x0c5126aa, 0x0280437a, 0x17d5cbb3, 0x7f174000, 0xa63572c7, 0x83fcf92a, 0xaaaa744e, 0xcdc10000];
+const sampleGalW4 = [0x116761a7, 0x0280437a, 0x17d5cbb3, 0x7f174000, 0xa63572c7, 0x83fcf92a, 0xaaaa744e, 0xcdc10000];
+
+const decGalW1 = decodeNavigationParameters({message: {constellationId: 2, satelliteId: 27, words: sampleGalW1}});
+assert.ok(decGalW1);
+assert.equal(decGalW1.constellation, 'Galileo');
+assert.equal(decGalW1.subframeId, 1);
+assert.match(decGalW1.title, /Word 1/);
+assert.equal(decGalW1.elements.find(e => e.name === 't_oe').target, 'SB2');
+assert.equal(decGalW1.elements.find(e => e.name === 't_oe').wordOrigin, 'Word 1');
+assert.equal(decGalW1.elements.find(e => e.name === '√a').target, 'SB2');
+assert.equal(decGalW1.elements.find(e => e.name === '√a').wordOrigin, 'Word 3~4');
+assert.equal(decGalW1.elements.find(e => e.name === 'e').target, 'SB2');
+assert.equal(decGalW1.elements.find(e => e.name === 'e').wordOrigin, 'Word 2~3');
+assert.equal(decGalW1.elements.find(e => e.name === 'M_0').target, 'SB2');
+assert.equal(decGalW1.elements.find(e => e.name === 'M_0').wordOrigin, 'Word 1~2');
+assert.equal(decGalW1.elements.find(e => e.name === 'IODnav').target, 'SB3');
+
+const decGalW3 = decodeNavigationParameters({message: {constellationId: 2, satelliteId: 32, words: sampleGalW3}});
+assert.ok(decGalW3);
+assert.equal(decGalW3.constellation, 'Galileo');
+assert.equal(decGalW3.subframeId, 3);
+assert.match(decGalW3.title, /Word 3/);
+assert.equal(decGalW3.elements.find(e => e.name === 'C_rs').target, 'SB3');
+assert.equal(decGalW3.elements.find(e => e.name === 'C_rs').wordOrigin, 'Word 4');
+assert.equal(decGalW3.elements.find(e => e.name === 'C_rc').target, 'SB3');
+assert.equal(decGalW3.elements.find(e => e.name === 'C_rc').wordOrigin, 'Word 3~4');
+assert.equal(decGalW3.elements.find(e => e.name === 'C_uc').target, 'SB3');
+assert.equal(decGalW3.elements.find(e => e.name === 'C_uc').wordOrigin, 'Word 2~3');
+assert.equal(decGalW3.elements.find(e => e.name === 'C_us').target, 'SB3');
+assert.equal(decGalW3.elements.find(e => e.name === 'C_us').wordOrigin, 'Word 3');
+assert.equal(decGalW3.elements.find(e => e.name === 'Ω̇').target, 'SB3');
+assert.equal(decGalW3.elements.find(e => e.name === 'Ω̇').wordOrigin, 'Word 1~2');
+assert.equal(decGalW3.elements.find(e => e.name === 'Δn').target, 'SB3');
+assert.equal(decGalW3.elements.find(e => e.name === 'Δn').wordOrigin, 'Word 2');
+
+const decGalW4 = decodeNavigationParameters({message: {constellationId: 2, satelliteId: 32, words: sampleGalW4}});
+assert.ok(decGalW4);
+assert.equal(decGalW4.constellation, 'Galileo');
+assert.equal(decGalW4.subframeId, 4);
+assert.match(decGalW4.title, /Word 4/);
+assert.equal(decGalW4.elements.find(e => e.name === 't_oc').target, 'SB2');
+assert.equal(decGalW4.elements.find(e => e.name === 't_oc').wordOrigin, 'Word 2~3');
+assert.equal(decGalW4.elements.find(e => e.name === 'a_f0').target, 'SB2');
+assert.equal(decGalW4.elements.find(e => e.name === 'a_f0').wordOrigin, 'Word 3~4');
+assert.equal(decGalW4.elements.find(e => e.name === 'a_f1').target, 'SB2');
+assert.equal(decGalW4.elements.find(e => e.name === 'a_f1').wordOrigin, 'Word 4');
+assert.equal(decGalW4.elements.find(e => e.name === 'a_f2').target, 'SB3');
+assert.equal(decGalW4.elements.find(e => e.name === 'a_f2').wordOrigin, 'Word 4');
+assert.equal(decGalW4.elements.find(e => e.name === 'C_ic').target, 'SB3');
+assert.equal(decGalW4.elements.find(e => e.name === 'C_ic').wordOrigin, 'Word 1~2');
+assert.equal(decGalW4.elements.find(e => e.name === 'C_is').target, 'SB3');
+assert.equal(decGalW4.elements.find(e => e.name === 'C_is').wordOrigin, 'Word 2');
+
 // Test details DOM rendering
 globalThis.document = {createElement: element};
 const detailsEl = renderNavigationParametersDetails(decSf1);
 assert.ok(detailsEl);
 assert.equal(detailsEl.className, 'nav-param-details');
 assert.ok(detailsEl.children.length >= 2);
+
+const detailsElBds = renderNavigationParametersDetails(decBdsSf1);
+assert.ok(detailsElBds);
+assert.equal(detailsElBds.className, 'nav-param-details');
+
+const detailsElGal = renderNavigationParametersDetails(decGalW1);
+assert.ok(detailsElGal);
+assert.equal(detailsElGal.className, 'nav-param-details');
+
 delete globalThis.document;
-console.log('PASS: GPS LNAV / QZSS parameter decoding, SB2/SB3 mappings, originating words and DOM inspector');
+console.log('PASS: GPS LNAV / QZSS / BDS B1I / GAL I/NAV parameter decoding, SB2/SB3 mappings, originating words and DOM inspector');
