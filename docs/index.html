@@ -225,10 +225,13 @@
     </defs>
   </svg>
   <main class="wrap">
-    <header class="masthead">
+    <header class="masthead" style="position: relative;">
       <a class="brand" href="./" aria-label="안내 처음으로" title="안내 처음으로">
         <img src="./logo_v3.png?v=995392000e36" alt="LNIS" width="56" height="56">
       </a>
+      <div class="header-center-logo" style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); pointer-events: none;">
+        <img src="./imt_logo.png" alt="IMT Logo" style="height: 44px; max-width: 220px; object-fit: contain;">
+      </div>
       <button class="plain" id="fullscreen" type="button">전체화면</button>
     </header>
     <section id="guide" aria-label="GNSS 송수신 시험 안내">
@@ -336,6 +339,7 @@
               <div id="frame-explorer" hidden>
                 <p class="fine">AFS 6,000 bits · 동기 68 + SB1 52 + SB2 2,400 + SB3 1,740 + SB4 1,740 bits (5,880 bits는 98×60 블록 인터리빙 적용)</p>
                 <div class="frame-selector" role="group" aria-label="AFS 서브프레임 설명">
+                  <button type="button" data-sb="0" aria-pressed="false">SP<small>68 bits</small></button>
                   <button type="button" data-sb="1" aria-pressed="false">SB1<small>52 bits</small></button>
                   <button type="button" data-sb="2" aria-pressed="false">SB2<small>2,400 bits</small></button>
                   <button type="button" data-sb="3" aria-pressed="false">SB3<small>1,740 bits</small></button>
@@ -498,6 +502,13 @@
                         <tr>
                           <th scope="row">물리 계층 (L1)<br>공통 프레임 규격</th>
                           <td>• 6,000 bits (750 bytes), 12초 주기<br>• 프레임 동기 부호 68 bits<br>• BCH(52,8), LDPC SF2(1/2), LDPC SF3(1/2 천공)<br>• 98×60 블록 인터리빙 (5,880 bits)</td>
+                          <td>NASA 공식 규격과 동일</td>
+                          <td>NASA 공식 규격과 동일</td>
+                          <td><strong>100% 완전 일치</strong><br>(표준 준수)</td>
+                        </tr>
+                        <tr>
+                          <th scope="row">SP (L1)<br>프레임 동기 부호</th>
+                          <td>• 68 bits 고정 의사난수 패턴<br>• 16진수: 0xCC 63 F7 45 36 F4 9E 04 A<br>• 자기상관 피크 검출로 프레임 시작점 확정</td>
                           <td>NASA 공식 규격과 동일</td>
                           <td>NASA 공식 규격과 동일</td>
                           <td><strong>100% 완전 일치</strong><br>(표준 준수)</td>
@@ -926,6 +937,20 @@
     }
 
     const subframeSpecs = {
+      0: () => ({
+        title: 'SP (프레임 동기 부호) · 프레임 시작점 식별 및 나노초 시각 동기',
+        badges: [
+          { text: '표준 동일 (NASA LSIS)', cls: 'badge-std' },
+          { text: '68 bits 고정 의사난수', cls: 'badge-std' },
+          { text: '무부호화 · 무천공 · 무인터리빙', cls: 'badge-ext' }
+        ],
+        note: '수신기가 우주 전파 잡음 속에서 6,000심볼 프레임의 정확한 시작점을 나노초 단위로 검출(Frame Lock)하기 위한 68비트 고정 패턴입니다. 자기상관성(Auto-correlation)이 매우 뛰어나 단 1비트라도 어긋나면 0으로 상쇄되고, 100% 포개어질 때만 펄스 피크가 발생하여 오인식 확률이 사실상 0에 수렴합니다.',
+        fields: [
+          ['SP 고정 바이트열 (Hex)', '68 bits (8.5B)', '0xCC 63 F7 45 36 F4 9E 04 A (MSB-first)', 'NASA 공식 고정 패턴 (0xCC63F74536F49E04A0)', '동일 제공 (달-지구 프레임 동기화 기준 패턴)'],
+          ['2진 비트열 (상위 32b)', '32 bits', '11001100 01100011 11110111 01000101', '의사난수 동기화 패턴 전반부', '동일 제공 (위상 동기 및 상관 피크 검출)'],
+          ['2진 비트열 (하위 36b)', '36 bits', '00110110 11110100 10011110 00000100 1010', '의사난수 동기화 패턴 후반부', '동일 제공 (프레임 경계 확정 및 SB1 진입)']
+        ]
+      }),
       1: () => ({
         title: 'SB1 (서브블록 1) · 프레임 동기 및 시간 간격 식별',
         badges: [
@@ -947,21 +972,21 @@
           { text: '정보 1,176b + CRC 24b', cls: 'badge-std' },
           { text: 'LDPC SF2 부호화 (2,400 bits)', cls: 'badge-std' }
         ],
-        note: '표준 오픈소스의 10개 핵심 궤도요소(eph2sbf, 284 bits) 위치를 그대로 유지하여 하위 호환성을 확보했습니다.',
+        note: '표준 오픈소스의 10개 핵심 궤도요소(eph2sbf, 262 bits) 및 프레임 시각 식별자(22 bits) 비트 위치를 그대로 유지하여 하위 호환성을 확보했습니다.',
         fields: [
-          ['Type 63 헤더', '57 bits', 'header', 'Type(6b)=63, Ver(6b)=3, Alert(1b), TOW(20b), Week(16b), PRN(6b), Health(2b)', '동일 제공 (메시지 유형 및 위성 ID 식별)'],
+          ['Week / ITOW 헤더', '22 bits', 'time', 'GPS Week(13b) + TOW 카운터(9b, 20분 주기) 프레임 시간 식별자', '동일 제공 (프레임 시간 식별자)'],
+          ['toe (궤도력 기준시)', '16 bits', 'scale 2⁴ s', 'GPS 주간 기준 궤도력 유효 시각', '동일 제공 (달 궤도력 유효 기준시)'],
           ['e (이심률)', '32 bits', 'scale 2⁻³³', '케플러 궤도 타원 이심률', '동일 제공 (달 중심 궤도 MCMF 타원 이심률)'],
           ['√A (궤도 장반경 제곱근)', '32 bits', 'scale 2⁻¹⁹ m¹/²', 'GPS 위성 궤도 장반경 제곱근', '동일 제공 (달 중심 궤도 장반경 제곱근)'],
           ['i₀ (궤도 경사각)', '32 bits', 'scale 2⁻³¹ semi-circles', '기준 에포크에서의 궤도 경사각', '동일 제공 (달 적도면 기준 궤도 경사각)'],
           ['Ω₀ (승교점 적경)', '32 bits', 'scale 2⁻³¹ semi-circles', '주간 기준시에서의 승교점 적경', '동일 제공 (달 중심 관성좌표계 기준 승교점 적경)'],
           ['ω (근지점 인수)', '32 bits', 'scale 2⁻³¹ semi-circles', '궤도 평면 상의 근지점 편각', '동일 제공 (달 궤도 평면 근지점 편각)'],
-          ['M₀ (평균 근량이각)', '32 bits', 'scale 2⁻³¹ semi-circles', '기준시에서의 평균 근량이각', '동일 제공 (달 궤도 기준시 평균 근량이각)'],
-          ['toe (궤도력 기준시)', '16 bits', 'scale 2⁴ s', 'GPS 주간 기준 궤도력 유효 시각', '동일 제공 (달 궤도력 유효 기준시)'],
+          ['M₀ (평균 근점각)', '32 bits', 'scale 2⁻³¹ semi-circles', '기준시에서의 평균 근점각', '동일 제공 (달 궤도 기준시 평균 근점각)'],
           ['toc (시계 기준시)', '16 bits', 'scale 2⁴ s', '위성 탑재 시계 보정 기준 시각', '동일 제공 (위성 탑재 원자시계 보정 기준시)'],
           ['af0 (위성 시계 편차)', '22 bits', 'scale 2⁻³¹ s', '다항식 0차 시계 보정 계수', '동일 제공 (원자시계 0차 편차 오프셋)'],
           ['af1 (위성 시계 드리프트)', '16 bits', 'scale 2⁻⁴³ s/s', '다항식 1차 시계 드리프트 계수', '동일 제공 (원자시계 1차 주파수 드리프트)'],
-          ['패딩 (Padding)', '835 bits', '0101… 교대', '표준 1,176비트 정보 크기 충족용 더미 비트', '동일 제공 (규격 정렬용 패딩)'],
-          ['CRC-24 & LDPC SF2', '1,224 bits', '부호화', 'CRC-24 (24 bits) 부가 후 LDPC SF2(부호율 1/2) → 총 2,400 bits', '동일 제공 (물리 계층 오류 정정 부호)']
+          ['패딩 (Padding)', '892 bits', '0101… 교대', '표준 1,176비트 정보 크기 충족용 더미 비트 (22 + 262 + 892 = 1,176)', '동일 제공 (규격 정렬용 패딩)'],
+          ['CRC-24 & LDPC SF2', '1,224 bits', '부호화', 'CRC-24 (24 bits) 부가 후 LDPC SF2(부호율 1/2) → 총 2,400 bits 심볼', '동일 제공 (물리 계층 오류 정정 부호)']
         ]
       }),
       3: () => ({
@@ -1012,8 +1037,8 @@
                 ['obsIndex / Week / TOW', '88 bits', 'uint & double', '관측 순번(8b), GPS Week(16b), ms TOW(64b)', '동일 제공 (관측 기준 시각)'],
                 ['원본 의사거리 Pᵢ', '64 bits', 'double (m)', 'u-blox 계측 의사거리 (비교 대조용 보존)', '수신기 RF 상관기에서 물리 계측 (송신 불가)'],
                 ['Doppler / C/N0 / Status', '48 bits', 'float & uint8', '도플러 주파수(32b), C/N0(8b), 추적상태(8b)', '수신기 추적 루프(PLL)에서 물리 계측 (송신 불가)'],
-                ['전리층 지연 계수', '240 bits', 'Klobuchar', '알파 0~3 (각 30b), 베타 0~3 (각 30b)', '달 환경 불필요 (달 표면 진공/플라즈마 모델 대체)'],
-                ['패딩 (Padding)', '349 bits', '0101… 교대', '표준 846비트 정보 크기 충족용 더미 비트 (총 506비트 유효)', '동일 제공 (규격 정렬용 패딩)'],
+                ['전리층 플래그 및 계수', '249 bits', 'Klobuchar', 'hasIon(1b) + ionPrn(8b) + Klobuchar α₀~α₃/β₀~β₃(240b)', '달 환경 불필요 (달 표면 진공/플라즈마 모델 대체)'],
+                ['패딩 (Padding)', '340 bits', '0101… 교대', '표준 846비트 정보 크기 충족용 더미 비트 (총 506비트 유효: 506 + 340 = 846)', '동일 제공 (규격 정렬용 패딩)'],
                 ['CRC-24 & LDPC SF3', '894 bits', '부호화', 'CRC-24 (24 bits) 부가 후 LDPC SF3 부호화 → 총 1,740 bits', '동일 제공 (물리 계층 오류 정정 부호)']
               ]
             : [
@@ -1023,9 +1048,9 @@
                 ['Doppler 주파수', '32 bits', 'float (Hz)', 'u-blox 계측 정답 도플러 (수신측 속도 계산용)', '시험베드 전용 주입 (실제 우주는 수신기 PLL 물리 계측)'],
                 ['C/N0 신호 품질', '8 bits', 'uint8 (dB-Hz)', 'u-blox 계측 정답 신호강도 (수신측 가중치 계산용)', '시험베드 전용 주입 (실제 우주는 수신기 안테나 수신품질 계측)'],
                 ['추적 상태 (trackingStatus)', '8 bits', 'uint8', 'u-blox 동기 유효 플래그', '시험베드 전용 주입 (수신기 동기 상태)'],
-                ['전리층 파라미터', '240 bits', 'Klobuchar', 'Klobuchar 모델 α₀~α₃ (각 30b), β₀~β₃ (각 30b)', '달 환경 불필요 (지구 대기 모델, 달은 진공/플라즈마 모델)'],
+                ['전리층 플래그 및 계수', '249 bits', 'Klobuchar', 'hasIon(1b) + ionPrn(8b) + Klobuchar α₀~α₃/β₀~β₃(240b)', '달 환경 불필요 (지구 대기 모델, 달은 진공/플라즈마 모델)'],
                 ['시험 시작 시각 (anchor S)', '114 bits', '초64b+ns32b+ps18b', '시험 시작 접수 시각 S', '지상 시험 시작 기준시'],
-                ['패딩 (Padding)', '176 bits', '0101… 교대', '표준 846비트 정보 크기 충족용 더미 비트 (총 670비트 유효)', '동일 제공 (규격 정렬용 패딩)'],
+                ['패딩 (Padding)', '176 bits', '0101… 교대', '표준 846비트 정보 크기 충족용 더미 비트 (총 670비트 유효: 670 + 176 = 846)', '동일 제공 (규격 정렬용 패딩)'],
                 ['CRC-24 & LDPC SF3', '894 bits', '부호화', 'CRC-24 (24 bits) 부가 후 LDPC SF3 부호화 → 총 1,740 bits', '동일 제공 (물리 계층 오류 정정 부호)']
               ]
         };
@@ -1034,6 +1059,7 @@
 
     function showSubframe(block) {
       const descriptions = {
+        0: 'SP · 프레임 동기 패턴입니다. 68비트 고정 의사난수 부호로 우주 전파 잡음 속에서 프레임 시작점을 나노초 정밀도로 검출합니다.',
         1: 'SB1 · 기존 프레임 식별 구조를 유지합니다. BCH 부호화 후 52 bits입니다.',
         2: 'SB2 · 기존 항법정보입니다. 정보 1,176 + CRC 24 bits를 부호화해 2,400 bits로 전달합니다.',
         3: 'SB3 · LNIS 보충 항법정보입니다. GPS LNAV의 나머지 정보를 담아 수신측 PVT 입력 복원에 사용합니다.',

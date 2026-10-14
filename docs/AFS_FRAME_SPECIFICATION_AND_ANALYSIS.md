@@ -53,15 +53,15 @@ AFS 한 프레임은 총 **6,000 bits (750 bytes)**로 구성되며, 신호 지�
 * **오류 정정 부호 (44 bits)**: BCH(52, 8) 순환 부호화 적용 $\rightarrow$ 총 52 bits.
 
 ### 3) SB2 (Subblock 2, 핵심 궤도력 및 시계): 2,400 bits
-* **정보 비트 (1,176 bits)**: 헤더(Type 63, WN, ITOW) + 10개 핵심 궤도/시계 파라미터(262 bits) + 패딩(835 bits).
+* **정보 비트 (1,176 bits)**: 프레임 시각 헤더(Week, ITOW 22 bits) + 10개 핵심 궤도/시계 파라미터(262 bits) + 규격 패딩(892 bits).
 * **오류 정정 부호**: CRC-24 (24 bits) 부가 $\rightarrow$ 총 1,200 bits를 LDPC SF2 (부호율 1/2)로 인코딩 $\rightarrow$ 총 2,400 bits.
 
 ### 4) SB3 (Subblock 3, 정밀 섭동 계수 보충): 1,740 bits
-* **정보 비트 (846 bits)**: 헤더(57 bits) + LNAV 잔여 섭동 계수(459 bits) + 패딩(329 bits).
+* **정보 비트 (846 bits)**: 공통 헤더(57 bits) + navPresent 플래그(1 bit) + LNAV 잔여 섭동 계수(459 bits) + 규격 패딩(329 bits).
 * **오류 정정 부호**: CRC-24 (24 bits) 부가 $\rightarrow$ 총 870 bits를 LDPC SF3 (부호율 1/2 천공)로 인코딩 $\rightarrow$ 총 1,740 bits.
 
 ### 5) SB4 (Subblock 4, 관측값 주입 및 DTN 에뮬레이션): 1,740 bits
-* **정보 비트 (846 bits)**: 헤더(57 bits) + 가상 송신시각($T^*_i$) 및 관측값(의사거리, 도플러, C/N0, 전리층) + 패딩.
+* **정보 비트 (846 bits)**: 공통 헤더(57 bits) + 관측값/가상송신시각 + 전리층 플래그/계수(249 bits) + 규격 패딩(340 bits 또는 176 bits).
 * **오류 정정 부호**: CRC-24 (24 bits) 부가 $\rightarrow$ 총 870 bits를 LDPC SF3 (부호율 1/2 천공)로 인코딩 $\rightarrow$ 총 1,740 bits.
 
 ### 6) 채널 인터리빙 (Interleaving): 5,880 bits
@@ -161,6 +161,12 @@ $$\begin{cases}
   sdr_unpack_data(af1,   16, syms + 246);
   ```
 * **공학적 결론**: LNIS 아키텍처가 임의로 시간 파라미터 4종을 추가한 것이 아니며, **NASA 레퍼런스 오픈소스 규격의 SB2 비트 레이아웃을 100% 온전히 보존하여 기존 표준 소프트웨어 수신기(`pocket_trk`)와의 상호 운용성(Interoperability)을 엄격히 확보**한 것입니다.
+
+> [!NOTE]
+> **$\omega$(aop) 및 $e$(ecc) 비트 정합성 및 Java 구현체(`AfsPvtFrameCodec`)와의 관계 해설**
+> - **NASA 공식 규격 및 C 레퍼런스 오픈소스**: 위의 `afs_sim.c`에서 확인할 수 있듯이, 공식 규격에서 $\omega$(aop)와 $e$(ecc)는 각각 공식 **32 bits**이며, 10대 요소 합계는 정확히 262 bits입니다.
+> - **Java 구현체의 분할 슬롯팅**: Java 코드(`AfsPvtFrameCodec.java`)의 내부 테이블(`FIELDS`)에서는 LNAV 비트를 SB2에 매핑할 때 Bit 38의 1비트 gap으로 인해 Bit 39~69(31 bits)로 1차 슬롯팅되어 있습니다.
+> - **100% 무손실 복원 메커니즘**: Java 코드는 SB2에 들어가지 않은 미할당 LNAV 비트 전체(459 bits)를 **SB3(Residual Block)**에 모아서 전송합니다. 따라서 31비트 슬롯팅으로 인해 남겨진 최하위 1비트(LSB) 역시 SB3를 통해 수신단으로 완벽히 전달되며, 수신단의 `decode()` 시점에 720비트 원본 LNAV(SF1~SF3)로 100% 무손실 복원되므로 최종 PVT 연산에는 1비트의 손실도 발생하지 않습니다.
 
 ---
 
