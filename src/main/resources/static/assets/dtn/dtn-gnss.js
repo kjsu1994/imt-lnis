@@ -7,11 +7,11 @@ export function initGnssControls({port, baud, refresh, changed = () => {}, log =
   let lastTransition = '', peerTime = null;
   const request = (path, options = {}) => requestJson('/node/gnss' + path, {cache: 'no-store', ...options});
   const attached = () => ['CONNECTED', 'CONNECTING', 'RECONNECTING'].includes(state.state);
+  const labels = {DISCONNECTED: '미연결', CONNECTING: '연결 중', CONNECTED: '연결됨',
+    RECONNECTING: '재연결 중', ERROR: '연결 오류'};
   const timeLabel = value => ({VALID: '시간 수신', ACQUIRING: '시간 확보 중',
     STALE: '시간 갱신 끊김', UNAVAILABLE: '시간 미확인'}[value] || '시간 미확인');
   function render() {
-    const labels = {DISCONNECTED: '미연결', CONNECTING: '연결 중', CONNECTED: '연결됨',
-      RECONNECTING: '재연결 중', ERROR: '연결 오류'};
     $('gnss-connection-state').textContent = labels[state.state] || '미확인';
     $('gnss-connection-state').className = 'pill ' + (state.state === 'CONNECTED' ? 'online' : 'warning');
     $('gnss-connect').textContent = attached() ? '연결 해제' : '연결';
@@ -26,8 +26,7 @@ export function initGnssControls({port, baud, refresh, changed = () => {}, log =
       $(baud).value = String(state.baudRate);
     }
     $('gnss-time-state').textContent = timeLabel(state.timeState);
-    $('gnss-summary').textContent = 'GNSS ' + (labels[state.state] || '미확인') + ' · ' + timeLabel(state.timeState)
-      + ' / 상대 GNSS ' + timeLabel(peerTime);
+    updateServiceClockDetail();
     $('gnss-time-detail').textContent = 'GNSS UTC: ' + (state.timeState === 'VALID' && state.utc ? state.utc : '—')
       + '\n최근 메시지 수신: ' + (state.updatedAt ? new Date(state.updatedAt).toLocaleTimeString('ko-KR') : '—')
       + '\n수신기 시간 정확도 추정: ' + (state.accuracyNanos == null ? '—' : state.accuracyNanos + ' ns (PC 정확도 아님)')
@@ -72,9 +71,23 @@ export function initGnssControls({port, baud, refresh, changed = () => {}, log =
     await pollClock();
   }
   const tickNow = () => globalThis.performance?.now() ?? Date.now();
-  let clockSample = null, clockTick = 0, clockWorking = false;
+  let clockSample = null, clockTick = 0, clockWorking = false, lastClockValue = null;
   const sourceLabel = value => ({SYSTEM: 'PC 시각 · 미보정', GNSS_USB: 'GNSS · 근사 보정',
     PEER_GNSS: '상대 GNSS · 근사 보정', NTP: '공통 NTP · 근사 보정'}[value] || '미확인');
+  function updateServiceClockDetail(value = lastClockValue) {
+    if (!$('service-clock-detail') || !value) return;
+    lastClockValue = value;
+    const gnssSummary = 'GNSS ' + (labels[state.state] || '미확인') + ' · ' + timeLabel(state.timeState)
+      + ' / 상대 GNSS ' + timeLabel(peerTime);
+    $('service-clock-detail').textContent = 'PC UTC: ' + value.rawAt + '\n시험 UTC: ' + value.trialAt
+      + '\n보정량: ' + Number(value.offsetSeconds).toFixed(9) + ' s'
+      + '\n최근 보정: ' + (value.calibratedAt || '없음')
+      + '\n시간원: ' + sourceLabel(value.source)
+      + '\nGNSS 상태: ' + gnssSummary
+      + '\n조회 왕복 시간: ' + (value.roundTripSeconds == null ? '—' : (value.roundTripSeconds * 1000).toFixed(3) + ' ms')
+      + '\nPC 시각 변경 감지: ' + value.clockChanges + '회'
+      + '\n표시는 서버 시각을 기준으로 갱신합니다. 소수점 자릿수는 측정 정확도가 아닙니다.';
+  }
   async function pollClock() {
     if (!$('service-clock-value')) return;
     try {
@@ -86,13 +99,7 @@ export function initGnssControls({port, baud, refresh, changed = () => {}, log =
       const value = response.clock;
       $('service-clock-state').textContent = sourceLabel(value.source) + (value.ageSeconds > 300 ? ' · 재확인 권장' : '');
       $('service-clock-sync').disabled = clockWorking || response.busy;
-      $('service-clock-detail').textContent = 'PC UTC: ' + value.rawAt + '\n시험 UTC: ' + value.trialAt
-        + '\n보정량: ' + Number(value.offsetSeconds).toFixed(9) + ' s'
-        + '\n최근 보정: ' + (value.calibratedAt || '없음')
-        + '\n시간원: ' + sourceLabel(value.source)
-        + '\n조회 왕복 시간: ' + (value.roundTripSeconds == null ? '—' : (value.roundTripSeconds * 1000).toFixed(3) + ' ms')
-        + '\nPC 시각 변경 감지: ' + value.clockChanges + '회'
-        + '\n표시는 서버 시각을 기준으로 갱신합니다. 소수점 자릿수는 측정 정확도가 아닙니다.';
+      updateServiceClockDetail(value);
     } catch {
       clockSample = null;
       $('service-clock-state').textContent = '시험 시각 조회 불가';

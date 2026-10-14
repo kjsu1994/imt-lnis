@@ -573,6 +573,7 @@ console.log('PASS: direct UBX upload reuses observation/PVT preview and retains 
 assert.match(html, /class="service-clock-pill"/);
 assert.equal((html.match(/id="service-clock-value"/g) || []).length, 1);
 assert.ok(html.includes('id="service-clock-sync"'));
+assert.match(elements.get('service-clock-detail').textContent, /GNSS 상태: GNSS .* \/ 상대 GNSS/);
 console.log('PASS: sender clock shares the status strip with unique existing controls');
 
 const originalGnssPoll = vm.runInContext('gnss', context).poll;

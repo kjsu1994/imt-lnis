@@ -1367,7 +1367,6 @@ body[data-page="dtn-receiver"] .destination-status > div { display: flex; align-
 .receiver-gnss .gnss-details[open] { width: min(360px, 85vw); background: white; border: 1px solid var(--line); border-radius: 6px; padding: 8px; box-shadow: 0 3px 12px #0002; }
 .gnss-details { margin: 6px 0; font-size: 12px; }
 .gnss-details pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
-#gnss-summary { display: block; color: var(--muted); font-size: 12px; }
 .gnss-details label { display: inline-flex; align-items: center; gap: 5px; margin-right: 8px; }
 @media (min-width: 901px) and (max-width: 1200px) {
   .receiver-connections { grid-template-columns: repeat(2, minmax(0, 1fr)); }
