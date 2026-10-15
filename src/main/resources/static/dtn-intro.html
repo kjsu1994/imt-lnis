@@ -107,8 +107,8 @@
     .bit-table th:nth-child(1), .bit-table td:nth-child(1) { text-align: left; white-space: nowrap; }
     .bit-table th:nth-child(2), .bit-table td:nth-child(2) { text-align: center; font-family: Consolas, monospace; white-space: nowrap; }
     .bit-table th:nth-child(3), .bit-table td:nth-child(3) { text-align: center; font-family: Consolas, monospace; font-size: 10.5px; white-space: nowrap; }
-    .bit-table th:nth-child(4), .bit-table td:nth-child(4) { text-align: center; white-space: nowrap; }
-    .bit-table th:nth-child(5), .bit-table td:nth-child(5) { text-align: left; }
+    .bit-table th:nth-child(4), .bit-table td:nth-child(4) { text-align: center; white-space: nowrap; padding: 5px 12px; border-right: 1px dashed #cbd5e1; }
+    .bit-table th:nth-child(5), .bit-table td:nth-child(5) { text-align: left; padding: 5px 12px; }
     .bit-table th:nth-child(6), .bit-table td:nth-child(6) { text-align: left; font-size: 10.5px; color: #1e3a8a; }
     .ubx-tag { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; background: #e8f0fe; color: #1a73e8; border: 1px solid #c2e7ff; white-space: nowrap; }
     .dash-text { color: #94a3b8; font-family: Consolas, monospace; }
@@ -116,12 +116,12 @@
     .deep-dive-card h3 { margin: 0 0 6px; font-size: 13px; color: #1a4971; }
     .deep-dive-card p { font-size: 12px; line-height: 1.6; color: #334e68; margin: 4px 0; }
     .deep-dive-card h4 { margin: 12px 0 4px; font-size: 12.5px; color: #1a4971; }
-    .deep-dive-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 8px; background: white; border-radius: 6px; overflow: hidden; }
-    .deep-dive-table th, .deep-dive-table td { padding: 6px 8px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+    .deep-dive-table { table-layout: fixed; width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 8px; background: white; border-radius: 6px; overflow: hidden; white-space: normal; }
+    .deep-dive-table th, .deep-dive-table td { padding: 6px 8px; border-bottom: 1px solid #e2e8f0; vertical-align: top; white-space: normal; word-break: keep-all; overflow-wrap: break-word; line-height: 1.5; }
     .deep-dive-table th { background: #e9f1f8; color: #1a4971; font-weight: 600; text-align: left; }
-    .deep-dive-table:not(.nasa-compare-table) th { width: 20%; }
-    .deep-dive-table:not(.nasa-compare-table) td:nth-child(2) { width: 40%; background: #fbfcfe; color: #334e68; }
-    .deep-dive-table:not(.nasa-compare-table) td:nth-child(3) { width: 40%; background: #f5fbf7; color: #1b4d3e; }
+    .deep-dive-table:not(.nasa-compare-table) th:first-child { width: 18%; font-weight: 600; color: #102a43; }
+    .deep-dive-table:not(.nasa-compare-table) td:nth-child(2), .deep-dive-table:not(.nasa-compare-table) th:nth-child(2) { width: 41%; background: #fbfcfe; color: #334e68; }
+    .deep-dive-table:not(.nasa-compare-table) td:nth-child(3), .deep-dive-table:not(.nasa-compare-table) th:nth-child(3) { width: 41%; background: #f5fbf7; color: #1b4d3e; }
 
     .nasa-compare-table { table-layout: fixed; width: 100%; }
     .nasa-compare-table th, .nasa-compare-table td { word-break: keep-all; overflow-wrap: break-word; line-height: 1.5; }
@@ -130,34 +130,30 @@
     .nasa-compare-table th:nth-child(3), .nasa-compare-table td:nth-child(3) { width: 19%; background: #f8fafc; color: #475569; }
     .nasa-compare-table th:nth-child(4), .nasa-compare-table td:nth-child(4) { width: 27%; background: #f5fbf7; color: #165b40; }
     .nasa-compare-table th:nth-child(5), .nasa-compare-table td:nth-child(5) { width: 13%; background: #fcfbfa; color: #0f172a; text-align: center; font-weight: 600; }
-    .delay-control { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 0 0 10px; }
-    .delay-control input { width: 90px; padding: 4px 8px; border-radius: 6px; border: 1px solid #b9c8d5; }
-    .presets { display: flex; gap: 5px; }
-    .presets button { background: white; border: 1px solid var(--line); border-radius: 6px; font-size: 12px; padding: 4px 8px; }
+    .pvt-step-grid { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+    .pvt-step-item { border: 1px solid #d2e3fc; border-radius: 6px; background: #ffffff; padding: 7px 10px; }
+    .pvt-step-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; border-bottom: 1px solid #edf2f7; padding-bottom: 3px; flex-wrap: wrap; gap: 4px; }
+    .pvt-step-title { font-size: 12px; font-weight: 700; color: #1a4971; }
+    .pvt-step-tag { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; }
+    .tag-blue { background: #e8f0fe; color: #1967d2; border: 1px solid #c2e7ff; }
+    .tag-green { background: #e6f4ea; color: #137333; border: 1px solid #ceead6; }
+    .tag-amber { background: #fef7e0; color: #b06000; border: 1px solid #fce8b2; }
+    .tag-purple { background: #f3e8fd; color: #7627bb; border: 1px solid #e9d2fd; }
+    .pvt-formula-box { padding: 4px 8px; margin: 3px 0; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 5px; font: 11px/1.45 Consolas, monospace; color: #0f172a; white-space: pre-wrap; overflow-x: auto; }
+    .pvt-step-list { margin: 4px 0; padding-left: 16px; font-size: 11px; line-height: 1.5; color: #334e68; }
+    .pvt-step-list li { margin-bottom: 2px; }
+    .pvt-warning-box { margin-top: 5px; padding: 4px 8px; border-radius: 4px; background: #fdf2f2; border-left: 3px solid #e53e3e; font-size: 11px; color: #9b2c2c; line-height: 1.4; }
     .fine { margin: 8px 0; font-size: 12px; color: var(--muted); }
     .formula { padding: 10px 12px; margin: 8px 0; background: #edf2f7; border-radius: 7px; font: 13px/1.8 Consolas, "Malgun Gothic", monospace; white-space: pre-line; overflow-wrap: anywhere; }
     .table-scroll { overflow-x: auto; }
     table { border-collapse: collapse; width: 100%; font-size: 12px; margin: 8px 0; font-variant-numeric: tabular-nums; white-space: nowrap; }
     th, td { padding: 5px 8px; border-bottom: 1px solid var(--line); text-align: left; }
     th { background: #edf2f7; }
-    #satellite-comparison td:nth-child(3) { color: #965e08; }
-    #satellite-comparison td:nth-child(4) { color: #b43131; }
     caption { text-align: left; font-size: 12px; color: var(--muted); padding: 4px 0; }
     footer { margin-top: 10px; color: var(--muted); font-size: 11px; }
     .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 
     @media (min-width: 1600px) { .wrap { max-width: 1460px; } }
-    @media (min-width: 1000px) {
-      #delay-example:has(#satellite-comparison:not([hidden])) {
-        display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr);
-        grid-template-rows: auto auto 1fr; column-gap: 24px; align-items: start;
-      }
-      #delay-example:has(#satellite-comparison:not([hidden])) .delay-control { grid-column: 1; grid-row: 1; }
-      #delay-example:has(#satellite-comparison:not([hidden])) #delay-context { grid-column: 1; grid-row: 2; margin: 0; }
-      #delay-example:has(#satellite-comparison:not([hidden])) #delay-help { grid-column: 1; grid-row: 3; }
-      #satellite-comparison { grid-column: 2; grid-row: 1 / 4; min-width: 0; }
-      #satellite-comparison table { margin-top: 0; }
-    }
     @media (max-width: 760px) {
       .wrap { padding: 12px; }
       .scroll-hint { display: block; width: 100%; font-size: 11px; }
@@ -340,7 +336,283 @@
                     </tbody>
                   </table>
                 </div>
-                <p class="fine">RAWX는 위성 관측값, SFRBX는 위성이 보낸 항법 메시지입니다. u-blox가 수신한 30개 워드(720비트) 중 케플러 기본 10요소(262비트)는 SB2로, 조화 섭동 6종 등 잔여 459비트는 SB3로 분할 패키징되어 100% 무손실 복원됩니다.</p>
+                <p class="fine">RAWX는 위성 관측값, SFRBX는 위성이 보낸 항법 메시지입니다. u-blox가 수신한 30개 워드(720비트) 중 케플러 기본 10요소(262비트)는 SB2로, 조화 섭동 6종 등 잔여 459비트는 SB3로 분할 패키징되어 손실 없이 원형 보존 복원됩니다.</p>
+              </div>
+              <div id="data-engine-fields" hidden>
+                <div class="deep-dive-card" id="data-pipeline-card">
+                  <h3>전송 데이터 변환 3단계 엔진 (1 Epoch 추출 → 의사거리 역산 시각 변환 → Solver 격리 패킷화)</h3>
+                  <p><strong>지연 시험 전달 코덱(DelayTransferCodec.java) 및 지연 시간 변환기(DelayTime.java):</strong> 원본 GRAW 로그에서 지정된 1 Epoch 관측 레코드와 선행 항법 데이터를 추출하고, 의사거리를 펨토초 정밀도의 가상 송신 시각(transmitAt)으로 변환한 뒤, Reference를 완전 격리하여 전송 패킷을 구성하는 세부 처리 과정입니다.</p>
+
+                  <div class="pvt-step-grid">
+                    <div class="pvt-step-item">
+                      <div class="pvt-step-header">
+                        <span class="pvt-step-title">1단계: 1 Epoch 관측 레코드 및 선행 항법 데이터 추출 (1 Epoch Selection)</span>
+                        <span class="pvt-step-tag tag-blue">단일 에포크 격리 · 선행 LNAV 보존</span>
+                      </div>
+                      <div class="pvt-formula-box">선택 추출: select(records, Epoch(week, tow)) → 1 ObservationEpoch + Preceding LNAV Messages
+정규화 검사: epoch.week == selected.week &amp;&amp; epoch.receiverTowSeconds == selected.towSeconds
+시간축 보존: GrawCodec.decode(record) 바이트 및 헤더 구조 원형 유지</div>
+                      <ul class="pvt-step-list">
+                        <li><strong>단일 관측 에포크 엄격 제한:</strong> 다중 에포크가 섞이면 번들 네트워크 지연(Δt = R − S)이 에포크별로 다르게 작용하므로, 공통 지연 흡수(Clock Bias Absorption) 검증을 위해 정확히 1개 관측 에포크만 선별 분리</li>
+                        <li><strong>선행 유효 궤도력(LNAV) 보존:</strong> 해당 에포크 관측 시점 이전에 수신된 위성별 유효 궤도 파라미터(Subframe 1~3, 30개 워드)를 그대로 유지하여 수신단 궤도 계산 준비</li>
+                      </ul>
+                      <div class="pvt-warning-box">
+                        ⚠️ <strong>없으면 발생하는 문제:</strong> 여러 에포크가 혼입되면 위성별 시차가 어긋나 공통 지연 거리(c·Δt) 흡수 원리가 파괴되어 측위 오차가 발생함
+                      </div>
+                    </div>
+
+                    <div class="pvt-step-item">
+                      <div class="pvt-step-header">
+                        <span class="pvt-step-title">2단계: 의사거리 → 가상 송신 시각(transmitAt) 펨토초 역산 (Delay Time Transformation)</span>
+                        <span class="pvt-step-tag tag-amber">거리 삭제 · 10⁻¹⁵초 역산 변환</span>
+                      </div>
+                      <div class="pvt-formula-box">가상 송신 시각: T*ᵢ = S − Pᵢ / c  (S: 시험 시작 접수 시각, Pᵢ: 원본 의사거리, c = 299,792,458 m/s)
+정밀도 분할: transmitAt = { "seconds": ⌊T*ᵢ⌋, "femtoseconds": (T*ᵢ − ⌊T*ᵢ⌋) × 10¹⁵ }
+거리 필드 삭제: observation.remove("pseudorangeMeters")  (원형 도플러·C/N0·상태 플래그는 보존)</div>
+                      <ul class="pvt-step-list">
+                        <li><strong>의사거리(Pᵢ) 사전 소거:</strong> 수신단이 원본 거리를 참조하지 못하도록 <code>pseudorangeMeters</code> 필드를 JSON에서 완전히 삭제</li>
+                        <li><strong>펨토초(10⁻¹⁵s) 고정밀 역산:</strong> 시험 시작 접수 시각(S)에서 원본 전파 전파 시간(Pᵢ/c)을 감산하여 가상 송신 시각(T*ᵢ)을 생성하되, 부동소수점 오차를 방지하기 위해 초(seconds)와 펨토초(femtoseconds)로 분할 패킹</li>
+                        <li><strong>관측 품질 지표 보존:</strong> 반송파 도플러 편이(dopplerHz), 신호 강도(carrierToNoiseDbHz), 추적 상태(trackingStatus)는 원본 그대로 보존하여 수신단 속도 산출 및 WLS 가중치 계산에 활용</li>
+                      </ul>
+                      <div class="pvt-warning-box">
+                        ⚠️ <strong>없으면 발생하는 문제:</strong> 단정밀도 부동소수점 사용 시 수 밀리미터 이상의 환산 오차가 발생하므로 15자리 펨토초 분할 보존 필수
+                      </div>
+                    </div>
+
+                    <div class="pvt-step-item">
+                      <div class="pvt-step-header">
+                        <span class="pvt-step-title">3단계: 원본 및 Reference 완전 격리 패킷 직렬화 (Strict Packet Isolation)</span>
+                        <span class="pvt-step-tag tag-purple">정답 사전 차단 · 사후 REST 대조</span>
+                      </div>
+                      <div class="pvt-formula-box">격리 삭제: packet.remove("referencePvt", "sourceSha256", "metadata", "file")
+전송 스키마: GNSS_RAW · format: "LNIS-GRAW-DELAY-v2" · schemaVersion: 2
+페이로드: { "testId": "...", "startedAt": "...", "records": [ { "observation": { "transmitAt": ... } } ] }</div>
+                      <ul class="pvt-step-list">
+                        <li><strong>수신단 솔버 정답 격리:</strong> 송신부 기준 위치/속도(Reference PVT) 및 원본 파일 해시를 전송 패킷에서 영구 제거하여, 수신단이 전달받은 시각 데이터만으로 순수하게 PVT를 산출하도록 강제</li>
+                        <li><strong>사후 REST 대조 체계:</strong> 수신 PVT 계산이 완전히 종료된 이후에만 송수신 서비스 간 내부 REST API로 원본 RAW 및 Reference를 조회하여 전달 전후 일치 여부를 대조 검증</li>
+                      </ul>
+                      <div class="pvt-warning-box">
+                        ⚠️ <strong>없으면 발생하는 문제:</strong> Reference가 수신부에 사전 노출되면 수신 솔버가 정답에 의존할 위험이 있어 지상 시험의 독립성과 신뢰성이 훼손됨
+                      </div>
+                    </div>
+                  </div>
+
+                  <h4>3대 전송 데이터 규격 비교표 (GNSS RAW vs AFS Frame vs I/Q Sample)</h4>
+                  <p><strong>데이터 선택 모드별 전송 페이로드와 지연 주입 방식 대조:</strong></p>
+                  <div class="table-scroll">
+                    <table class="deep-dive-table">
+                      <colgroup>
+                        <col style="width: 18%;">
+                        <col style="width: 27%;">
+                        <col style="width: 27%;">
+                        <col style="width: 28%;">
+                      </colgroup>
+                      <thead>
+                        <tr>
+                          <th scope="col">구분 항목</th>
+                          <th scope="col">GNSS RAW (raw)</th>
+                          <th scope="col">AFS Frame (afs)</th>
+                          <th scope="col">I/Q Sample (iq)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <th scope="row">전송 포맷 / 버전</th>
+                          <td><code>LNIS-GRAW-DELAY-v2</code><br>(schemaVersion 2)</td>
+                          <td><code>LNIS-AFS-GNSS-v5</code><br>(schemaVersion 5)</td>
+                          <td><code>LNIS-IQ-FILE-v2</code><br>(schemaVersion 2)</td>
+                        </tr>
+                        <tr>
+                          <th scope="row">전송 페이로드</th>
+                          <td><strong>raw.records[] JSON</strong><br>(1 Epoch 관측 레코드 + LNAV)</td>
+                          <td><strong>satellites[].frames[]</strong><br>(750B AFS 프레임 Base64)</td>
+                          <td><strong>file JSON 메타데이터</strong><br>(공유 폴더 2.16 GB BIN 경로)</td>
+                        </tr>
+                        <tr>
+                          <th scope="row">의사거리 전달 방식</th>
+                          <td><code>transmitAt</code> (초 + 펨토초 객체)<br>원본 pseudorangeMeters 삭제</td>
+                          <td>SB4 서브블록 내 비트 인입<br>(가상 송신 시각 T*ᵢ 탑재)</td>
+                          <td>90초 물리 RF 전파 샘플 합성<br>(SB4에 지연 미주입, 정상 관측)</td>
+                        </tr>
+                        <tr>
+                          <th scope="row">항법정보 전달 방식</th>
+                          <td>LNAV 1~3 서브프레임 JSON 워드</td>
+                          <td>SB2(262b) + SB3(459b) 무손실 결합</td>
+                          <td>PocketSDR이 RF 신호에서 직접 복호</td>
+                        </tr>
+                        <tr>
+                          <th scope="row">DTN 지연 적용 방식</th>
+                          <td>수신 시각 R에서 역산<br>(P′ᵢ = c × (R − T*ᵢ))</td>
+                          <td>수신 시각 R에서 역산<br>(P′ᵢ = c × (R − T*ᵢ))</td>
+                          <td>파일 도착 지연 기록<br>(의사거리에는 미반영, RF 추적)</td>
+                        </tr>
+                        <tr>
+                          <th scope="row">Reference 격리</th>
+                          <td><strong>전송 JSON에서 완전 제거</strong><br>(수신 계산 후 REST 조회)</td>
+                          <td><strong>전송 JSON에서 완전 제거</strong><br>(수신 계산 후 REST 조회)</td>
+                          <td>JSON 메타에 포함<br>(SDR 입력 차단, 사후 대조용)</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <h4>GNSS RAW 전송 페이로드(LNIS-GRAW-DELAY-v2) 상세 필드 명세표</h4>
+                  <p><strong>수신단으로 전송되는 raw.records JSON 레코드 내 세부 필드 분류 및 역할:</strong> 원본 RAWX 관측값 중 유지되는 필드, 가상 송신 시각(transmitAt)으로 치환된 필드, 솔버 오염 방지를 위해 사전 격리(삭제)된 필드 일람입니다.</p>
+                  <div class="table-scroll">
+                    <table class="deep-dive-table">
+                      <colgroup>
+                        <col style="width: 20%;">
+                        <col style="width: 20%;">
+                        <col style="width: 16%;">
+                        <col style="width: 44%;">
+                      </colgroup>
+                      <thead>
+                        <tr>
+                          <th scope="col">필드명 (JSON Key)</th>
+                          <th scope="col">데이터 타입 / 단위</th>
+                          <th scope="col">변환 / 보존 여부</th>
+                          <th scope="col">실제 쓰임새 및 물리적 역할</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr style="background: #f1f5f9;">
+                          <th colspan="4" style="font-weight: 700; color: #1e3a8a; background: #e2e8f0;">1. 공통 에포크 헤더 필드 (raw.startedAt &amp; raw.records[].observation)</th>
+                        </tr>
+                        <tr>
+                          <th scope="row"><code>startedAt</code></th>
+                          <td>String (ISO-8601 UTC)</td>
+                          <td><span class="pvt-step-tag tag-blue">신규 주입</span></td>
+                          <td><strong>시험 시작 접수 시각 (S):</strong> 지상 시험 시작 에포크 기준시 (지연 Δt = R − S 계산의 기준점)</td>
+                        </tr>
+                        <tr>
+                          <th scope="row"><code>week</code></th>
+                          <td>uint16 (0~8191)</td>
+                          <td><span class="pvt-step-tag tag-green">원형 보존</span></td>
+                          <td><strong>GPS Week 번호:</strong> 궤도력 기준시(t_oe) 및 시계 기준시(t_oc)와 매핑되는 기준 주차</td>
+                        </tr>
+                        <tr>
+                          <th scope="row"><code>receiverTowSeconds</code></th>
+                          <td>double (seconds)</td>
+                          <td><span class="pvt-step-tag tag-green">원형 보존</span></td>
+                          <td><strong>수신기 관측 시점 (TOW):</strong> 0 ~ 604,799.999s (동일 시점 가시위성 관측값을 묶는 공통 에포크 타임)</td>
+                        </tr>
+                        <tr>
+                          <th scope="row"><code>leapSeconds</code></th>
+                          <td>int8 (초)</td>
+                          <td><span class="pvt-step-tag tag-green">원형 보존</span></td>
+                          <td><strong>GPS-UTC 윤초:</strong> 현재 18초 (GPS 시간계와 국제 표준시 UTC 간 오프셋 보정)</td>
+                        </tr>
+                        <tr>
+                          <th scope="row"><code>receiverStatus</code></th>
+                          <td>uint8 (Bitmask)</td>
+                          <td><span class="pvt-step-tag tag-green">원형 보존</span></td>
+                          <td><strong>수신기 시계 유효성:</strong> TOW 유효성 및 내부 발진기 주파수 동기화 상태 플래그</td>
+                        </tr>
+
+                        <tr style="background: #f1f5f9;">
+                          <th colspan="4" style="font-weight: 700; color: #1e3a8a; background: #e2e8f0;">2. 위성별 개별 채널 관측 필드 (observation.observations[])</th>
+                        </tr>
+                        <tr>
+                          <th scope="row"><code>constellationId</code></th>
+                          <td>uint8 (0: GPS)</td>
+                          <td><span class="pvt-step-tag tag-green">원형 보존</span></td>
+                          <td><strong>위성군 식별자:</strong> GPS(0), SBAS(1), Galileo(2), BeiDou(3), GLONASS(6)</td>
+                        </tr>
+                        <tr>
+                          <th scope="row"><code>satelliteId</code> (PRN)</th>
+                          <td>uint8 (1~32)</td>
+                          <td><span class="pvt-step-tag tag-green">원형 보존</span></td>
+                          <td><strong>위성 식별 번호 (PRN):</strong> 관측값을 해당 위성의 LNAV 궤도력 및 위성 시계 계수와 1:1 결합</td>
+                        </tr>
+                        <tr>
+                          <th scope="row"><code>signalId</code></th>
+                          <td>uint8 (0: L1 C/A)</td>
+                          <td><span class="pvt-step-tag tag-green">원형 보존</span></td>
+                          <td><strong>신호 대역 식별자:</strong> GPS L1 C/A (1575.42 MHz 반송파)</td>
+                        </tr>
+                        <tr>
+                          <th scope="row"><code>transmitAt</code><br><small>{ seconds, femtoseconds }</small></th>
+                          <td>uint64 (초)<br>uint64 (10⁻¹⁵s)</td>
+                          <td><span class="pvt-step-tag tag-amber">핵심 역산 치환</span></td>
+                          <td><strong>지연 보정 가상 송신 시각 (T*ᵢ = S − Pᵢ/c):</strong><br>원본 의사거리를 삭제하고, 수신 도착 시각 R로부터 지연된 의사거리 P′ᵢ = c(R − T*ᵢ)를 역산할 수 있도록 펨토초 단위로 분할 전송</td>
+                        </tr>
+                        <tr>
+                          <th scope="row"><code>dopplerHz</code></th>
+                          <td>float (Hz)</td>
+                          <td><span class="pvt-step-tag tag-green">원형 보존</span></td>
+                          <td><strong>반송파 도플러 주파수 편이:</strong> 수신기 3차원 속도 벡터(v_x, v_y, v_z) 및 발진기 드리프트 산출</td>
+                        </tr>
+                        <tr>
+                          <th scope="row"><code>carrierToNoiseDbHz</code></th>
+                          <td>uint8 (dB-Hz)</td>
+                          <td><span class="pvt-step-tag tag-green">원형 보존</span></td>
+                          <td><strong>신호 품질 (C/N0):</strong> WLS(가중최소자승) 측위 시 신호 품질에 비례하는 가중치(W) 산출 기준</td>
+                        </tr>
+                        <tr>
+                          <th scope="row"><code>carrierPhaseCycles</code></th>
+                          <td>double (cycles)</td>
+                          <td><span class="pvt-step-tag tag-green">원형 보존</span></td>
+                          <td><strong>반송파 누적 위상:</strong> 원시 관측 무결성 보존용 (SPP 기본 계산에는 미사용)</td>
+                        </tr>
+                        <tr>
+                          <th scope="row"><code>trackingStatus</code></th>
+                          <td>uint8 (Bitmask)</td>
+                          <td><span class="pvt-step-tag tag-green">원형 보존</span></td>
+                          <td><strong>신호 추적 상태 플래그:</strong> 의사거리 유효(bit 0), 반송파 위상 유효(bit 1), 반주기 모호성 플래그</td>
+                        </tr>
+                        <tr>
+                          <th scope="row"><code>lockTimeMilliseconds</code></th>
+                          <td>uint16 (ms)</td>
+                          <td><span class="pvt-step-tag tag-green">원형 보존</span></td>
+                          <td><strong>신호 연속 추적 시간:</strong> 신호 유실 직후의 불안정한 측정값을 필터링하는 건전성 지표</td>
+                        </tr>
+
+                        <tr style="background: #f1f5f9;">
+                          <th colspan="4" style="font-weight: 700; color: #1e3a8a; background: #e2e8f0;">3. 위성별 선행 궤도력 필드 (raw.records[].navigation)</th>
+                        </tr>
+                        <tr>
+                          <th scope="row"><code>sfrbxVersion</code></th>
+                          <td>uint8</td>
+                          <td><span class="pvt-step-tag tag-green">원형 보존</span></td>
+                          <td><strong>u-blox SFRBX 메시지 버전:</strong> 항법 메시지 프로토콜 규격 식별</td>
+                        </tr>
+                        <tr>
+                          <th scope="row"><code>words</code> (10개 워드)</th>
+                          <td>List&lt;uint32&gt;</td>
+                          <td><span class="pvt-step-tag tag-green">원형 보존</span></td>
+                          <td><strong>LNAV 서브프레임 원시 워드 (24비트 데이터):</strong><br>
+                            • Subframe 1: 위성 원자시계 보정치(t_oc, a_f0, a_f1, a_f2), TGD, 위성 건강상태<br>
+                            • Subframe 2: 케플러 타원 궤도 기하 요소(t_oe, √A, e, M0) 및 섭동 계수(Δn, Cuc, Cus, Crs)<br>
+                            • Subframe 3: 3차원 궤도면 배향 요소(i0, Ω0, ω, Ω_dot, IDOT) 및 섭동 계수(Crc, Cic, Cis)<br>
+                            • Subframe 4: Klobuchar 전리층 보정 8대 계수(α₀~α₃, β₀~β₃)
+                          </td>
+                        </tr>
+
+                        <tr style="background: #fdf2f2;">
+                          <th colspan="4" style="font-weight: 700; color: #991b1b; background: #fee2e2;">4. 의도적 사전 삭제 / 격리 필드 (솔버 사전 오염 원천 차단)</th>
+                        </tr>
+                        <tr>
+                          <th scope="row" style="color: #991b1b;"><code>pseudorangeMeters</code></th>
+                          <td>double (meters)</td>
+                          <td><span class="pvt-step-tag" style="background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5;">완전 삭제</span></td>
+                          <td><strong>거리 정보 사전 은닉:</strong> 수신단이 원본 거리를 참조하지 못하도록 제거하고 가상 송신 시각(transmitAt)만 전달</td>
+                        </tr>
+                        <tr>
+                          <th scope="row" style="color: #991b1b;"><code>referencePvt</code></th>
+                          <td>Pvt Object</td>
+                          <td><span class="pvt-step-tag" style="background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5;">완전 격리</span></td>
+                          <td><strong>솔버 정답 의존 원천 차단:</strong> 수신 솔버가 독립 측위를 완결하기 전까지 정답 위치/속도 노출을 방지하기 위해 패킷에서 제외 (계산 후 REST로만 사후 대조)</td>
+                        </tr>
+                        <tr>
+                          <th scope="row" style="color: #991b1b;"><code>sourceSha256</code></th>
+                          <td>String (Hex)</td>
+                          <td><span class="pvt-step-tag" style="background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5;">완전 격리</span></td>
+                          <td><strong>조기 대조 차단:</strong> 계산 전 파일 일치 판정으로 인한 계산 건너뜀 방지</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
               <div id="frame-explorer" hidden>
                 <p class="fine">AFS 6,000 bits · 동기 68 + SB1 52 + SB2 2,400 + SB3 1,740 + SB4 1,740 bits (5,880 bits는 98×60 블록 인터리빙 적용)</p>
@@ -426,7 +698,7 @@
                   <p class="fine">연구실 환경에서 실시간 획득 가능한 신호원(지상 u-blox GPS 수신 신호)과 글로벌 표준 항법 솔버(RTKLIB)의 수치적 검증 신뢰성을 확보하기 위해 GPS LNAV를 채택하였으며, 달 궤도선 운용 시에는 섭동 계수만 달 중력장 모델로 치환되어 동일한 수식 구조로 동작합니다.</p>
 
                   <h4>NASA AFS 공식 표준(LSIS Vol-A) 대비 준수 및 독자 확장 분석</h4>
-                  <p><strong>공식 표준과의 일치점 및 시험베드 확장 분석:</strong> 무선 물리 계층(Layer 1)은 NASA 최신 권고안을 100% 준수하며, 상위 데이터 계층(Layer 2)의 미할당 영역(SB3·SB4)을 지상 검증 목적에 맞추어 독자 확장한 구조 분석입니다.</p>
+                  <p><strong>공식 표준과의 일치점 및 시험베드 확장 분석:</strong> 무선 물리 계층(Layer 1)은 NASA 최신 권고안을 충실히 준수하며, 상위 데이터 계층(Layer 2)의 미할당 영역(SB3·SB4)을 지상 검증 목적에 맞추어 독자 확장한 구조 분석입니다.</p>
                   <div class="table-scroll">
                     <table class="deep-dive-table nasa-compare-table">
                       <colgroup>
@@ -451,34 +723,34 @@
                           <td>• 6,000 bits (750 bytes), 12초 주기<br>• 프레임 동기 부호 68 bits<br>• BCH(52,8), LDPC SF2(1/2), LDPC SF3(1/2 천공)<br>• 98×60 블록 인터리빙 (5,880 bits)</td>
                           <td>NASA 공식 규격과 동일</td>
                           <td>NASA 공식 규격과 동일</td>
-                          <td><strong>100% 완전 일치</strong><br>(표준 준수)</td>
+                          <td><strong>완전 일치</strong><br>(표준 준수)</td>
                         </tr>
                         <tr>
                           <th scope="row">SP (L1)<br>프레임 동기 부호</th>
                           <td>• 68 bits 고정 의사난수 패턴<br>• 16진수: 0xCC 63 F7 45 36 F4 9E 04 A<br>• 자기상관 피크 검출로 프레임 시작점 확정</td>
                           <td>NASA 공식 규격과 동일</td>
                           <td>NASA 공식 규격과 동일</td>
-                          <td><strong>100% 완전 일치</strong><br>(표준 준수)</td>
+                          <td><strong>완전 일치</strong><br>(표준 준수)</td>
                         </tr>
                         <tr>
                           <th scope="row">SB1 (L2)<br>프레임 식별</th>
                           <td>• Frame ID (FID = 0, 항법 메시지)<br>• Time of Interval (TOI, 0~99)</td>
                           <td>NASA 공식 규격과 동일</td>
                           <td>NASA 공식 규격과 동일</td>
-                          <td><strong>100% 완전 일치</strong><br>(표준 준수)</td>
+                          <td><strong>완전 일치</strong><br>(표준 준수)</td>
                         </tr>
                         <tr>
                           <th scope="row">SB2 (L2)<br>핵심 궤도력</th>
                           <td>• 달 궤도선 Ephemeris & Clock (MCMF 좌표계)</td>
                           <td>10개 핵심 요소 탑재 (eph2sbf, 262 bits)<br>단, 나머지 892비트는 0101 패딩 처리</td>
-                          <td>10개 핵심 요소 비트 위치 100% 보존<br>(지상 시험 검증용 WGS-84 매핑)</td>
+                          <td>10개 핵심 요소 비트 위치 원형 보존<br>(지상 시험 검증용 WGS-84 매핑)</td>
                           <td><strong>비트 형식 일치</strong><br>(하위 호환성 유지)</td>
                         </tr>
                         <tr>
                           <th scope="row">SB3 (L2)<br>보충 궤도력</th>
                           <td>• 달 중력장(Mascon) 섭동 계수<br>• 위성 무결성 경보 (Alert Flag)</td>
                           <td><strong>미구현</strong><br>(0101 더미 데이터 패딩)</td>
-                          <td><strong>Type 63 헤더 + LNAV 잔여 459비트 탑재</strong><br>→ LNAV 720비트 100% 무손실 복원 달성</td>
+                          <td><strong>Type 63 헤더 + LNAV 잔여 459비트 탑재</strong><br>→ LNAV 720비트 원형 보존 달성</td>
                           <td><strong>시험용 독자 확장</strong><br>(무손실 궤도 완성)</td>
                         </tr>
                         <tr>
@@ -493,26 +765,966 @@
                   </div>
                 </div>
               </div>
-              <div id="delay-example" hidden>
-                <div class="delay-control">
-                  <label for="delay">예시 지연</label>
-                  <input id="delay" type="number" min="0" max="60" step="0.001" value="1" inputmode="decimal" aria-describedby="delay-help">초
-                  <div class="presets" aria-label="예시 지연 선택">
-                    <button type="button" data-delay="0.001">1 ms</button>
-                    <button type="button" data-delay="1">1 s</button>
-                    <button type="button" data-delay="20">20 s</button>
+              <div id="encode-engine-fields" hidden>
+                <div class="deep-dive-card" id="encode-pipeline-card">
+                  <h3>I/Q 신호 합성 4단계 변조 엔진 (기저대역 변조 → 다중 위성 중첩 → 2비트 ADC 양자화)</h3>
+                  <p><strong>C 네이티브 시뮬레이터(afs_sim.c) 및 지구 연동 인터페이스(iq_earth.c):</strong> 6,000심볼 AFS 프레임(12초)을 반복 변조하여 90초·12 MHz 대역의 복소 기저대역(I/Q) 신호를 생성하고, 2비트 ADC 양자화로 2.16 GB BIN 파일을 합성하는 세부 변조 과정입니다.</p>
+
+                  <div class="pvt-step-grid">
+                    <div class="pvt-step-item">
+                      <div class="pvt-step-header">
+                        <span class="pvt-step-title">1단계: 수신기 궤도 및 가시위성 기하 거리 계산 (Orbit & Range Calculation)</span>
+                        <span class="pvt-step-tag tag-blue">ECEF 궤적 전파 · 광속 지연 역산</span>
+                      </div>
+                      <div class="pvt-formula-box">수신기 위치: xyz(t) = origin + motion × dt  (ECEF_CONSTANT_VELOCITY 모형)
+위성 궤도·시계: eph2pos(t − τ, eph) → pos(X^s, Y^s, Z^s), vel(v^s), clk(dt^s, TGD)
+기하 거리: range = geodist(pos, xyz) + c × (bias − clk[0] + TGD)  (광속 지연 τ = range/c 3회 고정점 반복)</div>
+                      <ul class="pvt-step-list">
+                        <li><strong>수신기 3차원 ECEF 등속 궤적 전파:</strong> 초기 위치(origin)와 속도 벡터(motion)로부터 매 샘플 시점(dt)의 수신기 공간 좌표를 계산</li>
+                        <li><strong>위성 광속 지연 및 사냑(Sagnac) 보정:</strong> 전파 전파 시간(τ ≈ 70~85 ms) 동안 지구 자전으로 인한 ECEF 회전 효과를 Sagnac 기하 거리 공식으로 정확히 보정</li>
+                        <li><strong>위성 원자시계 및 수신기 클록 바이어스 반영:</strong> 위성 시계 오차(dt^s) 및 집단 지연(TGD), 수신기 내부 발진기 바이어스(bias)를 거리 단위(c·dt)로 사전 합성</li>
+                      </ul>
+                      <div class="pvt-warning-box">
+                        ⚠️ <strong>없으면 발생하는 문제:</strong> 위성 공전과 지구 자전 효과가 누락되어 실제 물리 궤도와 신호 도달 시각이 왜곡됨
+                      </div>
+                    </div>
+
+                    <div class="pvt-step-item">
+                      <div class="pvt-step-header">
+                        <span class="pvt-step-title">2단계: AFS 2채널 직교 변조 (Dual-channel I/Q Baseband Modulation)</span>
+                        <span class="pvt-step-tag tag-amber">데이터(I) + 파일럿(Q) 직교 믹싱</span>
+                      </div>
+                      <div class="pvt-formula-box">I 채널 (데이터): 1.023 Mcps Gold 코드 (2,046 chips = 2 ms) × AFS 심볼 데이터 D (D = −2×bit + 1, 6000심볼/12s)
+Q 채널 (파일럿): 5.115 Mcps 3계층 코드 (Primary 10,230 chips + Secondary 4 chips + Tertiary Weil 1500 chips/12s)
+직교 믹싱: ip = gain × (I·cos φ − Q·sin φ),  qp = gain × (I·sin φ + Q·cos φ)  (MAX2771 호환 Q 반전: qp = −qp)</div>
+                      <ul class="pvt-step-list">
+                        <li><strong>I 채널 (BPSK(1) 데이터 신호):</strong> 1.023 MHz 치핑률의 2,046 칩 확산 코드와 500 sps(심볼 주기 2 ms)의 AFS 6,000심볼 프레임을 곱하여 정보 비트 변조</li>
+                        <li><strong>Q 채널 (BPSK(5) 무변조 파일럿):</strong> 데이터가 실리지 않는 고감도 추적용 파일럿으로, 8 ms 주기의 Secondary 코드와 12초 주기의 1,500 칩 Tertiary Weil 코드를 합성하여 프레임 경계와 동기화</li>
+                        <li><strong>반송파 도플러 위상 회전:</strong> 위성-수신기 간 상대 가시선 속도로부터 유도된 반송파 도플러 주파수(f_carr)에 맞춰 512단계 삼각함수 테이블(cosT, sinT)로 I/Q 직교 합성</li>
+                      </ul>
+                      <div class="pvt-warning-box">
+                        ⚠️ <strong>없으면 발생하는 문제:</strong> 파일럿 채널이 결여되면 고감도 신호 획득 및 반송파 위상 추적 성능이 급격히 저하됨
+                      </div>
+                    </div>
+
+                    <div class="pvt-step-item">
+                      <div class="pvt-step-header">
+                        <span class="pvt-step-title">3단계: 다중 위성 신호 선형 중첩 및 가우시안 열잡음 주입</span>
+                        <span class="pvt-step-tag tag-purple">가시위성 합산 · 우주 무선 채널 모델링</span>
+                      </div>
+                      <div class="pvt-formula-box">다중 위성 합산: sample = Σ [chan[i].iq_buff]  (i = 1 .. Nsat 가시 위성)
+열잡음 부가: sample = sample + randn() × noise_scale  (Box-Muller 가우시안 백색잡음)
+게인 정규화: sample = sample / GAIN_SCALE  (ADC 입력 전 스케일링)</div>
+                      <ul class="pvt-step-list">
+                        <li><strong>N기 가시 위성 RF 신호 선형 중첩:</strong> 수신기 안테나에 동시 입사하는 모든 가시 위성의 개별 I/Q 합성 버퍼를 하나의 복소 베이스밴드 스트림으로 합산</li>
+                        <li><strong>가우시안 백색 열잡음(AWGN) 주입:</strong> 우주 공간 및 수신기 RF 프런트엔드에서 발생하는 열잡음을 Box-Muller 변환 정규분포 난수로 인입하여 실제 C/N0 신호대잡음비 모사</li>
+                      </ul>
+                      <div class="pvt-warning-box">
+                        ⚠️ <strong>없으면 발생하는 문제:</strong> 잡음 없는 비현실적 신호가 생성되어 SDR 수신기의 동기 루프 및 신호대잡음비(C/N0) 추정기가 비정상 동작함
+                      </div>
+                    </div>
+
+                    <div class="pvt-step-item">
+                      <div class="pvt-step-header">
+                        <span class="pvt-step-title">4단계: 2비트 ADC 양자화 및 2.16 GB 파일 패킹</span>
+                        <span class="pvt-step-tag tag-green">2비트 임계 양자화 · INT8X2 대용량 저장</span>
+                      </div>
+                      <div class="pvt-formula-box">2비트 ADC: sample ≥ 0 ? (sample > thresh ? +3 : +1) : (sample < -thresh ? -3 : -1)
+저장 포맷: INT8X2 (I, Q 성분을 각 1바이트 signed char로 교차 패킹)
+파일 크기: 90초 × 12,000,000 samples/s × 2 (I, Q) = 2,160,000,000 bytes (정확히 약 2.16 GB)</div>
+                      <ul class="pvt-step-list">
+                        <li><strong>2비트 4단계 부호·크기 양자화:</strong> 최적 임계값(thresh)을 기준으로 아날로그 합성 샘플을 -3, -1, +1, +3의 4단계 정수로 양자화(Sign 1b + Magnitude 1b)</li>
+                        <li><strong>INT8X2 바이트 패킹:</strong> 2비트 양자화된 I와 Q를 각각 1바이트(signed int8)에 매핑하여 [I0, Q0, I1, Q1, ...] 순서로 공유 폴더에 BIN 파일로 기록</li>
+                        <li><strong>SB4 지연 에뮬레이션과의 차이:</strong> I/Q 모드는 90초 물리 전파를 직접 생성하므로 SB4에 가상 송신 시각(T*ᵢ)을 넣지 않고 정상 관측 레코드를 탑재함</li>
+                      </ul>
+                      <div class="pvt-warning-box">
+                        ⚠️ <strong>없으면 발생하는 문제:</strong> 양자화 레벨이 어긋나면 신호 왜곡 및 가상 상관 피크가 발생하여 수신단 포착 실패로 이어짐
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <p id="delay-context" class="formula"></p>
-                <div class="table-scroll" id="satellite-comparison" hidden>
-                  <table>
-                    <caption>설명용 위성 A~D · 원본 Pᵢ는 비교용 · 거리 단위 m</caption>
-                    <thead><tr><th scope="col">위성</th><th scope="col">원본 Pᵢ</th><th scope="col">공통 증가분</th><th scope="col">변환 P′ᵢ</th></tr></thead>
-                    <tbody id="satellite-rows"></tbody>
-                  </table>
-                  <p class="fine">Doppler · C/N0 · 궤도정보는 유지합니다.</p>
+              </div>
+              <div id="decode-engine-fields" hidden>
+                <div class="deep-dive-card" id="decode-pipeline-card">
+                  <h3>PocketSDR-AFS 5단계 신호 처리 엔진 (신호 포착 → 반송파/코드 추적 → AFS 복호 → Solver 격리)</h3>
+                  <p><strong>C 네이티브 SDR 수신기(pocket_trk.c) 및 Java 프레임 복원기(IqFrameRecovery.java):</strong> 수신 공유 폴더의 2.16 GB BIN 파일에 대해 크기·해시 검증을 수행하고, FFT 고속 포착, 다중 루프 추적, AFS 프레임 복호, 그리고 엄격한 Reference 격리 원칙하에 독립적인 지구 PVT를 산출하는 세부 처리 과정입니다.</p>
+
+                  <div class="pvt-step-grid">
+                    <div class="pvt-step-item">
+                      <div class="pvt-step-header">
+                        <span class="pvt-step-title">1단계: 수신 파일 무결성 및 SHA-256 검증 (File Integrity Check)</span>
+                        <span class="pvt-step-tag tag-blue">파일 크기 2.16 GB 대조 · SHA-256 1:1 검증</span>
+                      </div>
+                      <div class="pvt-formula-box">파일 크기: size(file.bin) == 2,160,000,000 bytes (정확히 90s × 12 MHz × 2B)
+해시 검증: SHA-256(file.bin) == JSON.file.sha256 (단 1비트 불일치 시 SDR 구동 즉시 중단)
+저장 격리: 수신 공유 폴더(/exchange)에 보관하며 DB 및 HTTP 바디 인입 금지</div>
+                      <ul class="pvt-step-list">
+                        <li><strong>엄격한 바이너리 무결성 확인:</strong> DTN을 통해 수신된 2.16 GB BIN 파일의 크기와 SHA-256 체크섬을 시험 JSON 메타데이터와 대조하여 전송 중 파일 손상 여부를 사전 차단</li>
+                        <li><strong>불완전 파일 처리 방지:</strong> 파일이 없거나 크기/해시가 1바이트라도 일치하지 않으면 이후 SDR 추적 및 신호 처리를 일절 진행하지 않고 조기 거부</li>
+                      </ul>
+                      <div class="pvt-warning-box">
+                        ⚠️ <strong>없으면 발생하는 문제:</strong> 전송 불완전으로 깨진 I/Q 파일이 SDR에 입력되어 무한 루프나 세그멘테이션 오류(Crash)를 유발함
+                      </div>
+                    </div>
+
+                    <div class="pvt-step-item">
+                      <div class="pvt-step-header">
+                        <span class="pvt-step-title">2단계: FFT 기반 2차원 고속 신호 포착 (Parallel Code & Doppler Acquisition)</span>
+                        <span class="pvt-step-tag tag-amber">주파수/코드 2차원 탐색 · 상관 피크 검출</span>
+                      </div>
+                      <div class="pvt-formula-box">도플러 탐색 범위: f_D = −5,000 Hz ~ +5,000 Hz (탐색 빈 간격 250 Hz)
+코드 위상 탐색: τ = 0 ~ 2,045 chips (순환 상관: R(τ, f_D) = IFFT[ FFT(Signal) × FFT*(Local_Code) ])
+피크 검출 판정: Peak-to-Average Ratio > V_thresh → 신호 획득 (Signal Lock)</div>
+                      <ul class="pvt-step-list">
+                        <li><strong>FFT 기반 병렬 코드 위상 탐색:</strong> 입력 I/Q 신호와 수신기 내부 로컬 복제 코드(Gold/Weil)의 순환 상관을 FFT 및 IFFT로 일괄 고속 연산</li>
+                        <li><strong>도플러 주파수 빈 순회:</strong> 위성 공전 속도(초속 약 3.9 km)로 인한 최대 ±5 kHz 도플러 편이를 250 Hz 간격으로 스캔하여 2차원 상관 평면에서 뚜렷한 피크 검출 시 신호 획득(Lock)</li>
+                      </ul>
+                      <div class="pvt-warning-box">
+                        ⚠️ <strong>없으면 발생하는 문제:</strong> 도플러 주파수 오프셋을 찾지 못해 신호 에너지가 분산되어 수신기가 위성 신호를 전혀 획득하지 못함
+                      </div>
+                    </div>
+
+                    <div class="pvt-step-item">
+                      <div class="pvt-step-header">
+                        <span class="pvt-step-title">3단계: 다중 루프 연속 추적 및 고속 파일 재생 제어 (PLL/DLL Tracking & 20x Replay)</span>
+                        <span class="pvt-step-tag tag-purple">반송파(PLL) · 코드(DLL) · 20배속 재생 동기화</span>
+                      </div>
+                      <div class="pvt-formula-box">반송파 루프: 3차 PLL / FLL → 도플러 편이(f_D) 및 반송파 위상 연속 추적
+코드 루프: Early-Prompt-Late 3상관기 DLL → 코드 도달 시간(τ) 및 의사거리(P_i = c·τ) 추적
+고속 재생: -tscale 20 (20배속) + iq_file_replay.h (채널 간 ≥100 ms 상관 여유 동기화)</div>
+                      <ul class="pvt-step-list">
+                        <li><strong>반송파 및 코드 위상 연속 추적:</strong> Costas PLL과 FLL로 반송파 위상 및 도플러를 추적하고, Early/Prompt/Late 상관기로 코드 칩 지연을 나노초 정밀도로 연속 추적</li>
+                        <li><strong>20배속 고속 파일 재생 제어:</strong> `-tscale 20` 옵션으로 90초 분량 파일을 디스크에서 수 초 내로 고속 재생하며, `06-file-replay.patch`와 `iq_file_replay.h`가 가장 느린 채널 기준으로 최소 100 ms 여유를 보장하여 경합(Race Condition) 및 조기 종료를 원천 방지</li>
+                        <li><strong>신호 물리 시간 불변:</strong> 20배속은 파일 디스크 읽기 속도일 뿐이며, 신호 내부의 샘플링 레이트(12 MHz), 관측 시각(TOW), 도플러 주파수를 일절 변경하지 않음</li>
+                      </ul>
+                      <div class="pvt-warning-box">
+                        ⚠️ <strong>없으면 발생하는 문제:</strong> 고속 디스크 읽기 시 채널 간 처리 속도 차이로 인해 특정 위성이 조기 종료되어 유효 위성 수(4기 이상)가 부족해짐
+                      </div>
+                    </div>
+
+                    <div class="pvt-step-item">
+                      <div class="pvt-step-header">
+                        <span class="pvt-step-title">4단계: 심볼 복조 및 AFS 프레임 복호 (Demodulation & Frame Extraction)</span>
+                        <span class="pvt-step-tag tag-green">Prompt 심볼 복조 · LDPC/CRC 통과 프레임 추출</span>
+                      </div>
+                      <div class="pvt-formula-box">심볼 복조: Prompt 상관기 2 ms 적분 → 6,000 BPSK 심볼 비트스트림 복조
+AFS 복호: SP 68b 검출 → BCH(52,8) 복호 → 98×60 디인터리빙 → LDPC SF2/SF3 복호 → CRC-24 재계산
+출력 스트림: $IQAFS,&lt;sample time&gt;,&lt;PRN&gt;,&lt;block&gt;,&lt;packed hex&gt;  (CRC 무결성 통과 시에만 출력)</div>
+                      <ul class="pvt-step-list">
+                        <li><strong>2 ms 심볼 경계 동기화:</strong> Prompt 상관기 신호 적분으로 500 sps BPSK 심볼 경계를 확정하고 비트스트림 추출</li>
+                        <li><strong>물리 계층 오류 정정 및 무결성 검증:</strong> 68비트 SP 동기 패턴 검출 후 SB1 BCH(52,8), 98×60 디인터리빙, LDPC SF2/SF3 Sum-Product 복호, NASA 표준 CRC-24 재계산 수행</li>
+                        <li><strong>$IQAFS 스트림 방출:</strong> LDPC 복호와 CRC-24 검증을 모두 통과한 서브블록(SB2, SB3, SB4)만 Java 상위 수신기로 방출 (오류 프레임 원천 차단)</li>
+                      </ul>
+                      <div class="pvt-warning-box">
+                        ⚠️ <strong>없으면 발생하는 문제:</strong> CRC 검증이 누락되면 LDPC 오수렴으로 인한 잘못된 궤도 파라미터가 솔버에 인입되어 수십 km 측위 오차 발생
+                      </div>
+                    </div>
+
+                    <div class="pvt-step-item">
+                      <div class="pvt-step-header">
+                        <span class="pvt-step-title">5단계: 관측값 집계 및 Solver 완전 격리 (Observable Gathering & Solver Isolation)</span>
+                        <span class="pvt-step-tag tag-blue">RF 관측값 집계 · LNAV 720b 복원 · Reference 격리</span>
+                      </div>
+                      <div class="pvt-formula-box">관측값 집계: $IQOBS로부터 의사거리(P_i), 도플러(f_D), C/N0 집계 (최소 4기 이상 위성 연립)
+궤도력 복원: IqFrameRecovery가 $IQAFS 블록 결합 → u-blox LNAV 720비트(30개 워드) 원형 복원
+Solver 격리: Reference PVT 및 JSON 관측값은 SDR/RTKLIB 인입 원천 차단 → 순수 신호 복원 기반 독립 측위</div>
+                      <ul class="pvt-step-list">
+                        <li><strong>RF 추적 관측값과 궤도력 결합:</strong> SDR이 신호에서 직접 추적한 의사거리·도플러와 `$IQAFS`에서 복원한 LNAV 720비트 궤도력을 결합하여 RTKLIB 기반 4단계 SPP PVT 솔버 구동</li>
+                        <li><strong>엄격한 Solver 격리 원칙:</strong> 요청 JSON에 포함된 송신부 Reference PVT나 SB4 원본 관측값은 PocketSDR 추적기나 RTKLIB PVT 솔버의 입력으로 절대 전달되지 않으며, 오직 수신 PVT 계산이 끝난 후 비교 단계에서만 독립 대조용으로 사용됨</li>
+                      </ul>
+                      <div class="pvt-warning-box">
+                        ⚠️ <strong>없으면 발생하는 문제:</strong> Reference가 솔버에 유입되면 실제 수신 신호 처리 성능을 검증하지 못하고 가짜 성공(False Positive)을 초래함
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <p class="fine" id="delay-help">0~60초 계산 예시 · 실제 PVT 결과가 아닙니다.</p>
+              </div>
+              <div id="restore-engine-fields" hidden>
+                <div class="deep-dive-card" id="restore-pipeline-card">
+                  <h3>AFS 프레임 복원 5단계 무결성 엔진 (L1 물리 복호 → L2 데이터 무손실 재구성)</h3>
+                  <p><strong>C 네이티브 코덱(lnis_afs_codec.c) 및 Java 프레임 처리기(AfsPvtFrameCodec.java) 파이프라인:</strong> 수신된 750바이트(6,000심볼) 프레임으로부터 동기 검출, 디인터리빙, 천공 역소거, LDPC 순환 복호, CRC-24 재계산, LNAV 720비트 무손실 복구 및 Canonical 검증을 수행하는 세부 복원 과정입니다.</p>
+
+                  <div class="pvt-step-grid">
+                    <div class="pvt-step-item">
+                      <div class="pvt-step-header">
+                        <span class="pvt-step-title">1단계: 프레임 동기 부호(SP) 검출 및 SB1 BCH(52,8) 복호</span>
+                        <span class="pvt-step-tag tag-blue">나노초 동기 · 시간 간격 확정</span>
+                      </div>
+                      <div class="pvt-formula-box">SP 검출: Frame[0..67] == 0xCC 63 F7 45 36 F4 9E 04 A0 (Auto-correlation Peak)
+SB1 복호: BCH_Dec(Frame[68..119]) → FID = 0 (정규 항법 프레임), TOI = 0~99 (에포크 카운터)</div>
+                      <ul class="pvt-step-list">
+                        <li><strong>프레임 시작점 확정 (Frame Lock):</strong> 우주 전파 잡음 속에서 6,000심볼(750B) 프레임의 정확한 시작 경계를 나노초 단위로 검출 (불일치 시 <code>AFS synchronization pattern mismatch</code> 조기 거부)</li>
+                        <li><strong>BCH(52,8) 순환 부호 복호:</strong> 44비트 패리티로 순환 오류 정정 및 12초 주기 내 시간 간격 카운터 TOI(0~99) 정합성 확인</li>
+                      </ul>
+                      <div class="pvt-warning-box">
+                        ⚠️ <strong>없으면 발생하는 문제:</strong> 프레임 경계(Frame Boundary)를 찾지 못해 전체 6,000비트가 밀려 비트스트림 해독 자체가 불가능해짐
+                      </div>
+                    </div>
+
+                    <div class="pvt-step-item">
+                      <div class="pvt-step-header">
+                        <span class="pvt-step-title">2단계: 98열 × 60행 블록 디인터리빙 (Block Deinterleaving)</span>
+                        <span class="pvt-step-tag tag-amber">연집 오류 분산 해제 · 서브블록 분리</span>
+                      </div>
+                      <div class="pvt-formula-box">입력 심볼: Interleaved Symbols (Bit 120 ~ 5999, 총 5,880 bits)
+역변환 공식: deinterleaved[k++] = frame[j × 60 + i + 120]  (i = 0..59 행, j = 0..97 열)
+출력 분리: SB2 Coded (2,400b) + SB3 Coded (1,740b) + SB4 Coded (1,740b)</div>
+                      <ul class="pvt-step-list">
+                        <li><strong>우주 채널 연집 오류(Burst Error) 분산 해제:</strong> 송신 시 심각한 페이딩(Deep Fading)에 대비해 흩뿌려진 5,880개 심볼을 60행×98열 매트릭스 역순회로 재정렬</li>
+                        <li><strong>3대 서브블록 Coded Stream 분리:</strong> 핵심 궤도력(SB2, 2,400b), 보충 궤도력(SB3, 1,740b), 시험 관측값(SB4, 1,740b)으로 분할</li>
+                      </ul>
+                      <div class="pvt-warning-box">
+                        ⚠️ <strong>없으면 발생하는 문제:</strong> 채널 잡음으로 인한 연속 비트 파괴가 특정 서브블록에 집중되어 LDPC 오류 정정 한계를 초과함
+                      </div>
+                    </div>
+
+                    <div class="pvt-step-item">
+                      <div class="pvt-step-header">
+                        <span class="pvt-step-title">3단계: 천공 역소거(Depuncturing) 및 LDPC 순환 복호</span>
+                        <span class="pvt-step-tag tag-purple">삭제 심볼 주입 · Sum-Product 순환 정정</span>
+                      </div>
+                      <div class="pvt-formula-box">SB2: [Erasure(240b)] + [SB2_Coded(2,400b)] + [Erasure(3,600b)] → sdr_decode_LDPC_SF2 → 1,200 bits
+SB3/4: [Erasure(176b)] + [Syms_A(694b)] + [Erasure(10b)] + [Syms_B(1,046b)] + [Erasure(2,650b)] → sdr_decode_LDPC_SF3 → 870 bits</div>
+                      <ul class="pvt-step-list">
+                        <li><strong>천공 삭제 심볼(Erasure) 역소거:</strong> 무선 대역폭 절약을 위해 전송 생략된 위치에 <code>ERASURE(2)</code> 심볼을 주입하여 LDPC 복호기 입력 버퍼(SF2: 6,240b, SF3: 4,576b) 구성</li>
+                        <li><strong>Sum-Product (Belief Propagation) 알고리즘:</strong> 희소 패리티 검사 행렬(H) 기반 확률 전파를 통해 무선 전송 중 반전된 오류 비트를 최대 수십 회 반복 연산으로 자동 정정</li>
+                      </ul>
+                      <div class="pvt-warning-box">
+                        ⚠️ <strong>없으면 발생하는 문제:</strong> 무선 통신 과정에서 발생한 심볼 반전(오류)을 복구할 수 없어 비트 에러율(BER)이 급증함
+                      </div>
+                    </div>
+
+                    <div class="pvt-step-item">
+                      <div class="pvt-step-header">
+                        <span class="pvt-step-title">4단계: NASA 표준 CRC-24 재계산 및 비트 무결성 검증</span>
+                        <span class="pvt-step-tag tag-green">NASA 표준 CRC-24 1:1 대조 검증</span>
+                      </div>
+                      <div class="pvt-formula-box">재계산: CRC_calc = append_CRC24(Decoded_Data[Data_Len])  (g(x) = x²⁴ + x²³ + x¹⁸ + ... + 1)
+비트 판정: memcmp(CRC_calc, Decoded_Data + Data_Len, 24 bits) == 0
+검증 대상: SB2 (1,176b 데이터 + 24b CRC) / SB3 (846b + 24b) / SB4 (846b + 24b)</div>
+                      <ul class="pvt-step-list">
+                        <li><strong>수신단 독립 재계산 검증:</strong> 복호된 순수 정보 비트로부터 NASA AFS 표준 24비트 생성 다항식으로 CRC-24를 직접 재계산하여 전송받은 24비트 패리티와 1:1 비교 (<code>crc_ok</code>)</li>
+                        <li><strong>1비트 무오류 엄격 판정:</strong> 단 1비트라도 불일치 시 복호 실패로 판정하여 오수렴된 프레임이 항법 계산으로 인입되는 것을 원천 차단</li>
+                      </ul>
+                      <div class="pvt-warning-box">
+                        ⚠️ <strong>없으면 발생하는 문제:</strong> LDPC 복호기가 오수렴(False Convergence)했을 때 잘못된 궤도/시계 정보가 걸러지지 않고 PVT 엔진에 인입되어 수십 km의 측위 오차 발생
+                      </div>
+                    </div>
+
+                    <div class="pvt-step-item">
+                      <div class="pvt-step-header">
+                        <span class="pvt-step-title">5단계: LNAV 720비트 무손실 궤도력 복원 및 Canonical 검증</span>
+                        <span class="pvt-step-tag tag-blue">LNAV 720b 결합 · Canonical 무관용 검증</span>
+                      </div>
+                      <div class="pvt-formula-box">LNAV 720b 복원: Word 1~10 (SF1~3) = [SB2 10개 핵심 요소 262b] ∪ [SB3 섭동·보충 459b]
+SB4 관측값 복원: 가상 송신 시각(T*ᵢ = S − Pᵢ/c), Doppler, C/N0, Klobuchar(α, β), 시험 기준시(S)
+Canonical 검증: Arrays.equals(Re_Encoded(Payload), Received_SB234) == true</div>
+                      <ul class="pvt-step-list">
+                        <li><strong>LNAV 720비트 원형 보존 결합:</strong> SB2의 10개 기본 케플러 요소(262b)와 SB3의 6종 조화 섭동 계수/상태 플래그(459b)를 역슬롯팅 결합하여 u-blox 30개 워드(720비트)를 1비트의 손실 없이 원형 복원</li>
+                        <li><strong>관측값 및 가상 송신 시각 추출:</strong> SB4에서 DTN 지연 에뮬레이션용 가상 송신 시각(T*ᵢ)과 Doppler, C/N0, 전리층 보정 계수 복원</li>
+                        <li><strong>Canonical Re-encoding 무관용 검증:</strong> 복원된 데이터 객체를 가상 재인코딩하여 수신된 비트와 1:1 바이트 단위로 대조(<code>Arrays.equals</code>) 통과 시에만 PVT 엔진에 공급</li>
+                      </ul>
+                      <div class="pvt-warning-box">
+                        ⚠️ <strong>없으면 발생하는 문제:</strong> 섭동 파라미터 유실 시 100m 궤도 오차가 발생하며, 가상 송신 시각 불일치 시 DTN 지연 에뮬레이션이 왜곡됨
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div id="pvt-engine-fields" hidden>
+                <div class="deep-dive-card" id="pvt-time-system-card">
+                  <h3>2가지 시각(Time) 운용 체계: 실제 위성 송신 시각 vs 보정 송신 시각</h3>
+                  <p><strong>시각 분리 운용 배경:</strong> 우주 공간에서 초속 약 3.9 km로 공전하는 위성의 실제 물리 궤도를 고정하고, 지상 소프트웨어 시험베드에서 DTN 네트워크 지연(&Delta;t)을 의사거리에 정확히 주입하기 위해 2가지 시각 체계를 명확히 분리하여 사용합니다.</p>
+                    <table class="deep-dive-table">
+                      <thead>
+                        <tr>
+                          <th scope="col" style="width: 16%;">구분 항목</th>
+                          <th scope="col" style="width: 42%;">실제 위성 송신 시각<br><span style="font-weight: normal; font-size: 10px; color: #334e68;">(t_txᵢ = t₀ − Pᵢ/c)</span></th>
+                          <th scope="col" style="width: 42%;">지연 보정 송신 시각<br><span style="font-weight: normal; font-size: 10px; color: #165b40;">(T*ᵢ = S − Pᵢ/c)</span></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <th scope="row">물리적 정의</th>
+                          <td>전파가 실제 GPS 위성 안테나를 떠난 <strong>우주 물리적 발신 시각</strong> (t₀: 관측 기준시, Pᵢ: 원본 의사거리)</td>
+                          <td>시험 시작 접수 시각 S를 기준으로 원본 전파 전파 시간(Pᵢ/c)을 역산하여 생성한 <strong>지상 시험용 가상 송신 시각</strong></td>
+                        </tr>
+                        <tr>
+                          <th scope="row">주요 사용처</th>
+                          <td><strong>위성 3차원 궤도 좌표 (X^sᵢ, Y^sᵢ, Z^sᵢ) 및 위성 원자시계 오차(dt^sᵢ) 계산</strong></td>
+                          <td><strong>수신단 의사거리 역산 및 DTN 통신 지연 에뮬레이션 주입 (P′ᵢ = c × (R − T*ᵢ))</strong></td>
+                        </tr>
+                        <tr>
+                          <th scope="row">역할 및 고정 필수 이유</th>
+                          <td>
+                            <strong>위성 실제 우주 위치 고정 (필수):</strong><br>
+                            GPS 위성은 초속 약 3.9 km로 고속 공전하며 지구 자전계(ECEF)도 함께 회전합니다. 전파가 위성을 떠난 실제 시각 기준으로 궤도를 전파해야만 우주 공간에서 위성 위치가 실제 관측 기하와 일치합니다.<br>
+                            <em>(만약 네트워크 지연 &Delta;t만큼 궤도 계산 시점까지 임의로 지연시키면 위성이 수십~수백 km 엉뚱한 위치로 이탈하여 측위 자체가 파괴됨)</em>
+                          </td>
+                          <td>
+                            <strong>공통 지연 거리 주입 (에뮬레이션):</strong><br>
+                            지상 수신 서버에는 무선 RF 안테나나 하드웨어 상관기(Correlator)가 없으므로, 번들 네트워크 도착 시각 R과 시험 시작 시각 S의 시차(&Delta;t = R − S)를 모든 위성의 의사거리에 균일한 거리 지연(c&Delta;t)으로 주입합니다.<br>
+                            <em>(P′ᵢ = c(R − (S − Pᵢ/c)) = Pᵢ + c(R − S) = Pᵢ + c&Delta;t)</em>
+                          </td>
+                        </tr>
+                        <tr>
+                          <th scope="row">PVT 솔버 결합 원리</th>
+                          <td colspan="2">
+                            <strong>공통 지연 흡수(Clock Bias Absorption)의 수학적 원리:</strong><br>
+                            위성의 우주 위치 (X^sᵢ, Y^sᵢ, Z^sᵢ)는 <strong>'실제 위성 송신 시각'</strong>으로 원래 궤도에 정확히 고정해 두고, 의사거리 P′ᵢ에만 <strong>'지연 보정 송신 시각'</strong>을 통해 c&Delta;t 지연을 인입시킵니다. 그 결과, <strong>PVT 솔버가 사용자 위치 (x, y, z)는 원래 위치 그대로 0.000 mm 오차 없이 보존하고, 지연 c&Delta;t 전량을 수신기 시계오차(Clock Bias, c·dt_r)로 전량 흡수</strong>하게 됩니다.
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+
+                  <h4>PVT 계산 엔진 4단계 핵심 과정 및 방정식</h4>
+                  <p><strong>RTKLIB SPP 솔버 파이프라인:</strong> 원본 궤도력과 지연 의사거리로부터 사용자 3차원 위치, 속도, 시계오차를 산출하는 세부 계산 과정입니다.</p>
+
+                  <div class="pvt-step-grid">
+                    <div class="pvt-step-item">
+                      <div class="pvt-step-header">
+                        <span class="pvt-step-title">1단계: 케플러 궤도 전파 방정식 (Kepler Orbit Propagation)</span>
+                        <span class="pvt-step-tag tag-blue">위성 위치 · 시계 계산</span>
+                      </div>
+                      <div class="pvt-formula-box">M(t) = M₀ + (√(μ/A³) + Δn)(t − t_oe)
+E − e·sin(E) = M(t)  (Newton-Raphson 반복법)
+(X^s, Y^s, Z^s) = R_z(Ω_k) · R_x(i_k) · (r_k·cos u_k, r_k·sin u_k, 0)ᵀ</div>
+                      <ul class="pvt-step-list">
+                        <li><strong>궤도 16요소 대입:</strong> SB2의 6대 기본 케플러 요소와 SB3의 조화 섭동 6종(C_rs~C_is), 세차율(Ω̇, IDOT, Δn), 원자시계 보정계수(t_oc, a_f0~a_f2)를 대입하여 관측 시점(t)에서의 위성 3차원 ECEF 좌표 및 위성 시계오차(dt^s) 산출</li>
+                        <li><strong>궤도력 시간 고정 필수:</strong> 초속 약 3.9 km로 공전하는 위성의 실제 우주 위치를 원래 송신 시각으로 고정 (시간 임의 변경 시 수십 km 이탈 방지)</li>
+                      </ul>
+                      <div class="pvt-warning-box">
+                        ⚠️ <strong>없으면 발생하는 문제:</strong> 위성의 우주 3차원 위치를 알 수 없어 수신기와 위성 간 기하학적 거리 측정이 무용지물이 됨
+                      </div>
+                    </div>
+
+                    <div class="pvt-step-item">
+                      <div class="pvt-step-header">
+                        <span class="pvt-step-title">2단계: 기본 관측 방정식 (Pseudorange Observation Equation)</span>
+                        <span class="pvt-step-tag tag-green">위치 (x,y,z) · 시계오차 (dt_r) 측위</span>
+                      </div>
+                      <div class="pvt-formula-box">P′ᵢ = ρᵢ + c·(dt_r − dt^sᵢ) + Iᵢ + Tᵢ + εᵢ
+ρᵢ = √[(X^sᵢ − x)² + (Y^sᵢ − y)² + (Z^sᵢ − z)²]  (i = 1, 2, ..., N ≥ 4)</div>
+                      <ul class="pvt-step-list">
+                        <li><strong>4개 미지수 연립방정식:</strong> 사용자 3차원 위치 (x, y, z)와 수신기 시계오차 dt_r(거리 단위 c·dt_r) 총 4개의 미지수를 결정하기 위해 <strong>최소 4기 이상의 가시 위성 연립방정식 구성 필수</strong> (Gauss-Newton 반복 테일러 선형화 풀이)</li>
+                        <li><strong>공통 지연 흡수 원리:</strong> 모든 위성에 동일한 지연 거리(c·Δt) 부과 시 기하학적 위치 (x, y, z)는 0.000 mm 보존되고, 지연 전량은 수신기 시계오차 dt_r로 전량 흡수 (dt_r′ = dt_r + Δt)</li>
+                      </ul>
+                      <div class="pvt-warning-box">
+                        ⚠️ <strong>없으면 발생하는 문제:</strong> 수신기와 위성 간 거리를 해석할 수 없어 3차원 사용자 위치 측위 불가
+                      </div>
+                    </div>
+
+                    <div class="pvt-step-item">
+                      <div class="pvt-step-header">
+                        <span class="pvt-step-title">3단계: 속도 관측 방정식 (Doppler Velocity Equation)</span>
+                        <span class="pvt-step-tag tag-amber">3차원 속도 (v_x, v_y, v_z) · 주파수 드리프트</span>
+                      </div>
+                      <div class="pvt-formula-box">f_D,ᵢ = −(f₀/c) · (v⃗^sᵢ − v⃗_r) · e⃗ᵢ + f₀·ḋt_r
+e⃗ᵢ = (X⃗^sᵢ − x⃗) / ρᵢ  (시선 방향 단위벡터)</div>
+                      <ul class="pvt-step-list">
+                        <li><strong>3차원 속도 벡터 및 시계 드리프트 추정:</strong> 반송파 도플러 주파수 편이(f_D, u-blox RAWX 계측)와 위성 속도 벡터(v⃗^s)를 이용하여 수신기가 초당 몇 미터로 움직이는지 3차원 속도 벡터 v⃗_r = (v_x, v_y, v_z) 및 수신기 내부 발진기 주파수 편이율(Clock Drift ḋt_r) 동시 추정</li>
+                      </ul>
+                      <div class="pvt-warning-box">
+                        ⚠️ <strong>없으면 발생하는 문제:</strong> 위치 미분치(Δx/Δt)에만 의존해야 하므로 위치 측정 잡음과 시간 양자화 오차가 증폭되어 속도 오차가 수 배 이상 급증함
+                      </div>
+                    </div>
+
+                    <div class="pvt-step-item">
+                      <div class="pvt-step-header">
+                        <span class="pvt-step-title">4단계: 가중최소자승(WLS) 및 대기 오차 모델링 (WLS & Error Modeling)</span>
+                        <span class="pvt-step-tag tag-purple">가중치 W · Klobuchar 전리층 보정</span>
+                      </div>
+                      <div class="pvt-formula-box">Δx̂ = (Gᵀ W G)⁻¹ Gᵀ W Δy  (W = diag(σᵢ⁻²))
+P_corrected = P′ − I_klobuchar(α₀~α₃, β₀~β₃) − T_hopfield</div>
+                      <ul class="pvt-step-list">
+                        <li><strong>WLS 가중최소자승:</strong> 신호 품질(C/N0)이 우수하고 고앙각(High Elevation)에 위치한 위성에 높은 가중치를 부여하여 저앙각 다중경로(Multipath) 신호의 오차 전파 억제</li>
+                        <li><strong>Klobuchar 전리층 모델 사전 감산:</strong> 태양 복사로 대기 상층부를 통과할 때 발생하는 수~수십 미터 전파 지연 오차(Iᵢ)를 항법 메시지 8대 파라미터(α₀~α₃, β₀~β₃)로 사전 감산 보정</li>
+                      </ul>
+                      <div class="pvt-warning-box">
+                        ⚠️ <strong>없으면 발생하는 문제:</strong> 저품질 신호의 잡음 및 대기 지연 미보정으로 인해 수 미터에서 수십 미터 이상의 위치 오차 발생
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div id="compare-engine-fields" hidden>
+                <div class="deep-dive-card">
+                  <h3>2원화 평가 체계: 데이터 전달 무결성 vs 항법 PVT 지연 검증</h3>
+                  <p><strong>평가 도메인 분리 원칙:</strong> 지상 시험베드에서 데이터 전달 무결성(네트워크 전송 무손실)과 항법 PVT 계산 결과(지연 흡수 및 기하학적 측위)는 서로 다른 독립적 평가 도메인입니다. 전달 데이터가 완전히 일치하더라도 위성 가시성이나 기하학적 배치(DOP)에 따라 PVT 해가 달라질 수 있고, 반대로 PVT 계산이 실패하더라도 전달 데이터 자체는 무손실일 수 있으므로 두 결과를 명확히 분리하여 확인합니다.</p>
+                  <table class="deep-dive-table">
+                    <thead>
+                      <tr>
+                        <th scope="col" style="width: 18%;">구분 항목</th>
+                        <th scope="col" style="width: 41%;">체계 1: 데이터 전달 무결성<br><span style="font-weight: normal; font-size: 10px; color: #334e68;">(Data Delivery Integrity)</span></th>
+                        <th scope="col" style="width: 41%;">체계 2: 항법 PVT 지연 검증<br><span style="font-weight: normal; font-size: 10px; color: #165b40;">(Navigation PVT Verification)</span></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <th scope="row">검증 대상</th>
+                        <td>원본 GRAW 기반 재생성 패킷 SHA-256 해시 대조<br>(전송 중 비트 손상·변조 여부)</td>
+                        <td>송신 Reference PVT 대비 수신 PVT 차이 벡터 산출<br>(위치·속도 오차 및 Clock Bias 잔차)</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">검증 시점</th>
+                        <td>수신 PVT 계산 완료 후 사후 REST 조회 시<br>(<code>GET /api/dtn/reference/{testId}</code>)</td>
+                        <td>수신 노드 독자적 PVT 계산 직후<br>(사전 정답 유출 원천 차단 상태에서 연산)</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">판정 상태</th>
+                        <td><span class="pvt-step-tag tag-green">COMPLETE</span> (일치), <span class="pvt-step-tag tag-amber">MISMATCH</span> (불일치),<br><span class="pvt-step-tag tag-blue">WAITING</span> (조회 대기), UNAVAILABLE (조회 불가)</td>
+                        <td><span class="pvt-step-tag tag-blue">MEASURED</span> (측정 완료), <span class="pvt-step-tag tag-amber">PARTIAL</span> (부분 비교),<br><span class="pvt-step-tag tag-purple">INCONCLUSIVE</span> (비교 불가)</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">핵심 원리</th>
+                        <td><strong>재생성 해시 대조 (Reproduce & Digest):</strong><br>의도된 필드 치환(Pᵢ → T*ᵢ)과 정답 격리(referencePvt 삭제)를 손실로 오인하지 않도록 동일 변환 후 대조</td>
+                        <td><strong>공통 지연의 시계오차 흡수 (Clock Bias Absorption):</strong><br>허용오차 기반 합격/불합격(PASS/FAIL)이 아닌 물리적 계측치 관측 (위치 보존 및 잔차 εt 산출)</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">결과 보존성</th>
+                        <td>REST 조회가 지연되거나 일시 단절되어도 <strong>수신 계산 결과는 영구 보존</strong>되며 백그라운드 재시도</td>
+                        <td>수신 측위 해가 산출되는 즉시 <code>receiverJson</code>으로 영구 저장되어 변경되지 않음</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div class="deep-dive-card">
+                  <h3>3단계 결과 비교 엔진 파이프라인 (3-Step Post-Comparison Pipeline)</h3>
+                  <p><strong>수신부 비교 알고리즘:</strong> 수신 솔버의 독립적인 PVT 연산 완료 후, 송신 서비스와의 사후 REST 연동, 물리적 차이 산출, 그리고 2원화된 최종 상태 판정까지의 체계적인 3단계 처리 과정입니다.</p>
+
+                  <div class="pvt-step-grid">
+                    <div class="pvt-step-item">
+                      <div class="pvt-step-header">
+                        <span class="pvt-step-title">1단계: 사후 REST 원본 조회 및 재생성 해시 대조 (Strict REST & Reproduce-and-Digest)</span>
+                        <span class="pvt-step-tag tag-purple">사전 정답 차단 · 수신 결과 영구 보존</span>
+                      </div>
+                      <div class="pvt-formula-box">REST 요청: GET /api/dtn/reference/{testId}  (수신 PVT 계산 완료 후 비로소 호출)
+재생성 엔진: DelayTransferCodec.prepare(jobId, rawRecords, isGnssRaw, startedAt, codec)
+해시 대조: SHA-256(packet_recreated) == snapshot.payloadSha256</div>
+                      <ul class="pvt-step-list">
+                        <li><strong>사전 정답 오염 원천 차단:</strong> 수신 PVT 솔버가 연산 중에 원본 관측값이나 Reference PVT를 미리 참조하는 것을 원천 방지하기 위해, PVT 계산이 완전히 완료된 후에만 REST 엔드포인트로 비교자료(ReferenceSnapshot)를 호출</li>
+                        <li><strong>재생성 해시 대조 (Reproduce & Digest):</strong> 송신단에서 의사거리를 보정 송신 시각으로 치환하고 Reference를 제외했으므로, 원본 파일과의 단순 바이트 대조는 불일치함. 따라서 원본에서 동일한 변환 엔진을 구동해 전달 데이터를 재생성한 후 해시를 대조하여 의도한 변환·제외를 손실로 보지 않고 무결성을 증명</li>
+                        <li><strong>조회 지연 시 수신 결과 보존:</strong> 상대 노드의 REST 조회가 늦어지거나 네트워크가 일시 단절되더라도, 수신 노드가 이미 계산한 PVT 결과는 절대 폐기/롤백되지 않고 영구 보존되며 백그라운드 가상 스레드가 재조회를 지속</li>
+                      </ul>
+                      <div class="pvt-warning-box">
+                        ⚠️ <strong>주의:</strong> 단순 원본 GRAW 바이트 비교 시 의도된 transmitAt 변환으로 인해 불일치로 오판할 수 있으므로, 반드시 동일 변환 엔진을 거친 재생성 패킷 해시로 대조해야 합니다.
+                      </div>
+                    </div>
+
+                    <div class="pvt-step-item">
+                      <div class="pvt-step-header">
+                        <span class="pvt-step-title">2단계: 물리적 차이 산출 및 Clock Bias 잔차 방정식 (Physical Deltas & Clock Residual Equation)</span>
+                        <span class="pvt-step-tag tag-green">지연 전량 시계 흡수</span>
+                        <span class="pvt-step-tag tag-amber">위치 0.000 mm 보존</span>
+                      </div>
+                      <div class="pvt-formula-box">위치 차이: d_pos = ||x_rx − x_ref|| = √[(ΔX)² + (ΔY)² + (ΔZ)²]  [m]
+속도 차이: d_vel = ||v_rx − v_ref|| = √[(ΔVx)² + (ΔVy)² + (ΔVz)²]  [m/s]
+Clock Bias 변화: Δb = Bias_rx − Bias_ref  [s]
+Clock Bias 잔차: εt = (수신 Bias − Reference Bias) − Δt = Δb − Δt  [s]
+거리 환산 잔차: εd = c × εt = 299,792,458 × [Δb − Δt]  [m]</div>
+                      <ul class="pvt-step-list">
+                        <li><strong>차이 계산 기준:</strong> 모든 차이는 항상 <strong>수신 − Reference</strong> 기준입니다. 위치는 m, 속도는 m/s, Clock Bias는 s 단위로 계측합니다.</li>
+                        <li><strong>공통 지연의 시계오차 흡수:</strong> 모든 가시위성에 동일한 지연 시간(Δt)이 인입되면, WLS 측위 행렬 풀이 시 기하학적 사용자 위치 (x, y, z)는 원래 위치 그대로 0.000 mm 오차 없이 보존되고 지연 전량이 수신기 시계오차(Clock Bias)로 전이됩니다 (Δb ≈ Δt ⟹ εt ≈ 0).</li>
+                        <li><strong>위치 보존 ≠ 지연 부재:</strong> 위치 차이가 0.000 mm에 가깝다는 것은 지연이 발생하지 않았다는 뜻이 아니라, 지연이 위치 오차로 왜곡되지 않고 수신기 시계오차로 완벽히 격리·흡수되었다는 물리적 증거입니다.</li>
+                        <li><strong>도플러 속도 차이 발생 원인:</strong> 동일한 수신 도플러 주파수(f_D)를 사용하더라도, 지연에 따라 계산된 위성 궤도 위치와 수신기 위치 간 시선 방향 단위벡터(e⃗ᵢ = (X⃗^sᵢ − x⃗) / ρᵢ)의 미세한 방향 차이에 의해 미세한 속도 편차가 발생할 수 있습니다.</li>
+                      </ul>
+                      <div class="pvt-warning-box">
+                        💡 <strong>핵심 원리:</strong> Clock Bias 잔차(εt, εd)는 위치 오차가 아니며, 시계오차가 흡수한 시간과 주입한 지연의 물리적 차이를 진공 중 광속(c = 299,792,458 m/s)으로 환산한 관측치입니다 (허용오차 미설정).
+                      </div>
+                    </div>
+
+                    <div class="pvt-step-item">
+                      <div class="pvt-step-header">
+                        <span class="pvt-step-title">3단계: 판정 상태의 본질과 물리적 해석 (Verdict Semantics: MEASURED vs INCONCLUSIVE)</span>
+                        <span class="pvt-step-tag tag-blue">측정 완료 (MEASURED)</span>
+                        <span class="pvt-step-tag tag-purple">독립 2원 평가</span>
+                      </div>
+                      <div class="pvt-formula-box">지연 PVT 판정: positionValid ? (velocityValid ? "MEASURED" : "PARTIAL") : "INCONCLUSIVE"
+물리적 의미: MEASURED = 지연 반영 PVT 측정 완료 (허용오차 PASS/FAIL 판정이 아님)
+INCONCLUSIVE: 극심한 지연 또는 기하 배치 불량으로 인한 수렴 불가 (데이터 전달 무결성과 분리)</div>
+                      <ul class="pvt-step-list">
+                        <li><strong>MEASURED의 본질 (측정 완료):</strong> MEASURED는 사전에 정의된 특정 오차 범위 이내로 들어와야 하는 합격(PASS) 판정이 아니며, 물리적 연산이 완료되어 측정값을 확보했음을 의미합니다.</li>
+                        <li><strong>송수신 시계 차이 혼입:</strong> 실제 시험 환경에서는 독립된 송·수신기 발진기 시계 차이(Clock Drift)나 하드웨어 내부 군지연이 주입된 지연에 자연스럽게 섞이므로, 고정 임계치로 자르지 않고 관측치를 투명하게 보고합니다.</li>
+                        <li><strong>INCONCLUSIVE 판정 구분:</strong> 극심한 지연(수백 초 이상)이나 가시위성 부족으로 인해 연립방정식 해가 수렴하지 못하면 INCONCLUSIVE로 표기하며, 이는 데이터 전달 실패(MISMATCH)와 명확히 구분하여 확인합니다.</li>
+                      </ul>
+                      <div class="pvt-warning-box">
+                        ⚠️ <strong>평가 분리:</strong> 큰 지연에서 PVT 해가 유효하지 않아 INCONCLUSIVE가 되더라도, 데이터 전달 일치 여부(COMPLETE)와는 별개의 독립적인 판정입니다.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="deep-dive-card">
+                  <h3>결과 비교 지표 및 판정 상태 일람표 (Comparison Metrics & Verdict Table)</h3>
+                  <p><strong>수신부 검증 지표 종합:</strong> 수신 결과 비교 단계에서 산출되는 핵심 물리 지표의 공식, 단위, 물리적 의미 및 해석 요령입니다.</p>
+                  <table class="deep-dive-table" style="table-layout: fixed; width: 100%;">
+                    <thead>
+                      <tr>
+                        <th scope="col" style="width: 17%;">지표 항목</th>
+                        <th scope="col" style="width: 25%;">계산 공식</th>
+                        <th scope="col" style="width: 10%; text-align: center;">단위</th>
+                        <th scope="col" style="width: 26%;">물리적 의미 및 정상 동작 기준</th>
+                        <th scope="col" style="width: 22%;">주의사항 및 해석 요령</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <th scope="row">데이터 전달 일치<br><span style="font-weight: normal; font-size: 10px; color: #486581;">(Data Digest Match)</span></th>
+                        <td><span style="font-family: Consolas, monospace; font-size: 10.5px;">SHA-256(Packet_recreated) == snapshot.payloadSha256</span></td>
+                        <td style="text-align: center;"><span class="ubx-tag">Hash (Hex)</span></td>
+                        <td>원본에서 동일 엔진으로 재생성한 패킷의 SHA-256 해시 완전 일치</td>
+                        <td>의도적 치환(transmitAt)과 격리(referencePvt 삭제)는 손실로 보지 않음</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">위치 차이<br><span style="font-weight: normal; font-size: 10px; color: #486581;">(Position Delta)</span></th>
+                        <td><span style="font-family: Consolas, monospace; font-size: 10.5px;">||x_rx − x_ref||<br>= √[ΔX² + ΔY² + ΔZ²]</span></td>
+                        <td style="text-align: center;"><span class="ubx-tag">m</span></td>
+                        <td>송신 기준 위치 대비 수신 계산 위치 편차 (공통 지연 시 0.000 mm 오차 없이 보존)</td>
+                        <td>위치 차이가 작아도 지연이 없었다는 뜻이 아님 (시계로 전량 흡수)</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">속도 차이<br><span style="font-weight: normal; font-size: 10px; color: #486581;">(Velocity Delta)</span></th>
+                        <td><span style="font-family: Consolas, monospace; font-size: 10.5px;">||v_rx − v_ref||<br>= √[ΔVx² + ΔVy² + ΔVz²]</span></td>
+                        <td style="text-align: center;"><span class="ubx-tag">m/s</span></td>
+                        <td>송신 기준 속도 대비 수신 계산 속도 편차 (도플러 주파수 편이 기반 연산)</td>
+                        <td>동일 Doppler에서도 계산 위치·위성 방향에 따라 미세 속도 차이 발생 가능</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Clock Bias 변화량<br><span style="font-weight: normal; font-size: 10px; color: #486581;">(Clock Delta, Δb)</span></th>
+                        <td><span style="font-family: Consolas, monospace; font-size: 10.5px;">Δb = Bias_rx − Bias_ref</span></td>
+                        <td style="text-align: center;"><span class="ubx-tag">s</span></td>
+                        <td>수신기 시계오차가 공통 지연(Δt)을 흡수한 총량 (공통 지연 시 Δb ≈ Δt)</td>
+                        <td>지연 전량이 시계오차 축으로 전이되는 핵심 물리 지표</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Clock Bias 잔차<br><span style="font-weight: normal; font-size: 10px; color: #486581;">(Clock Residual, εt, εd)</span></th>
+                        <td><span style="font-family: Consolas, monospace; font-size: 10.5px;">εt = Δb − Δt<br>εd = c × εt</span></td>
+                        <td style="text-align: center;"><span class="ubx-tag">s / m</span></td>
+                        <td>Clock Bias가 흡수한 시간과 주입한 지연의 차이 및 거리 환산값 (c = 299,792,458 m/s)</td>
+                        <td>위치 오차가 아닌 시간 차이의 거리 환산값이며 허용오차 미설정</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">지연 PVT 판정<br><span style="font-weight: normal; font-size: 10px; color: #486581;">(Verdict: MEASURED)</span></th>
+                        <td><span style="font-family: Consolas, monospace; font-size: 10.5px;">positionValid ? (velocityValid ? "MEASURED" : "PARTIAL") : "INCONCLUSIVE"</span></td>
+                        <td style="text-align: center;"><span class="pvt-step-tag tag-blue">MEASURED</span></td>
+                        <td>지연 반영 PVT 물리 측정 완료 보고 (송수신 시계 차이 자연 혼입 인정)</td>
+                        <td>허용오차 기반 합격 판정이 아니며, 큰 지연 시 INCONCLUSIVE로 구분</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div id="send-engine-fields" hidden>
+                <div class="deep-dive-card">
+                  <div class="visual-diagram-card" style="margin: 8px 0; background: #ffffff; border: 1px solid #d2e3fc; border-radius: 8px; padding: 10px; overflow: hidden;">
+                    <svg viewBox="0 0 760 215" style="width: 100%; height: auto; display: block; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans KR', sans-serif;" aria-label="송신 요청 및 비동기 처리 아키텍처 흐름도">
+                      <defs>
+                        <marker id="arr-blue" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                          <path d="M0,0 L0,6 L6,3 z" fill="#1a73e8" />
+                        </marker>
+                        <marker id="arr-amber" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                          <path d="M0,0 L0,6 L6,3 z" fill="#b06000" />
+                        </marker>
+                        <marker id="arr-green" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                          <path d="M0,0 L0,6 L6,3 z" fill="#137333" />
+                        </marker>
+                      </defs>
+
+                      <!-- Node 1: LNIS 송신 서비스 -->
+                      <rect x="20" y="15" width="230" height="58" rx="7" fill="#e8f0fe" stroke="#1a73e8" stroke-width="1.5" />
+                      <text x="135" y="38" text-anchor="middle" font-size="13" font-weight="700" fill="#174ea6">LNIS 송신 서비스 (LnisServer)</text>
+                      <text x="135" y="56" text-anchor="middle" font-size="10.5" fill="#334e68">시험 접수 · 메타데이터 JSON 생성</text>
+
+                      <!-- Arrow 1: Service -> Shared Folder -->
+                      <path d="M 250 44 L 502 44" fill="none" stroke="#b06000" stroke-width="1.8" stroke-dasharray="5 3" marker-end="url(#arr-amber)" />
+                      <rect x="290" y="24" width="172" height="20" rx="4" fill="#fef7e0" stroke="#fce8b2" />
+                      <text x="376" y="38" text-anchor="middle" font-size="10" font-weight="600" fill="#b06000">① 2.16 GB BIN 바이너리 저장</text>
+
+                      <!-- Node 2: 송신 공유 폴더 -->
+                      <rect x="510" y="15" width="230" height="58" rx="7" fill="#fef7e0" stroke="#f29900" stroke-width="1.5" />
+                      <text x="625" y="38" text-anchor="middle" font-size="13" font-weight="700" fill="#b06000">송신 공유 폴더 (/exchange)</text>
+                      <text x="625" y="56" text-anchor="middle" font-size="10.5" fill="#7c4a00">UUID.bin 대용량 신호 파일 분리</text>
+
+                      <!-- Arrow 2: Service -> Adapter -->
+                      <path d="M 135 73 L 135 102" fill="none" stroke="#1a73e8" stroke-width="1.8" marker-end="url(#arr-blue)" />
+                      <text x="142" y="91" font-size="10" font-weight="600" fill="#1a73e8">② POST /transfers</text>
+
+                      <!-- Arrow 3: Shared Folder -> Adapter -->
+                      <path d="M 625 73 L 625 102" fill="none" stroke="#b06000" stroke-width="1.8" marker-end="url(#arr-amber)" />
+                      <text x="632" y="91" font-size="10" font-weight="600" fill="#b06000">③ 어댑터가 BIN 직접 로드</text>
+
+                      <!-- Node 3: 송신 어댑터 -->
+                      <rect x="20" y="110" width="720" height="48" rx="7" fill="#f8fafc" stroke="#64748b" stroke-width="1.5" />
+                      <text x="35" y="131" font-size="12" font-weight="700" fill="#0f172a">송신 어댑터 (DTN / HDTN Adapter)</text>
+                      <text x="35" y="147" font-size="10.5" fill="#475569">JSON 메타데이터 파싱 ──► 공유 폴더 BIN 매핑 ──► 우주 번들(Bundle) 캡슐화 ──► 라우터 주입</text>
+
+                      <!-- Arrow 4: Adapter -> Bottom Banner -->
+                      <path d="M 380 158 L 380 172" fill="none" stroke="#137333" stroke-width="1.8" marker-end="url(#arr-green)" />
+
+                      <!-- Node 4: 비동기 접수 상태 전이 -->
+                      <rect x="20" y="178" width="720" height="30" rx="5" fill="#e6f4ea" stroke="#137333" stroke-width="1.2" />
+                      <text x="380" y="198" text-anchor="middle" font-size="11" font-weight="700" fill="#137333">④ 200/202 Accepted 즉시 응답 ──► LNIS 상태: WAITING_DTN (상대 수신 대기 없이 즉시 다음 시험 접수 가능!)</text>
+                    </svg>
+                  </div>
+                </div>
+
+                <div class="deep-dive-card">
+                  <h3>NASA GRC HDTN 파이프라인 7대 제어 옵션 (hdtnConfig)</h3>
+                  <p><strong>고속 DTN 파이프라인 제어:</strong> 우주-지상 멀티 기가비트 전송을 위해 어댑터가 라우터 파이프라인에 주입하는 핵심 7대 설정 파라미터입니다.</p>
+                  <table class="deep-dive-table" style="table-layout: fixed; width: 100%;">
+                    <thead>
+                      <tr>
+                        <th scope="col" style="width: 24%;">옵션 파라미터명</th>
+                        <th scope="col" style="width: 14%; text-align: center;">기본값</th>
+                        <th scope="col" style="width: 12%; text-align: center;">단위/타입</th>
+                        <th scope="col" style="width: 50%;">우주 통신 제어 역할 및 동작 원리</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <th scope="row"><span style="font-family: Consolas, monospace; font-size: 11px;">maxNumberOfBundlesInPipeline</span></th>
+                        <td style="text-align: center;"><span class="ubx-tag">50</span></td>
+                        <td style="text-align: center;">개 (Integer)</td>
+                        <td>파이프라인 내 최대 동시 체류 번들 수 제한 (초과 시 인입 제동 및 메모리 고갈 방지)</td>
+                      </tr>
+                      <tr>
+                        <th scope="row"><span style="font-family: Consolas, monospace; font-size: 11px;">maxSumOfBundleBytesInPipeline</span></th>
+                        <td style="text-align: center;"><span class="ubx-tag">50,000,000</span></td>
+                        <td style="text-align: center;">Bytes (50 MB)</td>
+                        <td>파이프라인 내 총 번들 바이트 합계 상한 (대용량 버퍼 오버플로 방지)</td>
+                      </tr>
+                      <tr>
+                        <th scope="row"><span style="font-family: Consolas, monospace; font-size: 11px;">maxBundleSizeBytes</span></th>
+                        <td style="text-align: center;"><span class="ubx-tag">10,485,760</span></td>
+                        <td style="text-align: center;">Bytes (10 MB)</td>
+                        <td>단일 번들의 최대 페이로드 크기 상한 (10 MB 단위로 분할 전송)</td>
+                      </tr>
+                      <tr>
+                        <th scope="row"><span style="font-family: Consolas, monospace; font-size: 11px;">tcpclMaxSegmentSizeBytes</span></th>
+                        <td style="text-align: center;"><span class="ubx-tag">20,000</span></td>
+                        <td style="text-align: center;">Bytes (20 KB)</td>
+                        <td>TCP 수렴 계층(TCPCL RFC 9174) 전송 세그먼트 MTU 분할 단위</td>
+                      </tr>
+                      <tr>
+                        <th scope="row"><span style="font-family: Consolas, monospace; font-size: 11px;">neighborDepletedStorageDelaySeconds</span></th>
+                        <td style="text-align: center;"><span class="ubx-tag">10</span></td>
+                        <td style="text-align: center;">초 (Seconds)</td>
+                        <td>다음 홉 라우터 저장소 고갈 시 송신 일시 중지 백오프(Backpressure) 대기 시간</td>
+                      </tr>
+                      <tr>
+                        <th scope="row"><span style="font-family: Consolas, monospace; font-size: 11px;">enforceBundlePriority</span></th>
+                        <td style="text-align: center;"><span class="ubx-tag">false</span></td>
+                        <td style="text-align: center;">Boolean</td>
+                        <td>Expedited/Standard/Bulk 우선순위 큐 강제 적용 여부 (false 시 FIFO 선착순 처리)</td>
+                      </tr>
+                      <tr>
+                        <th scope="row"><span style="font-family: Consolas, monospace; font-size: 11px;">storageDeletionPolicy</span></th>
+                        <td style="text-align: center;"><span class="ubx-tag">DELETE_AFTER_FORWARDING</span></td>
+                        <td style="text-align: center;">Enum</td>
+                        <td>전송 완료 즉시 로컬 스토리지에서 삭제(on_forward)하여 한정된 스토리지 즉시 확보</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div class="deep-dive-card">
+                  <h3>비동기 송신 및 접수 상태 전이 규칙표</h3>
+                  <p><strong>송신 서비스 안전성 규칙:</strong> 어댑터 요청 후 상대 도착 대기 없이 다음 시험을 시작하며, 응답 미확인 시 자동 재전송을 차단합니다.</p>
+                  <table class="deep-dive-table" style="table-layout: fixed; width: 100%;">
+                    <thead>
+                      <tr>
+                        <th scope="col" style="width: 20%;">구분 항목</th>
+                        <th scope="col" style="width: 40%;">상태 및 동작 규칙</th>
+                        <th scope="col" style="width: 40%;">설계 이유 및 네트워크 보호 원리</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <th scope="row">어댑터 접수 상태</th>
+                        <td><span class="pvt-step-tag tag-green">HTTP 200 / 202 Accepted</span> 응답 확인</td>
+                        <td>어댑터가 요청을 정상 수신해 큐에 적재했음을 의미 (상대 도착 확인 아님)</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">비동기 처리 (Fire-and-Forget)</th>
+                        <td>상대 수신을 기다리지 않고 <strong>즉시 다음 시험 시작 가능</strong></td>
+                        <td>초 단위 우주 전파 지연으로 인해 송신측 스레드가 블로킹되는 병목 방지</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">미확인 요청 처리</th>
+                        <td>자동 재전송 금지 · <code>WAITING_DTN</code> 상태로 보류</td>
+                        <td>네트워크 단절 시 무단 재전송으로 인한 대역폭 낭비 및 중복 패킷 플러딩 방지</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">대용량 바이너리 격리</th>
+                        <td>REST JSON에는 파일 경로·크기·SHA-256만 포함</td>
+                        <td>2.16 GB 대용량 BIN 데이터를 HTTP JSON 본문에 싣는 직렬화 부하 원천 차단</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div id="network-engine-fields" hidden>
+                <div class="deep-dive-card">
+                  <div class="visual-diagram-card" style="margin: 8px 0; background: #ffffff; border: 1px solid #d2e3fc; border-radius: 8px; padding: 10px; overflow: hidden;">
+                    <svg viewBox="0 0 760 215" style="width: 100%; height: auto; display: block; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans KR', sans-serif;" aria-label="우주 DTN 라우터 Store-and-Forward 및 순서 역전 메커니즘">
+                      <defs>
+                        <marker id="arr-net-red" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                          <path d="M0,0 L0,6 L6,3 z" fill="#d93025" />
+                        </marker>
+                        <marker id="arr-net-green" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                          <path d="M0,0 L0,6 L6,3 z" fill="#188038" />
+                        </marker>
+                        <marker id="arr-net-amber" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                          <path d="M0,0 L0,6 L6,3 z" fill="#b06000" />
+                        </marker>
+                      </defs>
+
+                      <!-- Source Node: 송신 어댑터 -->
+                      <rect x="20" y="15" width="130" height="145" rx="7" fill="#f8fafc" stroke="#64748b" stroke-width="1.5" />
+                      <text x="85" y="65" text-anchor="middle" font-size="13" font-weight="700" fill="#0f172a">송신 어댑터</text>
+                      <text x="85" y="85" text-anchor="middle" font-size="10.5" fill="#475569">(DTN/HDTN)</text>
+                      <rect x="35" y="105" width="100" height="20" rx="3" fill="#e2e8f0" />
+                      <text x="85" y="119" text-anchor="middle" font-size="9.5" font-weight="600" fill="#334e68">번들 분기 전송</text>
+
+                      <!-- Path 1: Bundle 1 (시험 A) - 고지연 궤도 링크 -->
+                      <path d="M 150 45 C 300 20, 460 20, 602 45" fill="none" stroke="#d93025" stroke-width="1.8" stroke-dasharray="6 3" marker-end="url(#arr-net-red)" />
+                      <rect x="250" y="14" width="240" height="20" rx="4" fill="#fce8e6" stroke="#fad2cf" />
+                      <text x="370" y="28" text-anchor="middle" font-size="10" font-weight="600" fill="#c5221f">Bundle 1 (시험 A): 고지연 ISL 궤도 링크 (120초 지연)</text>
+                      <rect x="500" y="34" width="90" height="18" rx="3" fill="#fce8e6" />
+                      <text x="545" y="47" text-anchor="middle" font-size="9.5" font-weight="700" fill="#c5221f">3번째 지연 도착</text>
+
+                      <!-- Path 2: Bundle 2 (시험 B) - 초고속 직시 링크 -->
+                      <path d="M 150 85 L 602 85" fill="none" stroke="#188038" stroke-width="2.2" marker-end="url(#arr-net-green)" />
+                      <rect x="250" y="75" width="240" height="20" rx="4" fill="#e6f4ea" stroke="#ceead6" />
+                      <text x="370" y="89" text-anchor="middle" font-size="10" font-weight="700" fill="#137333">Bundle 2 (시험 B): 초고속 직시 통신 링크 (15초 쾌속)</text>
+                      <rect x="500" y="76" width="90" height="18" rx="3" fill="#e6f4ea" />
+                      <text x="545" y="89" text-anchor="middle" font-size="9.5" font-weight="700" fill="#137333">1번째 쾌속 도착! ⚡</text>
+
+                      <!-- Path 3: Bundle 3 (시험 C) - 간헐적 단절 & 스토리지 보관 -->
+                      <path d="M 150 130 L 250 130" fill="none" stroke="#b06000" stroke-width="1.8" />
+                      <!-- Intermediate storage node -->
+                      <rect x="250" y="118" width="240" height="24" rx="4" fill="#fef7e0" stroke="#fce8b2" />
+                      <text x="370" y="134" text-anchor="middle" font-size="9.5" font-weight="600" fill="#b06000">Bundle 3 (시험 C): 단절 궤도 스토리지 보관 후 전송</text>
+                      <path d="M 490 130 L 602 130" fill="none" stroke="#b06000" stroke-width="1.8" marker-end="url(#arr-net-amber)" />
+                      <rect x="500" y="121" width="90" height="18" rx="3" fill="#fef7e0" />
+                      <text x="545" y="134" text-anchor="middle" font-size="9.5" font-weight="700" fill="#b06000">2번째 도착 (복구)</text>
+
+                      <!-- Destination Node: 수신단 -->
+                      <rect x="610" y="15" width="130" height="145" rx="7" fill="#e8f0fe" stroke="#1a73e8" stroke-width="1.5" />
+                      <text x="675" y="65" text-anchor="middle" font-size="13" font-weight="700" fill="#174ea6">수신단</text>
+                      <text x="675" y="85" text-anchor="middle" font-size="10.5" fill="#334e68">(어댑터·서비스)</text>
+                      <rect x="625" y="105" width="100" height="20" rx="3" fill="#d2e3fc" />
+                      <text x="675" y="119" text-anchor="middle" font-size="9.5" font-weight="700" fill="#174ea6">도착 순서: B ─► C ─► A</text>
+
+                      <!-- Bottom Result Banner -->
+                      <rect x="20" y="172" width="720" height="32" rx="5" fill="#f3e8fd" stroke="#7627bb" stroke-width="1.2" />
+                      <text x="380" y="193" text-anchor="middle" font-size="11" font-weight="700" fill="#7627bb">testId(고유 UUID) 기반 독립 식별: 패킷 순서 역전이나 우주 지연과 무관하게 완전 무손실 원형 복원!</text>
+                    </svg>
+                  </div>
+                </div>
+
+                <div class="deep-dive-card">
+                  <h3>NASA JPL ION vs NASA GRC HDTN 우주 라우터 엔진 비교표</h3>
+                  <p><strong>2대 핵심 라우터 비교:</strong> LNIS가 지원하는 NASA 공식 DTN(ION)과 고속 DTN(HDTN) 라우터의 아키텍처 특성입니다.</p>
+                  <table class="deep-dive-table" style="table-layout: fixed; width: 100%;">
+                    <thead>
+                      <tr>
+                        <th scope="col" style="width: 18%;">비교 항목</th>
+                        <th scope="col" style="width: 41%;">NASA JPL ION (화면의 DTN)<br><span style="font-weight: normal; font-size: 10px; color: #334e68;">(Interplanetary Overlay Network)</span></th>
+                        <th scope="col" style="width: 41%;">NASA GRC HDTN<br><span style="font-weight: normal; font-size: 10px; color: #165b40;">(High-Rate Delay Tolerant Networking)</span></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <th scope="row">코어 아키텍처</th>
+                        <td><strong>SDR (공유 메모리 힙) 트랜잭션 엔진</strong><br>단일 노드 메모리 보호 및 트랜잭션 무결성 최우선</td>
+                        <td><strong>멀티스레드 Zero-Copy 파이프라인 엔진</strong><br>초고속 컷스루 스케줄링 및 10 Gbps+ 처리율 최우선</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">라우팅 메커니즘</th>
+                        <td><strong>Contact Graph Routing (CGR)</strong><br>접촉 계획표(Contact Plan) 기반 결정론적 최적 경로 계산</td>
+                        <td><strong>Pipelined Scheduling & Queuing</strong><br>입출력 큐 기반 고속 스케줄링 및 링 버퍼 중계</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">스토리지 관리</th>
+                        <td>SDR 트랜잭션 로그 및 비휘발성 파일 장기 보관</td>
+                        <td>링 버퍼 및 전송 후 즉시 삭제(<code>DELETE_AFTER_FORWARDING</code>)</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">주요 적용 환경</th>
+                        <td>심우주(Deep Space) 행성 간 고지연/간헐적 통신 링크</td>
+                        <td>달-지구 궤도선, 우주정거장(ISS), 광학 고속 전송 링크</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div class="deep-dive-card">
+                  <h3>대기 종료(Cancellation) 및 지연 수신 처리 정책표</h3>
+                  <p><strong>수신 대기 및 취소 정책:</strong> 외부 수신 대기는 시간 제한이 없으며, 종료 후 지연 도착한 번들은 감사(Audit)용 원문만 보관합니다.</p>
+                  <table class="deep-dive-table" style="table-layout: fixed; width: 100%;">
+                    <thead>
+                      <tr>
+                        <th scope="col" style="width: 20%;">시험 상태 / 상황</th>
+                        <th scope="col" style="width: 28%;">대기 종료(Cancel) 동작</th>
+                        <th scope="col" style="width: 24%;">우주망 번들 회수 여부</th>
+                        <th scope="col" style="width: 28%;">종료 후 데이터 지연 도착 시 처리</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <th scope="row">수신 대기 중<br><span style="font-weight: normal; font-size: 10px; color: #486581;">(WAITING_DTN)</span></th>
+                        <td>단건 취소 또는 대기 전체 종료 가능</td>
+                        <td><strong>회수 불가</strong><br>(이미 우주 라우터에 주입됨)</td>
+                        <td><span class="pvt-step-tag tag-purple">AFTER_CANCEL</span><br>영수증 원문만 보관 (PVT 계산 미수행)</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">진행 중인 시험<br><span style="font-weight: normal; font-size: 10px; color: #486581;">(PREPARING / CALCULATING)</span></th>
+                        <td>대기 전체 종료 대상에서 <strong>자동 제외</strong></td>
+                        <td>로컬 노드에서 이미 수신 연산 중</td>
+                        <td>정상 계산 완료 시까지 프로세스 유지</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">외부 수신 대기 시간</th>
+                        <td><strong>무제한 (시간 제한 없음)</strong></td>
+                        <td>라우터 내부 TTL에 따라 수명 관리</td>
+                        <td>번들 수명(TTL) 만료 시 라우터가 자체 폐기</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div id="receive-engine-fields" hidden>
+                <div class="deep-dive-card">
+                  <h3>수신 데이터 접수, 이중 분리 검증 및 직렬 큐잉 파이프라인</h3>
+                  <p><strong>수신부 안전 수신 흐름도:</strong> REST JSON 접수와 공유 폴더 BIN 검증을 엄격히 분리하고, 1건씩 직렬 계산하며 작업 제한시간을 감시합니다.</p>
+                  <div class="visual-diagram-card" style="margin: 8px 0; background: #ffffff; border: 1px solid #d2e3fc; border-radius: 8px; padding: 10px; overflow: hidden;">
+                    <svg viewBox="0 0 760 225" style="width: 100%; height: auto; display: block; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans KR', sans-serif;" aria-label="수신 데이터 접수, 이중 분리 검증 및 직렬 큐잉 파이프라인">
+                      <defs>
+                        <marker id="arr-rx-blue" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                          <path d="M0,0 L0,6 L6,3 z" fill="#1a73e8" />
+                        </marker>
+                        <marker id="arr-rx-amber" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                          <path d="M0,0 L0,6 L6,3 z" fill="#b06000" />
+                        </marker>
+                        <marker id="arr-rx-red" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                          <path d="M0,0 L0,6 L6,3 z" fill="#c5221f" />
+                        </marker>
+                      </defs>
+
+                      <!-- Top Left: 수신 어댑터 -->
+                      <rect x="20" y="15" width="220" height="52" rx="7" fill="#f8fafc" stroke="#64748b" stroke-width="1.5" />
+                      <text x="130" y="37" text-anchor="middle" font-size="13" font-weight="700" fill="#0f172a">수신 어댑터 (DTN / HDTN)</text>
+                      <text x="130" y="54" text-anchor="middle" font-size="10.5" fill="#475569">우주망 번들 수신 완료 · 파일 분리</text>
+
+                      <!-- Arrow 1: Adapter -> Shared Folder -->
+                      <path d="M 240 41 L 502 41" fill="none" stroke="#b06000" stroke-width="1.8" stroke-dasharray="5 3" marker-end="url(#arr-rx-amber)" />
+                      <rect x="280" y="21" width="180" height="20" rx="4" fill="#fef7e0" stroke="#fce8b2" />
+                      <text x="370" y="35" text-anchor="middle" font-size="10" font-weight="600" fill="#b06000">① 공유 폴더에 BIN 저장 (/exchange)</text>
+
+                      <!-- Top Right: 수신 공유 폴더 -->
+                      <rect x="510" y="15" width="230" height="52" rx="7" fill="#fef7e0" stroke="#f29900" stroke-width="1.5" />
+                      <text x="625" y="37" text-anchor="middle" font-size="13" font-weight="700" fill="#b06000">수신 공유 폴더 (/exchange)</text>
+                      <text x="625" y="54" text-anchor="middle" font-size="10.5" fill="#7c4a00">UUID.bin 바이너리 보관</text>
+
+                      <!-- Arrow 2: Adapter -> LNIS Service -->
+                      <path d="M 130 67 L 130 92" fill="none" stroke="#1a73e8" stroke-width="1.8" marker-end="url(#arr-rx-blue)" />
+                      <text x="138" y="83" font-size="10" font-weight="600" fill="#1a73e8">② POST /receive</text>
+
+                      <!-- Middle Node: LNIS 수신 서비스 (1차 접수 & 영수증 발행) -->
+                      <rect x="20" y="98" width="720" height="48" rx="7" fill="#e8f0fe" stroke="#1a73e8" stroke-width="1.5" />
+                      <text x="35" y="120" font-size="12" font-weight="700" fill="#174ea6">LNIS 수신 서비스 (1차 접수 & 영수증 발행)</text>
+                      <text x="35" y="136" font-size="10.5" fill="#334e68">헤더 인증 + 16 MiB 검증 ──► receipts 영구 원문 보관 (ACCEPTED/AFTER_CANCEL/REJECTED) ──► WAITING_RECEIVER (큐 대기: 무제한)</text>
+
+                      <!-- Arrow 3: 1차 접수 -> 2차 계산 실행 -->
+                      <path d="M 380 146 L 380 162" fill="none" stroke="#c5221f" stroke-width="1.8" marker-end="url(#arr-rx-red)" />
+
+                      <!-- Bottom Node: 계산 실행 & 2차 BIN 독립 검증 & 타임아웃 감시 -->
+                      <rect x="20" y="168" width="720" height="44" rx="7" fill="#fdf2f2" stroke="#e53e3e" stroke-width="1.5" />
+                      <text x="35" y="188" font-size="12" font-weight="700" fill="#9b2c2c">계산 실행 & 2차 BIN 독립 검증 (타임아웃 감시)</text>
+                      <text x="35" y="203" font-size="10.5" fill="#7f1d1d">공유 폴더 BIN 파일 존재·크기·해시 검사 ──► 에이전트 READY 시 1건씩 직렬 계산 (실제 작업 제한시간: 일반 10분 / I/Q 20분)</text>
+                    </svg>
+                  </div>
+                </div>
+
+                <div class="deep-dive-card">
+                  <h3>수신 영수증(receipts) 아카이빙 및 상태표</h3>
+                  <p><strong>영구 영수증 감사(Audit) 체계:</strong> 수신 서비스로 인입된 모든 본문은 검증 실패나 대기 종료 여부와 무관하게 receipts 테이블에 원문 보관됩니다.</p>
+                  <table class="deep-dive-table" style="table-layout: fixed; width: 100%;">
+                    <thead>
+                      <tr>
+                        <th scope="col" style="width: 18%;">영수증 상태</th>
+                        <th scope="col" style="width: 28%;">발생 조건</th>
+                        <th scope="col" style="width: 22%; text-align: center;">본문 보존 여부</th>
+                        <th scope="col" style="width: 32%;">후속 처리 및 시스템 동작</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <th scope="row"><span class="pvt-step-tag tag-green">ACCEPTED</span></th>
+                        <td>인증, JSON 문법, 해시 검증 통과</td>
+                        <td style="text-align: center;"><span class="ubx-tag">원문 영구 보존 (16 MiB)</span></td>
+                        <td>수신 큐(<code>WAITING_RECEIVER</code>) 등록 후 PVT 계산 진행</td>
+                      </tr>
+                      <tr>
+                        <th scope="row"><span class="pvt-step-tag tag-purple">AFTER_CANCEL</span></th>
+                        <td>사용자가 대기 종료한 후 지연 도착</td>
+                        <td style="text-align: center;"><span class="ubx-tag">원문 영구 보존</span></td>
+                        <td><strong>계산 미수행</strong>, 사후 분석 및 감사용 원문 데이터만 유지</td>
+                      </tr>
+                      <tr>
+                        <th scope="row"><span class="pvt-step-tag tag-amber">REJECTED</span></th>
+                        <td>인증 실패, JSON 문법 오류, 해시 불일치</td>
+                        <td style="text-align: center;"><span class="ubx-tag">실패 본문 영구 보존</span></td>
+                        <td>4xx/5xx 에러 응답 반환 및 원인 분석용 로그 기록</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div class="deep-dive-card">
+                  <h3>수신 단계별 시간 기준 및 타임아웃 제어 정책표</h3>
+                  <p><strong>시간 기준 및 실행 제한시간:</strong> 수신 큐 대기 시간은 무제한이나, 실제 실행 작업에는 10분/20분의 안전 제한시간이 적용됩니다.</p>
+                  <table class="deep-dive-table" style="table-layout: fixed; width: 100%;">
+                    <thead>
+                      <tr>
+                        <th scope="col" style="width: 22%;">처리 단계</th>
+                        <th scope="col" style="width: 20%; text-align: center;">허용 시간 (타임아웃)</th>
+                        <th scope="col" style="width: 34%;">시간 기준 및 물리적 의미</th>
+                        <th scope="col" style="width: 24%;">초과 시 처리 동작</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <th scope="row">수신 큐 대기<br><span style="font-weight: normal; font-size: 10px; color: #486581;">(WAITING_RECEIVER)</span></th>
+                        <td style="text-align: center;"><span class="ubx-tag">무제한 (시간 제한 없음)</span></td>
+                        <td>외부 우주망 지연 도착 및 이전 시험 직렬 처리 완료 대기</td>
+                        <td>사용자 취소 전까지 무기한 큐 유지</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">일반 시험 계산<br><span style="font-weight: normal; font-size: 10px; color: #486581;">(RAW / AFS)</span></th>
+                        <td style="text-align: center;"><span class="pvt-step-tag tag-amber">10분 (600초)</span></td>
+                        <td>에이전트 준비부터 4단계 PVT 연립방정식 풀이 완료까지</td>
+                        <td>스레드 인터럽트 및 <span class="pvt-step-tag tag-amber">FAILED</span> 안전 종료</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">I/Q 대용량 시험 계산<br><span style="font-weight: normal; font-size: 10px; color: #486581;">(2.16 GB PocketSDR)</span></th>
+                        <td style="text-align: center;"><span class="pvt-step-tag tag-purple">20분 (1,200초)</span></td>
+                        <td>PocketSDR 신호 획득·추적, LNAV 복호 및 PVT 산출</td>
+                        <td>프로세스 강제 회수 및 <span class="pvt-step-tag tag-amber">FAILED</span> 종료</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">I/Q 파일 전송 지연 (Δt)</th>
+                        <td style="text-align: center;"><span class="ubx-tag">의사거리 미반영</span></td>
+                        <td>대용량 파일 전송 지연을 신호 의사거리에 임의 합산 금지</td>
+                        <td>순수 SDR RF 신호 계측값만 PVT 입력</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
               </div>
               <div id="evidence-detail-copy"></div>
               <p id="request-caption" class="fine" hidden>일부 항목을 생략한 요청 예시 · 원본 파일 내용과 비교 기준은 생략했습니다.</p>
@@ -568,23 +1780,27 @@
 
         case 'data':
           return {
-            title: '송신부 · 전송 데이터',
+            title: raw ? '송신부 · 전송 데이터 (3단계 변환 엔진)' : '송신부 · 전송 데이터',
             copy: raw
-              ? '선택한 1 Epoch의 의사거리를 보정 송신 시각으로 바꿔 JSON으로 보냅니다. AFS 구성과 I/Q 생성은 건너뜁니다.'
+              ? '선택한 1 Epoch의 의사거리를 펨토초 정밀도의 보정 송신 시각(transmitAt)으로 변환하고, Reference를 완전 격리하여 JSON으로 전송합니다. AFS 구성과 I/Q 생성은 건너뜁니다.'
               : iq
-                ? 'GNSS 데이터로 AFS 프레임을 만들고, 이를 I/Q 신호 파일로 변환합니다.'
-                : '선택한 1 Epoch의 보정 송신 시각과 PVT 계산에 필요한 정보를 AFS 프레임에 담습니다.',
-            summary: '전달 항목과 규격',
-            detail: [
-              raw
-                ? 'GNSS_RAW · LNIS-GRAW-DELAY-v2 · schemaVersion 2. 원본 GRAW 파일 대신 raw.records JSON을 보냅니다. pseudorangeMeters를 transmitAt으로 바꾸고 나머지 원본 필드는 유지합니다.'
-                : iq
-                  ? 'IQ_SAMPLE · LNIS-IQ-FILE-v2 · schemaVersion 2. JSON에는 파일 경로·크기·SHA-256·신호 정보·Reference가 들어가고, BIN 파일은 별도로 전달합니다.'
-                  : 'AFS_METADATA · LNIS-AFS-GNSS-v5 · schemaVersion 5. 선택한 Epoch의 GPS L1 관측 위성마다 한 프레임을 만들고 satellites 아래에 묶습니다.',
-              iq
-                ? 'pvtMethod는 AFS_IQ_FRAME_PVT-v2입니다. 수신측은 실제 I/Q 신호를 추적하고 프레임을 복호해 PVT를 계산합니다.'
-                : '원본 RAW와 Reference는 수신 계산 뒤 서비스 간 REST로 조회합니다. 어댑터 전달 JSON에는 testId·엔진·요청 설정과 변환한 관측 JSON 또는 AFS 프레임을 넣습니다.'
-            ].join('\n\n')
+                ? 'GNSS 데이터로부터 AFS 프레임을 합성하고, 이를 90초·12 MHz 대역의 2.16 GB I/Q 복소 신호 파일로 변환합니다.'
+                : '선택한 1 Epoch의 보정 송신 시각과 PVT 계산에 필요한 AFS 6,000비트 프레임(SB2+SB3+SB4)을 구성합니다.',
+            summary: raw ? '1 Epoch 추출과 펨토초 시각 변환 및 격리' : '전달 항목과 규격',
+            detail: raw
+              ? [
+                  '【단일 Epoch 추출과 시간 동기화 배경】\n전체 수집 세션에서 시험 대상인 정확히 1개 관측 에포크(ObservationEpoch)와 그 직전에 수신된 유효 LNAV 항법 레코드만 선별 추출합니다. 다중 에포크가 섞이면 네트워크 전달 지연(Δt = R − S)이 에포크별로 다르게 반영되어 공통 지연 흡수(Clock Bias Absorption) 검증 원리가 왜곡되므로 1 Epoch만 엄격히 격리합니다.',
+                  '【의사거리 → transmitAt 펨토초 역산 변환】\n수신단이 원본 거리를 알 수 없도록 pseudorangeMeters 필드를 JSON에서 완전히 삭제하고, 시험 시작 접수 시각 S에서 전파 전파 시간(Pᵢ/c)을 역산한 가상 송신 시각(T*ᵢ = S − Pᵢ/c)을 transmitAt 객체로 치환합니다. 부동소수점 오차로 인한 거리 왜곡을 원천 방지하기 위해 초(seconds)와 펨토초(femtoseconds, 10⁻¹⁵초)로 분할하여 전송하며, Doppler·C/N0·추적상태는 원형 보존합니다.',
+                  '【엄격한 Reference 격리 및 사후 REST 대조】\n수신 솔버가 사전 정답에 오염되지 않도록 송신부 Reference PVT, 원본 파일 해시, 메타데이터는 어댑터 전송 JSON에서 완전히 제거합니다. 수신부는 전달받은 가상 시각만으로 독립적인 PVT 계산을 완료한 뒤에만 서비스 간 내부 REST API로 원본 RAW와 Reference를 조회하여 대조합니다.'
+                ].join('\n\n')
+              : [
+                  iq
+                    ? 'IQ_SAMPLE · LNIS-IQ-FILE-v2 · schemaVersion 2. JSON에는 파일 경로·크기·SHA-256·신호 정보·Reference가 들어가고, BIN 파일은 공유 폴더로 전달합니다.'
+                    : 'AFS_METADATA · LNIS-AFS-GNSS-v5 · schemaVersion 5. 선택한 Epoch의 GPS L1 관측 위성마다 한 프레임을 만들고 satellites 아래에 묶습니다.',
+                  iq
+                    ? 'pvtMethod는 AFS_IQ_FRAME_PVT-v2입니다. 수신측은 실제 I/Q 신호를 추적하고 프레임을 복호해 PVT를 계산합니다.'
+                    : '원본 RAW와 Reference는 수신 계산 뒤 서비스 간 REST로 조회합니다. 어댑터 전달 JSON에는 testId·엔진·요청 설정과 변환한 관측 JSON 또는 AFS 프레임을 넣습니다.'
+                ].join('\n\n')
           };
 
         case 'frame':
@@ -593,19 +1809,19 @@
             copy: iq
               ? '6,000-bit AFS 프레임을 신호 생성에 사용합니다. I/Q용 SB4에는 기존 원본 관측값이 들어갑니다.'
               : '6,000-bit AFS에 항법정보와 보정 송신 시각을 담습니다. 수신측은 도착 시각을 이용해 의사거리를 계산합니다.',
-            summary: '프레임 크기와 부호화',
+            summary: 'AFS Frame 구성 상세보기',
             detail: ''
           };
 
         case 'encode':
           return {
-            title: '송신부 · I/Q 생성',
-            copy: 'AFS 프레임을 반복해 I/Q 신호 파일을 만듭니다. 생성한 BIN은 송신 공유 폴더에 저장합니다.',
-            summary: '신호 길이와 파일 크기',
+            title: '송신부 · I/Q 생성 (4단계 변조 엔진)',
+            copy: 'AFS 프레임을 반복하여 90초·12 MHz 대역의 복소 기저대역(I/Q) 신호를 생성하고, 2비트 ADC 양자화로 2.16 GB BIN 파일을 만들어 송신 공유 폴더에 저장합니다.',
+            summary: '신호 길이와 파일 크기 및 4단계 변조 파이프라인',
             detail: [
-              '기본 설정은 90초·12 MHz입니다. 위성별 AFS 프레임을 반복하는 신호이며, GNSS RAW 90초 분량을 그대로 담는다는 뜻은 아닙니다.',
-              'I/Q 각 성분은 −3, −1, +1, +3으로 양자화하고 각각 1 byte로 저장합니다. 파일 크기는 90 × 12,000,000 × 2 = 2,160,000,000 bytes(약 2.16 GB)입니다. 2비트 양자화와 파일 저장 크기는 다릅니다.',
-              'I/Q용과 AFS 지연 시험용은 물리 부호화기를 공유하지만 SB4 내용은 다릅니다. 수신 재생 배속은 파일 처리 속도 설정이며 신호의 관측 시각이나 DTN 전송 속도를 바꾸지 않습니다.'
+              '【신호 길이와 파일 크기 산출 공식】\n기본 설정은 90초·12 MHz 샘플링 레이트입니다. I/Q 복소수 신호는 I(In-phase)와 Q(Quadrature) 성분으로 구성되며, 각 성분은 2비트(-3, -1, +1, +3)로 양자화한 후 1바이트(signed char)씩 저장합니다.\n파일 크기 = 90초 × 12,000,000 samples/s × 2 (I, Q) = 2,160,000,000 bytes (정확히 약 2.16 GB)\n2비트 양자화와 파일 저장 단위(1 byte)는 다르며, 90초 동안 위성별 AFS 프레임(12초 주기)을 반복하여 신호 연속성을 유지합니다.',
+              '【I/Q용과 AFS 지연 시험용(v5)의 핵심 차이】\nI/Q용과 AFS 지연 시험용은 물리 부호화기(BCH·LDPC·인터리빙)를 공유하지만 SB4의 내용과 전송 방식이 완전히 다릅니다.\n• AFS 지연 시험 (v5): 수신단에 무선 RF 상관기가 없으므로 SB4에 가상 송신 시각(T*ᵢ = S − Pᵢ/c)을 주입하여 DTN 지연을 에뮬레이션합니다.\n• I/Q 신호 생성: 90초 분량의 실제 RF 물리 전파 신호 자체를 합성하므로 SB4에 가상 시각을 넣지 않고 정상 프레임(지구 항법/관측 레코드)을 싣습니다. DTN은 메타 JSON 대신 2.16 GB BIN 파일 자체를 전달하며, 수신단 SDR이 물리적으로 신호를 추적합니다.',
+              '【수신 재생 배속의 물리적 의미】\n수신기 옵션의 20배속(-tscale 20)은 디스크에 저장된 I/Q 파일을 고속으로 읽어 들이는 소프트웨어 처리 속도 설정일 뿐이며, 신호 내부의 관측 시각(TOW), 샘플링 주파수(12 MHz), 도플러 편이, DTN 전송 속도를 일절 바꾸지 않습니다.'
             ].join('\n\n')
           };
 
@@ -619,7 +1835,8 @@
               iq
                 ? 'JSON에는 파일 경로·크기·SHA-256·신호 정보·Reference가 들어갑니다. 어댑터는 송신 공유 폴더에서 BIN을 읽어 전달합니다.'
                 : 'RAW는 보정 송신 시각을 담은 raw.records, AFS는 위성별 프레임을 전달합니다. 원본 의사거리·Reference·보존용 Metadata는 포함하지 않습니다.',
-              '어댑터 요청이 끝나면 상대 수신을 기다리지 않고 다음 시험을 시작할 수 있습니다. 응답을 확인하지 못한 요청은 자동 재전송하지 않고 수신 대기로 남깁니다.'
+              '어댑터 요청이 끝나면 상대 수신을 기다리지 않고 다음 시험을 시작할 수 있습니다. 응답을 확인하지 못한 요청은 자동 재전송하지 않고 수신 대기로 남깁니다.',
+              '【송신 요청 및 비동기 처리 핵심 요약】\n• 아키텍처: 2.16 GB BIN 파일은 송신 공유 폴더에 분리 보관하고, REST JSON(POST /transfers)에는 파일 메타데이터(크기·SHA-256)만 전달\n• HDTN 7대 파이프라인: maxNumberOfBundlesInPipeline(50), maxSumOfBundleBytesInPipeline(50MB), maxBundleSizeBytes(10MB), tcpclMaxSegmentSizeBytes(20KB), neighborDepletedStorageDelaySeconds(10s), enforceBundlePriority(false), storageDeletionPolicy(DELETE_AFTER_FORWARDING)\n• 비동기 원칙: 어댑터가 200/202 접수 완료 시 상대 노드 수신 대기 없이 즉시 다음 시험 시작 가능(Fire-and-Forget), 미확인 요청은 자동 재전송하지 않고 WAITING_DTN 유지'
             ].join('\n\n')
           };
 
@@ -631,7 +1848,8 @@
             detail: [
               'LNIS는 ' + state.tx + ' → ' + state.rx + ' 경로로 전달을 요청합니다. 화면의 DTN은 ION 라우터입니다. 여러 시험은 testId로 구분하며 지연 전달·순서 역전·내용 보존을 확인합니다. 실제 중계 경로는 어댑터·라우터 로그로 확인해야 합니다.',
               '외부 수신 대기는 시간 제한이 없습니다. 번들 수명(TTL)과 라우터의 저장·삭제 정책은 어댑터에서 설정하며 LNIS 수신 대기와 별개입니다.',
-              '선택한 시험의 대기를 끝내거나 대기 전체 종료를 사용할 수 있습니다. 전체 종료는 이미 수신·계산 중인 시험을 제외합니다. 어댑터에 전달한 번들의 회수는 보장하지 않으며, 종료 후 늦게 도착한 정상 데이터는 원문만 보관합니다.'
+              '선택한 시험의 대기를 끝내거나 대기 전체 종료를 사용할 수 있습니다. 전체 종료는 이미 수신·계산 중인 시험을 제외합니다. 어댑터에 전달한 번들의 회수는 보장하지 않으며, 종료 후 늦게 도착한 정상 데이터는 원문만 보관합니다.',
+              '【우주 라우터 및 대기 관리 핵심 요약】\n• 2대 라우터: NASA JPL ION(SDR 공유 메모리 힙 기반 Contact Graph Routing) vs NASA GRC HDTN(멀티스레드 Zero-Copy 고속 파이프라인 및 컷스루 중계)\n• 순서 역전 보존: 고지연 궤도 링크 및 간헐적 단절로 인해 패킷 순서가 역전되어도 고유 testId(UUID)로 완전 독립 식별 및 복원\n• 대기 종료(Cancel): 사용자가 대기 종료 시 우주 라우터에 주입된 번들 회수는 불가하며, 종료 후 지연 도착한 번들은 AFTER_CANCEL 상태로 원문 영수증만 보관(계산 미수행)'
             ].join('\n\n')
           };
 
@@ -647,60 +1865,61 @@
               iq
                 ? 'JSON 접수와 BIN 검증은 별도입니다. 수신 서비스가 파일 존재·크기·SHA-256을 확인한 뒤 신호 추적을 시작합니다. I/Q에는 파일 도착 지연을 의사거리에 더하지 않습니다.'
                 : '지연 Δt는 수신 본문 완료 시각 R에서 시험 시작 접수 시각 S를 뺀 값입니다. 시작 이후 준비·변환·전송 대기는 포함하고, 수집 후 시작 전 대기와 도착 후 계산 대기는 제외합니다. 송수신 시계 차이가 섞이지 않도록 시간 기준을 맞춰야 합니다.',
-              '정상 본문을 먼저 보관하고 계산은 한 건씩 진행합니다. 수신·계산 순서 대기는 무제한이지만 실제 준비·계산 작업에는 일반 10분, I/Q 20분의 제한이 있습니다.'
+              '정상 본문을 먼저 보관하고 계산은 한 건씩 진행합니다. 수신·계산 순서 대기는 무제한이지만 실제 준비·계산 작업에는 일반 10분, I/Q 20분의 제한이 있습니다.',
+              '【데이터 접수 및 작업 제한시간 핵심 요약】\n• 수신 영수증: POST /receive 접수 시 모든 본문(정상 ACCEPTED, 대기종료 후 AFTER_CANCEL, 검증실패 REJECTED)을 receipts 테이블에 16 MiB까지 영구 아카이빙\n• 이중 분리 원칙: JSON 접수와 BIN 파일 검증을 분리하며, I/Q 파일 전송 지연(Δt)은 신호 의사거리에 임의 합산 금지\n• 2원 시간 기준: 수신 큐(WAITING_RECEIVER) 대기 시간은 무제한이며 1건씩 직렬 계산에 진입. 단, 실제 준비·계산 작업에는 일반 10분, I/Q 20분의 엄격한 안전 제한시간 적용'
             ].join('\n\n')
           };
 
         case 'decode':
           return {
-            title: '수신부 · I/Q 추적·복호',
-            copy: 'BIN 파일을 확인하고 신호를 추적해 관측값을 얻습니다. 신호에 담긴 AFS 프레임도 복호합니다.',
-            summary: '파일 검증과 신호 처리',
+            title: '수신부 · I/Q 추적·복호 (5단계 수신 엔진)',
+            copy: '수신 공유 폴더의 2.16 GB BIN 파일을 검증하고, PocketSDR-AFS 기반 SDR 상관기로 신호 포착·추적·복호를 수행하여 의사거리와 항법정보를 복원합니다.',
+            summary: '파일 무결성 검증과 5단계 SDR 신호 처리 파이프라인',
             detail: [
-              '수신 공유 폴더의 파일을 JSON에 기록된 크기·SHA-256과 대조합니다. 파일이 없거나 일치하지 않으면 신호 처리를 진행하지 않습니다.',
-              'PocketSDR가 I/Q 신호를 획득·추적해 관측값을 얻고 AFS를 복호합니다. PVT에 사용할 항법정보는 CRC가 확인된 프레임에서 복원합니다.',
-              'SB4 원본 관측값이나 Reference로 신호 추적 결과를 대신하지 않습니다. 파일 일치, 신호 추적, 프레임 복호, 유효한 PVT 확보는 각각 확인해야 합니다.'
+              '【파일 무결성 검증과 조기 차단】\n수신 공유 폴더의 파일을 JSON에 기록된 정확한 크기(2,160,000,000 바이트) 및 SHA-256 해시와 1:1 대조합니다. 파일이 없거나 단 1비트라도 일치하지 않으면 이후 SDR 신호 처리를 일절 진행하지 않고 즉시 오류를 반환합니다.',
+              '【PocketSDR-AFS 5단계 신호 처리 엔진】\n1단계 파일 무결성 검증 → 2단계 FFT 기반 2차원 고속 신호 포착(도플러 ±5 kHz 탐색) → 3단계 3차 PLL/DLL 다중 루프 추적 및 20배속 재생 제어(iq_file_replay.h) → 4단계 2 ms 심볼 복조 및 LDPC/CRC-24 무결성 프레임 복호($IQAFS) → 5단계 RF 관측값($IQOBS) 집계 및 LNAV 720비트(30개 워드) 궤도력 원형 복원의 파이프라인을 거칩니다.',
+              '【엄격한 Solver 격리 원칙】\n요청 JSON에 포함된 송신부 Reference PVT나 SB4 원본 관측값은 PocketSDR 추적기나 RTKLIB PVT 솔버의 입력으로 절대 전달되지 않습니다. 수신부는 순수하게 I/Q 신호 추적에서 얻은 관측값(의사거리·도플러)과 CRC가 검증된 복호 프레임만으로 독립적인 지구 PVT를 계산하며, Reference는 계산이 모두 끝난 후 결과 대조용으로만 분리 사용됩니다.'
             ].join('\n\n')
           };
 
         case 'restore':
           return {
-            title: raw ? '수신부 · 관측 JSON 읽기' : '수신부 · AFS 정보 복원',
+            title: raw ? '수신부 · 관측 JSON 읽기' : '수신부 · AFS 정보 복원 (5단계 복원 엔진)',
             copy: raw
               ? 'JSON의 보정 송신 시각과 관측·항법정보를 읽습니다. 원본 의사거리 대신 받은 시각 값으로 계산을 준비합니다.'
               : iq
-                ? '복호한 AFS에서 항법정보를 복원합니다. 관측값은 I/Q 신호 추적 결과를 사용합니다.'
-                : 'AFS의 CRC와 시험 시각을 검사하고 항법정보·보정 송신 시각을 복원합니다.',
-            summary: '복원 항목과 검증',
-            detail: [
-              raw
-                ? 'raw.records의 transmitAt·Doppler·C/N0·관측 시각·항법정보와 startedAt을 확인합니다. transmitAt은 초와 펨토초로 나누어 전달합니다. 수신 원문은 보존하고 계산용 복사본에 의사거리를 생성합니다.'
-                : iq
-                  ? 'SB2·SB3의 항법정보를 사용합니다. 계산 가능한 프레임이 4개 PRN 미만이면 Metadata로 보완하지 않고 오류를 표시합니다.'
-                  : '프레임을 복호해 CRC·시험 시각·위성 식별을 검사합니다. SB2·SB3의 항법정보와 SB4의 보정 송신 시각·Doppler·C/N0를 계산에 사용합니다.',
-              iq
-                ? 'JSON의 신호 정보는 탐색에, Reference는 결과 비교에 사용합니다. JSON 항법정보나 SB4 원본 관측값으로 RF 측정값을 대체하지 않습니다.'
-                : '보정 송신 시각으로 계산하는 동안 원본 RAW와 Reference는 사용하지 않습니다. 원본과 비교하는 과정은 수신 PVT 계산 뒤에 진행합니다.'
-            ].join('\n\n')
+                ? 'RF 수신 프레임에서 동기 검출·디인터리빙·LDPC 복호·CRC 검증을 거쳐 항법정보를 복원하고, 신호 추적 관측값과 결합합니다.'
+                : '수신된 AFS 프레임(750B)에서 동기 검출 → 98×60 디인터리빙 → 천공 역소거 및 LDPC 복호 → CRC-24 재계산 → LNAV 720비트 무손실 복구의 5단계 파이프라인으로 항법정보와 보정 송신 시각을 복원합니다.',
+            summary: raw ? '관측 항목과 시각 확인' : 'L1 무선 물리 복호 및 L2 데이터 무손실 복원 파이프라인',
+            detail: raw
+              ? [
+                  'raw.records의 transmitAt·Doppler·C/N0·관측 시각·항법정보와 startedAt을 확인합니다. transmitAt은 초와 펨토초로 나누어 전달합니다. 수신 원문은 보존하고 계산용 복사본에 의사거리를 생성합니다.',
+                  '보정 송신 시각으로 계산하는 동안 원본 RAW와 Reference는 사용하지 않습니다. 원본과 비교하는 과정은 수신 PVT 계산 뒤에 진행합니다.'
+                ].join('\n\n')
+              : [
+                  '【L1 무선 물리 계층 복호 (C 네이티브 코덱)】\n우주 채널 잡음 속에서 68비트 SP 고정 동기 패턴과 BCH(52,8) 순환 부호로 프레임 경계와 송신 에포크(TOI)를 나노초 정밀도로 동기화합니다. 이후 연집 오류(Burst Error)를 해제하기 위해 5,880 심볼(Bit 120~5999)을 98열×60행 매트릭스 역순회로 디인터리빙하고, 천공 비트 위치에 삭제 심볼(Erasure)을 주입한 뒤 Sum-Product(BP) 반복 복호 알고리즘으로 물리 오류를 정정합니다.',
+                  '【L2 무결성 검증 및 720비트 무손실 복원 (Java 상위 처리기)】\n복호된 데이터 비트 끝단의 패리티를 대상으로 NASA AFS 표준 CRC-24 다항식을 직접 재계산하여 무결성을 판정합니다. 검증 통과 후, SB2의 10대 기본 케플러 요소(262b)와 SB3의 6종 조화 섭동 계수(459b)를 인터리브 슬롯팅 역변환으로 결합하여 u-blox GPS LNAV 1~3 서브프레임(720비트)을 단 1비트의 손실도 없이 원형 복원합니다.',
+                  '【보정 송신 시각 추출 및 Canonical 무관용 검증】\nSB4에서 지상 시험용 가상 송신 시각(T*ᵢ = S − Pᵢ/c), Doppler, C/N0, Klobuchar 전리층 모델 계수를 추출합니다. 복원 완료 후 전체 객체를 가상 재인코딩(Canonical Re-encoding)하여 수신된 비트와 1:1 바이트 단위로 대조 검증을 통과한 프레임만 다음 PVT 솔버 입력으로 공급합니다.'
+                ].join('\n\n')
           };
 
         case 'calculate':
           return {
-            title: iq ? '수신부 · PVT 계산' : '수신부 · 지연 반영 PVT',
+            title: iq ? '수신부 · PVT 계산 (4단계 엔진)' : '수신부 · 지연 반영 PVT (4단계 엔진)',
             copy: iq
-              ? '신호 추적 관측값과 복호한 항법정보로 PVT를 계산합니다. 파일 전송 지연은 의사거리에 더하지 않습니다.'
-              : '도착 시각과 보정 송신 시각의 차이로 의사거리를 구해 PVT를 계산합니다. Doppler·C/N0·항법정보는 유지합니다.',
-            summary: iq ? '계산 입력과 결과' : '의사거리와 시각 계산식',
+              ? '신호 추적 관측값과 복호한 항법정보로 케플러 궤도 전파 → 기본 관측 연립방정식 → 도플러 속도 → WLS 대기 보정의 4단계 엔진을 거쳐 PVT를 계산합니다.'
+              : '실제 위성 송신 시각(궤도 계산)과 지연 보정 송신 시각(의사거리 산출)을 분리 운용하여 케플러 전파 → 기본 관측 연립방정식 → 도플러 속도 → WLS 대기 보정의 4단계 엔진으로 PVT를 계산합니다.',
+            summary: iq ? '계산 입력과 4단계 엔진' : '2가지 시각 운용 체계와 4단계 SPP 계산 엔진',
             detail: iq
               ? [
-                  'RF 추적에서 얻은 관측값과 CRC가 확인된 AFS 항법정보를 RTKLIB 계산에 사용합니다. 결과는 위치·속도·시계오차입니다.',
-                  '원본 Reference는 계산 입력을 채우거나 결과를 고치는 데 사용하지 않습니다. 유효한 수신 PVT를 얻었는지 먼저 확인하고 이후 비교합니다.',
-                  'RAW·AFS의 공통 지연 주입과는 다른 시험입니다. I/Q 결과에는 신호 생성·추적·복호 과정의 영향이 포함됩니다.'
+                  'RF 추적에서 얻은 관측값(의사거리·도플러·C/N0)과 CRC가 검증된 AFS 항법정보를 4단계 PVT 솔버(RTKLIB 기반)에 입력하여 사용자 3차원 위치, 속도, 수신기 시계오차를 산출합니다.',
+                  '1단계 케플러 궤도 전파(16요소로 위성 위치·시계 계산) → 2단계 관측 연립방정식(최소 4기 이상 위성 테일러 선형화) → 3단계 도플러 속도 및 주파수 드리프트 추정 → 4단계 WLS(가중최소자승) 및 Klobuchar 전리층 오차 사전 감산 순으로 처리합니다.',
+                  '원본 Reference는 계산 입력을 채우거나 결과를 고치는 데 사용하지 않으며, 독립적인 수신 PVT 계산을 완료한 뒤 일치 여부를 비교합니다.'
                 ].join('\n\n')
               : [
-                  'S는 시험 시작 접수 시각, R은 수신 본문 완료 시각입니다. t₀는 원본 GNSS 관측 시각, Pᵢ는 원본 의사거리이며 c=299,792,458 m/s입니다.',
-                  '지연: Δt = R − S\n송신부 역산: t_txᵢ = t₀ − Pᵢ/c\n시험 시작 기준 보정: T*ᵢ = t_txᵢ + (S − t₀) = S − Pᵢ/c\n수신부 의사거리: P′ᵢ = c × (R − T*ᵢ) = Pᵢ + c × Δt\nPVT 관측 시각: t₁ = t₀ + Δt',
-                  'T*ᵢ는 시험용으로 보정한 가상 시각입니다. GNSS 관측 시각을 기준으로 Δt를 더하고 기존 궤도정보를 사용합니다. 지연 동안 위성이 실제로 이동한 상황을 재현하는 계산은 아닙니다.'
+                  '【2가지 시각(Time) 운용 체계】\n• 실제 위성 송신 시각 (t_txᵢ = t₀ − Pᵢ/c): 초속 약 3.9 km로 공전하는 위성의 실제 우주 ECEF 3차원 위치(X^s, Y^s, Z^s)와 위성 원자시계 오차(dt^s) 계산에만 전담 사용합니다. 궤도 계산 시점을 임의로 변경하면 위성 위치가 수십 km 이탈하므로 실제 발신 시각으로 엄격히 고정합니다.\n• 지연 보정 송신 시각 (T*ᵢ = S − Pᵢ/c): DTN 번들 통신 지연(Δt = R − S)을 하드웨어 상관기 없이 의사거리에 반영하기 위한 지상 시험용 가상 송신 시각입니다. 수신 의사거리: P′ᵢ = c × (R − T*ᵢ) = Pᵢ + c·Δt',
+                  '【공통 지연 흡수(Clock Bias Absorption) 원리】\n위성의 우주 위치는 원래 시각으로 고정하고, 모든 가시위성의 의사거리에만 동일한 지연 거리(c·Δt)를 인입시킵니다. 그 결과 PVT 연립방정식 풀이 시 수신기 3차원 위치(x, y, z)는 0.000 mm 오차 없이 보존되며, 지연 전량은 수신기 시계오차(dt_r′ = dt_r + Δt)로 전량 흡수됩니다.',
+                  '【4단계 PVT 계산 엔진 파이프라인】\n1단계: 케플러 궤도 전파 방정식 (16요소 대입으로 위성 3차원 위치 및 위성 시계 계산)\n2단계: 기본 관측 방정식 (최소 4기 이상 위성 연립방정식으로 3차원 위치 x,y,z 및 시계오차 dt_r 추정)\n3단계: 속도 관측 방정식 (도플러 주파수 편이 기반 3차원 속도 v_x,v_y,v_z 및 발진기 드리프트 추정)\n4단계: WLS 가중최소자승 및 대기 오차 모델링 (고앙각·C/N0 가중치 W 부여 및 Klobuchar 전리층 모델 사전 감산)'
                 ].join('\n\n')
           };
 
@@ -718,7 +1937,10 @@
                 : '차이는 수신 − Reference입니다. 위치는 m, 속도는 m/s, Clock Bias는 s로 봅니다.\nClock Bias 잔차 = (수신 Bias − Reference Bias) − Δt\n공통 지연이 Clock Bias 증가로 나타나는지 확인합니다. 위치 차이가 작아도 지연이 없었다는 뜻은 아니며, 같은 Doppler에서도 계산 위치·위성 방향에 따라 속도 차이가 생길 수 있습니다.',
               iq
                 ? '계산 재현성을 비교하는 시험이며 실제 위치 정확도를 보증하지 않습니다. 유효한 해가 없으면 파일 무결성 결과와 계산 실패를 구분해 확인합니다.'
-                : 'MEASURED는 측정 완료이며 허용오차 기반 합격 판정이 아닙니다. 송수신 시계 차이는 지연에 섞일 수 있습니다. 큰 지연에서 해가 유효하지 않으면 INCONCLUSIVE로 표시하며, 데이터 일치 여부와 구분해 확인합니다.'
+                : 'MEASURED는 측정 완료이며 허용오차 기반 합격 판정이 아닙니다. 송수신 시계 차이는 지연에 섞일 수 있습니다. 큰 지연에서 해가 유효하지 않으면 INCONCLUSIVE로 표시하며, 데이터 일치 여부와 구분해 확인합니다.',
+              iq
+                ? '【3단계 결과 비교 파이프라인】\n1단계: I/Q 파일 크기·SHA-256 무결성 검증\n2단계: 신호 추적 및 항법 복호 결과 독립 확인\n3단계: 수신 PVT ↔ 송신 Reference 편차 산출 및 재현성 관측'
+                : '【3단계 결과 비교 엔진 파이프라인】\n1단계: 사후 REST 원본 조회 및 재생성 해시 대조 (사전 정답 차단 · 의도적 변환/제외를 손실로 보지 않음 · 조회 지연 시에도 수신 계산 결과 보존)\n2단계: 물리적 차이 산출 및 Clock Bias 잔차 방정식 (수신 − Reference 편차 · 공통 지연의 시계오차 흡수로 위치 0.000 mm 보존 · εt = Δb − Δt · εd = c×εt)\n3단계: 판정 상태의 본질과 물리적 해석 (MEASURED는 물리 측정 완료이며 합격/불합격 판정이 아님 · 송수신 시계 차이 혼입 인정 · 큰 지연 수렴 불가 시 INCONCLUSIVE 표기 및 데이터 일치와 분리)'
             ].join('\n\n')
           };
 
@@ -765,13 +1987,6 @@
       }
     }
 
-    const exampleSatellites = [
-      { name: 'A', meters: 21000000 },
-      { name: 'B', meters: 22000000 },
-      { name: 'C', meters: 23000000 },
-      { name: 'D', meters: 24000000 }
-    ];
-    const lightSpeed = 299792458;
     let evidenceKey = '';
     let evidenceStage = 'source';
 
@@ -870,15 +2085,22 @@
       }));
       $('evidence-facts').hidden = facts.length === 0;
       $('gnss-fields').hidden = stage !== 'source';
+      if ($('data-engine-fields')) $('data-engine-fields').hidden = stage !== 'data';
       $('frame-explorer').hidden = stage !== 'frame';
       const delay = state.data !== 'iq';
-      $('delay-example').hidden = !delay || !['receive', 'calculate', 'compare'].includes(stage);
-      $('satellite-comparison').hidden = !delay || stage !== 'calculate';
+      if ($('send-engine-fields')) $('send-engine-fields').hidden = stage !== 'send';
+      if ($('network-engine-fields')) $('network-engine-fields').hidden = stage !== 'network';
+      if ($('receive-engine-fields')) $('receive-engine-fields').hidden = stage !== 'receive';
+      if ($('encode-engine-fields')) $('encode-engine-fields').hidden = stage !== 'encode';
+      if ($('decode-engine-fields')) $('decode-engine-fields').hidden = stage !== 'decode';
+      if ($('restore-engine-fields')) $('restore-engine-fields').hidden = stage !== 'restore' || state.data === 'raw';
+      if ($('pvt-engine-fields')) $('pvt-engine-fields').hidden = stage !== 'calculate';
+      if ($('compare-engine-fields')) $('compare-engine-fields').hidden = stage !== 'compare';
+      if ($('pvt-time-system-card')) $('pvt-time-system-card').hidden = !delay;
       $('request-caption').hidden = stage !== 'send';
       $('request-json').hidden = stage !== 'send';
       if (stage === 'send') $('request-json').textContent = JSON.stringify(requestExample(), null, 2);
       showSubframe(Number(document.querySelector('[data-sb][aria-pressed="true"]').dataset.sb));
-      updateExample();
       $('announcement').textContent = content.title + '. ' + content.copy;
     }
 
@@ -890,7 +2112,7 @@
           { text: '68 bits 고정 의사난수', cls: 'badge-std' },
           { text: '무부호화 · 무천공 · 무인터리빙', cls: 'badge-ext' }
         ],
-        note: '수신기가 우주 전파 잡음 속에서 6,000심볼 프레임의 정확한 시작점을 나노초 단위로 검출(Frame Lock)하기 위한 68비트 고정 패턴입니다. 자기상관성(Auto-correlation)이 매우 뛰어나 단 1비트라도 어긋나면 0으로 상쇄되고, 100% 포개어질 때만 펄스 피크가 발생하여 오인식 확률이 사실상 0에 수렴합니다.',
+        note: '수신기가 우주 전파 잡음 속에서 6,000심볼 프레임의 정확한 시작점을 나노초 단위로 검출(Frame Lock)하기 위한 68비트 고정 패턴입니다. 자기상관성(Auto-correlation)이 매우 뛰어나 단 1비트라도 어긋나면 0으로 상쇄되고, 완전 일치할 때만 펄스 피크가 발생하여 오인식 확률이 사실상 0에 수렴합니다.',
         fields: [
           ['SP 고정 바이트열 (Hex)', '68 bits (8.5B)', '0xCC 63 F7 45 36 F4 9E 04 A (MSB)', '-', 'NASA 공식 프레임 동기 고정 바이트 패턴 (0xCC63F74536F49E04A0)', '동일 제공 (달-지구 프레임 동기화 기준 패턴)'],
           ['2진 비트열 (상위 32b)', '32 bits', '11001100 01100011 11110111 01000101', '-', '의사난수 동기화 패턴 전반부', '동일 제공 (위상 동기 및 상관 피크 검출)'],
@@ -1063,41 +2285,6 @@
       }
     }
 
-    function updateExample() {
-      const input = $('delay');
-      const valid = input.value !== '' && input.validity.valid && Number.isFinite(input.valueAsNumber);
-      input.setAttribute('aria-invalid', String(!valid));
-      const seconds = input.valueAsNumber;
-      const added = lightSpeed * seconds;
-      const number = value => value.toLocaleString('ko-KR', { maximumFractionDigits: 3 });
-      const rows = $('satellite-rows');
-      if (!rows.children.length) {
-        for (const satellite of exampleSatellites) {
-          const row = document.createElement('tr');
-          const name = document.createElement('th');
-          name.scope = 'row';
-          name.textContent = satellite.name;
-          row.append(name);
-          for (let i = 0; i < 3; i++) row.append(document.createElement('td'));
-          rows.append(row);
-        }
-      }
-      exampleSatellites.forEach((satellite, index) => {
-        const cells = rows.children[index].cells;
-        cells[1].textContent = number(satellite.meters);
-        cells[2].textContent = valid ? '+ ' + number(added) : '—';
-        cells[3].textContent = valid ? number(satellite.meters + added) : '—';
-      });
-      if (!valid) {
-        $('delay-context').textContent = '0~60초 범위에서 0.001초 단위로 입력하세요.';
-      } else if (evidenceStage === 'receive') {
-        $('delay-context').textContent = '상대시간 예시: S = 0 s → R = ' + number(seconds) + ' s\nΔt = R − S = ' + number(seconds) + ' s';
-      } else if (evidenceStage === 'compare') {
-        $('delay-context').textContent = 'Clock Bias 증가 기대값 ≈ ' + number(seconds) + ' s\n증가량 − Δt ≈ 0 s가 이상적인 관계입니다. 실제 측정값은 아닙니다.';
-      } else {
-        $('delay-context').textContent = '송신부: T*ᵢ = S − Pᵢ/c\n수신부: P′ᵢ = c × (R − T*ᵢ)\n결과적으로 모든 위성에 같은 ' + number(added) + ' m가 추가됩니다.';
-      }
-    }
 
     document.querySelectorAll('[data-sb]').forEach(button => {
       button.addEventListener('click', () => showSubframe(Number(button.dataset.sb)));
@@ -1289,11 +2476,6 @@
       render();
     }));
 
-    $('delay').addEventListener('input', updateExample);
-    document.querySelectorAll('[data-delay]').forEach(button => button.addEventListener('click', () => {
-      $('delay').value = button.dataset.delay;
-      updateExample();
-    }));
     $('fullscreen').addEventListener('click', async () => {
       try {
         if (document.fullscreenElement) await document.exitFullscreen();
@@ -1317,7 +2499,6 @@
       goToStep(state.step + (event.key === 'ArrowRight' ? 1 : -1));
     });
     new ResizeObserver(() => drawWires(state.inspection || steps()[state.step])).observe($('scene'));
-    updateExample();
     render();
   </script>
 </body>
