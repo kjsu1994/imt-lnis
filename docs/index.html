@@ -813,11 +813,11 @@ Q 채널 (파일럿): 5.115 Mcps 3계층 코드 (Primary 10,230 chips + Secondar
                         <span class="pvt-step-tag tag-purple">가시위성 합산 · 우주 무선 채널 모델링</span>
                       </div>
                       <div class="pvt-formula-box">다중 위성 합산: sample = Σ [chan[i].iq_buff]  (i = 1 .. Nsat 가시 위성)
-열잡음 부가: sample = sample + randn() × noise_scale  (Box-Muller 가우시안 백색잡음)
+열잡음 부가: sample = sample + randn() × noise_scale  (XORSHIFT32 CLT 가우시안 백색잡음)
 게인 정규화: sample = sample / GAIN_SCALE  (ADC 입력 전 스케일링)</div>
                       <ul class="pvt-step-list">
                         <li><strong>N기 가시 위성 RF 신호 선형 중첩:</strong> 수신기 안테나에 동시 입사하는 모든 가시 위성의 개별 I/Q 합성 버퍼를 하나의 복소 베이스밴드 스트림으로 합산</li>
-                        <li><strong>가우시안 백색 열잡음(AWGN) 주입:</strong> 우주 공간 및 수신기 RF 프런트엔드에서 발생하는 열잡음을 Box-Muller 변환 정규분포 난수로 인입하여 실제 C/N0 신호대잡음비 모사</li>
+                        <li><strong>가우시안 백색 열잡음(AWGN) 주입:</strong> 우주 공간 및 수신기 RF 프런트엔드에서 발생하는 열잡음을 XORSHIFT32 PRNG 및 6차 중심극한정리(CLT) 정규분포 난수로 인입하여 실제 C/N0 신호대잡음비 모사</li>
                       </ul>
                       <div class="pvt-warning-box">
                         ⚠️ <strong>없으면 발생하는 문제:</strong> 잡음 없는 비현실적 신호가 생성되어 SDR 수신기의 동기 루프 및 신호대잡음비(C/N0) 추정기가 비정상 동작함
