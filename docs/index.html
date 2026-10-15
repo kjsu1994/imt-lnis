@@ -100,11 +100,18 @@
     .badge-gt { background: #fef7e0; color: #b06000; border: 1px solid #fce8b2; }
     .bit-spec-note { margin: 4px 0 8px; font-size: 11px; color: #486581; line-height: 1.5; }
     .bit-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 4px; }
-    .bit-table th, .bit-table td { padding: 4px 6px; border-bottom: 1px solid var(--line); }
-    .bit-table th { background: #f1f5f9; font-weight: 600; text-align: left; }
+    .bit-table th, .bit-table td { padding: 5px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+    .bit-table th { background: #f1f5f9; font-weight: 600; color: #1e293b; }
     .bit-table tr:hover td { background: #f8fafc; }
     .bit-table .mono { font-family: Consolas, monospace; }
-    .bit-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .bit-table th:nth-child(1), .bit-table td:nth-child(1) { text-align: left; white-space: nowrap; }
+    .bit-table th:nth-child(2), .bit-table td:nth-child(2) { text-align: center; font-family: Consolas, monospace; white-space: nowrap; }
+    .bit-table th:nth-child(3), .bit-table td:nth-child(3) { text-align: center; font-family: Consolas, monospace; font-size: 10.5px; white-space: nowrap; }
+    .bit-table th:nth-child(4), .bit-table td:nth-child(4) { text-align: center; white-space: nowrap; }
+    .bit-table th:nth-child(5), .bit-table td:nth-child(5) { text-align: left; }
+    .bit-table th:nth-child(6), .bit-table td:nth-child(6) { text-align: left; font-size: 10.5px; color: #1e3a8a; }
+    .ubx-tag { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; background: #e8f0fe; color: #1a73e8; border: 1px solid #c2e7ff; white-space: nowrap; }
+    .dash-text { color: #94a3b8; font-family: Consolas, monospace; }
     .deep-dive-card { margin-top: 14px; border: 1px solid #bcd0e6; border-radius: 8px; background: #f4f8fc; padding: 12px 14px; }
     .deep-dive-card h3 { margin: 0 0 6px; font-size: 13px; color: #1a4971; }
     .deep-dive-card p { font-size: 12px; line-height: 1.6; color: #334e68; margin: 4px 0; }
@@ -123,7 +130,6 @@
     .nasa-compare-table th:nth-child(3), .nasa-compare-table td:nth-child(3) { width: 19%; background: #f8fafc; color: #475569; }
     .nasa-compare-table th:nth-child(4), .nasa-compare-table td:nth-child(4) { width: 27%; background: #f5fbf7; color: #165b40; }
     .nasa-compare-table th:nth-child(5), .nasa-compare-table td:nth-child(5) { width: 13%; background: #fcfbfa; color: #0f172a; text-align: center; font-weight: 600; }
-    .bit-table td:nth-child(5) { font-size: 10.5px; color: #1e3a8a; }
     .delay-control { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 0 0 10px; }
     .delay-control input { width: 90px; padding: 4px 8px; border-radius: 6px; border: 1px solid #b9c8d5; }
     .presets { display: flex; gap: 5px; }
@@ -230,7 +236,7 @@
         <img src="./logo_v3.png?v=995392000e36" alt="LNIS" width="56" height="56">
       </a>
       <div class="header-center-logo" style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); pointer-events: none;">
-        <img src="./imt_logo.png" alt="IMT Logo" style="height: 44px; max-width: 220px; object-fit: contain;">
+        <img src="/assets/common/imt_logo.png" alt="IMT Logo" style="height: 44px; max-width: 220px; object-fit: contain;">
       </div>
       <button class="plain" id="fullscreen" type="button">전체화면</button>
     </header>
@@ -372,12 +378,12 @@
                         <tr>
                           <th scope="row">항법 궤도력 (Ephemeris)</th>
                           <td>달 궤도 및 AFS 위성 자체의 정밀 궤도력 파라미터가 데이터 비트로 방송됩니다 (달 중심 좌표계).</td>
-                          <td>지구 GNSS 기반 검증을 위해 GPS LNAV 1~4 서브프레임 전체(SB2 10개 핵심 요소 + SB3 잔여 459비트)를 오차 없이 완전 무손실 복원하도록 탑재합니다.</td>
+                          <td>지구 GNSS 기반 검증을 위해 GPS LNAV 1~3 서브프레임 궤도력 전체(SB2 10개 핵심 요소 + SB3 잔여 459비트) 및 4 서브프레임 전리층 보정치(SB4)를 오차 없이 복원하도록 탑재합니다.</td>
                         </tr>
                         <tr>
                           <th scope="row">지연 흡수 검증 원리</th>
                           <td>실제 우주 전파는 빛의 속도 c로 공간을 진행하며 기하학적 거리가 변화합니다.</td>
-                          <td>번들 네트워크 지연 Δt = R − S가 발생해도, 모든 위성에 동일한 지연 거리 cΔt가 더해지므로 <strong>PVT 솔버가 이를 수신기 시계오차(Clock Bias)로 정확히 흡수</strong>하여 사용자 위치 (X, Y, Z)를 0.19 mm 이내로 완벽히 복원함을 수학적으로 입증합니다.</td>
+                          <td>번들 네트워크 지연 Δt = R − S가 발생해도, 모든 위성에 동일한 지연 거리 cΔt가 더해지므로 <strong>PVT 솔버가 이를 수신기 시계오차(Clock Bias)로 정확히 흡수</strong>하여 사용자 위치 (X, Y, Z)를 오차 없이(부동소수점 연산 정밀도 수준) 복원함을 입증합니다.</td>
                         </tr>
                       </tbody>
                     </table>
@@ -392,7 +398,7 @@
                         <tr>
                           <th scope="row">동일 제공 항목<br>(공통 궤도·시계)</th>
                           <td>
-                            • 6대 케플러 요소 (SB2): 장반경(√A), 이심률(e), 경사각(i₀), 승교점적경(Ω₀), 근지점인수(ω), 평균근량이각(M₀)<br>
+                            • 6대 케플러 요소 (SB2): 장반경(√A), 이심률(e), 경사각(i₀), 승교점적경(Ω₀), 근지점인수(ω), 평균 근점각(M₀)<br>
                             • 원자시계 보정치 (SB2/SB3): 시계 기준시(t_oc), 편차(a_f0), 드리프트(a_f1), 가속도(a_f2)<br>
                             • 궤도 기준시(t_oe) 및 위성 건전성(Health) 플래그<br>
                             <em>(달 중심 좌표계 MCMF 기준 타원 궤도 결정 필수 정보)</em>
@@ -418,65 +424,6 @@
                     </table>
                   </div>
                   <p class="fine">연구실 환경에서 실시간 획득 가능한 신호원(지상 u-blox GPS 수신 신호)과 글로벌 표준 항법 솔버(RTKLIB)의 수치적 검증 신뢰성을 확보하기 위해 GPS LNAV를 채택하였으며, 달 궤도선 운용 시에는 섭동 계수만 달 중력장 모델로 치환되어 동일한 수식 구조로 동작합니다.</p>
-
-                  <h4>[SB2] 케플러 핵심 10요소 세부 비트 매핑 (Bit 22 ~ 283, 총 1,176 bits)</h4>
-                  <p><strong>SB2 비트 배치:</strong> NASA 규격 및 기존 오픈소스(eph2sbf)의 오프셋을 100% 보존하여 하위 호환성을 유지한 10개 핵심 요소 매핑입니다.</p>
-                  <div class="table-scroll">
-                    <table class="deep-dive-table">
-                      <thead>
-                        <tr>
-                          <th scope="col" style="width: 8%;">순번</th>
-                          <th scope="col" style="width: 18%;">핵심 요소 항목</th>
-                          <th scope="col" style="width: 26%;">물리적 의미</th>
-                          <th scope="col" style="width: 22%;">UBX 내 출처 (SFRBX)</th>
-                          <th scope="col" style="width: 16%;">SB2 비트 위치</th>
-                          <th scope="col" style="width: 10%;">크기</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr><th>—</th><td>Week / ITOW</td><td>시각 식별자</td><td>RAWX / SFRBX 헤더</td><td>Bit 0 ~ 21</td><td>22 bits</td></tr>
-                        <tr><th>1</th><td>t_oe</td><td>궤도 기준시각</td><td>Subframe 2 (Word 10)</td><td>Bit 22 ~ 37</td><td>16 bits</td></tr>
-                        <tr><th>2</th><td>ω (aop)</td><td>근지점 인수 (타원 방향)</td><td>Subframe 3 (Word 7~8)</td><td>Bit 39 ~ 69</td><td>31 bits</td></tr>
-                        <tr><th>3</th><td>√a (sqrta)</td><td>궤도 장반경 제곱근 (크기)</td><td>Subframe 2 (Word 8~9)</td><td>Bit 70 ~ 101</td><td>32 bits</td></tr>
-                        <tr><th>4</th><td>i₀ (inc0)</td><td>기준 궤도 경사각 (기울기)</td><td>Subframe 3 (Word 5~6)</td><td>Bit 102 ~ 133</td><td>32 bits</td></tr>
-                        <tr><th>5</th><td>Ω₀ (omg0)</td><td>승교점 적경 (경도 위치)</td><td>Subframe 3 (Word 3~4)</td><td>Bit 134 ~ 165</td><td>32 bits</td></tr>
-                        <tr><th>6</th><td>M₀ (m0)</td><td>기준 평균근점각 (위치)</td><td>Subframe 2 (Word 4~5)</td><td>Bit 166 ~ 197</td><td>32 bits</td></tr>
-                        <tr><th>7</th><td>e (ecc)</td><td>궤도 이심률 (찌그러짐)</td><td>Subframe 2 (Word 6~7)</td><td>Bit 198 ~ 229</td><td>32 bits</td></tr>
-                        <tr><th>8</th><td>a_f1</td><td>위성 시계 표류율</td><td>Subframe 1 (Word 9)</td><td>Bit 230 ~ 245</td><td>16 bits</td></tr>
-                        <tr><th>9</th><td>a_f0</td><td>위성 시계 편차</td><td>Subframe 1 (Word 10)</td><td>Bit 246 ~ 267</td><td>22 bits</td></tr>
-                        <tr><th>10</th><td>t_oc</td><td>시계 기준시각</td><td>Subframe 1 (Word 8)</td><td>Bit 268 ~ 283</td><td>16 bits</td></tr>
-                        <tr><th>—</th><td>규격 패딩</td><td>미사용 0101 패딩</td><td>—</td><td>Bit 284 ~ 1175</td><td>892 bits</td></tr>
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <h4>[SB3] 섭동 보정항 6종 및 정밀 파라미터 세부 비트 매핑 (Bit 58 ~ 516, 총 846 bits)</h4>
-                  <p><strong>SB3 비트 배치:</strong> Type 63 헤더(57b) 뒤의 459비트 잔여 슬롯에 탑재되어 100m 궤도 오차를 1mm 이하로 무손실 복원하는 세부 파라미터입니다.</p>
-                  <div class="table-scroll">
-                    <table class="deep-dive-table">
-                      <thead>
-                        <tr>
-                          <th scope="col" style="width: 18%;">섭동 보정 항목</th>
-                          <th scope="col" style="width: 32%;">물리적 의미</th>
-                          <th scope="col" style="width: 24%;">UBX 내 출처 (SFRBX)</th>
-                          <th scope="col" style="width: 16%;">SB3 탑재 위치</th>
-                          <th scope="col" style="width: 10%;">크기</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr><th>C_rs</th><td>궤도 반경 Sine 조화 섭동</td><td>Subframe 2 (Word 3)</td><td>SB3 잔여 슬롯 (Bit 58~516)</td><td>16 bits</td></tr>
-                        <tr><th>C_uc</th><td>궤도 위도 Cosine 조화 섭동</td><td>Subframe 2 (Word 6)</td><td>SB3 잔여 슬롯 (Bit 58~516)</td><td>16 bits</td></tr>
-                        <tr><th>C_us</th><td>궤도 위도 Sine 조화 섭동</td><td>Subframe 2 (Word 7~8)</td><td>SB3 잔여 슬롯 (Bit 58~516)</td><td>16 bits</td></tr>
-                        <tr><th>C_ic</th><td>경사각 Cosine 조화 섭동</td><td>Subframe 3 (Word 3)</td><td>SB3 잔여 슬롯 (Bit 58~516)</td><td>16 bits</td></tr>
-                        <tr><th>C_is</th><td>경사각 Sine 조화 섭동</td><td>Subframe 3 (Word 5)</td><td>SB3 잔여 슬롯 (Bit 58~516)</td><td>16 bits</td></tr>
-                        <tr><th>C_rc</th><td>궤도 반경 Cosine 조화 섭동</td><td>Subframe 3 (Word 7)</td><td>SB3 잔여 슬롯 (Bit 58~516)</td><td>16 bits</td></tr>
-                        <tr><th>Δn / Ω̇ / IDOT</th><td>평균운동량(16b) / 승교점세차율(24b) / 경사각변화율(14b)</td><td>SF2(W4) / SF3(W9) / SF3(W10)</td><td>SB3 잔여 슬롯</td><td>54 bits</td></tr>
-                        <tr><th>a_f2 / T_GD</th><td>2차 시계 가속도(8b) / 전송 지연차(8b)</td><td>Subframe 1 (Word 7, 8)</td><td>SB3 잔여 슬롯</td><td>16 bits</td></tr>
-                        <tr><th>식별·건전성 플래그</th><td>IODE, IODC, CodeL2, URA, SV Health 등 상태 비트</td><td>Subframe 1, 2, 3</td><td>SB3 잔여 슬롯</td><td>293 bits</td></tr>
-                        <tr><th>규격 패딩</th><td>미사용 0101 패딩</td><td>—</td><td>Bit 517 ~ 845</td><td>329 bits</td></tr>
-                      </tbody>
-                    </table>
-                  </div>
 
                   <h4>NASA AFS 공식 표준(LSIS Vol-A) 대비 준수 및 독자 확장 분석</h4>
                   <p><strong>공식 표준과의 일치점 및 시험베드 확장 분석:</strong> 무선 물리 계층(Layer 1)은 NASA 최신 권고안을 100% 준수하며, 상위 데이터 계층(Layer 2)의 미할당 영역(SB3·SB4)을 지상 검증 목적에 맞추어 독자 확장한 구조 분석입니다.</p>
@@ -523,28 +470,27 @@
                         <tr>
                           <th scope="row">SB2 (L2)<br>핵심 궤도력</th>
                           <td>• 달 궤도선 Ephemeris & Clock (MCMF 좌표계)</td>
-                          <td>10개 핵심 요소 탑재 (eph2sbf, 262 bits)<br>단, 나머지 892비트는 0101 패딩 방치</td>
+                          <td>10개 핵심 요소 탑재 (eph2sbf, 262 bits)<br>단, 나머지 892비트는 0101 패딩 처리</td>
                           <td>10개 핵심 요소 비트 위치 100% 보존<br>(지상 시험 검증용 WGS-84 매핑)</td>
                           <td><strong>비트 형식 일치</strong><br>(하위 호환성 유지)</td>
                         </tr>
                         <tr>
                           <th scope="row">SB3 (L2)<br>보충 궤도력</th>
                           <td>• 달 중력장(Mascon) 섭동 계수<br>• 위성 무결성 경보 (Alert Flag)</td>
-                          <td><strong>미구현</strong><br>(0101 더미 데이터 방치)</td>
+                          <td><strong>미구현</strong><br>(0101 더미 데이터 패딩)</td>
                           <td><strong>Type 63 헤더 + LNAV 잔여 459비트 탑재</strong><br>→ LNAV 720비트 100% 무손실 복원 달성</td>
                           <td><strong>시험용 독자 확장</strong><br>(무손실 궤도 완성)</td>
                         </tr>
                         <tr>
                           <th scope="row">SB4 (L2)<br>시험 관측값</th>
                           <td>• 달 조난 탐색구조 (Lunar SAR)<br>• 사용자 방송 / 저속 과학 데이터</td>
-                          <td><strong>미구현</strong><br>(0101 더미 데이터 방치)</td>
+                          <td><strong>미구현</strong><br>(0101 더미 데이터 패딩)</td>
                           <td><strong>가상 송신 시각(T*ᵢ) + u-blox 정답 관측값</strong><br>→ DTN 통신 지연 에뮬레이션 주입</td>
                           <td><strong>시험용 독자 확장</strong><br>(지상 시험 전용)</td>
                         </tr>
                       </tbody>
                     </table>
                   </div>
-                  <p class="fine">물리 계층(L1)은 NASA 최신 표준을 엄격히 준수하며, 오픈소스에서 더미(0101)로 방치되었던 SB3·SB4 유휴 공간을 활용하여 지상 시험베드의 핵심 목표인 '지구 궤도 무손실 복원(SB3)'과 'DTN 지연 에뮬레이션(SB4)'을 완벽히 달성하도록 설계되었습니다.</p>
                 </div>
               </div>
               <div id="delay-example" hidden>
@@ -946,9 +892,9 @@
         ],
         note: '수신기가 우주 전파 잡음 속에서 6,000심볼 프레임의 정확한 시작점을 나노초 단위로 검출(Frame Lock)하기 위한 68비트 고정 패턴입니다. 자기상관성(Auto-correlation)이 매우 뛰어나 단 1비트라도 어긋나면 0으로 상쇄되고, 100% 포개어질 때만 펄스 피크가 발생하여 오인식 확률이 사실상 0에 수렴합니다.',
         fields: [
-          ['SP 고정 바이트열 (Hex)', '68 bits (8.5B)', '0xCC 63 F7 45 36 F4 9E 04 A (MSB-first)', 'NASA 공식 고정 패턴 (0xCC63F74536F49E04A0)', '동일 제공 (달-지구 프레임 동기화 기준 패턴)'],
-          ['2진 비트열 (상위 32b)', '32 bits', '11001100 01100011 11110111 01000101', '의사난수 동기화 패턴 전반부', '동일 제공 (위상 동기 및 상관 피크 검출)'],
-          ['2진 비트열 (하위 36b)', '36 bits', '00110110 11110100 10011110 00000100 1010', '의사난수 동기화 패턴 후반부', '동일 제공 (프레임 경계 확정 및 SB1 진입)']
+          ['SP 고정 바이트열 (Hex)', '68 bits (8.5B)', '0xCC 63 F7 45 36 F4 9E 04 A (MSB)', '-', 'NASA 공식 프레임 동기 고정 바이트 패턴 (0xCC63F74536F49E04A0)', '동일 제공 (달-지구 프레임 동기화 기준 패턴)'],
+          ['2진 비트열 (상위 32b)', '32 bits', '11001100 01100011 11110111 01000101', '-', '의사난수 동기화 패턴 전반부', '동일 제공 (위상 동기 및 상관 피크 검출)'],
+          ['2진 비트열 (하위 36b)', '36 bits', '00110110 11110100 10011110 00000100 1010', '-', '의사난수 동기화 패턴 후반부', '동일 제공 (프레임 경계 확정 및 SB1 진입)']
         ]
       }),
       1: () => ({
@@ -960,9 +906,9 @@
         ],
         note: 'NASA LSIS AFS Volume A 규격 및 오픈소스 afs_sim.c와 동일합니다. 8비트 정보(FID 4비트 + TOI 4비트)를 BCH(52, 8)로 부호화하여 52비트 코드워드를 생성합니다.',
         fields: [
-          ['FID (Frame ID)', '4 bits', 'uint4', '0 (고정값, LSIS AFS 규격)', '동일 제공 (NASA LSIS 표준 프레임 식별자)'],
-          ['TOI (Time of Interval)', '4 bits', 'uint4', '(TOW % 1200) / 12 (0~99 카운터)', '동일 제공 (달 위성 온보드 시각 카운터)'],
-          ['BCH 패리티 (Parity)', '44 bits', 'bitstream', 'BCH(52, 8) 생성 다항식 순환 부호화', '동일 제공 (순환 부호 오류 정정)']
+          ['FID (Frame ID)', '4 bits', 'uint4', '-', '0 고정값 (LSIS AFS 정규 프레임 식별자)', '동일 제공 (NASA LSIS 표준 프레임 식별자)'],
+          ['TOI (Time of Interval)', '4 bits', 'uint4', 'RAWX / SFRBX', '(TOW % 1200) / 12 (0~99 시간 간격 카운터)', '동일 제공 (달 위성 온보드 시각 카운터)'],
+          ['BCH 패리티 (Parity)', '44 bits', 'bitstream', '-', 'BCH(52, 8) 생성 다항식 기반 순환 부호화 패리티', '동일 제공 (순환 부호 오류 정정)']
         ]
       }),
       2: () => ({
@@ -974,19 +920,19 @@
         ],
         note: '표준 오픈소스의 10개 핵심 궤도요소(eph2sbf, 262 bits) 및 프레임 시각 식별자(22 bits) 비트 위치를 그대로 유지하여 하위 호환성을 확보했습니다.',
         fields: [
-          ['Week / ITOW 헤더', '22 bits', 'time', 'GPS Week(13b) + TOW 카운터(9b, 20분 주기) 프레임 시간 식별자', '동일 제공 (프레임 시간 식별자)'],
-          ['toe (궤도력 기준시)', '16 bits', 'scale 2⁴ s', 'GPS 주간 기준 궤도력 유효 시각', '동일 제공 (달 궤도력 유효 기준시)'],
-          ['e (이심률)', '32 bits', 'scale 2⁻³³', '케플러 궤도 타원 이심률', '동일 제공 (달 중심 궤도 MCMF 타원 이심률)'],
-          ['√A (궤도 장반경 제곱근)', '32 bits', 'scale 2⁻¹⁹ m¹/²', 'GPS 위성 궤도 장반경 제곱근', '동일 제공 (달 중심 궤도 장반경 제곱근)'],
-          ['i₀ (궤도 경사각)', '32 bits', 'scale 2⁻³¹ semi-circles', '기준 에포크에서의 궤도 경사각', '동일 제공 (달 적도면 기준 궤도 경사각)'],
-          ['Ω₀ (승교점 적경)', '32 bits', 'scale 2⁻³¹ semi-circles', '주간 기준시에서의 승교점 적경', '동일 제공 (달 중심 관성좌표계 기준 승교점 적경)'],
-          ['ω (근지점 인수)', '32 bits', 'scale 2⁻³¹ semi-circles', '궤도 평면 상의 근지점 편각', '동일 제공 (달 궤도 평면 근지점 편각)'],
-          ['M₀ (평균 근점각)', '32 bits', 'scale 2⁻³¹ semi-circles', '기준시에서의 평균 근점각', '동일 제공 (달 궤도 기준시 평균 근점각)'],
-          ['toc (시계 기준시)', '16 bits', 'scale 2⁴ s', '위성 탑재 시계 보정 기준 시각', '동일 제공 (위성 탑재 원자시계 보정 기준시)'],
-          ['af0 (위성 시계 편차)', '22 bits', 'scale 2⁻³¹ s', '다항식 0차 시계 보정 계수', '동일 제공 (원자시계 0차 편차 오프셋)'],
-          ['af1 (위성 시계 드리프트)', '16 bits', 'scale 2⁻⁴³ s/s', '다항식 1차 시계 드리프트 계수', '동일 제공 (원자시계 1차 주파수 드리프트)'],
-          ['패딩 (Padding)', '892 bits', '0101… 교대', '표준 1,176비트 정보 크기 충족용 더미 비트 (22 + 262 + 892 = 1,176)', '동일 제공 (규격 정렬용 패딩)'],
-          ['CRC-24 & LDPC SF2', '1,224 bits', '부호화', 'CRC-24 (24 bits) 부가 후 LDPC SF2(부호율 1/2) → 총 2,400 bits 심볼', '동일 제공 (물리 계층 오류 정정 부호)']
+          ['Week / ITOW 헤더', '22 bits (Bit 0~21)', 'time', 'RAWX / SFRBX', 'GPS Week(13b) + TOW 카운터(9b, 20분 주기) 프레임 시간 식별자', '동일 제공 (프레임 시간 식별자)'],
+          ['t_oe (궤도력 기준시)', '16 bits (Bit 22~37)', 'scale 2⁴ s (16초)', 'SF2 (Word 10)', '궤도력 유효 기준 에포크 시각 (Time of Ephemeris)', '동일 제공 (달 궤도력 유효 기준시)'],
+          ['e (이심률, ecc)', '31 bits (Bit 39~69)', 'scale 2⁻³³', 'SF2 (Word 6~7)', '케플러 타원 궤도 이심률 (31b 슬롯팅, 32번째 LSB는 SB3 연계)', '동일 제공 (달 중심 궤도 MCMF 타원 이심률)'],
+          ['√a (장반경 제곱근, sqrta)', '32 bits (Bit 70~101)', 'scale 2⁻¹⁹ m¹/²', 'SF2 (Word 8~9)', '궤도 장반경 제곱근 (타원 궤도 절대 크기)', '동일 제공 (달 중심 궤도 장반경 제곱근)'],
+          ['i₀ (궤도 경사각, inc0)', '32 bits (Bit 102~133)', 'scale 2⁻³¹ semi-circles', 'SF3 (Word 5~6)', '기준 에포크 궤도 경사각 (적도면 대비 기울기)', '동일 제공 (달 적도면 기준 궤도 경사각)'],
+          ['Ω₀ (승교점 적경, omg0)', '32 bits (Bit 134~165)', 'scale 2⁻³¹ semi-circles', 'SF3 (Word 3~4)', '주간 기준시 승교점 적경 (궤도면의 관성 경도 회전각)', '동일 제공 (달 중심 관성좌표계 기준 승교점 적경)'],
+          ['ω (근지점 인수, aop)', '32 bits (Bit 166~197)', 'scale 2⁻³¹ semi-circles', 'SF3 (Word 7~8)', '근지점 인수 (타원 장축 지향 방위 각도)', '동일 제공 (달 궤도 평면 근지점 편각)'],
+          ['M₀ (평균 근점각, m0)', '32 bits (Bit 198~229)', 'scale 2⁻³¹ semi-circles', 'SF2 (Word 4~5)', '기준시 평균 근점각 (타원 궤도 상 초기 위상 각도)', '동일 제공 (달 궤도 기준시 평균 근점각)'],
+          ['t_oc (시계 기준시)', '16 bits (Bit 230~245)', 'scale 2⁴ s (16초)', 'SF1 (Word 8)', '위성 탑재 원자시계 보정 유효 기준 시각 (Time of Clock)', '동일 제공 (위성 탑재 원자시계 보정 기준시)'],
+          ['a_f0 (시계 편차 바이어스)', '22 bits (Bit 246~267)', 'scale 2⁻³¹ s', 'SF1 (Word 10)', '위성 탑재 원자시계 0차 위상 오프셋 편차 (Bias)', '동일 제공 (원자시계 0차 편차 오프셋)'],
+          ['a_f1 (시계 표류율 드리프트)', '16 bits (Bit 268~283)', 'scale 2⁻⁴³ s/s', 'SF1 (Word 9)', '위성 탑재 원자시계 1차 주파수 편이 표류율 (Drift)', '동일 제공 (원자시계 1차 주파수 드리프트)'],
+          ['규격 패딩 (Padding)', '892 bits (Bit 284~1175)', '0101… 교대', '-', '미사용 영역 표준 0101 교대 패턴 (22 + 262 + 892 = 1,176 bits)', '동일 제공 (규격 정렬용 패딩)'],
+          ['CRC-24 & LDPC SF2', '1,224 bits', '부호화', '-', 'CRC-24 (24 bits) 부가 후 LDPC SF2(부호율 1/2 천공) → 총 2,400 심볼', '동일 제공 (물리 계층 오류 정정 부호)']
         ]
       }),
       3: () => ({
@@ -999,16 +945,22 @@
         ],
         note: 'NASA 공식 규격은 달 중력장(Mascon) 및 Alert용으로 지정하고 있으나, 기존 오픈소스는 미구현(0101 패딩) 상태였습니다. LNIS는 이 공간에 LNAV 459비트를 탑재하여 무손실 궤도 복원을 구현했습니다.',
         fields: [
-          ['Type 63 헤더', '57 bits', 'header', 'Type 63, Version 3, TOW, Week, PRN 공통 헤더', '동일 제공 (공통 헤더)'],
-          ['navPresent 플래그', '1 bit', 'boolean', '1 = LNAV 잔여 궤도 파라미터 유효', '동일 제공 (보충 궤도 파라미터 유효 플래그)'],
-          ['Δn (평균 운동 보정치)', '16 bits', 'scale 2⁻⁴³ semi-circles/s', '위성 평균 운동량 섭동 보정치', '달 환경 치환 (달 중력장 특성 보정치 적용)'],
-          ['Ω_dot (승교점 세차율)', '24 bits', 'scale 2⁻⁴³ semi-circles/s', '지구 자전 및 편평도에 따른 섭동', '달 환경 치환 (달 자전 주기 27.3일 세차율 적용)'],
-          ['IDOT (경사각 변화율)', '14 bits', 'scale 2⁻⁴³ semi-circles/s', '궤도 경사각 시간 변화율', '동일 제공 (궤도 경사각 시간 변화율)'],
-          ['af2 / TGD', '8 + 8 bits', 'clock param', '2차 시계 가속도(8b) 및 전송 지연차 TGD(8b)', 'af2: 동일 제공 (시계 가속도) / TGD: 달 링크 지연치로 치환'],
-          ['조화 섭동 보정항 6종', '96 bits', '각 16 bits', 'Cuc, Cus, Crc, Crs, Cic, Cis (지구 중력 타원체 섭동)', '달 환경 치환 (달 매스콘 Mascon 중력 이상 섭동 계수 적용)'],
-          ['식별 및 건전성 플래그', '293 bits', 'flags', 'IODE(SF2/SF3), IODC, CodeL2, L2P, URA, SV Health 등 잔여 비트', '동일 제공 (위성 건전성 및 궤도 일련번호)'],
-          ['패딩 (Padding)', '329 bits', '0101… 교대', '표준 846비트 정보 크기 충족용 더미 비트', '동일 제공 (규격 정렬용 패딩)'],
-          ['CRC-24 & LDPC SF3', '894 bits', '부호화', 'CRC-24 (24 bits) 부가 후 LDPC SF3(천공 부호율 1/2) → 총 1,740 bits', '동일 제공 (물리 계층 오류 정정 부호)']
+          ['Type 63 헤더', '57 bits (Bit 0~56)', 'header', '-', 'Type 63, Version 3, TOW, Week, PRN 공통 헤더', '동일 제공 (공통 헤더)'],
+          ['navPresent 플래그', '1 bit (Bit 57)', 'boolean', '-', '1 = LNAV 잔여 궤도 파라미터 유효 플래그', '동일 제공 (보충 궤도 파라미터 유효 플래그)'],
+          ['C_rs (반경 Sine 조화 섭동)', '16 bits', 'scale 2⁻⁵ m (1/32 m)', 'SF2 (Word 3)', '궤도 반경 Sine 조화 섭동 보정치 (δr)', '달 환경 치환 (달 매스콘 Mascon 반경 중력 이상 보정)'],
+          ['C_uc (위도 Cosine 조화 섭동)', '16 bits', 'scale 2⁻²⁹ rad', 'SF2 (Word 6)', '궤도 위도 각거리 Cosine 조화 섭동치 (δu)', '달 환경 치환 (달 매스콘 Mascon 위도 중력 이상 보정)'],
+          ['C_us (위도 Sine 조화 섭동)', '16 bits', 'scale 2⁻²⁹ rad', 'SF2 (Word 7~8)', '궤도 위도 각거리 Sine 조화 섭동치 (δu)', '달 환경 치환 (달 매스콘 Mascon 위도 중력 이상 보정)'],
+          ['C_ic (경사각 Cosine 조화 섭동)', '16 bits', 'scale 2⁻²⁹ rad', 'SF3 (Word 3)', '궤도 경사각 Cosine 조화 섭동치 (δi)', '달 환경 치환 (지구·태양 인력 기인 경사각 섭동 보정)'],
+          ['C_is (경사각 Sine 조화 섭동)', '16 bits', 'scale 2⁻²⁹ rad', 'SF3 (Word 5)', '궤도 경사각 Sine 조화 섭동치 (δi)', '달 환경 치환 (지구·태양 인력 기인 경사각 섭동 보정)'],
+          ['C_rc (반경 Cosine 조화 섭동)', '16 bits', 'scale 2⁻⁵ m (1/32 m)', 'SF3 (Word 7)', '궤도 반경 Cosine 조화 섭동 보정치 (δr)', '달 환경 치환 (달 매스콘 Mascon 반경 중력 이상 보정)'],
+          ['Δn (평균 운동량 섭동)', '16 bits', 'scale 2⁻⁴³ semi-circles/s', 'SF2 (Word 4)', '위성 평균 운동량 섭동 보정치 (Mean Motion Difference)', '달 환경 치환 (달 중력장에 따른 평균 운동 섭동치)'],
+          ['Ω̇ (승교점 세차율, OMEGA DOT)', '24 bits', 'scale 2⁻⁴³ semi-circles/s', 'SF3 (Word 9)', '지구 자전 및 타원체 편평도에 따른 궤도면 회전율', '달 환경 치환 (달 자전 주기 27.3일 세차율로 대체)'],
+          ['IDOT (경사각 시간 변화율)', '14 bits', 'scale 2⁻⁴³ semi-circles/s', 'SF3 (Word 10)', '궤도 경사각 시간 변화율', '동일 제공 (지구/태양 인력에 의한 경사각 변화율)'],
+          ['a_f2 (시계 2차 가속도)', '8 bits', 'scale 2⁻⁵⁵ s/s²', 'SF1 (Word 8)', '위성 원자시계 2차 노화 가속도 계수', '동일 제공 (달 궤도선 원자시계 노화 가속도)'],
+          ['T_GD (전송 군지연차)', '8 bits', 'scale 2⁻³¹ s', 'SF1 (Word 7)', 'GPS L1/L2 하드웨어 전송 군지연차', '달 환경 치환 (AFS 단일 주파수 순방향 링크 회로 지연 보정치)'],
+          ['식별 및 상태·건전성 플래그', '293 bits', 'flags', 'SF1~3 (전체)', 'IODE(SF2/SF3), IODC, CodeL2, L2P, URA, SV Health 등 상태 비트', '동일 제공 (위성 건전성 및 궤도 일련번호)'],
+          ['규격 패딩 (Padding)', '329 bits (Bit 517~845)', '0101… 교대', '-', '표준 846비트 정보 크기 충족용 더미 비트 (57 + 1 + 459 + 329 = 846)', '동일 제공 (규격 정렬용 패딩)'],
+          ['CRC-24 & LDPC SF3', '894 bits', '부호화', '-', 'CRC-24 (24 bits) 부가 후 LDPC SF3(천공 부호율 1/2) → 총 1,740 bits', '동일 제공 (물리 계층 오류 정정 부호)']
         ]
       }),
       4: () => {
@@ -1033,25 +985,25 @@
             : 'NASA 공식 규격은 Lunar SAR(조난신호)용이며 실제 위성은 수신기 관측값을 보내지 않습니다. LNIS는 지상 DTN 지연 시험을 위해 가상 송신 시각(T*ᵢ)과 정답 관측값을 주입하는 시험베드 컨테이너로 활용했습니다.',
           fields: isIq
             ? [
-                ['Type 63 헤더', '57 bits', 'header', 'Type 63, Version 3, TOW, Week, PRN 공통 헤더', '동일 제공 (공통 헤더)'],
-                ['obsIndex / Week / TOW', '88 bits', 'uint & double', '관측 순번(8b), GPS Week(16b), ms TOW(64b)', '동일 제공 (관측 기준 시각)'],
-                ['원본 의사거리 Pᵢ', '64 bits', 'double (m)', 'u-blox 계측 의사거리 (비교 대조용 보존)', '수신기 RF 상관기에서 물리 계측 (송신 불가)'],
-                ['Doppler / C/N0 / Status', '48 bits', 'float & uint8', '도플러 주파수(32b), C/N0(8b), 추적상태(8b)', '수신기 추적 루프(PLL)에서 물리 계측 (송신 불가)'],
-                ['전리층 플래그 및 계수', '249 bits', 'Klobuchar', 'hasIon(1b) + ionPrn(8b) + Klobuchar α₀~α₃/β₀~β₃(240b)', '달 환경 불필요 (달 표면 진공/플라즈마 모델 대체)'],
-                ['패딩 (Padding)', '340 bits', '0101… 교대', '표준 846비트 정보 크기 충족용 더미 비트 (총 506비트 유효: 506 + 340 = 846)', '동일 제공 (규격 정렬용 패딩)'],
-                ['CRC-24 & LDPC SF3', '894 bits', '부호화', 'CRC-24 (24 bits) 부가 후 LDPC SF3 부호화 → 총 1,740 bits', '동일 제공 (물리 계층 오류 정정 부호)']
+                ['Type 63 헤더', '57 bits (Bit 0~56)', 'header', '-', 'Type 63, Version 3, TOW, Week, PRN 공통 헤더', '동일 제공 (공통 헤더)'],
+                ['obsIndex / Week / TOW', '88 bits (Bit 57~144)', 'uint & double', 'RAWX', '관측 순번(8b), GPS Week(16b), ms TOW(64b)', '동일 제공 (관측 기준 시각)'],
+                ['원본 의사거리 Pᵢ', '64 bits (Bit 145~208)', 'double (m)', 'RAWX', 'u-blox 계측 원본 의사거리 (비교 대조용 보존)', '수신기 RF 상관기에서 물리 계측 (송신 불가)'],
+                ['Doppler / C/N0 / Status', '48 bits (Bit 209~256)', 'float & uint8', 'RAWX', '도플러 주파수(32b), C/N0(8b), 추적상태(8b)', '수신기 추적 루프(PLL)에서 물리 계측 (송신 불가)'],
+                ['전리층 플래그 및 계수', '249 bits (Bit 257~505)', 'Klobuchar', 'SFRBX (SF4)', 'hasIon(1b) + ionPrn(8b) + Klobuchar α₀~α₃/β₀~β₃(240b)', '달 환경 불필요 (달 표면 진공/플라즈마 모델 대체)'],
+                ['패딩 (Padding)', '340 bits (Bit 506~845)', '0101… 교대', '-', '표준 846비트 정보 크기 충족용 더미 비트 (506 + 340 = 846 bits)', '동일 제공 (규격 정렬용 패딩)'],
+                ['CRC-24 & LDPC SF3', '894 bits', '부호화', '-', 'CRC-24 (24 bits) 부가 후 LDPC SF3 부호화 → 총 1,740 bits', '동일 제공 (물리 계층 오류 정정 부호)']
               ]
             : [
-                ['Type 63 헤더', '57 bits', 'header', 'Type 63, Version 3, TOW, Week, PRN 공통 헤더', '동일 제공 (공통 헤더)'],
-                ['obsIndex / Week / TOW', '88 bits', 'uint & double', '관측 순번(8b), GPS Week(16b), ms TOW(64b)', '동일 제공 (관측 기준 시각)'],
-                ['가상 송신 시각 (T*ᵢ)', '114 bits', '초64b+ns32b+ps18b', '정답 의사거리에서 변환: T*ᵢ = S − Pᵢ/c (지연 에뮬레이션)', '시험베드 전용 주입 (실제 우주는 수신기 RF 상관기 계측)'],
-                ['Doppler 주파수', '32 bits', 'float (Hz)', 'u-blox 계측 정답 도플러 (수신측 속도 계산용)', '시험베드 전용 주입 (실제 우주는 수신기 PLL 물리 계측)'],
-                ['C/N0 신호 품질', '8 bits', 'uint8 (dB-Hz)', 'u-blox 계측 정답 신호강도 (수신측 가중치 계산용)', '시험베드 전용 주입 (실제 우주는 수신기 안테나 수신품질 계측)'],
-                ['추적 상태 (trackingStatus)', '8 bits', 'uint8', 'u-blox 동기 유효 플래그', '시험베드 전용 주입 (수신기 동기 상태)'],
-                ['전리층 플래그 및 계수', '249 bits', 'Klobuchar', 'hasIon(1b) + ionPrn(8b) + Klobuchar α₀~α₃/β₀~β₃(240b)', '달 환경 불필요 (지구 대기 모델, 달은 진공/플라즈마 모델)'],
-                ['시험 시작 시각 (anchor S)', '114 bits', '초64b+ns32b+ps18b', '시험 시작 접수 시각 S', '지상 시험 시작 기준시'],
-                ['패딩 (Padding)', '176 bits', '0101… 교대', '표준 846비트 정보 크기 충족용 더미 비트 (총 670비트 유효: 670 + 176 = 846)', '동일 제공 (규격 정렬용 패딩)'],
-                ['CRC-24 & LDPC SF3', '894 bits', '부호화', 'CRC-24 (24 bits) 부가 후 LDPC SF3 부호화 → 총 1,740 bits', '동일 제공 (물리 계층 오류 정정 부호)']
+                ['Type 63 헤더', '57 bits (Bit 0~56)', 'header', '-', 'Type 63, Version 3, TOW, Week, PRN 공통 헤더', '동일 제공 (공통 헤더)'],
+                ['obsIndex / Week / TOW', '88 bits (Bit 57~144)', 'uint & double', 'RAWX', '관측 순번(8b), GPS Week(16b), ms TOW(64b)', '동일 제공 (관측 기준 시각)'],
+                ['가상 송신 시각 (T*ᵢ)', '114 bits (Bit 145~258)', '초 64b + 펨토초(fs) 50b', 'RAWX (Pᵢ) 변환', '정답 의사거리에서 변환: T*ᵢ = S − Pᵢ/c (지연 에뮬레이션 주입)', '시험베드 전용 주입 (실제 우주는 수신기 RF 상관기 계측)'],
+                ['Doppler 주파수', '32 bits (Bit 259~290)', 'float (Hz)', 'RAWX', 'u-blox 계측 정답 도플러 (수신측 속도 계산용)', '시험베드 전용 주입 (실제 우주는 수신기 PLL 물리 계측)'],
+                ['C/N0 신호 품질', '8 bits (Bit 291~298)', 'uint8 (dB-Hz)', 'RAWX', 'u-blox 계측 정답 신호강도 (수신측 가중치 계산용)', '시험베드 전용 주입 (실제 우주는 수신기 안테나 수신품질 계측)'],
+                ['추적 상태 (trackingStatus)', '8 bits (Bit 299~306)', 'uint8', 'RAWX', 'u-blox 동기 유효 플래그', '시험베드 전용 주입 (수신기 동기 상태)'],
+                ['전리층 플래그 및 계수', '249 bits (Bit 307~555)', 'Klobuchar', 'SFRBX (SF4)', 'hasIon(1b) + ionPrn(8b) + Klobuchar α₀~α₃/β₀~β₃(240b)', '달 환경 불필요 (지구 대기 모델, 달은 진공/플라즈마 모델)'],
+                ['시험 시작 시각 (anchor S)', '114 bits (Bit 556~669)', '초 64b + 펨토초(fs) 50b', '-', '시험 시작 접수 시각 S (수신단 의사거리 역산 기준시)', '지상 시험 시작 기준시'],
+                ['패딩 (Padding)', '176 bits (Bit 670~845)', '0101… 교대', '-', '표준 846비트 정보 크기 충족용 더미 비트 (670 + 176 = 846 bits)', '동일 제공 (규격 정렬용 패딩)'],
+                ['CRC-24 & LDPC SF3', '894 bits', '부호화', '-', 'CRC-24 (24 bits) 부가 후 LDPC SF3 부호화 → 총 1,740 bits', '동일 제공 (물리 계층 오류 정정 부호)']
               ]
         };
       }
@@ -1083,13 +1035,23 @@
           <p class="bit-spec-note">${spec.note}</p>
           <div class="table-scroll">
             <table class="bit-table">
-              <thead><tr><th>필드명</th><th>비트 크기</th><th>형식 / 단위</th><th>LNIS 매핑 (지구 GPS)</th><th>실제 달 궤도선 (LunaNet) 대응</th></tr></thead>
+              <thead>
+                <tr>
+                  <th>필드명</th>
+                  <th>비트 크기 (위치)</th>
+                  <th>형식 / 단위 (LSB)</th>
+                  <th>UBX 출처</th>
+                  <th>물리적 의미 (LNIS)</th>
+                  <th>실제 달 궤도선 (LunaNet) 대응</th>
+                </tr>
+              </thead>
               <tbody>
-                ${spec.fields.map(([name, size, type, desc, moon]) => `
+                ${spec.fields.map(([name, size, type, ubx, desc, moon]) => `
                   <tr>
                     <td><strong>${name}</strong></td>
-                    <td class="mono num">${size}</td>
+                    <td class="mono">${size}</td>
                     <td class="mono">${type}</td>
+                    <td>${ubx && ubx !== '-' ? `<span class="ubx-tag">${ubx}</span>` : `<span class="dash-text">-</span>`}</td>
                     <td>${desc}</td>
                     <td>${moon}</td>
                   </tr>
