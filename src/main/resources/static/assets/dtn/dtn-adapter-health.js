@@ -6,7 +6,7 @@ export function validAdapterUrl(value) {
   } catch { return null; }
 }
 
-export function initAdapterHealth(defaultUrl, log = () => {}, onStatus = () => {}) {
+export function initAdapterHealth(defaultUrl, log = () => {}, onStatus = () => {}, onSave = () => {}) {
   const $ = id => document.getElementById(id);
   const input = $('dtn-send-url'), button = $('dtn-adapter-health');
   const save = $('dtn-adapter-save');
@@ -20,6 +20,7 @@ export function initAdapterHealth(defaultUrl, log = () => {}, onStatus = () => {
   try {
     input.value = localStorage.getItem(storageKey) || defaultUrl;
   } catch { /* Storage may be disabled. */ }
+  onSave(input.value.trim());
   let checking = false, revision = 0, lastState = '';
   const reportState = (state, automatic) => {
     if (!automatic || state !== lastState) log('어댑터 연결 확인 · ' + state);
@@ -84,7 +85,10 @@ export function initAdapterHealth(defaultUrl, log = () => {}, onStatus = () => {
       const address = input.value.trim(), url = new URL(address);
       if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.hash)
         throw new Error('어댑터 서버 주소를 확인하세요.');
-      localStorage.setItem(storageKey, address);
+      try {
+        localStorage.setItem(storageKey, address);
+      } catch { /* Storage may be disabled. */ }
+      onSave(address);
       log('어댑터 주소 저장·적용 완료 · 이 브라우저에 저장됨');
       await check(false);
     } catch (error) { log('어댑터 주소 저장 실패 · ' + error.message); }

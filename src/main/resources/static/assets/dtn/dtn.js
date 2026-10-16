@@ -499,6 +499,7 @@ if (typeof window !== 'undefined' && typeof window.addEventListener === 'functio
 
 let adapterOnline = false;
 let adapterStatusText = '확인 대기';
+let appliedSendUrl = '';
 
 function updateAdapterStripPill(text, tone, className) {
   const pillEl = $('dtn-adapter-strip-status');
@@ -561,7 +562,7 @@ function updateClockSkewWarning(connection) {
     warning.hidden = true;
   }
 }
-const buildSendUrl = () => validAdapterUrl($('dtn-send-url').value);
+const buildSendUrl = () => validAdapterUrl(appliedSendUrl || $('dtn-send-url').value);
 const urlValid = () => !!buildSendUrl();
 function renderPvt() {
   view.setPvt(pvt);
@@ -1038,12 +1039,16 @@ async function connectPeer(save) {
   if (!$('dtn-receiver-ip').reportValidity() || !$('dtn-receiver-port').reportValidity()) return;
   busy = true; updateControls(); destination('확인 중');
   try {
-    const body = {ip: $('dtn-receiver-ip').value.trim(), port: Number($('dtn-receiver-port').value), scheme: peerConfig.scheme || 'http'};
+    const body = {ip: $('dtn-receiver-ip').value.trim(), port: Number($('dtn-receiver-port').value), scheme: peerConfig?.scheme || 'http'};
     const result = await request('/node/connection' + (save ? '' : '/test'), {method: save ? 'PUT' : 'POST',
       headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
-    if (save) { peerConfig = result; destination('저장 완료 · 재확인 필요'); }
-    else destination(result.connected ? '응답 확인' : '연결 실패', result.connected ? 'online' : 'offline');
-    $('dtn-connection-message').textContent = save ? '상대 서비스 주소를 저장했습니다.' : result.message;
+    if (save) {
+      peerConfig = result;
+      destination(result.peerOnline ? '연결됨' : '저장됨 · 연결 확인 중', result.peerOnline ? 'online' : 'unknown');
+    } else {
+      destination(result.connected ? '응답 확인' : '연결 실패', result.connected ? 'online' : 'offline');
+    }
+    $('dtn-connection-message').textContent = save ? '상대 서비스 주소를 저장·적용했습니다.' : result.message;
     log($('dtn-connection-message').textContent, !save && !result.connected ? 'ERROR' : 'INFO');
   } catch (e) { destination('연결 실패', 'offline'); $('dtn-connection-message').textContent = e.message; log(e.message, 'ERROR'); }
   finally { busy = false; updateControls(); }
@@ -1093,7 +1098,7 @@ $('dtn-send').onclick = async () => {
   busy = true; resetResult(); updateControls();
   try {
     job = await post('/dtn/tests', {inputId: selectedType === 'IQ_SAMPLE' ? null : inputId, iqFileId: iqJob?.id, senderAgentId: $('dtn-sender').value,
-      receiverAgentId: $('dtn-receiver').value, sendUrl: $('dtn-send-url').value.trim(), testType: selectedType, senderMode, receiverMode, pvtConstellation, ...delayRequest, ...(dtnConfig ? {dtnConfig} : {}), ...(hdtnConfig ? {hdtnConfig} : {})});
+      receiverAgentId: $('dtn-receiver').value, sendUrl: (appliedSendUrl || $('dtn-send-url').value).trim(), testType: selectedType, senderMode, receiverMode, pvtConstellation, ...delayRequest, ...(dtnConfig ? {dtnConfig} : {}), ...(hdtnConfig ? {hdtnConfig} : {})});
     log('전송시험 시작 · ' + job.testId);
     renderSummary();
     historyPage = 0; $('dtn-test-filter').value = ''; await refreshHistory();
@@ -1268,11 +1273,15 @@ async function initialize() {
     config = await request('/dtn/config');
     if (config.iqEnabled) await loadIqFiles();
     $('dtn-send-url').value = config.defaultSendUrl || '';
+    appliedSendUrl = config.adapterUrl || config.defaultSendUrl || '';
     initAdapterHealth(config.adapterUrl || config.defaultSendUrl || '', log, (text, className, tone) => {
       adapterStatusText = text;
       adapterOnline = (tone === 'online' || className?.includes('online'));
       updateAdapterStripPill(text, tone, className);
       updateInputSummary();
+      updateControls();
+    }, savedUrl => {
+      appliedSendUrl = savedUrl;
       updateControls();
     });
       $('dtn-transport-mode-state').textContent = senderMode + ' → ' + receiverMode + ' · 전송 요청에 포함';

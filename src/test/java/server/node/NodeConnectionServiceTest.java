@@ -67,25 +67,46 @@ class NodeConnectionServiceTest {
     }
 
     @Test
-    void activeDtnPreventsAddressChange() {
-        when(jobs.findByStateIn(anyList())).thenReturn(List.of(new DtnJob()));
-        assertThrows(
-                IllegalStateException.class, () -> service.save(request("192.168.1.30", 8088)));
-        verifyNoInteractions(client, settings, connection);
-    }
-
-    @Test
-    void saveRequiresReadyAndDoesNotApplyWhenDatabaseFails() {
-        NodeDto.StatusResponse status = ready();
-        status.setState(AgentState.BUSY);
-        when(client.statusAt(any())).thenReturn(status);
+    void activeDtnPreventsAddressChangeWhileWaitingDtnAllowsIt() {
+        when(jobs.findByStateIn(List.of("PREPARING", "WAITING_RECEIVER", "CALCULATING")))
+                .thenReturn(List.of(new DtnJob()));
         assertThrows(
                 IllegalStateException.class, () -> service.save(request("192.168.1.30", 8088)));
         verifyNoInteractions(settings, connection);
-        status.setState(AgentState.READY);
+
+        reset(jobs);
+        when(jobs.findByStateIn(List.of("PREPARING", "WAITING_RECEIVER", "CALCULATING")))
+                .thenReturn(List.of());
+        doAnswer(
+                        call -> {
+                            properties.applyPeerAddress(call.getArgument(0));
+                            return null;
+                        })
+                .when(connection)
+                .applyAddress(any());
+        assertEquals(
+                "http://192.168.1.30:8088",
+                service.save(request("192.168.1.30", 8088)).getBaseUrl());
+    }
+
+    @Test
+    void saveAllowsOfflinePeerAndDoesNotApplyWhenDatabaseFails() {
+        doThrow(new IllegalStateException("상대 노드 연결 실패")).when(connection).poll();
+        doAnswer(
+                        call -> {
+                            properties.applyPeerAddress(call.getArgument(0));
+                            return null;
+                        })
+                .when(connection)
+                .applyAddress(any());
+        assertEquals(
+                "http://192.168.1.30:8088",
+                service.save(request("192.168.1.30", 8088)).getBaseUrl());
+
+        reset(settings, connection);
         when(settings.saveAndFlush(any())).thenThrow(new IllegalStateException("DB unavailable"));
         assertThrows(
-                IllegalStateException.class, () -> service.save(request("192.168.1.30", 8088)));
+                IllegalStateException.class, () -> service.save(request("192.168.1.31", 8088)));
         verifyNoInteractions(connection);
     }
 

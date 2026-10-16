@@ -46,9 +46,14 @@ public final class DtnDestination {
     }
 
     public static boolean usesConfiguredToken(URI destination, String defaultUrl) {
+        if (destination == null || defaultUrl == null || defaultUrl.isBlank()) {
+            return false;
+        }
         try {
-            // 다른 주소로 기존 비밀 토큰을 자동 전달하지 않는다. 정규화된 전송 URL 전체가 일치해야 한다.
-            return destination.equals(resolve(null, defaultUrl));
+            URI configured = resolve(null, defaultUrl);
+            return destination.getScheme().equalsIgnoreCase(configured.getScheme())
+                    && java.util.Objects.equals(destination.getPath(), configured.getPath())
+                    && java.util.Objects.equals(destination.getQuery(), configured.getQuery());
         } catch (IllegalArgumentException error) {
             return false;
         }

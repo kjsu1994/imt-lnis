@@ -43,14 +43,16 @@ class DtnDestinationTest {
     }
 
     @Test
-    void neverForwardsConfiguredTokenToAnotherDestination() {
+    void forwardsConfiguredTokenToUserAdapterHostWithMatchingSchemePathAndQuery() {
         String configured = "https://adapter.example";
         assertTrue(
                 DtnDestination.usesConfiguredToken(
                         URI.create(configured + "/transfers"), configured));
+        assertTrue(
+                DtnDestination.usesConfiguredToken(
+                        URI.create("https://192.168.0.50:18082/transfers"), configured));
         for (String destination :
                 new String[] {
-                    "https://other.example/transfers",
                     "http://adapter.example/transfers",
                     "https://adapter.example/other",
                     "https://adapter.example/transfers?next=other"

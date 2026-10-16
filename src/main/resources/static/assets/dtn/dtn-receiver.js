@@ -80,29 +80,49 @@ const logView=createDtnLog($('dtn-log'));
 const waitingCancellation = initWaitingCancellation({isLocked: () => cancelling, refresh: () => poll(true), log});
 function log(message,level='INFO') { logView.write(message,level); }
 const gnss = initGnssControls({port: 'gnss-port', baud: 'gnss-baud', refresh: 'gnss-refresh', log});
-let peerAddressDirty = false, peerSaving = false;
+let peerAddressDirty = false, peerSaving = false, lastPeerPort = 8090, lastPeerScheme = 'http';
 $('sender-address').oninput = () => {
   peerAddressDirty = true;
-  $('reverse-state').textContent = '주소 변경 · 미확인';
+  $('reverse-state').textContent = '주소 변경 · 적용 필요';
   $('reverse-dot').className = 'connection-dot unknown';
   $('sender-address-feedback').textContent = '';
 };
+function parseSenderAddress(raw) {
+  let value = raw.trim();
+  if (!value) throw new Error('상대 송신 서비스 IP 또는 http(s)://IP:포트 형식으로 입력하세요.');
+  if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(value)) {
+    value = lastPeerScheme + '://' + value;
+  }
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error('http(s)://IPv4:포트 또는 IPv4:포트 형식으로 입력하세요.');
+  }
+  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password
+      || url.search || url.hash || url.pathname !== '/') {
+    throw new Error('http(s)://IPv4:포트 형식으로 입력하세요.');
+  }
+  const scheme = url.protocol.slice(0, -1);
+  const port = Number(url.port || lastPeerPort || (url.protocol === 'https:' ? 443 : 8090));
+  return {ip: url.hostname, port, scheme};
+}
 async function saveSenderAddress(save) {
   if (peerSaving) return;
   peerSaving = true;
   $('sender-address-save').disabled = $('sender-address-test').disabled = true;
   try {
-    const url = new URL($('sender-address').value.trim());
-    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password
-        || url.search || url.hash || url.pathname !== '/') throw new Error('http(s)://IPv4:포트 형식으로 입력하세요.');
+    const parsed = parseSenderAddress($('sender-address').value);
     const result = await requestJson('/node/connection' + (save ? '' : '/test'), {
       method: save ? 'PUT' : 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ip: url.hostname, port: Number(url.port || (url.protocol === 'https:' ? 443 : 80)), scheme: url.protocol.slice(0, -1)})});
+      body: JSON.stringify(parsed)});
     $('sender-address-feedback').textContent = save ? '수신 서버에 저장·적용됨' : result.message;
     log(save ? '상대 송신 서비스 주소 저장·적용' : result.message, !save && !result.connected ? 'WARN' : 'INFO');
     if (save) {
       peerAddressDirty = false;
       $('sender-address').value = result.baseUrl;
+      if (result.port) lastPeerPort = result.port;
+      if (result.scheme) lastPeerScheme = result.scheme;
       reportKey = '';
     }
   } catch (error) {
@@ -1133,16 +1153,19 @@ async function poll(force = false) {
     receivedIds = new Set(nextTests.filter(job => job.dtnReceived).map(job => job.testId));
     tests = nextTests;
     const connection = await get('/node/connection').catch(() => ({}));
+    if (connection.port) lastPeerPort = connection.port;
+    if (connection.scheme) lastPeerScheme = connection.scheme;
     gnss.setPeerTime(connection.peerGnssTimeState);
     updateClockSkewWarning(connection);
     if (!peerAddressDirty) {
-      $('sender-address').value = connection.baseUrl || '';
+      if (connection.baseUrl != null) $('sender-address').value = connection.baseUrl;
       $('reverse-state').textContent = connection.peerOnline == null ? '미확인' : connection.peerOnline ? '연결됨' : '연결 끊김';
       $('reverse-dot').className = 'connection-dot ' + (connection.peerOnline == null ? 'unknown' : connection.peerOnline ? 'online' : 'offline');
     }
-    $('sender-address-save').disabled = peerSaving || !!connection.busy || !connection.editable;
-    $('sender-address-test').disabled = peerSaving || !connection.editable;
-    $('sender-address').disabled = peerSaving || !!connection.busy || !connection.editable;
+    const canEditPeer = connection.editable !== false;
+    $('sender-address-save').disabled = peerSaving || !!connection.busy || !canEditPeer;
+    $('sender-address-test').disabled = peerSaving || !canEditPeer;
+    $('sender-address').disabled = peerSaving || !canEditPeer;
     renderAgents(agents);
     const selected = $('dtn-tests').value;
     $('dtn-tests').replaceChildren(new Option(tests.length ? '시험 선택' : '등록된 시험 없음', ''), ...(tests.length ? tests.map(job =>

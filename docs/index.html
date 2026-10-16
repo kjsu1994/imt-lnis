@@ -112,6 +112,33 @@
     .bit-table th:nth-child(6), .bit-table td:nth-child(6) { text-align: left; font-size: 10.5px; color: #1e3a8a; }
     .ubx-tag { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; background: #e8f0fe; color: #1a73e8; border: 1px solid #c2e7ff; white-space: nowrap; }
     .dash-text { color: #94a3b8; font-family: Consolas, monospace; }
+    .time-guide-box { margin-top: 12px; padding: 12px 14px; border: 1px solid #d2e3fc; border-radius: 8px; background: #f8fbff; }
+    .time-guide-title { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; font-size: 12.5px; font-weight: 700; color: #1a4971; }
+    .time-guide-title span { font-size: 11px; font-weight: 600; color: #1967d2; background: #e8f0fe; border: 1px solid #c2e7ff; padding: 2px 8px; border-radius: 999px; font-family: Consolas, "Malgun Gothic", monospace; }
+    .time-tier-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .time-tier-card { background: white; border: 1px solid #dce5ec; border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; position: relative; }
+    .time-tier-card.active-tier { border: 1.5px solid #245cbb; background: #ffffff; box-shadow: 0 2px 6px #245cbb14; }
+    .time-tier-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+    .time-tier-name { font-size: 12.5px; font-weight: 700; color: #102a43; }
+    .time-tier-loc { font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 4px; background: #edf2f7; color: #334e68; font-family: Consolas, monospace; }
+    .time-tier-card.active-tier .time-tier-loc { background: #e1edff; color: #1967d2; }
+    .time-tier-metaphor { font-size: 12px; font-weight: 700; color: #1967d2; margin-top: 1px; }
+    .time-tier-desc { font-size: 11px; color: #486581; line-height: 1.45; word-break: normal; overflow-wrap: break-word; }
+    .time-tier-cycle { margin-top: auto; padding-top: 5px; border-top: 1px dashed #e2e8f0; font-size: 10.5px; color: #137333; font-weight: 600; }
+    .toi-formula-bar { margin-top: 10px; background: white; border: 1px solid #dce5ec; border-radius: 8px; padding: 9px 12px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+    .toi-formula-bar.plain-bar { background: transparent; border: none; padding: 4px 2px 0; margin-top: 12px; }
+    .toi-formula-eq { font: 700 12px/1.4 Consolas, monospace; color: #0f172a; background: #f1f5f9; padding: 5px 10px; border-radius: 6px; border: 1px solid #cbd5e1; white-space: nowrap; }
+    .toi-formula-parts { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; justify-content: flex-end; }
+    .toi-part-pill { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: #334e68; background: #f8fafc; border: 1px solid #e2e8f0; padding: 3px 8px; border-radius: 6px; }
+    .toi-part-pill code { font-family: Consolas, monospace; font-weight: 700; color: #1967d2; background: #e8f0fe; padding: 1px 5px; border-radius: 4px; }
+    .time-why-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
+    .time-why-card { background: #ffffff; border: 1px dashed #b9d2ee; border-radius: 8px; padding: 8px 11px; display: flex; flex-direction: column; gap: 3px; }
+    .time-why-card strong { font-size: 11.5px; color: #1a4971; display: flex; align-items: center; gap: 5px; }
+    .time-why-card p { font-size: 11px; color: #486581; line-height: 1.45; margin: 0; word-break: normal; overflow-wrap: break-word; }
+    @media (max-width: 860px) {
+      .time-tier-grid, .time-why-grid { grid-template-columns: 1fr; }
+      .toi-formula-parts { justify-content: flex-start; }
+    }
     .deep-dive-card { margin-top: 14px; border: 1px solid #bcd0e6; border-radius: 8px; background: #f4f8fc; padding: 12px 14px; }
     .deep-dive-card h3 { margin: 0 0 6px; font-size: 13px; color: #1a4971; }
     .deep-dive-card p { font-size: 12px; line-height: 1.6; color: #334e68; margin: 4px 0; }
@@ -2104,6 +2131,124 @@ INCONCLUSIVE: 극심한 지연 또는 기하 배치 불량으로 인한 수렴 �
       $('announcement').textContent = content.title + '. ' + content.copy;
     }
 
+    function renderSpGuide() {
+      return `
+        <div class="time-guide-box" aria-label="SP 프레임 동기 부호 이해하기">
+          <div class="time-guide-title">
+            <strong>SP (동기 패턴) 한눈에 이해하기 · NASA LSIS-AFS Vol.A (2.4.1.2 / LSIS-330~340) 공식 규격</strong>
+            <span>68 symbols = 136 ms (500 sps × 2 ms) · 0xCC63F74536F49E04A</span>
+          </div>
+          <div class="time-tier-grid">
+            <div class="time-tier-card active-tier">
+              <div class="time-tier-head">
+                <span class="time-tier-name">① 프레임 경계 검출</span>
+                <span class="time-tier-loc">LSIS-330 · Table 12</span>
+              </div>
+              <div class="time-tier-metaphor">🎯 6,000심볼의 시작점 찾기</div>
+              <div class="time-tier-desc">우주 잡음 속에서 12초(6,000심볼) 프레임이 시작되는 정확한 경계(Frame Boundary)를 찾아내는 68심볼 고정 프리앰블입니다.</div>
+              <div class="time-tier-cycle">비주기 자기상관(Aperiodic Autocorrelation) 최적화 시퀀스</div>
+            </div>
+            <div class="time-tier-card active-tier">
+              <div class="time-tier-head">
+                <span class="time-tier-name">② 무부호화 · 무인터리빙</span>
+                <span class="time-tier-loc">LSIS-340 · LSIS-FID0-470</span>
+              </div>
+              <div class="time-tier-metaphor">⚡ 왜 SP만 그대로 보낼까?</div>
+              <div class="time-tier-desc">뒤섞인(60×98 인터리빙) SB2~SB4를 풀려면 먼저 프레임 첫머리를 알아야 하므로, SP(68)와 SB1(52)은 인터리빙 없이 원형 그대로 맨 앞에 송출합니다.</div>
+              <div class="time-tier-cycle">프레임 진입 후 0.136초(68심볼) 만에 즉시 검출</div>
+            </div>
+            <div class="time-tier-card active-tier">
+              <div class="time-tier-head">
+                <span class="time-tier-name">③ 시각 기준점 & 위상 판별</span>
+                <span class="time-tier-loc">LSIS-160 · LSIS-720</span>
+              </div>
+              <div class="time-tier-metaphor">⏱️ 프레임 송신 시각(TOI)의 기준선</div>
+              <div class="time-tier-desc">SP 첫 번째 심볼의 첫 칩 상승 에지(Leading Edge)가 해당 프레임 <code>TOI</code> 시각의 물리적 기준점이며, 정위상/역위상(<code>180°</code> 반전)도 함께 판별합니다.</div>
+              <div class="time-tier-cycle">6,000심볼 간격 연속 2회 SP 일치 시 프레임 락(Lock) 확정</div>
+            </div>
+          </div>
+          <div class="time-why-grid">
+            <div class="time-why-card">
+              <strong>📐 왜 하필 이 68비트(0xCC63…E04A)인가?</strong>
+              <p>NASA LSIS Table 12(Kocabas &amp; Atalar 논문 기반)에서 채택한 최소 비주기 자기상관 부호입니다. </br>1심볼이라도 어긋나면 상관값이 낮게 억제되고, 68심볼이 정확히 겹칠 때만 날카로운 피크가 발생합니다.</p>
+            </div>
+            <div class="time-why-card">
+              <strong>🔗 확산 부호(Primary/Tertiary)와의 동기화</strong>
+              <p>공식 규격(LSIS-160, Figure 3 &amp; 11)에 따라 SP 첫 심볼은 I채널 Primary Code(2,046칩, 2ms) 및 Q채널 Tertiary Code(1,500심볼, 12초) 시작점과 <code>0.5 ns</code> 이내로 정밀 정렬됩니다.</p>
+            </div>
+            <div class="time-why-card">
+              <strong>🛰️ 수신기(PocketSDR / LNIS) 실제 검출 동작</strong>
+              <p>수신기는 심볼 버퍼에서 <code>6,000심볼(12초)</code> 간격의 두 프레임 시작점이 모두 68비트 SP(또는 역위상 반전 SP)와 일치하는지 대조(<code>sync_frame</code>)하여 프레임 동기를 확정합니다.</p>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderTimeGuide(activeBlock) {
+      const isSb1 = activeBlock === 1;
+      const isSb2 = activeBlock === 2;
+      return `
+        <div class="time-guide-box" aria-label="위성 송신 시간 이해하기">
+          <div class="time-guide-title">
+            <strong>위성 송신 시간 한눈에 이해하기 (Week · ITOW · TOI 계층 구조)</strong>
+            <span>전체 초(TOW) = (ITOW × 1,200초) + (TOI × 12초)</span>
+          </div>
+          <div class="time-tier-grid">
+            <div class="time-tier-card ${isSb2 ? 'active-tier' : ''}">
+              <div class="time-tier-head">
+                <span class="time-tier-name">① Week (주 번호)</span>
+                <span class="time-tier-loc">SB2 · 13 bits</span>
+              </div>
+              <div class="time-tier-metaphor">📅 큰 달력 (몇 번째 주인가?)</div>
+              <div class="time-tier-desc">GNSS 기준 시작일로부터 몇 주가 지났는지 나타내는 가장 큰 시간 단위입니다.</div>
+              <div class="time-tier-cycle">1주일(604,800초)마다 +1 증가</div>
+            </div>
+            <div class="time-tier-card ${isSb2 ? 'active-tier' : ''}">
+              <div class="time-tier-head">
+                <span class="time-tier-name">② ITOW (Interval TOW)</span>
+                <span class="time-tier-loc">SB2 · 9 bits</span>
+              </div>
+              <div class="time-tier-metaphor">🕒 큰 시간대 (몇 번째 20분 구간인가?)</div>
+              <div class="time-tier-desc">그 주(1주일)를 20분(1,200초) 단위로 쪼갠 구간 번호입니다. (<code>TOW / 1200</code>, 0~503)</div>
+              <div class="time-tier-cycle">20분(1,200초)마다 +1 증가</div>
+            </div>
+            <div class="time-tier-card ${isSb1 ? 'active-tier' : ''}">
+              <div class="time-tier-head">
+                <span class="time-tier-name">③ TOI (Time of Interval)</span>
+                <span class="time-tier-loc">SB1 · 프레임 카운터</span>
+              </div>
+              <div class="time-tier-metaphor">⏱️ 프레임 순번 (몇 번째 12초 프레임인가?)</div>
+              <div class="time-tier-desc">현재 20분 구간 안에서 12초 프레임이 바뀔 때마다 <code>0 → 99</code>까지 1씩 올라갑니다.</div>
+              <div class="time-tier-cycle">99가 되면 다음 20분 주기가 시작되며 0으로 돌아감</div>
+            </div>
+          </div>
+          <div class="toi-formula-bar">
+            <div class="toi-formula-eq">TOI 계산식 : (TOW % 1200) / 12</div>
+            <div class="toi-formula-parts">
+              <span class="toi-part-pill"><code>TOW</code> 일요일 0시 0분 기준 현재까지 경과한 전체 시간(초)</span>
+              <span class="toi-part-pill"><code>1200</code> 20분 주기(1,200초)</span>
+              <span class="toi-part-pill"><code>12</code> 1프레임 전송시간(12초)</span>
+            </div>
+          </div>
+          <div class="time-why-grid">
+            <div class="time-why-card">
+              <strong>🎯 왜 이 시각 정보가 꼭 필요한가?</strong>
+              <p>전파 출발 시각을 알아야 <code>(도착시각 − 출발시각) × 빛의 속도</code>로 위성까지 거리를 재고, 그 순간 날아가는 위성의 3차원 위치를 계산합니다.</p>
+            </div>
+            <div class="time-why-card">
+              <strong>🧩 왜 SB1과 SB2로 나누어 담았는가?</strong>
+              <p>20분 내내 안 바뀌는 <code>Week·ITOW</code>는 SB2에 두고, 12초마다 바뀌는 <code>TOI</code>만 초소형 SB1에 실어 전파가 미약할 때도 초침(TOI)만 읽고 시간을 유지합니다.</p>
+            </div>
+            <div class="time-why-card">
+              <strong>🛰️ 위성에서는 값을 어떻게 관리하는가?</strong>
+              <p>위성 원자시계가 1초마다 세는 <code>TOW</code>에서 매 12초마다 몫(<code>TOW/1200</code>)은 SB2 <code>ITOW</code>로, 나머지 순번(<code>%1200/12</code>)은 SB1 <code>TOI</code>로 자동 분배합니다.</p>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
     const subframeSpecs = {
       0: () => ({
         title: 'SP (프레임 동기 부호) · 프레임 시작점 식별 및 나노초 시각 동기',
@@ -2117,7 +2262,8 @@ INCONCLUSIVE: 극심한 지연 또는 기하 배치 불량으로 인한 수렴 �
           ['SP 고정 바이트열 (Hex)', '68 bits (8.5B)', '0xCC 63 F7 45 36 F4 9E 04 A (MSB)', '-', 'NASA 공식 프레임 동기 고정 바이트 패턴 (0xCC63F74536F49E04A0)', '동일 제공 (달-지구 프레임 동기화 기준 패턴)'],
           ['2진 비트열 (상위 32b)', '32 bits', '11001100 01100011 11110111 01000101', '-', '의사난수 동기화 패턴 전반부', '동일 제공 (위상 동기 및 상관 피크 검출)'],
           ['2진 비트열 (하위 36b)', '36 bits', '00110110 11110100 10011110 00000100 1010', '-', '의사난수 동기화 패턴 후반부', '동일 제공 (프레임 경계 확정 및 SB1 진입)']
-        ]
+        ],
+        extraHtml: renderSpGuide()
       }),
       1: () => ({
         title: 'SB1 (서브블록 1) · 프레임 동기 및 시간 간격 식별',
@@ -2131,7 +2277,8 @@ INCONCLUSIVE: 극심한 지연 또는 기하 배치 불량으로 인한 수렴 �
           ['FID (Frame ID)', '4 bits', 'uint4', '-', '0 고정값 (LSIS AFS 정규 프레임 식별자)', '동일 제공 (NASA LSIS 표준 프레임 식별자)'],
           ['TOI (Time of Interval)', '4 bits', 'uint4', 'RAWX / SFRBX', '(TOW % 1200) / 12 (0~99 시간 간격 카운터)', '동일 제공 (달 위성 온보드 시각 카운터)'],
           ['BCH 패리티 (Parity)', '44 bits', 'bitstream', '-', 'BCH(52, 8) 생성 다항식 기반 순환 부호화 패리티', '동일 제공 (순환 부호 오류 정정)']
-        ]
+        ],
+        extraHtml: renderTimeGuide(1)
       }),
       2: () => ({
         title: 'SB2 (서브블록 2) · LNAV 핵심 궤도력 및 위성 시계 보정',
@@ -2155,7 +2302,8 @@ INCONCLUSIVE: 극심한 지연 또는 기하 배치 불량으로 인한 수렴 �
           ['a_f1 (시계 표류율 드리프트)', '16 bits (Bit 268~283)', 'scale 2⁻⁴³ s/s', 'SF1 (Word 9)', '위성 탑재 원자시계 1차 주파수 편이 표류율 (Drift)', '동일 제공 (원자시계 1차 주파수 드리프트)'],
           ['규격 패딩 (Padding)', '892 bits (Bit 284~1175)', '0101… 교대', '-', '미사용 영역 표준 0101 교대 패턴 (22 + 262 + 892 = 1,176 bits)', '동일 제공 (규격 정렬용 패딩)'],
           ['CRC-24 & LDPC SF2', '1,224 bits', '부호화', '-', 'CRC-24 (24 bits) 부가 후 LDPC SF2(부호율 1/2 천공) → 총 2,400 심볼', '동일 제공 (물리 계층 오류 정정 부호)']
-        ]
+        ],
+        extraHtml: renderTimeGuide(2)
       }),
       3: () => ({
         title: 'SB3 (서브블록 3) · LNAV 보충 궤도력 (무손실 궤도 복원용)',
@@ -2281,6 +2429,7 @@ INCONCLUSIVE: 극심한 지연 또는 기하 배치 불량으로 인한 수렴 �
               </tbody>
             </table>
           </div>
+          ${spec.extraHtml || ''}
         `;
       }
     }

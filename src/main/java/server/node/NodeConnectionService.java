@@ -87,22 +87,22 @@ public class NodeConnectionService {
             if (busy()) {
                 throw new IllegalStateException("시험 진행 중에는 상대 노드 주소를 변경할 수 없습니다.");
             }
-            NodeDto.StatusResponse status = client.statusAt(address);
-            if (!status.isOnline() || status.getState() != AgentState.READY) {
-                throw new IllegalStateException("상대 실행기가 READY인 경우에만 저장·적용할 수 있습니다.");
-            }
             NodePeerSetting setting = new NodePeerSetting();
             setting.setId(1);
             setting.setBaseUrl(address.toString());
             settings.saveAndFlush(setting);
             connection.applyAddress(address);
+            try {
+                connection.poll();
+            } catch (RuntimeException ignored) {
+                // 상대 노드가 아직 기동 전이어도 저장한 주소는 유지한다.
+            }
             return configuration();
         }
     }
 
     private boolean busy() {
-        return !jobs.findByStateIn(
-                        List.of("PREPARING", "WAITING_DTN", "WAITING_RECEIVER", "CALCULATING"))
+        return !jobs.findByStateIn(List.of("PREPARING", "WAITING_RECEIVER", "CALCULATING"))
                 .isEmpty();
     }
 
