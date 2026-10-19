@@ -43,8 +43,11 @@ class AfsPvtFrameIntegrationTest {
                 var bits = AfsPvtFrameCodec.encode(p);
                 assertEquals(846, bits.sb3().length);
                 assertEquals(846, bits.sb4().length);
-                for (int i = AfsPvtFrameCodec.SB3_USED; i < 846; i++) {
-                    assertEquals(0, bits.sb3()[i]);
+                for (int i = AfsPvtFrameCodec.SB2_USED; i < 1176; i++) {
+                    assertEquals(i % 2, bits.sb2()[i]);
+                }
+                for (int i = 0; i < 846; i++) {
+                    assertEquals(i % 2, bits.sb3()[i]);
                 }
                 for (int i = AfsPvtFrameCodec.SB4_USED; i < 846; i++) {
                     assertEquals(0, bits.sb4()[i]);
@@ -167,7 +170,7 @@ class AfsPvtFrameIntegrationTest {
         assertThrows(
                 IllegalArgumentException.class,
                 () -> AfsPvtFrameCodec.decode(a.sb2(), a.sb3(), b.sb4()));
-        a.sb3()[845] = 1;
+        a.sb3()[845] ^= 1;
         assertThrows(
                 IllegalArgumentException.class,
                 () -> AfsPvtFrameCodec.decode(a.sb2(), a.sb3(), a.sb4()));

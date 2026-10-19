@@ -12,7 +12,7 @@ import java.util.*;
 public final class AfsPvtFrameCodec {
     public static final String FORMAT = "LNIS-AFS-GNSS-v4";
     public static final int TYPE = 63, VERSION = 2;
-    public static final int SB3_USED = 517, SB4_USED = 506;
+    public static final int SB2_PRIMARY_USED = 284, SB2_USED = 801, SB3_USED = 0, SB4_USED = 506;
     private static final UUID INTERNAL_ID = new UUID(0, 0);
     // LNAV subframe, bit offset (parity stripped), AFS SB2 offset, bit count.
     private static final int[][] FIELDS = {
@@ -141,9 +141,6 @@ public final class AfsPvtFrameCodec {
     public static Blocks encode(Payload p) {
         validate(p);
         byte[] sb2 = new byte[1176];
-        for (int i = 284; i < sb2.length; i++) {
-            sb2[i] = (byte) (i % 2);
-        }
         put(sb2, 0, 13, p.week());
         put(sb2, 13, 9, (int) (p.tow() / 1200));
         if (p.navigation() != null) {
@@ -151,12 +148,24 @@ public final class AfsPvtFrameCodec {
                 put(sb2, f[2], f[3], read(p.navigation()[f[0]], f[1], f[3]));
             }
         }
-        Bits b3 = header(p, 3);
-        b3.write(p.navigation() == null ? 0 : 1, 1);
+        Bits b2 = new Bits(sb2, SB2_PRIMARY_USED);
+        b2.write(TYPE, 6);
+        b2.write(VERSION, 8);
+        b2.write(2, 3);
+        b2.write(p.epoch(), 32);
+        b2.write(p.prn(), 8);
+        b2.write(p.navigation() == null ? 0 : 1, 1);
         for (int i = 0; i < 720; i++) {
             if (!MAPPED[i]) {
-                b3.write(p.navigation() == null ? 0 : read(p.navigation()[i / 240], i % 240, 1), 1);
+                b2.write(p.navigation() == null ? 0 : read(p.navigation()[i / 240], i % 240, 1), 1);
             }
+        }
+        for (int i = SB2_USED; i < sb2.length; i++) {
+            sb2[i] = (byte) (i % 2);
+        }
+        byte[] sb3 = new byte[846];
+        for (int i = 0; i < sb3.length; i++) {
+            sb3[i] = (byte) (i % 2);
         }
         Bits b4 = header(p, 4);
         b4.write(p.measurement(), 8);
@@ -171,21 +180,22 @@ public final class AfsPvtFrameCodec {
         for (int i = 0; i < 10; i++) {
             b4.write(p.ionosphere() == null ? 0 : p.ionosphere()[i], 24);
         }
-        return new Blocks(sb2, b3.data, b4.data);
+        return new Blocks(sb2, sb3, b4.data);
     }
 
     public static Payload decode(byte[] sb2, byte[] sb3, byte[] sb4) {
         checkBits(sb2, 1176);
-        Bits b3 = new Bits(sb3), b4 = new Bits(sb4);
-        int[] h3 = readHeader(b3, 3), h4 = readHeader(b4, 4);
-        if (!Arrays.equals(h3, h4)) {
-            throw invalid("SB3/SB4 식별 불일치");
+        checkBits(sb3, 846);
+        Bits b2 = new Bits(sb2, SB2_PRIMARY_USED), b4 = new Bits(sb4);
+        int[] h2 = readHeader(b2, 2), h4 = readHeader(b4, 4);
+        if (!Arrays.equals(h2, h4)) {
+            throw invalid("SB2/SB4 식별 불일치");
         }
-        boolean hasNav = b3.read(1) != 0;
+        boolean hasNav = b2.read(1) != 0;
         int[][] nav = new int[3][10];
         for (int i = 0; i < 720; i++) {
             if (!MAPPED[i]) {
-                write(nav[i / 240], i % 240, 1, b3.read(1));
+                write(nav[i / 240], i % 240, 1, b2.read(1));
             }
         }
         for (int[] f : FIELDS) {
@@ -204,11 +214,11 @@ public final class AfsPvtFrameCodec {
         }
         Payload p =
                 new Payload(
-                        h3[0],
+                        h2[0],
                         measurement,
                         week,
                         tow,
-                        h3[1],
+                        h2[1],
                         range,
                         doppler,
                         cn0,
@@ -297,9 +307,9 @@ public final class AfsPvtFrameCodec {
     /** v5는 SB4 의사거리 대신 가상 송신 시각을 전달한다. */
     public static Blocks encodeDelay(Payload p, Instant start) {
         Blocks original = encode(p);
+        byte[] sb2 = original.sb2().clone();
+        put(sb2, SB2_PRIMARY_USED + 6, 8, 3);
         byte[] sb3 = original.sb3().clone();
-        put(sb3, 6, 8, 3);
-        for (int i = SB3_USED; i < 846; i++) sb3[i] = (byte) ((i - SB3_USED) % 2);
         Bits b4 = header(p, 4);
         put(b4.data, 6, 8, 3);
         b4.write(p.measurement(), 8);
@@ -322,18 +332,19 @@ public final class AfsPvtFrameCodec {
         b4.write(anchor.femtoseconds(), 50);
         if (b4.offset != 670) throw invalid("지연 SB4 비트 수 오류");
         for (int i = b4.offset; i < 846; i++) b4.data[i] = (byte) ((i - b4.offset) % 2);
-        return new Blocks(original.sb2(), sb3, b4.data);
+        return new Blocks(sb2, sb3, b4.data);
     }
 
     public static DelayPayload decodeDelay(byte[] sb2, byte[] sb3, byte[] sb4, Instant received) {
         checkBits(sb2, 1176);
-        Bits b3 = new Bits(sb3), b4 = new Bits(sb4);
-        int[] h3 = readDelayHeader(b3, 3), h4 = readDelayHeader(b4, 4);
-        if (!Arrays.equals(h3, h4)) throw invalid("지연 SB 식별 불일치");
-        boolean hasNav = b3.read(1) != 0;
+        checkBits(sb3, 846);
+        Bits b2 = new Bits(sb2, SB2_PRIMARY_USED), b4 = new Bits(sb4);
+        int[] h2 = readDelayHeader(b2, 2), h4 = readDelayHeader(b4, 4);
+        if (!Arrays.equals(h2, h4)) throw invalid("지연 SB 식별 불일치");
+        boolean hasNav = b2.read(1) != 0;
         int[][] nav = new int[3][10];
         for (int i = 0; i < 720; i++) {
-            if (!MAPPED[i]) write(nav[i / 240], i % 240, 1, b3.read(1));
+            if (!MAPPED[i]) write(nav[i / 240], i % 240, 1, b2.read(1));
         }
         for (int[] f : FIELDS) write(nav[f[0]], f[1], f[3], read(sb2, f[2], f[3]));
         int measurement = (int) b4.read(8), week = (int) b4.read(16);
@@ -349,18 +360,17 @@ public final class AfsPvtFrameCodec {
         if (anchor.femtoseconds() % 1_000_000 != 0) throw invalid("시험 시작 시각 정밀도 오류");
         Instant start = Instant.ofEpochSecond(anchor.seconds(), anchor.femtoseconds() / 1_000_000);
         if (received.isBefore(start)) throw invalid("음수 지연: PC 시계 동기화를 확인하세요.");
-        boolean empty = h3[1] == 0;
+        boolean empty = h2[1] == 0;
         if (empty ? !transmit.equals(anchor) : transmit.until(start) <= 0) {
             throw invalid("가상 송신 시각 오류");
         }
-        Payload p = new Payload(h3[0], measurement, week, tow, h3[1],
+        Payload p = new Payload(h2[0], measurement, week, tow, h2[1],
                 empty ? 0 : transmit.rangeAt(received), doppler, cn0, status,
                 hasNav ? nav : null, ionPrn, hasIon ? ion : null);
         Blocks expected = encode(p);
-        byte[] canonical3 = expected.sb3().clone();
-        put(canonical3, 6, 8, 3);
-        for (int i = SB3_USED; i < 846; i++) canonical3[i] = (byte) ((i - SB3_USED) % 2);
-        if (!Arrays.equals(sb2, expected.sb2()) || !Arrays.equals(sb3, canonical3)) {
+        byte[] canonical2 = expected.sb2().clone();
+        put(canonical2, SB2_PRIMARY_USED + 6, 8, 3);
+        if (!Arrays.equals(sb2, canonical2) || !Arrays.equals(sb3, expected.sb3())) {
             throw invalid("SB2/SB3 시간 또는 예약 비트 오류");
         }
         for (int i = b4.offset; i < 846; i++) {
@@ -534,8 +544,13 @@ public final class AfsPvtFrameCodec {
         private int offset;
 
         private Bits(byte[] data) {
+            this(data, 0);
             checkBits(data, 846);
+        }
+
+        private Bits(byte[] data, int offset) {
             this.data = data;
+            this.offset = offset;
         }
 
         private void write(long value, int count) {

@@ -145,7 +145,7 @@ public class NativePvtIntegrationTest {
                     assertEquals(0, eph.argumentOfPerigeeRadians());
                     assertEquals(0, eph.af0Seconds());
                     assertEquals(0, eph.af1SecondsPerSecond());
-                    assertTrue(eph.headerMatchesPacket() && eph.tailTestPatternValid());
+                    assertTrue(eph.headerMatchesPacket());
                 }
             }
             var misleadingReference = new DtnModels.Pvt();

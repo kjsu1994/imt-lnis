@@ -75,8 +75,11 @@ public class DelayTransferCodecTest {
         var records = GrawCodec.splitLengthPrefixed(NativePvtIntegrationTest.validSample());
         var payload = AfsPvtFrameCodec.select(records).getFirst();
         var blocks = AfsPvtFrameCodec.encodeDelay(payload, start);
+        assertEquals(801, AfsPvtFrameCodec.SB2_USED);
+        assertEquals(0, AfsPvtFrameCodec.SB3_USED);
         assertEquals(506, AfsPvtFrameCodec.SB4_USED);
-        for (int i = 517; i < 846; i++) assertEquals((i - 517) % 2, blocks.sb3()[i]);
+        for (int i = AfsPvtFrameCodec.SB2_USED; i < 1176; i++) assertEquals(i % 2, blocks.sb2()[i]);
+        for (int i = 0; i < 846; i++) assertEquals(i % 2, blocks.sb3()[i]);
         for (int i = 670; i < 846; i++) assertEquals((i - 670) % 2, blocks.sb4()[i]);
         var restored = AfsPvtFrameCodec.decodeDelay(blocks.sb2(), blocks.sb3(), blocks.sb4(), start);
         assertEquals(payload.range(), restored.observation().range(), 1e-6);

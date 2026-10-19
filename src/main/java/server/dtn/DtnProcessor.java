@@ -81,7 +81,7 @@ public final class DtnProcessor {
             result.setTransfer(transfer);
             return result;
         }
-        progress.accept("AFS 변환", "Epoch별 GPS 관측 → SB2 항법정보 · SB3 보충정보 · SB4 원본 관측값");
+        progress.accept("AFS 변환", "Epoch별 GPS 관측 → SB2 통합 항법·섭동정보 · SB3 0101 패딩 · SB4 원본 관측값");
         AfsPvtTransferCodec.prepare(transfer, records, afs);
         int count = transfer.getSatellites().stream().mapToInt(s -> s.frames().size()).sum();
         progress.accept(
@@ -89,7 +89,7 @@ public final class DtnProcessor {
                 "인코딩 완료 · "
                         + count
                         + " frames · 각 6000 bits/750 bytes"
-                        + " · SB3 517/846 bits · SB4 606/846 bits · 원본 메타데이터 별도 보존");
+                        + " · SB2 801/1176 bits · SB3 0101 패딩 · SB4 506/846 bits · 원본 메타데이터 별도 보존");
         progress.accept("JSON 준비", "AFS v4 · PVT 계산 입력은 프레임, 원본 RAW는 metadata로 보존");
         result.setTransfer(transfer);
         return result;
