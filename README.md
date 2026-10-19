@@ -1,173 +1,322 @@
-# LNIS 송수신 시험
+# LNIS — Lunar Navigation & Delay-Tolerant Networking Integration System
 
-**통신 지연을 GNSS 의사거리에 반영했을 때, PVT 계산기가 공통 지연을 수신기 시계오차(Clock Bias)로 해석하는지 확인하는 시험입니다.**
-DTN/HDTN을 거친 데이터의 수신·복원·일치 여부도 함께 확인합니다.
+![Java](https://img.shields.io/badge/Java-21%20LTS-007396?logo=openjdk&logoColor=white)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.16-6DB33F?logo=springboot&logoColor=white)
+![Native Codec](https://img.shields.io/badge/Native-C%2FC%2B%2B%20(JNA)-00599C?logo=c&logoColor=white)
+![NASA LSIS](https://img.shields.io/badge/Standard-NASA%20LSIS%20Vol.%20A%20v1.0%20%2F%20V5.0-0B3D91?logo=nasa&logoColor=white)
+![PVT Engine](https://img.shields.io/badge/PVT%20Engine-RTKLIB%202.4.3%20SPP-teal)
+![Docker](https://img.shields.io/badge/Deployment-Docker%20Compose-2496ED?logo=docker&logoColor=white)
 
-송신부가 원본 GNSS의 1 Epoch로 Reference PVT를 계산하고, 수신부는 전달받은 정보와 지연시간으로 PVT를 계산해 비교합니다.
-공통 지연은 주로 Clock Bias 증가로 나타나며 위치·속도에는 작은 차이가 생길 수 있습니다.
-실제 미래 위성 운동이나 실제 위치 정확도를 검증하는 시험은 아닙니다.
+**LNIS** is an end-to-end verification and testbed platform designed to evaluate how **Delay/Disruption-Tolerant Networking (DTN / HDTN)** propagation delays affect **GNSS / Lunar Augmented Forward Signal (AFS)** navigation data and **Position, Velocity, and Time (PVT)** solutions.
 
-## 1. 실행과 설정
+Specifically, LNIS verifies two core engineering hypotheses:
+1. **Bit-Exact Frame & Payload Integrity over DTN/HDTN**: Whether raw GNSS observations (`GNSS_RAW`), 6,000-bit NASA LunaNet AFS frames (`AFS_METADATA`), and 90-second RF baseband I/Q sample streams (`IQ_SAMPLE`) are transported, decoded, and reconstructed without corruption across ION-DTN and HDTN bundle pipelines.
+2. **Common Propagation Delay Absorption into Receiver Clock Bias ($dt_r$)**: When a uniform network transmission delay ($\Delta t = R - S$) is injected into satellite pseudoranges ($P'_i = P_i + c\Delta t$), whether the Single Point Positioning (SPP) least-squares solver absorbs the common range offset $c\Delta t$ directly into the **Receiver Clock Bias ($dt_r$)** while preserving the 3D ECEF position $(x, y, z)$.
 
-송신·수신 PC에 각각 **LNIS 서비스 + 외부 DTN/HDTN 어댑터**를 실행합니다. DB와 공유 파일 폴더는 PC별로 관리합니다.
-Java 21 · Spring Boot · H2 · HTML/JavaScript를 사용하며, PVT는 기존 RTKLIB GPS L1 C/A SPP 계산기를 사용합니다.
+> [!NOTE]
+> LNIS is an **engineering verification system for delay-injected pseudorange and frame transport**, not a simulator of future lunar orbital dynamics or absolute geodetic survey accuracy. Both Reference PVT (sender) and Reconstructed PVT (receiver) are computed from raw pseudorange/ephemeris inputs using the embedded RTKLIB SPP engine rather than relying on receiver hardware `UBX-NAV-PVT` outputs.
 
-새 PC에는 build/distributions/lnis-node-linux.zip을 풀고 .env.example을 .env로 복사합니다.
-배포 폴더의 **.env**에서 다음 값을 설정합니다.
+---
 
-| 설정 | 용도 |
-|---|---|
-| LNIS_NODE_ROLE | sender 또는 receiver |
-| LNIS_SERVER_PORT | 현재 서비스 포트 |
-| LNIS_NODE_BASE_URL / LNIS_NODE_PEER_URL | 본인 / 상대 LNIS 주소 |
-| LNIS_NODE_MANAGEMENT_TOKEN | 양쪽 LNIS가 사용하는 동일한 관리 토큰 |
-| dtn_adapter | 연결할 어댑터 주소. 예: http://192.168.1.154:8080 |
-| LNIS_DTN_SEND_TOKEN / LNIS_DTN_RECEIVE_TOKEN | 해당 어댑터와 맞춘 송신 / 수신 토큰 |
-| LNIS_IQ_ENABLED | I/Q 생성 사용 여부 |
+## Table of Contents
 
-~~~sh
-# 소스 루트가 아닌 배포 폴더에서 실행
+1. [Standards, Specifications & Open-Source References](#1-standards-specifications--open-source-references)
+2. [System Architecture & End-to-End Pipeline](#2-system-architecture--end-to-end-pipeline)
+3. [Mathematical Model: Delay Injection & Clock Bias Absorption](#3-mathematical-model-delay-injection--clock-bias-absorption)
+4. [AFS 6,000-Bit Frame Specification (`LNIS-AFS-GNSS-v5`)](#4-afs-6000-bit-frame-specification-lnis-afs-gnss-v5)
+5. [Deployment & Node Configuration](#5-deployment--node-configuration)
+6. [Operational Workflow & Trial Execution](#6-operational-workflow--trial-execution)
+7. [Build, Native Compilation & Verification](#7-build-native-compilation--verification)
+8. [Troubleshooting & Diagnostics](#8-troubleshooting--diagnostics)
+9. [License & Third-Party Notices](#9-license--third-party-notices)
+
+---
+
+## 1. Standards, Specifications & Open-Source References
+
+Every physical-layer frame structure, forward error correction (FEC) code, navigation bit allocation, and positioning algorithm in LNIS is grounded in official aerospace standards and peer-reviewed open-source implementations:
+
+| Subsystem / Domain | Implemented Specification & Mechanism | Authoritative Standard / Open-Source Reference |
+| :--- | :--- | :--- |
+| **AFS Physical Frame & Subframe Architecture** | • 6,000-symbol physical frame (`SP` 68b + `SB1` 52b + `SB2` 2,400b + `SB3` 1,740b + `SB4` 1,740b)<br>• 500 symbols/sec transmission rate (12-second frame period) | • **NASA LunaNet Signal-In-Space (LSIS) Recommended Standard — Volume A: Augmented Forward Signal (AFS), Version 1.0** ([NASA Technical Document, Feb 2025](https://www.nasa.gov/wp-content/uploads/2025/02/lunanet-signal-in-space-recommended-standard-augmented-forward-signal-vol-a.pdf))<br>• **NASA LSIS Baseline V5.0 (Detailed Specification)**, *pp. 34–38 (Section 3.2 Frame Structure, Figure 9, Tables 12–15)* |
+| **Synchronization Pattern (`SP`, 68 bits)** | • Fixed 68-bit hex sequence `0xCC63F74536F49E04A` (MSB-first)<br>• Minimum aperiodic autocorrelation peak sidelobe (PSL = 4) for frame boundary lock and phase ambiguity resolution | • **NASA LSIS Vol. A v1.0 / Baseline V5.0**, *Table 12 (68-bit Synchronization Pattern, p. 35)*<br>• **S. E. Kocabas & A. Atalar (2003)**, *"Binary sequences with low aperiodic autocorrelation for synchronization"*, IEEE Communications Letters, Vol. 7, No. 1, pp. 36–38 |
+| **Subframe 1 (`SB1`, 52 bits)** | • 9-bit data (`FID` 2 bits + `TOI` 7 bits)<br>• Uncoded MSB (`FID[1]`) + $(51, 8)$ Systematic BCH encoding (generator polynomial $107_8$ / `0x47`, LFSR) + bit-by-bit XOR mask | • **NASA LSIS Vol. A v1.0 / Baseline V5.0**, *Section 3.3 (Subframe 1 BCH (51,8) Encoding, pp. 35–36)* |
+| **Subframes 2, 3 & 4 (`SB2`–`SB4`, 5,880 bits)** | • 24-bit `CRC-24Q` (`0x1864CFB`) error detection<br>• Rate $1/2$ 5G NR Quasi-Cyclic LDPC (Base Graph 2, lifting factor $Z=24$ for SB2, $Z=18$ for SB3/SB4) with systematic puncturing ($2Z$) and parity shortening<br>• $98 \times 60$ Block Interleaver ($5,880$ symbols: column-write, row-read) | • **NASA LSIS Vol. A v1.0 / Baseline V5.0**, *Sections 3.4–3.6 (CRC-24Q, LDPC Encoding & $98 \times 60$ Block Interleaver, pp. 36–38)*<br>• **3GPP TS 38.212** *(NR; Multiplexing and channel coding — LDPC Base Graph 2)* |
+| **AFS Baseband Modulation, PRN Codes & RF Tracking** | • Weil-based 10,230-chip PRN sequences (`008_Weil1500hex210prns.txt`)<br>• I/Q baseband signal synthesis (`afs_sim`) and asynchronous FFT/correlator signal acquisition & tracking (`pocket_trk`) | • **LANS-AFS-SIM** ([`osqzss/LANS-AFS-SIM`](https://github.com/osqzss/LANS-AFS-SIM), Copyright © 2025 Takuji Ebinuma)<br>• **PocketSDR-AFS** ([`osqzss/PocketSDR-AFS`](https://github.com/osqzss/PocketSDR-AFS), Copyright © 2021–2025 T. Takasu & T. Ebinuma)<br>• **LDPC-codes** ([`radfordneal/LDPC-codes`](https://github.com/radfordneal/LDPC-codes), Radford M. Neal, commit `74a8e28`) |
+| **GPS L1 C/A Navigation Message (LNAV)** | • 300-bit LNAV Subframes 1–3 (Week, ITOW, SV Clock, Broadcast Ephemeris)<br>• Subframe 4 Page 18 (8-parameter Klobuchar Ionospheric Correction $\alpha_0..\alpha_3, \beta_0..\beta_3$) | • **IS-GPS-200N** *(Navstar GPS Space Segment / Navigation User Segment Interfaces)*, *Section 20.3.3 (Subframes 1–3 Ephemeris & Subframe 4 Page 18 Ionospheric Model)* |
+| **GNSS Receiver Raw Binary Protocol (UBX)** | • `UBX-RXM-RAWX` (Multi-GNSS raw pseudorange, carrier phase, Doppler, $C/N_0$, tracking lock status)<br>• `UBX-RXM-SFRBX` (Raw navigation subframe words) & `UBX-MON-VER` (Hardware/firmware inspection) | • **u-blox ZED-F9T-10B Integration Manual**, Doc. `UBX-20033630`, *Section 3.12.1.2 (Broadcast Navigation Data `UBX-RXM-SFRBX` & Raw Measurements `UBX-RXM-RAWX`)* |
+| **Single Point Positioning (SPP) PVT Solver** | • Iterated Weighted Least Squares (Gauss-Newton) estimation of 4 unknowns $(x, y, z, c \cdot dt_r)$ + 3D velocity $(v_x, v_y, v_z)$ from Doppler<br>• Earth rotation (Sagnac effect), relativistic clock correction, Klobuchar ionospheric delay, and Saastamoinen tropospheric delay | • **RTKLIB 2.4.3** (`src/pntpos.c`, `src/ephemeris.c`, `src/rtkcmn.c`, Copyright © 2007–2020 T. Takasu; integrated via PocketSDR-AFS `sdr_pvt.c`) |
+| **Space Internetworking (DTN / HDTN)** | • Bundle Protocol (BPv6 / BPv7), TCPCL / LTP convergence layers, Custody Transfer / ACS, SDR heap & pipeline buffer control | • **IETF RFC 5050** (BPv6) / **RFC 9171** (BPv7)<br>• **CCSDS 734.2-B-1** *(CCSDS Bundle Protocol Specification)*<br>• **NASA ION-DTN** *(Interplanetary Overlay Network)* & **NASA HDTN** *(High-Rate Delay Tolerant Networking)* |
+
+---
+
+## 2. System Architecture & End-to-End Pipeline
+
+LNIS operates as two independent, symmetric node instances (**Sender Node** and **Receiver Node**), each paired with an external DTN/HDTN adapter daemon.
+
+```mermaid
+flowchart LR
+  subgraph Sender["Sender Node (LNIS + Native Codec)"]
+    A["u-blox ZED-F9T (COM)<br/>or .ubx / .graw Upload"] --> B["Epoch Selection &<br/>Reference PVT (RTKLIB)"]
+    B --> C{"Trial Mode"}
+    C -->|GNSS_RAW| D1["DelayTransferCodec<br/>Virtual Tx Time T*ᵢ"]
+    C -->|AFS_METADATA| D2["AfsPvtFrameCodec<br/>6,000-bit AFS Frame (v5)"]
+    C -->|IQ_SAMPLE| D3["afs_sim<br/>90s Baseband I/Q (.bin)"]
+  end
+
+  subgraph Network["Space Link Emulation (DTN / HDTN)"]
+    D1 & D2 & D3 --> E["Sender Adapter<br/>(ION-DTN / HDTN)"]
+    E ==>|"Bundle Custody &<br/>Propagation Delay (Δt)"| F["Receiver Adapter<br/>(ION-DTN / HDTN)"]
+  end
+
+  subgraph Receiver["Receiver Node (LNIS + Native Codec)"]
+    F --> G{"Payload Decoder"}
+    G -->|GNSS_RAW| H1["Pseudorange Rebuild<br/>P'ᵢ = c(R - T*ᵢ)"]
+    G -->|AFS_METADATA| H2["BCH / LDPC Decode →<br/>P'ᵢ = c(R - T*ᵢ)"]
+    G -->|IQ_SAMPLE| H3["pocket_trk RF Tracking<br/>$IQOBS / $IQAFS"]
+    H1 & H2 & H3 --> I["Reconstructed PVT<br/>(RTKLIB pntpos)"]
+    I --> J["REST Verification vs.<br/>Sender Reference PVT"]
+  end
+```
+
+### Trial Modes Summary
+
+| Trial Type | Payload Transmitted via DTN/HDTN Adapter | Receiver Processing Pipeline |
+| :--- | :--- | :--- |
+| **`GNSS_RAW`** | JSON containing 1 selected epoch of observations where raw pseudoranges $P_i$ are replaced by virtual transmission timestamps $T^*_i$, plus broadcast navigation subframes (`LNIS-DELAY-RAW-v2`). | Reconstructs delayed pseudorange $P'_i = c(R - T^*_i)$ at arrival time $R \rightarrow$ computes PVT $\rightarrow$ compares against Sender Reference. |
+| **`AFS_METADATA`** | Per-satellite **6,000-bit AFS physical frames** (`LNIS-AFS-GNSS-v5`, 750 bytes/SV) containing encoded ephemeris (`SB2`/`SB3`) and virtual transmission timestamps (`SB4`). Original pseudoranges and Reference PVT are **excluded** from the payload. | Demodulates `SP`/`SB1`, decodes $98\times60$ interleaved LDPC blocks (`SB2`–`SB4`), reconstructs $P'_i = c(R - T^*_i)$, computes PVT, and fetches Sender Reference via out-of-band REST for verification. |
+| **`IQ_SAMPLE`** | Metadata manifest (`LNIS-IQ-FILE-v2`: file path, size, SHA-256) referencing a 90-second synthesized RF I/Q binary file generated by `afs_sim`. | Verifies file integrity $\rightarrow$ executes `pocket_trk` baseband correlator tracking $\rightarrow$ extracts `$IQAFS` subframes and `$IQOBS` pseudoranges $\rightarrow$ computes `AFS_IQ_FRAME_PVT-v2`. |
+
+---
+
+## 3. Mathematical Model: Delay Injection & Clock Bias Absorption
+
+### 3.1 Dual Role of Satellite Transmission Time vs. Virtual Delayed Time
+A critical architectural distinction in LNIS is how two different timestamps are used during PVT computation:
+
+1. **Original Satellite Transmission Time ($t_{\text{tx}}$, carried in `SB1`/`SB2`)**:
+   - Represents the true GNSS epoch ($t_0$) when the satellites broadcast the signal.
+   - Used by RTKLIB (`ephemeris.c:satpos()`) to evaluate Keplerian orbital mechanics and determine the exact **3D satellite coordinates $(X_i, Y_i, Z_i)$ and satellite clock bias ($dt^s_i$)** at the moment of signal emission.
+2. **Virtual Delayed Transmission Time ($T^*_i$, carried in `SB4` / `DelayTransferCodec`)**:
+   - Synthesized at the moment the DTN trial starts ($S$) by subtracting each satellite's original travel time ($P_i / c$) from $S$:
+     $$T^*_i = S - \frac{P_i}{c}$$
+   - When the bundle arrives at the Receiver Node at timestamp $R$ (after experiencing network delay $\Delta t = R - S$), the receiver computes the **delay-injected pseudorange ($P'_i$)**:
+     $$P'_i = c \cdot (R - T^*_i) = c \cdot \left(R - S + \frac{P_i}{c}\right) = P_i + c\Delta t$$
+
+### 3.2 4-Unknown Simultaneous Equations & Clock Bias Absorption
+In RTKLIB's Single Point Positioning solver (`pntpos.c:estpos()`), the pseudorange observation equation for satellite $i$ ($i = 1, \dots, N$, where $N \ge 4$) is linearized around the receiver's state vector $\mathbf{x} = [x, y, z, c \cdot dt_r]^T$:
+
+$$P'_i = \underbrace{\sqrt{(X_i - x)^2 + (Y_i - y)^2 + (Z_i - z)^2}}_{\text{Geometric Range } \rho_i(x,y,z)} + c \cdot dt_{r,\text{rx}} - c \cdot dt^s_i + I_i + T_i + \varepsilon_i$$
+
+Substituting $P'_i = P_i + c\Delta t$ into the system of $N$ equations:
+
+$$P_i + c\Delta t = \rho_i(x, y, z) + c \cdot (dt_{r,\text{ref}} + \Delta t) - c \cdot dt^s_i + I_i + T_i + \varepsilon_i$$
+
+Because $c\Delta t$ is **identical across all satellites** in the epoch, the partial derivatives with respect to receiver coordinates $(\frac{\partial \rho_i}{\partial x}, \frac{\partial \rho_i}{\partial y}, \frac{\partial \rho_i}{\partial z})$ remain invariant, whereas the partial derivative with respect to the receiver clock bias term $c \cdot dt_r$ is **1** for every satellite. Consequently:
+- **3D ECEF Position $(x, y, z)$**: Converges to the original terrestrial coordinates (up to minor Sagnac/iteration coupling if epoch time is shifted).
+- **Receiver Clock Bias ($dt_{r,\text{rx}}$)**: Absorbs the entire network propagation delay $\Delta t$:
+  $$dt_{r,\text{rx}} \approx dt_{r,\text{ref}} + \Delta t$$
+- **Time Residual Verification Metric**:
+  $$\text{Time Residual} = (dt_{r,\text{rx}} - dt_{r,\text{ref}}) - \Delta t$$
+
+```text
+t₀ : Original GNSS Observation Epoch (Week / TOW)
+S  : Trial Start Timestamp (Sender)
+R  : Bundle Payload Arrival Timestamp (Receiver)
+Δt : End-to-End Propagation Delay = R − S
+c  : Speed of Light = 299,792,458 m/s
+
+[Sender]   Virtual Tx Time       : T*ᵢ = S − (Pᵢ / c)
+[Receiver] Delayed Pseudorange   : P′ᵢ = c × (R − T*ᵢ) = Pᵢ + c·Δt
+           Effective GNSS Epoch  : t₀ + Δt
+[Verify]   Clock Bias Residual   : (Receiver Clock Bias − Reference Clock Bias) − Δt
+```
+
+> [!IMPORTANT]
+> Delay measurement $\Delta t = R - S$ includes sender preparation, adapter queuing, and DTN/HDTN link transit after pressing **Start Trial**, but excludes pre-trial idle time after GNSS capture and post-reception PVT computation time.
+
+---
+
+## 4. AFS 6,000-Bit Frame Specification (`LNIS-AFS-GNSS-v5`)
+
+In `AFS_METADATA` mode, LNIS encodes one **6,000-bit (750-byte) physical frame per observed GPS L1 C/A satellite** following **NASA LSIS Volume A v1.0 / Baseline V5.0 (pp. 34–38)** for the physical layer and FEC pipeline, while utilizing `SB3` and `SB4` as LNIS testbed extensions to carry supplementary LNAV words and delay-test observation parameters.
+
+### 4.1 Physical Layer & FEC Pipeline
+
+```text
+[Uninterleaved Header: 120 bits]
+  ├── SP  (Synchronization Pattern) : 68 bits  (Fixed Hex: 0xCC63F74536F49E04A)
+  └── SB1 (Frame ID & Time of Interval) : 52 bits  (1b FID[1] + 51b BCH(51,8) of FID[0]||TOI[6:0])
+
+[98 × 60 Block Interleaved Payload: 5,880 bits]
+  ├── SB2 (Clock & Primary Ephemeris)   : 1,176 data bits + 24b CRC-24Q = 1,200b ──(5G NR LDPC BG2, Z=24)──► 2,400 symbols
+  ├── SB3 (LNIS Supplementary LNAV)     :   846 data bits + 24b CRC-24Q =   870b ──(5G NR LDPC BG2, Z=18)──► 1,740 symbols
+  └── SB4 (LNIS Delayed Obs & Iono)     :   846 data bits + 24b CRC-24Q =   870b ──(5G NR LDPC BG2, Z=18)──► 1,740 symbols
+                                                                                                    Total = 5,880 symbols
+  └──► Written into 98 columns × 60 rows matrix (column-wise write, row-wise read)
+
+[Final Transmitted Physical Frame: 6,000 bits = 750 Bytes (12 seconds @ 500 sps)]
+  [ SP (68b) ][ SB1 (52b) ][ Interleaved SB2 · SB3 · SB4 (5,880b) ]
+```
+
+| Subframe | Pre-FEC Data Bits | CRC-24Q | Post-LDPC & Puncturing | Standard / Role |
+| :--- | :---: | :---: | :---: | :--- |
+| **`SP`** | 68 bits | — | **68 symbols** | NASA LSIS Table 12 fixed synchronization sequence (`0xCC63F74536F49E04A`) |
+| **`SB1`** | 9 bits (`FID` 2b + `TOI` 7b) | — | **52 symbols** | NASA LSIS Section 3.3 frame identifier & 12-second Time of Interval |
+| **`SB2`** | 1,176 bits | 24 bits | **2,400 symbols** | NASA LSIS Section 3.4 primary clock & Keplerian ephemeris (`afs_sim.c:eph2sbf`) |
+| **`SB3`** | 846 bits | 24 bits | **1,740 symbols** | **LNIS Extension**: Supplementary GPS LNAV Subframe 1–3 parameters |
+| **`SB4`** | 846 bits | 24 bits | **1,740 symbols** | **LNIS Extension**: Virtual Tx Time ($T^*_i$), Doppler, $C/N_0$, Klobuchar Iono & Trial Start ($S$) |
+| **Total** | **2,945 bits** | **72 bits** | **6,000 symbols (750 B)** | Complete 12-second NASA LSIS AFS Frame |
+
+### 4.2 Bit-Level Allocation of LNIS Extensions (`SB3` & `SB4`)
+
+Both `SB3` and `SB4` contain an 846-bit pre-CRC data payload (`AfsPvtPayload.java`). Unused trailing bits are padded with alternating `010101...` sequences.
+
+| Block | Total Data Bits | Bit-Field Breakdown (MSB to LSB) |
+| :--- | :---: | :--- |
+| **Common Header** | **57 bits** | `type` (6b, fixed `63`) + `version` (8b, `5` for delay trials / `2` for I/Q) + `block` (3b, `3`=SB3 / `4`=SB4) + `epochIndex` (32b) + `prn` (8b) |
+| **`SB3` Payload** | **846 bits** | • **Common Header** (57b)<br>• `hasNavigation` flag (1b)<br>• **Supplementary GPS LNAV fields** (459b: Week, IODE, IODC, SV Health/Accuracy, TGD, $\Delta n$, $M_0$/$e$/$\sqrt{A}$ LSB remainders, inclination rate $i_{dot}$, $\Omega_{dot}$, CRS, CRC, CUS, CUC, CIS, CIC)<br>• Alternating `0101...` padding (329b) |
+| **`SB4` Payload (v5)** | **846 bits** | • **Common Header** (57b)<br>• `observationOrder` (8b) + `week` (16b) + `towSeconds` (64b IEEE-754 double)<br>• **Virtual Transmission Time $T^*_i$** (114b: 64-bit signed Unix seconds + 50-bit unsigned femtoseconds)<br>• `dopplerHz` (32b float) + `cn0DbHz` (8b) + `trackingStatus` (8b)<br>• `hasIonosphere` flag (1b) + `ionosphereSourcePrn` (8b) + **Klobuchar Ionospheric Page** (240b: 8 words $\times$ 30 bits from LNAV SF4 Page 18)<br>• **Trial Start Timestamp $S$** (114b: 64-bit Unix seconds + 50-bit femtoseconds)<br>• Alternating `0101...` padding (176b) |
+
+> [!TIP]
+> **Why 114-bit Femtosecond Timestamps?**
+> Light travels approximately $0.3\text{ m}$ per nanosecond. Standard millisecond or microsecond timestamps introduce quantization noise into $P'_i = c(R - T^*_i)$. Representing $T^*_i$ and $S$ with **64-bit Unix seconds + 50-bit femtoseconds ($10^{-15}\text{ s}$)** eliminates floating-point and timestamp serialization rounding across Java, H2 (`TIMESTAMP(9)`), and AFS bitstreams.
+
+---
+
+## 5. Deployment & Node Configuration
+
+LNIS is deployed as two standalone nodes (**Sender PC** and **Receiver PC**). Each PC runs its own **LNIS Server container** (`lnis-node`) and communicates with an external **DTN / HDTN Adapter**. Databases (`H2`) and exchange directories are isolated per node.
+
+### 5.1 Environment Configuration (`.env`)
+
+Unpack `build/distributions/lnis-node-linux.zip` on each target machine, copy `.env.example` to `.env`, and configure the following variables (see [deployment/node/README.md](deployment/node/README.md)):
+
+| Environment Variable | Description | Example |
+| :--- | :--- | :--- |
+| `LNIS_NODE_ROLE` | Operational role of the current node (`sender` or `receiver`) | `sender` |
+| `LNIS_SERVER_PORT` | HTTP/WebSocket listening port for the LNIS web UI and REST APIs | `8088` |
+| `LNIS_NODE_BASE_URL` | Self-reachable base URL of this LNIS instance | `http://192.168.1.101:8088` |
+| `LNIS_NODE_PEER_URL` | Base URL of the counterpart LNIS node (used for clock sync & Reference PVT verification) | `http://192.168.1.102:8089` |
+| `LNIS_NODE_MANAGEMENT_TOKEN` | Shared secret token for inter-node management REST calls (must match on both nodes) | `lnis-mgmt-secret-token` |
+| `dtn_adapter` | Default endpoint URL of the external DTN/HDTN sender adapter | `http://192.168.1.154:8080` |
+| `LNIS_DTN_SEND_TOKEN` | Bearer token sent by LNIS to the external sender adapter | `adapter-send-token` |
+| `LNIS_DTN_RECEIVE_TOKEN` | Bearer token required by `/lnis/api/v1/dtn/receive` from the receiver adapter | `adapter-recv-token` |
+| `LNIS_IQ_ENABLED` | Enables 90-second RF I/Q file synthesis and tracking (`true` / `false`) | `true` |
+
+### 5.2 Starting the Containers
+
+```bash
+# Run inside the unpacked deployment directory (not the source repository root)
 docker compose up -d --build
 docker compose ps
-~~~
+```
 
-Windows COM을 사용할 때는 배포 폴더의 **START.cmd 또는 start.ps1**로 시작합니다. Docker 기동만으로 Windows COM 중계가 시작되지는 않습니다.
-중계 포트는 .env의 LNIS_SERIAL_BRIDGE_PORT, 실제 COM 번호는 화면의 **포트 조회**에서 설정합니다.
+- **Web UI Entrypoint**: `http://<NODE_IP>:<LNIS_SERVER_PORT>/` (automatically routes to `/dtn-sender` or `/dtn-receiver` based on `LNIS_NODE_ROLE`)
+- **Interactive System Architecture & Frame Guide**: `http://<NODE_IP>:<LNIS_SERVER_PORT>/dtn-intro`
+- **Hardware GNSS Serial Mapping**:
+  - **Windows Host + WSL2 Docker**: Launch using `START.cmd` or `start.ps1` to start the Windows COM Serial Bridge alongside Docker (see [WINDOWS-SERIAL-BRIDGE.md](deployment/node/WINDOWS-SERIAL-BRIDGE.md)).
+  - **Native Linux Host**: Configure `LNIS_SERIAL_DEVICE=/dev/serial/by-id/...` in `.env` (see [WSL2-GNSS.md](deployment/node/WSL2-GNSS.md)).
 
-- 기본 접속: http://PC주소:포트/ → 설정된 역할의 시험 화면
-- 설명 구성도: /dtn-intro
-- 상세 절차: [노드 배포](deployment/node/README.md) · [Windows COM](deployment/node/WINDOWS-SERIAL-BRIDGE.md) · [WSL2 USB](deployment/node/WSL2-GNSS.md)
+---
 
-기존 **.env, DB, exchange**는 재배포 시 유지합니다.
+## 6. Operational Workflow & Trial Execution
 
-## 2. 시험 순서
+1. **Adapter & Route Configuration**:
+   - Open the Settings Drawer (`⚙️`), verify the counterpart LNIS peer address, adapter URL, trial payload type (`GNSS RAW`, `AFS Frame`, or `I/Q Sample`), and routing engine (`DTN → HDTN`, `DTN → DTN`, `HDTN → DTN`, or `HDTN → HDTN`).
+   - Engine parameters (e.g., ION SDR Heap Size, HDTN Pipeline Bundle Capacity, Custody/Deletion Policy) are persisted in browser storage and transmitted in the adapter request header/body.
+2. **GNSS Data Ingestion**:
+   - **Live Capture**: Connect a u-blox ZED-F9T receiver via COM port (`38400` baud default) and click **1-Epoch Capture** (up to 120s timeout to collect `RXM-RAWX` + `RXM-SFRBX` subframes).
+   - **File Upload**: Upload a `.ubx` file (up to 64 MiB / 1,000 epochs) or `.graw` file (up to 1 MiB) and select the target observation epoch.
+   - Inspect the computed **Reference PVT** (ECEF position, velocity, receiver clock bias, and per-satellite LNAV SF1–3 readiness).
+3. **Node Clock Calibration (`Time Sync → Apply`)**:
+   - Before starting delay trials, click **Time Sync → Apply** on **both** Sender and Receiver UIs while no trial is active.
+   - This calibrates the internal trial clock offset against GNSS/peer time without altering the host OS clock, preventing negative or skewed $\Delta t$ measurements.
+4. **Trial Execution (`Start Trial`)**:
+   - Each click registers a unique `testId` and dispatches the bundle to the external adapter.
+   - Once the adapter accepts the dispatch, subsequent trials can be queued immediately without waiting for prior bundles to arrive.
+5. **Reception & Verification**:
+   - Upon bundle arrival at `/lnis/api/v1/dtn/receive`, the Receiver Node decodes the payload, reconstructs $P'_i$, runs RTKLIB SPP, and queries the Sender Node for the original Reference PVT.
+   - Inspect **Payload Integrity (`PASS`/`FAIL`)**, **PVT Status (`MEASURED`/`PARTIAL`/`INCONCLUSIVE`)**, **3D Position/Velocity Deltas**, and **Clock Bias Residual**.
 
-1. **설정:** 상대 LNIS·어댑터 주소, 시험 유형, DTN/HDTN 경로를 확인합니다. HDTN 설정은 어댑터에 전달할 요청값이며 실제 적용은 어댑터가 담당합니다.
-2. **입력:** GNSS를 연결해 **1 Epoch 수집**하거나 .ubx / .graw 파일을 적용합니다. 관측 시점을 선택하고 원본 PVT를 확인합니다.
-3. **시각 보정:** 진행 중인 시험을 종료한 뒤 **양쪽 화면에서 각각 ‘시간 맞추기 → 적용’**을 실행합니다. 한쪽에만 GNSS가 있다면 그쪽부터 적용합니다.
-4. **전송시험 시작:** 클릭마다 새 testId로 시험을 등록합니다. 어댑터 요청이 끝나면 이전 시험의 최종 수신을 기다리지 않고 다음 시험을 보낼 수 있습니다.
-5. **수신 결과:** 데이터 일치 여부와 위치·속도·Clock Bias 차이, 상세 로그를 확인합니다.
+---
 
-**시간 맞추기는 누른 서비스의 시험 시각만 보정합니다.** OS·로그·어댑터 시계는 바뀌지 않으며 재기동하면 보정이 초기화됩니다.
-양쪽 시각이 다르면 음수 지연이나 잘못된 지연이 나올 수 있습니다. 표시 자릿수는 동기화 정확도를 의미하지 않습니다.
+## 7. Build, Native Compilation & Verification
 
-COM 수집은 최대 120초입니다. 시간 초과 시 남은 관측값을 사용할지 선택할 수 있지만, PVT 계산은 보장되지 않습니다.
-유센터에서 같은 COM을 쓰려면 먼저 LNIS에서 **연결 해제**해야 합니다.
-UBX는 최대 64 MiB·1000 Epoch, 변환된 GRAW는 최대 1 MiB를 지원합니다.
+LNIS uses a reproducible, containerized multi-stage build (`native/Dockerfile`) to compile its C/C++ native libraries (`libLnisAfsCodec.so` for Linux x86-64, `LnisAfsCodec.dll` for Windows x86-64, and `afs_sim` / `pocket_trk` executables) from unmodified upstream vendor snapshots (`native/vendor/`) and auditable patch sets (`native/patches/`).
 
-수신은 등록된 testId와 인증·무결성을 확인하며, 외부 데이터 도착 대기에는 10분 제한이 없습니다.
-종료하려면 시험별 **대기 종료 / 계산 중지**, 또는 **대기 전체 종료**를 사용합니다.
-이미 어댑터로 보낸 번들을 회수하는 기능은 아닙니다. 종료 후 도착한 데이터는 원문만 보관합니다.
+### 7.1 Gradle Build Tasks
 
-## 3. 전송 방식과 PVT 비교
-
-| 유형 | 어댑터로 전달하는 데이터 | 수신측 처리 |
-|---|---|---|
-| GNSS RAW | 선택한 1 Epoch의 의사거리를 가상 송신 시각으로 바꾼 JSON | 의사거리 재계산 → PVT → 원본 비교 |
-| AFS Frame | 위성별 6,000비트 프레임 목록과 시험·엔진 정보 | 프레임 복원 → 의사거리 재계산 → PVT → 원본 비교 |
-| I/Q Sample | BIN 파일 경로·크기·해시 및 생성·기준 정보 | 파일 확인 → 신호 추적·프레임 복호 → PVT 비교 |
-
-RAW·AFS의 원본 GNSS와 Reference는 수신 PVT 계산 **후** LNIS 간 REST로 별도 조회합니다.
-Reference는 장비의 NAV-PVT가 아니라 송신 원본 관측값으로 계산한 PVT이며, 수신 계산을 대신하지 않습니다.
-I/Q는 별도 신호 추적 시험으로, 파일 전달 지연을 의사거리에 추가하지 않습니다.
-
-~~~text
-t₀: 원본 GNSS 관측 시각    S: 시험 시작 시각    R: 수신 본문 완료 시각
-Δt = R − S                c = 299,792,458 m/s
-
-송신: 가상 송신 시각 T*ᵢ = S − Pᵢ/c
-수신: 의사거리 P′ᵢ = c × (R − T*ᵢ) = Pᵢ + cΔt
-      GNSS 계산 시각 = t₀ + Δt
-비교: 시간 잔차 = (수신 Clock Bias − Reference Clock Bias) − Δt
-~~~
-
-수집 후 시작 전 대기는 제외하고, 시작 이후 준비·어댑터·전송 대기는 포함합니다. 수신 후 계산 대기는 제외합니다.
-RAW·AFS의 Doppler·C/N₀·궤도정보는 송신 값을 유지합니다. Doppler가 같아도 계산 위치·위성 방향 등에 따라 속도에 작은 차이가 생길 수 있습니다.
-
-- **데이터 일치:** 의도한 변환·제외를 고려해 전송 대상 데이터를 대조한 결과입니다. PVT 성공 여부와 별개입니다.
-- **PVT 결과:** MEASURED 측정 완료 / PARTIAL 부분 비교 / INCONCLUSIVE 비교 불가. 합격 허용오차는 적용하지 않습니다.
-- **수신기 정보(송신):** 파일 정보 옆에서 모델·펌웨어·프로토콜·지원 위성군·Epoch 수·관측 구간을 확인합니다. MON-VER 정보는 새 UBX 적용 시 보관하며 과거 입력의 미기록 값은 추정하지 않습니다.
-- **관측표:** 기본은 전체 항법정보입니다. 위성 버튼으로 필터하고 작은 **전체 보기** 버튼으로 해제합니다. GPS G04는 PRN 4를 뜻합니다. 관측 수·GPS L1 입력 대상·SF1~3 확인·계산기 실제 사용 수는 서로 구분합니다.
-- **계산 상태:** 누르면 부족한 입력이나 실제 실패 이유를 확인합니다. SF1~3 존재만으로 궤도 유효성·계산 성공을 보장하지 않습니다.
-- **의사거리 두 열:** 별도 조회한 원본과 수신 재계산값을 비교합니다. 재계산값·보정 송신 시각은 빨간색이며 미전송·미확인 값은 ‘—’입니다.
-
-## 4. AFS 프레임 구조
-
-AFS 지연 시험은 **schemaVersion=5, LNIS-AFS-GNSS-v5**입니다.
-GPS L1 관측 위성마다 프레임을 만들며, 원본 의사거리·metadata·Reference를 프레임 전송 JSON에 넣지 않습니다.
-
-~~~text
-송신 GNSS → SB2 항법 + SB3 보충 항법 + SB4 가상 송신 시각·관측값
-          → DTN/HDTN → 수신 프레임 복원 → P′ 계산 → PVT
-송신 원본·Reference ───── 별도 LNIS REST 조회 ─────→ 비교
-~~~
-
-| 구간 | 부호화 전 데이터 | 물리 프레임 크기 | 역할 |
-|---|---|---:|---|
-| 동기 | 고정 패턴 | 68 bits | 프레임 동기 |
-| SB1 | FID·TOI → BCH | 52 bits | 기존 프레임 식별·시각 |
-| SB2 | 1,176 + CRC 24 → LDPC·천공 | 2,400 bits | 기존 항법정보 |
-| SB3 | 846 + CRC 24 → LDPC·천공 | 1,740 bits | LNIS 보충 항법정보 |
-| SB4 | 846 + CRC 24 → LDPC·천공 | 1,740 bits | LNIS 관측·시험 시각 |
-| **합계** | | **6,000 bits = 750 bytes** | |
-
-~~~text
-SB2 2400 + SB3 1740 + SB4 1740 → 5880비트 인터리빙(98×60)
-
-최종 프레임: [동기 68][SB1 BCH 52][인터리빙된 SB2·SB3·SB4 5880]
-~~~
-
-SB2·SB3·SB4는 최종 비트열에 단순히 연속 배치되지 않습니다.
-물리 크기·오류 정정·인터리빙은 기존 SIM/PocketSDR를 사용합니다.
-SB3·SB4 내용은 **LNIS 시험용 확장**이며 공식 메시지 할당을 의미하지 않습니다.
-물리 구조 근거: [NASA LSIS AFS Volume A v1.0](https://www.nasa.gov/wp-content/uploads/2025/02/lunanet-signal-in-space-recommended-standard-augmented-forward-signal-vol-a.pdf).
-
-| LNIS 확장 | 846비트 데이터 영역 구성 |
-|---|---|
-| 공통 헤더 | type 6 + version 8 + block 3 + epochIndex 32 + PRN 8 = 57 bits |
-| SB3 | 헤더 57 + 항법 존재 1 + 보충 LNAV 459 + 미사용 329 |
-| SB4 | 헤더 57 + 관측 순서 8 + week 16 + TOW 64 + 가상 송신 시각 114 + Doppler 32 + C/N₀ 8 + 추적 상태 8 + 전리층 존재 1 + 항법 PRN 8 + 전리층 페이지 240 + 시험 시작 시각 114 + 미사용 176 |
-
-시각 114비트는 Unix 정수 초 64 + 초 미만 femtosecond 50입니다. 표현 정밀도이며 시계 정확도가 아닙니다.
-미사용 영역은 010101…로 채웁니다. GPS 항법 SF1~5와 AFS SB1~4는 서로 다른 구분입니다.
-
-I/Q는 같은 물리 부호화기를 쓰되 기존 version=2 관측 형식과 원본 의사거리를 유지합니다(SB4 사용 506비트).
-I/Q 형식은 LNIS-IQ-FILE-v2, 계산 방식은 AFS_IQ_FRAME_PVT-v2입니다.
-
-## 5. 문제 확인과 로그
-
-| 증상 | 먼저 확인할 사항 |
-|---|---|
-| 음수 지연 / PVT 비교 불가 | 양쪽 시험 시각 보정, 실제 PVT 실패 메시지, 유효 관측·항법정보 |
-| 원본 비교 대기 / 조회 실패 | 상대 LNIS 주소·관리 토큰·송신 시험 기록 |
-| 401 / 403 | 해당 API의 어댑터 토큰 또는 LNIS 관리 토큰 |
-| 연결 실패 / 수신 대기 | 어댑터 주소·포트, 양쪽 서비스, 라우터 로그·번들 TTL |
-| COM 연결 실패 | 유센터 등 다른 프로그램의 포트 점유, COM 번호·속도, 중계 실행 여부 |
-
-~~~sh
-# 각 배포 폴더에서 최근 100줄부터 확인
-docker compose logs --tail 100 -f node
-~~~
-
-시험 상세 로그와 실제 송수신 JSON은 INFO, 정상 조회·폴링과 추가 HTTP 정보는 DEBUG입니다. WARN/ERROR는 유지합니다.
-로그는 한국 시간이며, testId·requestId로 요청을 추적합니다. IN/OUT, URL·매핑·상대 IP·포트도 기록합니다.
-추가 진단은 .env의 LNIS_HTTP_LOG_LEVEL=DEBUG를 적용한 뒤 재기동하고, 완료 후 INFO로 복원합니다.
-기본 Compose의 Docker 로그는 **100m × 3개**로 순환하며, DB 보관 정책과는 별개입니다.
-
-## 6. 개발·유지보수
-
-~~~powershell
+```powershell
+# 1. Compile Linux .so, I/Q binaries, and Windows .dll inside isolated Docker toolchain
 .\gradlew.bat nativeBuild
+
+# 2. Run Java unit/integration tests, ArchUnit checks, and browser JS smoke tests
 .\gradlew.bat check bootJar -PnativeCandidate=build/native-pvt
+
+# 3. Package standalone Linux deployment archive (build/distributions/lnis-node-linux.zip)
 .\gradlew.bat linuxNodeDistZip
-~~~
 
-- 실행 파일: build/libs/lnis.jar / 배포 묶음: build/distributions/lnis-node-linux.zip
-- 설정: src/main/resources/application.yml / PC별 설정: 배포 폴더 .env
-- 백엔드: server/gnss 입력, server/afs 프레임, server/pvt 계산, server/iq I/Q, server/dtn 시험, server/node 노드
-- 화면: src/main/resources/static/assets/dtn / 설명 구성도: src/main/resources/static/dtn-intro.html
-- 안내 페이지 동기화: gradlew.bat syncIntroDocs → docs/index.html
-- 기존 운영 배포: scripts/deploy-nodes.ps1 — 설정·DB 유지, 진행 중 작업 확인, 재기동·상태 확인
-- 네이티브 원본·수정 정책과 상세 빌드: [native/README.md](native/README.md)
+# 4. Synchronize static documentation page (src/main/resources/static/dtn-intro.html -> docs/index.html)
+.\gradlew.bat syncIntroDocs
+```
 
-일반 빌드는 운영 서비스를 재기동하지 않습니다. 합성·개발용 REST 시험 통과와 실제 GNSS·DTN/HDTN 장비 검증은 구분합니다.
+### 7.2 Repository Structure
+
+```text
+LnisServer/
+├── src/main/java/server/
+│   ├── afs/          # NASA LSIS AFS 6,000-bit frame codecs (AfsPvtFrameCodec, AfsPvtPayload, NativeAfsCodec)
+│   ├── dtn/          # DTN/HDTN trial state machine, DelayTransferCodec, REST controllers & peer sync
+│   ├── gnss/         # UBX-RXM-RAWX / SFRBX parser, GRAW codec, serial capture & u-blox framing
+│   ├── iq/           # 90-second RF baseband I/Q generator (afs_sim) & tracker (pocket_trk) orchestration
+│   ├── pvt/          # JNA bridge to RTKLIB SPP solver (NativePvtCodec)
+│   └── node/         # Inter-node connection health, GNSS clock offset & management security
+├── src/main/resources/static/
+│   ├── dtn-sender.html    # Sender Node operational dashboard
+│   ├── dtn-receiver.html  # Receiver Node operational dashboard
+│   ├── dtn-intro.html     # Interactive NASA LSIS AFS & DTN technical specification guide
+│   └── assets/dtn/        # ES module frontend logic & stylesheets
+├── native/
+│   ├── vendor/       # Upstream sources: LANS-AFS-SIM, PocketSDR-AFS (with RTKLIB), LDPC-codes
+│   ├── patches/      # Auditable patches (01-korean-comments through 06-file-replay)
+│   ├── lnis_afs.c    # JNA ABI wrapper for AFS BCH/LDPC/Interleaver encoding & decoding
+│   ├── lnis_pvt.c    # JNA ABI wrapper for RTKLIB pntpos() & decode_frame()
+│   └── README.md     # Native provenance, SHA-256 verification & patch documentation
+└── deployment/node/  # Docker Compose templates, .env.example & Windows Serial Bridge scripts
+```
+
+---
+
+## 8. Troubleshooting & Diagnostics
+
+| Symptom / Error | Primary Root Cause & Resolution |
+| :--- | :--- |
+| **Negative Delay ($\Delta t < 0$) or Large Time Residual** | Clock skew between Sender and Receiver hosts. Terminate active trials and execute **Time Sync → Apply** on both nodes. |
+| **`INCONCLUSIVE` PVT Verdict** | Insufficient satellites with complete LNAV Subframes 1–3 ($N < 4$), ephemeris out of validity window, or extreme delay causing Gauss-Newton divergence. Click the **PVT Status** pill to inspect the exact RTKLIB rejection reason. |
+| **Reference Comparison Pending / Fetch Failed** | Counterpart node is unreachable or `LNIS_NODE_MANAGEMENT_TOKEN` mismatches between `.env` files. Verify Peer Connection status in the Settings Drawer. |
+| **HTTP `401` / `403` on Adapter or Node APIs** | Mismatched `LNIS_DTN_SEND_TOKEN`, `LNIS_DTN_RECEIVE_TOKEN`, or `LNIS_NODE_MANAGEMENT_TOKEN`. |
+| **COM Port Connection Failure** | Port is locked by another application (e.g., u-center) or Windows Serial Bridge (`start.ps1` / `START.cmd`) is not running. Disconnect in u-center before connecting in LNIS. |
+
+### Inspecting Live Container Logs
+
+```bash
+# Tail the last 100 lines of the LNIS node service
+docker compose logs --tail 100 -f node
+```
+
+- All trial lifecycle events and outbound/inbound adapter JSON payloads are logged at `INFO` level with `testId` and `requestId` correlation tags.
+- For verbose HTTP header/polling diagnostics, set `LNIS_HTTP_LOG_LEVEL=DEBUG` in `.env`, restart the container, and revert to `INFO` after inspection.
+
+---
+
+## 9. License & Third-Party Notices
+
+This project integrates and adapts open-source software components distributed under their respective licenses. Full license texts, upstream SHA-256 manifests (`native/UPSTREAM-SHA256.txt`), and source rebuild archives (`licenses/native-sources.zip`) are packaged with every binary distribution:
+
+- **LANS-AFS-SIM**: Copyright © 2025 Takuji Ebinuma (BSD-style 2-Clause License)
+- **PocketSDR / PocketSDR-AFS**: Copyright © 2021–2025 T. Takasu & Takuji Ebinuma (BSD 2-Clause License)
+- **RTKLIB**: Copyright © 2007–2020 T. Takasu (`native/RTKLIB-README.txt`, BSD 2-Clause License)
+- **LDPC-codes**: Copyright © 1995–2012 Radford M. Neal (`native/vendor/LDPC-codes/COPYRIGHT` & `LGPL`, GNU Lesser General Public License v2.1)
+
+See [native/THIRD-PARTY-NOTICES.txt](native/THIRD-PARTY-NOTICES.txt) and [native/README.md](native/README.md) for complete provenance and compliance details.
