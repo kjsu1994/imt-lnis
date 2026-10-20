@@ -1126,7 +1126,10 @@ export function createObservationView(container, onSelect = () => {}, role = '')
     const activeSet = getActivePvtNavigationItems(navigation, navigationPositions, epochPosition);
 
     const baseShown = !selected || showAllNavigation ? navigation : matching;
-    const shown = showPvtActiveOnly ? baseShown.filter(item => activeSet.has(item)) : baseShown;
+    const filtered = showPvtActiveOnly ? baseShown.filter(item => activeSet.has(item)) : baseShown;
+    const shown = [...filtered].sort((a, b) =>
+      (a.message?.constellationId ?? 99) - (b.message?.constellationId ?? 99)
+      || (a.message?.satelliteId ?? 999) - (b.message?.satelliteId ?? 999));
 
     container.querySelector('[data-navigation-title]').textContent =
       selected && !showAllNavigation
@@ -1563,7 +1566,7 @@ export function createObservationView(container, onSelect = () => {}, role = '')
       const iq = data?.source === 'IQ_TRACKING';
       const navigationBody = container.querySelector('[data-navigation]');
       navigationBody.replaceChildren();
-      for (const item of data?.navigation || []) {
+      for (const item of [...(data?.navigation || [])].sort((a, b) => (a.message?.constellationId ?? 99) - (b.message?.constellationId ?? 99) || (a.message?.satelliteId ?? 999) - (b.message?.satelliteId ?? 999))) {
         const row = document.createElement('tr');
         const navigation = navigationCells(item, iq);
         if (data?.receivedValues && !data.receivedValues.records) {

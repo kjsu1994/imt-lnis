@@ -21,26 +21,7 @@ export function renderIqFile(container, data, label = '파일 준비 완료') {
   if (data.durationSeconds) summary.append(node('span', data.durationSeconds + '초'));
   if (data.sampleRateHz) summary.append(node('span', data.sampleRateHz / 1e6 + ' MHz'));
   const path = node('div', data.filePath || '경로 정보 없음', 'iq-file-path');
-  const details = node('details'); details.open = expanded;
-  details.append(node('summary', '해시 · I/Q 샘플 상세'));
-  details.append(node('div', '파일 크기 · ' + (Number.isFinite(data.sizeBytes) ? data.sizeBytes.toLocaleString('ko-KR') + ' bytes' : '—')));
-  details.append(node('div', 'SHA-256 · ' + (data.sha256 || '—'), 'iq-file-path'));
-  if (Array.isArray(data.preview) && data.preview.length) {
-    details.append(node('small', '파일 앞부분 ' + data.preview.length + '쌍 · 전체 샘플 아님'));
-    const table = node('table', undefined, 'iq-sample-table');
-    const head = node('thead'), row = node('tr');
-    for (const title of ['번호', 'I', 'Q']) { const th = node('th', title); th.scope = 'col'; row.append(th); }
-    head.append(row); table.append(head);
-    const body = node('tbody');
-    data.preview.forEach((pair, i) => {
-      const tr = node('tr');
-      for (const value of [i + 1, pair?.[0] ?? '—', pair?.[1] ?? '—']) tr.append(node('td', String(value)));
-      body.append(tr);
-    });
-    table.append(body);
-    const scroll = node('div', undefined, 'iq-sample-scroll'); scroll.tabIndex = 0; scroll.append(table); details.append(scroll);
-  }
-  container.append(summary, path, details);
+  container.append(summary, path);
 }
 export function payloadUrl(testId, direction, download = false) {
   if (!['sent', 'received'].includes(direction)) throw new Error('지원하지 않는 JSON 방향입니다.');
