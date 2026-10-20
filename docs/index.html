@@ -2276,7 +2276,7 @@ INCONCLUSIVE: 극심한 지연 또는 기하 배치 불량으로 인한 수렴 �
         fields: [
           ['FID (Frame ID)', '2 bits (Bit 0~1)', 'uint2 (0~3)', '-', '0 고정값 (LSIS AFS 정규 항법 프레임 식별자)', '동일 제공 (NASA LSIS 표준 프레임 식별자)'],
           ['TOI (Time of Interval)', '7 bits (Bit 2~8)', 'uint7 (0~99)', 'RAWX / SFRBX', '(TOW % 1200) / 12 (20분 주기 내 12초 간격 카운터, 0~99)', '동일 제공 (달 위성 온보드 시각 카운터)'],
-          ['BCH(51, 8) 부호화 코드워드', '52 bits (1b + 51b)', 'bitstream', '-', 'FID MSB(1b) 직결 + 하위 8비트 BCH(51, 8) LFSR(생성다항식 107₈) 51b 부호화 및 XOR 마스킹', '동일 제공 (순환 부호 오류 정정)']
+          ['BCH(51, 8) 부호화 코드워드', '52 bits (1b + 51b)', 'bitstream', '-', 'FID MSB + 하위 8비트 BCH(51, 8) LFSR(생성다항식 107₈) 부호화 및 XOR 마스킹', '동일 제공 (순환 부호 오류 정정)']
         ],
         extraHtml: renderTimeGuide(1)
       }),
@@ -2304,9 +2304,9 @@ INCONCLUSIVE: 극심한 지연 또는 기하 배치 불량으로 인한 수렴 �
           ['Type 63 보충 헤더 & 플래그', '58 bits (Bit 284~341)', 'header + bool', '-', 'Type 63(6b) + Version(8b) + Block 2(3b) + Epoch(32b) + PRN(8b) + navPresent(1b)', '동일 제공 (보충 궤도 파라미터 식별 헤더)'],
           ['6종 조화 섭동 (C_rs ~ C_rc)', '96 bits (Bit 342~)', '각 16 bits', 'SF2 / SF3', '궤도 반경(C_rs, C_rc)·위도(C_uc, C_us)·경사각(C_ic, C_is) Sine/Cosine 조화 섭동 6종', '달 환경 치환 (달 매스콘 Mascon 및 삼체 인력 섭동 계수)'],
           ['Δn · Ω̇ · IDOT (동역학 변화율)', '54 bits (Bit 342~)', '16b + 24b + 14b', 'SF2 / SF3', '평균 운동량 섭동(Δn), 승교점 세차율(Ω̇), 경사각 시간 변화율(IDOT)', '달 환경 치환 (달 중력장 및 27.3일 자전 주기 세차율)'],
-          ['a_f2 · T_GD · 상태·건전성 플래그', '309 bits (~Bit 800)', '8b + 8b + 293b', 'SF1~3 (전체)', '시계 2차 가속도(a_f2), 군지연(T_GD), IODE/IODC, URA, SV Health 및 e LSB 등 (잔여 459b 완성)', '동일 제공 (원자시계 2차 가속도, 회로 지연, 건전성 플래그)'],
-          ['규격 패딩 (Padding)', '375 bits (Bit 801~1175)', '0101… 교대', '-', '미사용 영역 표준 0101 교대 패턴 (284 + 517 + 375 = 1,176 bits)', '동일 제공 (규격 정렬용 패딩)'],
-          ['CRC-24 & LDPC SF2', '1,224 bits', '부호화', '-', 'CRC-24 (24 bits) 부가 후 LDPC SF2(부호율 1/2 천공) → 총 2,400 심볼', '동일 제공 (물리 계층 오류 정정 부호)']
+          ['a_f2 · T_GD · 상태·건전성 플래그', '309 bits (~Bit 800)', '8b + 8b + 293b', 'SF1~3 (전체)', '시계 2차 가속도(a_f2), 군지연(T_GD), IODE/IODC, URA, SV Health 및 e LSB 등', '동일 제공 (원자시계 2차 가속도, 회로 지연, 건전성 플래그)'],
+          ['규격 패딩 (Padding)', '375 bits (Bit 801~1175)', '0101… 교대', '-', '미사용 영역 표준 0101 교대 패턴', '동일 제공 (규격 정렬용 패딩)'],
+          ['CRC-24 & LDPC SF2', '1,224 bits', '부호화', '-', 'CRC-24 (24 bits) 부가 후 LDPC SF2(부호율 1/2 천공)->총 2,400 심볼', '동일 제공 (물리 계층 오류 정정 부호)']
         ],
         extraHtml: renderTimeGuide(2)
       }),
@@ -2318,7 +2318,7 @@ INCONCLUSIVE: 극심한 지연 또는 기하 배치 불량으로 인한 수렴 �
           { text: '정보 846b (0101 패턴) + CRC 24b', cls: 'badge-std' },
           { text: 'LDPC SF3 부호화 (1,740 bits)', cls: 'badge-std' }
         ],
-        note: 'NASA 공식 규격(LNIS V5 / LSIS Vol-A)은 SB3를 위성군 전체 개략 궤도력인 알마낙(MSG-G5 Reduced Almanac, MSG-G6 Midi Almanac), 달-지구 시간·좌표계 변환 파라미터, 무결성 경보(Alert) 및 LunaSAR 응답 메시지용 가변 페이지 슬롯으로 지정합니다. LNIS 지상 시험베드는 정밀 측위용 LNAV 720비트 전체(기본 262b + 섭동·보충 459b)를 공식 규격에 맞춰 SB2 단일 블록에 모두 통합 탑재했으므로, 단일 에포크 지상 측위에 사용되지 않는 SB3(846 bits)는 레퍼런스 오픈소스(afs_sim.c)와 동일하게 표준 0101 교대 더미 패턴으로 패딩합니다.',
+        note: 'NASA 공식 규격(LNIS V5 / LSIS Vol-A)은 SB3를 위성군 전체 개략 궤도력인 알마낙(MSG-G5 Reduced Almanac, MSG-G6 Midi Almanac), 달-지구 시간·좌표계 변환 파라미터, 무결성 경보(Alert) 및 LunaSAR 응답 메시지용 가변 페이지 슬롯으로 지정합니다. 단일 에포크 지상 측위에 사용되지 않는 SB3(846 bits)는 오픈소스(afs_sim.c)와 동일하게 표준 0101 교대 더미 패턴으로 패딩합니다.',
         fields: [
           ['공식 규격 할당 (NASA LSIS)', '846 bits (가변 페이지)', 'MSG-G5 / G6 외', '-', '위성군 전체 알마낙(Almanac), 달-지구 시공간 좌표 변환, 무결성 경보(Alert), LunaSAR 응답', '달 궤도 다중 위성 탐색 및 시간계 변환 시 사용'],
           ['표준 시험 패딩 (LNIS / 오픈소스)', '846 bits (Bit 0~845)', '0101… 교대 (0x55)', '-', '01010101… 표준 교대 비트 패턴 (섭동·보충 항법 데이터를 SB2로 완전 통합하여 SB3는 미사용 패딩 유지)', '동일 제공 (비트 전이 밀도 유지 및 복호 무결성 검증)'],
@@ -2403,7 +2403,7 @@ INCONCLUSIVE: 극심한 지연 또는 기하 배치 불량으로 인한 수렴 �
                   <th>비트 크기 (위치)</th>
                   <th>형식 / 단위 (LSB)</th>
                   <th>UBX 출처</th>
-                  <th>물리적 의미 (LNIS)</th>
+                  <th>데이터 의미</th>
                   <th>실제 달 궤도선 (LunaNet) 대응</th>
                 </tr>
               </thead>

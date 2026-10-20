@@ -284,11 +284,11 @@ function decodeGpsLnavParameters(words, iq, constellationName = 'GPS') {
         { target: 'SB2', name: 't_oc', fullName: 't_oc (시계 기준시각)', meaning: '위성 시계 기준시각', wordOrigin: 'Word 8', value: toc, formatted: toc.toLocaleString() + ' s' },
         { target: 'SB2', name: 'a_f0', fullName: 'a_f0 (시계 편차)', meaning: '위성 시계 편차 (Bias)', wordOrigin: 'Word 10', value: af0, formatted: (Math.abs(af0) < 1e-3 ? (af0 * 1e6).toFixed(3) + ' µs (' + af0.toExponential(4) + ' s)' : af0.toFixed(6) + ' s') },
         { target: 'SB2', name: 'a_f1', fullName: 'a_f1 (시계 표류율)', meaning: '위성 시계 표류율 (Drift)', wordOrigin: 'Word 9', value: af1, formatted: af1.toExponential(4) + ' s/s' },
-        { target: 'SB3', name: 'a_f2', fullName: 'a_f2 (시계 드리프트율)', meaning: '2차 시계 가속도', wordOrigin: 'Word 9', value: af2, formatted: af2 === 0 ? '0.0 s/s²' : af2.toExponential(4) + ' s/s²' },
-        { target: 'SB3', name: 'T_GD', fullName: 'T_GD (전송 지연차)', meaning: 'L1/L2 군지연차', wordOrigin: 'Word 7', value: tgd, formatted: (tgd * 1e9).toFixed(3) + ' ns (' + tgd.toExponential(4) + ' s)' },
-        { target: 'SB3', name: 'IODC', fullName: 'IODC (시계 데이터 번호)', meaning: '시계 이슈 번호', wordOrigin: 'Word 3 & 8', value: iodc, formatted: String(iodc) },
-        { target: 'SB3', name: 'Week', fullName: 'GPS Week', meaning: '기준 주차 번호', wordOrigin: 'Word 3', value: week, formatted: 'Week ' + week },
-        { target: 'SB3', name: 'SV Health', fullName: 'SV Health (위성 건전성)', meaning: '위성 신호 정상 여부', wordOrigin: 'Word 3', value: health, formatted: health === 0 ? '0 (정상)' : '0x' + health.toString(16) + ' (비정상)' }
+        { target: 'SB2', subTarget: '후반', name: 'a_f2', fullName: 'a_f2 (시계 드리프트율)', meaning: '2차 시계 가속도', wordOrigin: 'Word 9', value: af2, formatted: af2 === 0 ? '0.0 s/s²' : af2.toExponential(4) + ' s/s²' },
+        { target: 'SB2', subTarget: '후반', name: 'T_GD', fullName: 'T_GD (전송 지연차)', meaning: 'L1/L2 군지연차', wordOrigin: 'Word 7', value: tgd, formatted: (tgd * 1e9).toFixed(3) + ' ns (' + tgd.toExponential(4) + ' s)' },
+        { target: 'SB2', subTarget: '후반', name: 'IODC', fullName: 'IODC (시계 데이터 번호)', meaning: '시계 이슈 번호', wordOrigin: 'Word 3 & 8', value: iodc, formatted: String(iodc) },
+        { target: 'SB2', subTarget: '헤더/후반', name: 'Week', fullName: 'GPS Week', meaning: '기준 주차 번호', wordOrigin: 'Word 3', value: week, formatted: 'Week ' + week },
+        { target: 'SB2', subTarget: '후반', name: 'SV Health', fullName: 'SV Health (위성 건전성)', meaning: '위성 신호 정상 여부', wordOrigin: 'Word 3', value: health, formatted: health === 0 ? '0 (정상)' : '0x' + health.toString(16) + ' (비정상)' }
       ]
     };
   }
@@ -323,11 +323,11 @@ function decodeGpsLnavParameters(words, iq, constellationName = 'GPS') {
         { target: 'SB2', name: '√a', fullName: '√a (장반경 제곱근)', meaning: '궤도 장반경 제곱근 (크기)', wordOrigin: 'Word 8~9', value: sqrta, formatted: sqrta.toFixed(4) + ' m^(1/2) (a ≈ ' + aKm.toFixed(1) + ' km)' },
         { target: 'SB2', name: 'e', fullName: 'e (이심률)', meaning: '궤도 이심률 (찌그러짐)', wordOrigin: 'Word 6~7', value: ecc, formatted: ecc.toFixed(8) },
         { target: 'SB2', name: 'M_0', fullName: 'M_0 (평균근점각)', meaning: '기준 평균근점각 (위치)', wordOrigin: 'Word 4~5', value: m0, formatted: (m0 * 180 / Math.PI).toFixed(2) + '° (' + m0.toFixed(4) + ' rad)' },
-        { target: 'SB3', name: 'C_rs', fullName: 'C_rs (반경 Sine 섭동)', meaning: '궤도 반경 Sine 조화 섭동', wordOrigin: 'Word 3', value: crs, formatted: (crs >= 0 ? '+' : '') + crs.toFixed(3) + ' m' },
-        { target: 'SB3', name: 'C_uc', fullName: 'C_uc (위도 Cos 섭동)', meaning: '궤도 위도 Cosine 조화 섭동', wordOrigin: 'Word 6', value: cuc, formatted: (cuc >= 0 ? '+' : '') + cuc.toExponential(4) + ' rad' },
-        { target: 'SB3', name: 'C_us', fullName: 'C_us (위도 Sin 섭동)', meaning: '궤도 위도 Sine 조화 섭동', wordOrigin: 'Word 8', value: cus, formatted: (cus >= 0 ? '+' : '') + cus.toExponential(4) + ' rad' },
-        { target: 'SB3', name: 'Δn', fullName: 'Δn (평균운동량 보정)', meaning: '평균 운동량 섭동 보정치', wordOrigin: 'Word 4', value: dn, formatted: (dn >= 0 ? '+' : '') + dn.toExponential(4) + ' rad/s' },
-        { target: 'SB3', name: 'IODE', fullName: 'IODE (궤도 데이터 번호)', meaning: '궤도 이슈 번호', wordOrigin: 'Word 3', value: iode, formatted: String(iode) + ' (0x' + iode.toString(16).toUpperCase() + ')' }
+        { target: 'SB2', subTarget: '후반', name: 'C_rs', fullName: 'C_rs (반경 Sine 섭동)', meaning: '궤도 반경 Sine 조화 섭동', wordOrigin: 'Word 3', value: crs, formatted: (crs >= 0 ? '+' : '') + crs.toFixed(3) + ' m' },
+        { target: 'SB2', subTarget: '후반', name: 'C_uc', fullName: 'C_uc (위도 Cos 섭동)', meaning: '궤도 위도 Cosine 조화 섭동', wordOrigin: 'Word 6', value: cuc, formatted: (cuc >= 0 ? '+' : '') + cuc.toExponential(4) + ' rad' },
+        { target: 'SB2', subTarget: '후반', name: 'C_us', fullName: 'C_us (위도 Sin 섭동)', meaning: '궤도 위도 Sine 조화 섭동', wordOrigin: 'Word 8', value: cus, formatted: (cus >= 0 ? '+' : '') + cus.toExponential(4) + ' rad' },
+        { target: 'SB2', subTarget: '후반', name: 'Δn', fullName: 'Δn (평균운동량 보정)', meaning: '평균 운동량 섭동 보정치', wordOrigin: 'Word 4', value: dn, formatted: (dn >= 0 ? '+' : '') + dn.toExponential(4) + ' rad/s' },
+        { target: 'SB2', subTarget: '후반', name: 'IODE', fullName: 'IODE (궤도 데이터 번호)', meaning: '궤도 이슈 번호', wordOrigin: 'Word 3', value: iode, formatted: String(iode) + ' (0x' + iode.toString(16).toUpperCase() + ')' }
       ]
     };
   }
@@ -360,12 +360,12 @@ function decodeGpsLnavParameters(words, iq, constellationName = 'GPS') {
         { target: 'SB2', name: 'i_0', fullName: 'i_0 (궤도 경사각)', meaning: '기준 궤도 경사각 (기울기)', wordOrigin: 'Word 5~6', value: inc0, formatted: (inc0 * 180 / Math.PI).toFixed(4) + '° (' + inc0.toFixed(4) + ' rad)' },
         { target: 'SB2', name: 'Ω_0', fullName: 'Ω_0 (승교점 적경)', meaning: '승교점 적경 (경도 위치)', wordOrigin: 'Word 3~4', value: omg0, formatted: (omg0 * 180 / Math.PI).toFixed(2) + '° (' + omg0.toFixed(4) + ' rad)' },
         { target: 'SB2', name: 'ω', fullName: 'ω (근지점 인수)', meaning: '근지점 인수 (타원 방향)', wordOrigin: 'Word 7~8', value: aop, formatted: (aop * 180 / Math.PI).toFixed(2) + '° (' + aop.toFixed(4) + ' rad)' },
-        { target: 'SB3', name: 'C_rc', fullName: 'C_rc (반경 Cos 섭동)', meaning: '궤도 반경 Cosine 조화 섭동', wordOrigin: 'Word 7', value: crc, formatted: (crc >= 0 ? '+' : '') + crc.toFixed(3) + ' m' },
-        { target: 'SB3', name: 'C_ic', fullName: 'C_ic (경사각 Cos 섭동)', meaning: '경사각 Cosine 조화 섭동', wordOrigin: 'Word 3', value: cic, formatted: (cic >= 0 ? '+' : '') + cic.toExponential(4) + ' rad' },
-        { target: 'SB3', name: 'C_is', fullName: 'C_is (경사각 Sin 섭동)', meaning: '경사각 Sine 조화 섭동', wordOrigin: 'Word 5', value: cis, formatted: (cis >= 0 ? '+' : '') + cis.toExponential(4) + ' rad' },
-        { target: 'SB3', name: 'Ω̇', fullName: 'Ω̇ (승교점 세차율)', meaning: '승교점 세차율 (궤도면 회전)', wordOrigin: 'Word 9', value: omgDot, formatted: (omgDot >= 0 ? '+' : '') + omgDot.toExponential(4) + ' rad/s' },
-        { target: 'SB3', name: 'IDOT', fullName: 'IDOT (경사각 변화율)', meaning: '경사각 시간 변화율', wordOrigin: 'Word 10', value: idot, formatted: (idot >= 0 ? '+' : '') + idot.toExponential(4) + ' rad/s' },
-        { target: 'SB3', name: 'IODE', fullName: 'IODE (궤도 데이터 번호)', meaning: '궤도 이슈 번호', wordOrigin: 'Word 10', value: iode, formatted: String(iode) + ' (0x' + iode.toString(16).toUpperCase() + ')' }
+        { target: 'SB2', subTarget: '후반', name: 'C_rc', fullName: 'C_rc (반경 Cos 섭동)', meaning: '궤도 반경 Cosine 조화 섭동', wordOrigin: 'Word 7', value: crc, formatted: (crc >= 0 ? '+' : '') + crc.toFixed(3) + ' m' },
+        { target: 'SB2', subTarget: '후반', name: 'C_ic', fullName: 'C_ic (경사각 Cos 섭동)', meaning: '경사각 Cosine 조화 섭동', wordOrigin: 'Word 3', value: cic, formatted: (cic >= 0 ? '+' : '') + cic.toExponential(4) + ' rad' },
+        { target: 'SB2', subTarget: '후반', name: 'C_is', fullName: 'C_is (경사각 Sin 섭동)', meaning: '경사각 Sine 조화 섭동', wordOrigin: 'Word 5', value: cis, formatted: (cis >= 0 ? '+' : '') + cis.toExponential(4) + ' rad' },
+        { target: 'SB2', subTarget: '후반', name: 'Ω̇', fullName: 'Ω̇ (승교점 세차율)', meaning: '승교점 세차율 (궤도면 회전)', wordOrigin: 'Word 9', value: omgDot, formatted: (omgDot >= 0 ? '+' : '') + omgDot.toExponential(4) + ' rad/s' },
+        { target: 'SB2', subTarget: '후반', name: 'IDOT', fullName: 'IDOT (경사각 변화율)', meaning: '경사각 시간 변화율', wordOrigin: 'Word 10', value: idot, formatted: (idot >= 0 ? '+' : '') + idot.toExponential(4) + ' rad/s' },
+        { target: 'SB2', subTarget: '후반', name: 'IODE', fullName: 'IODE (궤도 데이터 번호)', meaning: '궤도 이슈 번호', wordOrigin: 'Word 10', value: iode, formatted: String(iode) + ' (0x' + iode.toString(16).toUpperCase() + ')' }
       ]
     };
   }
@@ -444,13 +444,13 @@ function decodeBdsD1Parameters(words, iq) {
         { target: 'SB2', name: 't_oc', fullName: 't_oc (시계 기준시각)', meaning: '위성 시계 기준시각', wordOrigin: 'Word 3~4', value: toc, formatted: toc.toLocaleString() + ' s' },
         { target: 'SB2', name: 'a_f0', fullName: 'a_f0 (시계 편차)', meaning: '위성 시계 편차 (Bias)', wordOrigin: 'Word 8~9', value: af0, formatted: (Math.abs(af0) < 1e-3 ? (af0 * 1e6).toFixed(3) + ' µs (' + af0.toExponential(4) + ' s)' : af0.toFixed(6) + ' s') },
         { target: 'SB2', name: 'a_f1', fullName: 'a_f1 (시계 표류율)', meaning: '위성 시계 표류율 (Drift)', wordOrigin: 'Word 9~10', value: af1, formatted: af1.toExponential(4) + ' s/s' },
-        { target: 'SB3', name: 'a_f2', fullName: 'a_f2 (시계 드리프트율)', meaning: '2차 시계 가속도', wordOrigin: 'Word 8', value: af2, formatted: af2 === 0 ? '0.0 s/s²' : af2.toExponential(4) + ' s/s²' },
-        { target: 'SB3', name: 'T_GD1', fullName: 'T_GD1 (B1/B3 전송지연차)', meaning: 'B1 군지연차', wordOrigin: 'Word 4', value: tgd1, formatted: (tgd1 * 1e9).toFixed(1) + ' ns' },
-        { target: 'SB3', name: 'T_GD2', fullName: 'T_GD2 (B2/B3 전송지연차)', meaning: 'B2 군지연차', wordOrigin: 'Word 4~5', value: tgd2, formatted: (tgd2 * 1e9).toFixed(1) + ' ns' },
-        { target: 'SB3', name: 'AODC', fullName: 'AODC (시계 데이터 번호)', meaning: '시계 이슈 번호', wordOrigin: 'Word 2', value: iodc, formatted: String(iodc) },
-        { target: 'SB3', name: 'AODE', fullName: 'AODE (궤도 데이터 번호)', meaning: '궤도 이슈 번호', wordOrigin: 'Word 10', value: iode, formatted: String(iode) },
-        { target: 'SB3', name: 'Week', fullName: 'BDT Week', meaning: '기준 주차 번호', wordOrigin: 'Word 3', value: week, formatted: 'Week ' + week },
-        { target: 'SB3', name: 'SV Health', fullName: 'SV Health (위성 건전성)', meaning: '위성 신호 정상 여부', wordOrigin: 'Word 2', value: svh, formatted: svh === 0 ? '0 (정상)' : '0x' + svh.toString(16) + ' (비정상)' }
+        { target: 'SB2', subTarget: '후반', name: 'a_f2', fullName: 'a_f2 (시계 드리프트율)', meaning: '2차 시계 가속도', wordOrigin: 'Word 8', value: af2, formatted: af2 === 0 ? '0.0 s/s²' : af2.toExponential(4) + ' s/s²' },
+        { target: 'SB2', subTarget: '후반', name: 'T_GD1', fullName: 'T_GD1 (B1/B3 전송지연차)', meaning: 'B1 군지연차', wordOrigin: 'Word 4', value: tgd1, formatted: (tgd1 * 1e9).toFixed(1) + ' ns' },
+        { target: 'SB2', subTarget: '후반', name: 'T_GD2', fullName: 'T_GD2 (B2/B3 전송지연차)', meaning: 'B2 군지연차', wordOrigin: 'Word 4~5', value: tgd2, formatted: (tgd2 * 1e9).toFixed(1) + ' ns' },
+        { target: 'SB2', subTarget: '후반', name: 'AODC', fullName: 'AODC (시계 데이터 번호)', meaning: '시계 이슈 번호', wordOrigin: 'Word 2', value: iodc, formatted: String(iodc) },
+        { target: 'SB2', subTarget: '후반', name: 'AODE', fullName: 'AODE (궤도 데이터 번호)', meaning: '궤도 이슈 번호', wordOrigin: 'Word 10', value: iode, formatted: String(iode) },
+        { target: 'SB2', subTarget: '헤더/후반', name: 'Week', fullName: 'BDT Week', meaning: '기준 주차 번호', wordOrigin: 'Word 3', value: week, formatted: 'Week ' + week },
+        { target: 'SB2', subTarget: '후반', name: 'SV Health', fullName: 'SV Health (위성 건전성)', meaning: '위성 신호 정상 여부', wordOrigin: 'Word 2', value: svh, formatted: svh === 0 ? '0 (정상)' : '0x' + svh.toString(16) + ' (비정상)' }
       ]
     };
   }
@@ -475,12 +475,12 @@ function decodeBdsD1Parameters(words, iq) {
         { target: 'SB2', name: '√a', fullName: '√a (장반경 제곱근)', meaning: '궤도 장반경 제곱근 (크기)', wordOrigin: 'Word 9~10', value: sqrta, formatted: sqrta.toFixed(4) + ' m^(1/2) (a ≈ ' + aKm.toFixed(1) + ' km)' },
         { target: 'SB2', name: 'e', fullName: 'e (이심률)', meaning: '궤도 이심률 (찌그러짐)', wordOrigin: 'Word 5~6', value: ecc, formatted: ecc.toFixed(8) },
         { target: 'SB2', name: 'M_0', fullName: 'M_0 (평균근점각)', meaning: '기준 평균근점각 (위치)', wordOrigin: 'Word 4~5', value: m0, formatted: (m0 * 180 / Math.PI).toFixed(2) + '° (' + m0.toFixed(4) + ' rad)' },
-        { target: 'SB3', name: 't_oe (MSB)', fullName: 't_oe (기준시각 상위 2bit)', meaning: 'Ephemeris 기준시각 상위', wordOrigin: 'Word 10', value: toe1, formatted: '0b' + toe1.toString(2).padStart(2, '0') + ' (SF3에서 완성)' },
-        { target: 'SB3', name: 'C_rs', fullName: 'C_rs (반경 Sine 섭동)', meaning: '궤도 반경 Sine 조화 섭동', wordOrigin: 'Word 8~9', value: crs, formatted: (crs >= 0 ? '+' : '') + crs.toFixed(3) + ' m' },
-        { target: 'SB3', name: 'C_uc', fullName: 'C_uc (위도 Cos 섭동)', meaning: '궤도 위도 Cosine 조화 섭동', wordOrigin: 'Word 3~4', value: cuc, formatted: (cuc >= 0 ? '+' : '') + cuc.toExponential(4) + ' rad' },
-        { target: 'SB3', name: 'C_us', fullName: 'C_us (위도 Sin 섭동)', meaning: '궤도 위도 Sine 조화 섭동', wordOrigin: 'Word 7', value: cus, formatted: (cus >= 0 ? '+' : '') + cus.toExponential(4) + ' rad' },
-        { target: 'SB3', name: 'C_rc', fullName: 'C_rc (반경 Cos 섭동)', meaning: '궤도 반경 Cosine 조화 섭동', wordOrigin: 'Word 7~8', value: crc, formatted: (crc >= 0 ? '+' : '') + crc.toFixed(3) + ' m' },
-        { target: 'SB3', name: 'Δn', fullName: 'Δn (평균운동량 보정)', meaning: '평균 운동량 섭동 보정치', wordOrigin: 'Word 2~3', value: dn, formatted: (dn >= 0 ? '+' : '') + dn.toExponential(4) + ' rad/s' }
+        { target: 'SB2', subTarget: '후반', name: 't_oe (MSB)', fullName: 't_oe (기준시각 상위 2bit)', meaning: 'Ephemeris 기준시각 상위', wordOrigin: 'Word 10', value: toe1, formatted: '0b' + toe1.toString(2).padStart(2, '0') + ' (SF3에서 완성)' },
+        { target: 'SB2', subTarget: '후반', name: 'C_rs', fullName: 'C_rs (반경 Sine 섭동)', meaning: '궤도 반경 Sine 조화 섭동', wordOrigin: 'Word 8~9', value: crs, formatted: (crs >= 0 ? '+' : '') + crs.toFixed(3) + ' m' },
+        { target: 'SB2', subTarget: '후반', name: 'C_uc', fullName: 'C_uc (위도 Cos 섭동)', meaning: '궤도 위도 Cosine 조화 섭동', wordOrigin: 'Word 3~4', value: cuc, formatted: (cuc >= 0 ? '+' : '') + cuc.toExponential(4) + ' rad' },
+        { target: 'SB2', subTarget: '후반', name: 'C_us', fullName: 'C_us (위도 Sin 섭동)', meaning: '궤도 위도 Sine 조화 섭동', wordOrigin: 'Word 7', value: cus, formatted: (cus >= 0 ? '+' : '') + cus.toExponential(4) + ' rad' },
+        { target: 'SB2', subTarget: '후반', name: 'C_rc', fullName: 'C_rc (반경 Cos 섭동)', meaning: '궤도 반경 Cosine 조화 섭동', wordOrigin: 'Word 7~8', value: crc, formatted: (crc >= 0 ? '+' : '') + crc.toFixed(3) + ' m' },
+        { target: 'SB2', subTarget: '후반', name: 'Δn', fullName: 'Δn (평균운동량 보정)', meaning: '평균 운동량 섭동 보정치', wordOrigin: 'Word 2~3', value: dn, formatted: (dn >= 0 ? '+' : '') + dn.toExponential(4) + ' rad/s' }
       ]
     };
   }
@@ -505,10 +505,10 @@ function decodeBdsD1Parameters(words, iq) {
         { target: 'SB2', name: 'Ω_0', fullName: 'Ω_0 (승교점 적경)', meaning: '승교점 적경 (경도 위치)', wordOrigin: 'Word 8~9', value: omg0, formatted: (omg0 * 180 / Math.PI).toFixed(2) + '° (' + omg0.toFixed(4) + ' rad)' },
         { target: 'SB2', name: 'ω', fullName: 'ω (근지점 인수)', meaning: '근지점 인수 (타원 방향)', wordOrigin: 'Word 9~10', value: aop, formatted: (aop * 180 / Math.PI).toFixed(2) + '° (' + aop.toFixed(4) + ' rad)' },
         { target: 'SB2', name: 't_oe', fullName: 't_oe (궤도 기준시각 LSB)', meaning: 'Ephemeris 기준시각', wordOrigin: 'Word 2~3', value: toeApprox, formatted: toeApprox.toLocaleString() + ' s' },
-        { target: 'SB3', name: 'C_ic', fullName: 'C_ic (경사각 Cos 섭동)', meaning: '경사각 Cosine 조화 섭동', wordOrigin: 'Word 4~5', value: cic, formatted: (cic >= 0 ? '+' : '') + cic.toExponential(4) + ' rad' },
-        { target: 'SB3', name: 'C_is', fullName: 'C_is (경사각 Sin 섭동)', meaning: '경사각 Sine 조화 섭동', wordOrigin: 'Word 6~7', value: cis, formatted: (cis >= 0 ? '+' : '') + cis.toExponential(4) + ' rad' },
-        { target: 'SB3', name: 'Ω̇', fullName: 'Ω̇ (승교점 세차율)', meaning: '승교점 세차율 (궤도면 회전)', wordOrigin: 'Word 5~6', value: omgDot, formatted: (omgDot >= 0 ? '+' : '') + omgDot.toExponential(4) + ' rad/s' },
-        { target: 'SB3', name: 'IDOT', fullName: 'IDOT (경사각 변화율)', meaning: '경사각 시간 변화율', wordOrigin: 'Word 7~8', value: idot, formatted: (idot >= 0 ? '+' : '') + idot.toExponential(4) + ' rad/s' }
+        { target: 'SB2', subTarget: '후반', name: 'C_ic', fullName: 'C_ic (경사각 Cos 섭동)', meaning: '경사각 Cosine 조화 섭동', wordOrigin: 'Word 4~5', value: cic, formatted: (cic >= 0 ? '+' : '') + cic.toExponential(4) + ' rad' },
+        { target: 'SB2', subTarget: '후반', name: 'C_is', fullName: 'C_is (경사각 Sin 섭동)', meaning: '경사각 Sine 조화 섭동', wordOrigin: 'Word 6~7', value: cis, formatted: (cis >= 0 ? '+' : '') + cis.toExponential(4) + ' rad' },
+        { target: 'SB2', subTarget: '후반', name: 'Ω̇', fullName: 'Ω̇ (승교점 세차율)', meaning: '승교점 세차율 (궤도면 회전)', wordOrigin: 'Word 5~6', value: omgDot, formatted: (omgDot >= 0 ? '+' : '') + omgDot.toExponential(4) + ' rad/s' },
+        { target: 'SB2', subTarget: '후반', name: 'IDOT', fullName: 'IDOT (경사각 변화율)', meaning: '경사각 시간 변화율', wordOrigin: 'Word 7~8', value: idot, formatted: (idot >= 0 ? '+' : '') + idot.toExponential(4) + ' rad/s' }
       ]
     };
   }
@@ -561,7 +561,7 @@ function decodeGalileoInavParameters(words, iq) {
         { target: 'SB2', name: '√a', fullName: '√a (장반경 제곱근)', meaning: '궤도 장반경 제곱근 (크기)', wordOrigin: 'Word 3~4', value: sqrta, formatted: sqrta.toFixed(4) + ' m^(1/2) (a ≈ ' + aKm.toFixed(1) + ' km)' },
         { target: 'SB2', name: 'e', fullName: 'e (이심률)', meaning: '궤도 이심률 (찌그러짐)', wordOrigin: 'Word 2~3', value: ecc, formatted: ecc.toFixed(8) },
         { target: 'SB2', name: 'M_0', fullName: 'M_0 (평균근점각)', meaning: '기준 평균근점각 (위치)', wordOrigin: 'Word 1~2', value: m0, formatted: (m0 * 180 / Math.PI).toFixed(2) + '° (' + m0.toFixed(4) + ' rad)' },
-        { target: 'SB3', name: 'IODnav', fullName: 'IODnav (궤도 데이터 번호)', meaning: 'Galileo 궤도/시계 이슈 번호', wordOrigin: 'Word 1', value: iodNav, formatted: String(iodNav) }
+        { target: 'SB2', subTarget: '후반', name: 'IODnav', fullName: 'IODnav (궤도 데이터 번호)', meaning: 'Galileo 궤도/시계 이슈 번호', wordOrigin: 'Word 1', value: iodNav, formatted: String(iodNav) }
       ]
     };
   }
@@ -586,8 +586,8 @@ function decodeGalileoInavParameters(words, iq) {
         { target: 'SB2', name: 'i_0', fullName: 'i_0 (궤도 경사각)', meaning: '기준 궤도 경사각 (기울기)', wordOrigin: 'Word 2~3', value: inc0, formatted: (inc0 * 180 / Math.PI).toFixed(4) + '° (' + inc0.toFixed(4) + ' rad)' },
         { target: 'SB2', name: 'Ω_0', fullName: 'Ω_0 (승교점 적경)', meaning: '승교점 적경 (경도 위치)', wordOrigin: 'Word 1~2', value: omg0, formatted: (omg0 * 180 / Math.PI).toFixed(2) + '° (' + omg0.toFixed(4) + ' rad)' },
         { target: 'SB2', name: 'ω', fullName: 'ω (근지점 인수)', meaning: '근지점 인수 (타원 방향)', wordOrigin: 'Word 3~4', value: aop, formatted: (aop * 180 / Math.PI).toFixed(2) + '° (' + aop.toFixed(4) + ' rad)' },
-        { target: 'SB3', name: 'IDOT', fullName: 'IDOT (경사각 변화율)', meaning: '경사각 시간 변화율', wordOrigin: 'Word 4', value: idot, formatted: (idot >= 0 ? '+' : '') + idot.toExponential(4) + ' rad/s' },
-        { target: 'SB3', name: 'IODnav', fullName: 'IODnav (궤도 데이터 번호)', meaning: 'Galileo 궤도/시계 이슈 번호', wordOrigin: 'Word 1', value: iodNav, formatted: String(iodNav) }
+        { target: 'SB2', subTarget: '후반', name: 'IDOT', fullName: 'IDOT (경사각 변화율)', meaning: '경사각 시간 변화율', wordOrigin: 'Word 4', value: idot, formatted: (idot >= 0 ? '+' : '') + idot.toExponential(4) + ' rad/s' },
+        { target: 'SB2', subTarget: '후반', name: 'IODnav', fullName: 'IODnav (궤도 데이터 번호)', meaning: 'Galileo 궤도/시계 이슈 번호', wordOrigin: 'Word 1', value: iodNav, formatted: String(iodNav) }
       ]
     };
   }
@@ -613,13 +613,13 @@ function decodeGalileoInavParameters(words, iq) {
       subframeId: 3,
       title: 'Word 3 · 섭동정보 (GAL I/NAV)',
       elements: [
-        { target: 'SB3', name: 'C_rs', fullName: 'C_rs (반경 Sine 섭동)', meaning: '궤도 반경 Sine 조화 섭동', wordOrigin: 'Word 4', value: crs, formatted: (crs >= 0 ? '+' : '') + crs.toFixed(3) + ' m' },
-        { target: 'SB3', name: 'C_rc', fullName: 'C_rc (반경 Cos 섭동)', meaning: '궤도 반경 Cosine 조화 섭동', wordOrigin: 'Word 3~4', value: crc, formatted: (crc >= 0 ? '+' : '') + crc.toFixed(3) + ' m' },
-        { target: 'SB3', name: 'C_uc', fullName: 'C_uc (위도 Cos 섭동)', meaning: '궤도 위도 Cosine 조화 섭동', wordOrigin: 'Word 2~3', value: cuc, formatted: (cuc >= 0 ? '+' : '') + cuc.toExponential(4) + ' rad' },
-        { target: 'SB3', name: 'C_us', fullName: 'C_us (위도 Sin 섭동)', meaning: '궤도 위도 Sine 조화 섭동', wordOrigin: 'Word 3', value: cus, formatted: (cus >= 0 ? '+' : '') + cus.toExponential(4) + ' rad' },
-        { target: 'SB3', name: 'Ω̇', fullName: 'Ω̇ (승교점 세차율)', meaning: '승교점 세차율 (궤도면 회전)', wordOrigin: 'Word 1~2', value: omgDot, formatted: (omgDot >= 0 ? '+' : '') + omgDot.toExponential(4) + ' rad/s' },
-        { target: 'SB3', name: 'Δn', fullName: 'Δn (평균운동량 보정)', meaning: '평균 운동량 섭동 보정치', wordOrigin: 'Word 2', value: deln, formatted: (deln >= 0 ? '+' : '') + deln.toExponential(4) + ' rad/s' },
-        { target: 'SB3', name: 'IODnav', fullName: 'IODnav (궤도 데이터 번호)', meaning: 'Galileo 궤도/시계 이슈 번호', wordOrigin: 'Word 1', value: iodNav, formatted: String(iodNav) }
+        { target: 'SB2', subTarget: '후반', name: 'C_rs', fullName: 'C_rs (반경 Sine 섭동)', meaning: '궤도 반경 Sine 조화 섭동', wordOrigin: 'Word 4', value: crs, formatted: (crs >= 0 ? '+' : '') + crs.toFixed(3) + ' m' },
+        { target: 'SB2', subTarget: '후반', name: 'C_rc', fullName: 'C_rc (반경 Cos 섭동)', meaning: '궤도 반경 Cosine 조화 섭동', wordOrigin: 'Word 3~4', value: crc, formatted: (crc >= 0 ? '+' : '') + crc.toFixed(3) + ' m' },
+        { target: 'SB2', subTarget: '후반', name: 'C_uc', fullName: 'C_uc (위도 Cos 섭동)', meaning: '궤도 위도 Cosine 조화 섭동', wordOrigin: 'Word 2~3', value: cuc, formatted: (cuc >= 0 ? '+' : '') + cuc.toExponential(4) + ' rad' },
+        { target: 'SB2', subTarget: '후반', name: 'C_us', fullName: 'C_us (위도 Sin 섭동)', meaning: '궤도 위도 Sine 조화 섭동', wordOrigin: 'Word 3', value: cus, formatted: (cus >= 0 ? '+' : '') + cus.toExponential(4) + ' rad' },
+        { target: 'SB2', subTarget: '후반', name: 'Ω̇', fullName: 'Ω̇ (승교점 세차율)', meaning: '승교점 세차율 (궤도면 회전)', wordOrigin: 'Word 1~2', value: omgDot, formatted: (omgDot >= 0 ? '+' : '') + omgDot.toExponential(4) + ' rad/s' },
+        { target: 'SB2', subTarget: '후반', name: 'Δn', fullName: 'Δn (평균운동량 보정)', meaning: '평균 운동량 섭동 보정치', wordOrigin: 'Word 2', value: deln, formatted: (deln >= 0 ? '+' : '') + deln.toExponential(4) + ' rad/s' },
+        { target: 'SB2', subTarget: '후반', name: 'IODnav', fullName: 'IODnav (궤도 데이터 번호)', meaning: 'Galileo 궤도/시계 이슈 번호', wordOrigin: 'Word 1', value: iodNav, formatted: String(iodNav) }
       ]
     };
   }
@@ -649,10 +649,10 @@ function decodeGalileoInavParameters(words, iq) {
         { target: 'SB2', name: 't_oc', fullName: 't_oc (시계 기준시각)', meaning: '위성 시계 기준시각', wordOrigin: 'Word 2~3', value: toc, formatted: toc.toLocaleString() + ' s' },
         { target: 'SB2', name: 'a_f0', fullName: 'a_f0 (시계 편차)', meaning: '위성 시계 편차 (Bias)', wordOrigin: 'Word 3~4', value: af0, formatted: (Math.abs(af0) < 1e-3 ? (af0 * 1e6).toFixed(3) + ' µs (' + af0.toExponential(4) + ' s)' : af0.toFixed(6) + ' s') },
         { target: 'SB2', name: 'a_f1', fullName: 'a_f1 (시계 표류율)', meaning: '위성 시계 표류율 (Drift)', wordOrigin: 'Word 4', value: af1, formatted: af1.toExponential(4) + ' s/s' },
-        { target: 'SB3', name: 'a_f2', fullName: 'a_f2 (시계 드리프트율)', meaning: '2차 시계 가속도', wordOrigin: 'Word 4', value: af2, formatted: af2 === 0 ? '0.0 s/s²' : af2.toExponential(4) + ' s/s²' },
-        { target: 'SB3', name: 'C_ic', fullName: 'C_ic (경사각 Cos 섭동)', meaning: '경사각 Cosine 조화 섭동', wordOrigin: 'Word 1~2', value: cic, formatted: (cic >= 0 ? '+' : '') + cic.toExponential(4) + ' rad' },
-        { target: 'SB3', name: 'C_is', fullName: 'C_is (경사각 Sin 섭동)', meaning: '경사각 Sine 조화 섭동', wordOrigin: 'Word 2', value: cis, formatted: (cis >= 0 ? '+' : '') + cis.toExponential(4) + ' rad' },
-        { target: 'SB3', name: 'IODnav', fullName: 'IODnav (궤도 데이터 번호)', meaning: 'Galileo 궤도/시계 이슈 번호', wordOrigin: 'Word 1', value: iodNav, formatted: String(iodNav) }
+        { target: 'SB2', subTarget: '후반', name: 'a_f2', fullName: 'a_f2 (시계 드리프트율)', meaning: '2차 시계 가속도', wordOrigin: 'Word 4', value: af2, formatted: af2 === 0 ? '0.0 s/s²' : af2.toExponential(4) + ' s/s²' },
+        { target: 'SB2', subTarget: '후반', name: 'C_ic', fullName: 'C_ic (경사각 Cos 섭동)', meaning: '경사각 Cosine 조화 섭동', wordOrigin: 'Word 1~2', value: cic, formatted: (cic >= 0 ? '+' : '') + cic.toExponential(4) + ' rad' },
+        { target: 'SB2', subTarget: '후반', name: 'C_is', fullName: 'C_is (경사각 Sin 섭동)', meaning: '경사각 Sine 조화 섭동', wordOrigin: 'Word 2', value: cis, formatted: (cis >= 0 ? '+' : '') + cis.toExponential(4) + ' rad' },
+        { target: 'SB2', subTarget: '후반', name: 'IODnav', fullName: 'IODnav (궤도 데이터 번호)', meaning: 'Galileo 궤도/시계 이슈 번호', wordOrigin: 'Word 1', value: iodNav, formatted: String(iodNav) }
       ]
     };
   }
@@ -706,20 +706,17 @@ export function renderNavigationParametersDetails(parsed) {
   summary.append(icon);
   summary.append(title);
 
-  const sb2Count = parsed.elements.filter(e => e.target === 'SB2').length;
-  const sb3Count = parsed.elements.filter(e => e.target === 'SB3').length;
+  const sb2PrimaryCount = parsed.elements.filter(e => e.target === 'SB2' && !e.subTarget).length;
+  const sb2SuppCount = parsed.elements.filter(e => e.target === 'SB2' && e.subTarget).length;
+  const sb2Total = sb2PrimaryCount + sb2SuppCount;
 
-  if (sb2Count > 0) {
+  if (sb2Total > 0) {
     const pillSb2 = doc.createElement('span');
     pillSb2.className = 'nav-badge-pill badge-sb2';
-    pillSb2.textContent = 'SB2 ' + sb2Count + '항목';
+    pillSb2.textContent = sb2PrimaryCount > 0 && sb2SuppCount > 0
+      ? 'SB2 통합 ' + sb2Total + '항목 (기본 ' + sb2PrimaryCount + ' + 섭동·보충 ' + sb2SuppCount + ')'
+      : 'SB2 통합 ' + sb2Total + '항목';
     summary.append(pillSb2);
-  }
-  if (sb3Count > 0) {
-    const pillSb3 = doc.createElement('span');
-    pillSb3.className = 'nav-badge-pill badge-sb3';
-    pillSb3.textContent = 'SB3 ' + sb3Count + '항목';
-    summary.append(pillSb3);
   }
 
   const arrow = doc.createElement('span');
@@ -733,7 +730,7 @@ export function renderNavigationParametersDetails(parsed) {
 
   for (const el of parsed.elements) {
     const card = doc.createElement('div');
-    card.className = 'nav-param-card target-' + (el.target === 'SB2' ? 'sb2' : 'sb3');
+    card.className = 'nav-param-card target-sb2' + (el.subTarget ? ' target-sb2-supp' : '');
 
     const header = doc.createElement('div');
     header.className = 'nav-param-card-header';
@@ -748,8 +745,8 @@ export function renderNavigationParametersDetails(parsed) {
     }
 
     const tagSpan = doc.createElement('span');
-    tagSpan.className = 'nav-tag nav-tag-' + (el.target === 'SB2' ? 'sb2' : 'sb3');
-    tagSpan.textContent = el.target;
+    tagSpan.className = 'nav-tag nav-tag-sb2' + (el.subTarget ? ' nav-tag-sb2-supp' : '');
+    tagSpan.textContent = el.subTarget ? (el.target + ' · ' + el.subTarget) : (el.target + ' · 기본');
 
     header.append(nameSpan);
     header.append(tagSpan);
@@ -1433,7 +1430,7 @@ export function createObservationView(container, onSelect = () => {}, role = '')
     frameBody.replaceChildren();
     if (frameInput) {
       container.querySelector('[data-frame-summary]').textContent = frameInput.frameCount
-        + ' frames · SB2·SB3 항법정보 + SB4 관측값 · 원본 메타데이터 대조 통과 · 위 RAWX 표는 원본 보존값';
+        + ' frames · SB2 통합 항법정보 + SB3 0101 패딩 + SB4 관측값 · 원본 메타데이터 대조 통과 · 위 RAWX 표는 원본 보존값';
       const frameEpoch = frameInput.epochs?.[Number(select.value)]?.observation;
       for (const observation of frameEpoch?.observations || []) {
         const row = document.createElement('tr');
@@ -1499,7 +1496,7 @@ export function createObservationView(container, onSelect = () => {}, role = '')
     container.querySelector('[data-count]').textContent = '관측 신호 ' + values.length;
     container.querySelector('[data-status]').textContent = '';
     container.querySelector('[data-navigation-title]').textContent = '수신 항법정보 · SFRBX';
-    container.querySelector('[data-navigation-caption]').textContent = rawEpoch ? '전달된 항법 메시지' : 'SB2·SB3·SB4에서 복원한 항법 메시지';
+    container.querySelector('[data-navigation-caption]').textContent = rawEpoch ? '전달된 항법 메시지' : 'SB2 통합 항법 슬롯에서 복원한 항법 메시지 (SB3 0101 패딩)';
     select.replaceChildren(new Option('Week ' + (week ?? '—') + ' / TOW ' + numeric(tow) + ' s', '0'));
     select.disabled = true;
     body.replaceChildren();

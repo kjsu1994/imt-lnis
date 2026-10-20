@@ -392,7 +392,7 @@ public class IqReceiver {
                         navigation,
                         "assistance",
                         embedded
-                                ? "AFS SB2·SB3·SB4 복원 · JSON 항법정보 계산 대체 없음"
+                                ? "AFS SB2 통합 항법 · SB3 패딩 · SB4 복원 · JSON 항법정보 계산 대체 없음"
                                 : "GPS LNAV 메타데이터 · I/Q에서 복원한 SFRBX가 아님"));
     }
 
