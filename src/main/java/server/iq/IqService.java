@@ -1,62 +1,82 @@
 package server.iq;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
-
 import jakarta.annotation.PreDestroy;
-
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-
 import server.common.DtnModels.IqFile;
 import server.common.Hashing;
 import server.dtn.DtnLogService;
-
 import java.io.*;
 import java.nio.file.*;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
-
 /** One on-demand native process. Shared files stay outside the DB and HTTP body. */
 @Service
 public class IqService {
     public static final long EXPECTED_BYTES = 90L * 12_000_000 * 2;
     private final ObjectMapper json;
     private final Path root, simulator;
+    private final String hostDirectory;
     private final boolean enabled;
     private volatile Process process;
     private UUID active;
-
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private DtnLogService logs;
-
     private void trace(UUID id, String stage, boolean detail, String message) {
         if (logs != null) {
             logs.add(id, "IQ", stage, detail, message);
         }
     }
-
     private final Map<UUID, Map<String, Object>> jobs = new LinkedHashMap<>();
+        public IqService(
+            ObjectMapper json,
+            String root,
+            String simulator,
+            boolean enabled) {
+        this(json, root, null, simulator, enabled);
+    }
 
+    @org.springframework.beans.factory.annotation.Autowired
     public IqService(
             ObjectMapper json,
             @Value("${lnis.iq.directory:/exchange}") String root,
+            @Value("${lnis.iq.host-path:${lnis.iq.host-directory:}}") String hostDirectory,
             @Value("${lnis.iq.simulator:/app/iq/afs_sim}") String simulator,
             @Value("${lnis.iq.enabled:false}") boolean enabled) {
         this.json = json;
         this.root = Path.of(root).toAbsolutePath().normalize();
+        this.hostDirectory =
+                hostDirectory == null || hostDirectory.isBlank() ? null : hostDirectory.trim();
         this.simulator = Path.of(simulator).toAbsolutePath().normalize();
         this.enabled = enabled;
     }
-
+    public static String extractFileName(String rawPath) {
+        if (rawPath == null || rawPath.isBlank()) {
+            return null;
+        }
+        int lastBackslash = rawPath.lastIndexOf('\\');
+        int lastSlash = rawPath.lastIndexOf('/');
+        int lastSep = Math.max(lastBackslash, lastSlash);
+        return lastSep >= 0 ? rawPath.substring(lastSep + 1) : rawPath;
+    }
+    public String formatFilePath(UUID id) {
+        if (hostDirectory != null && !hostDirectory.isBlank()) {
+            String clean = hostDirectory.trim();
+            String sep = clean.contains("\\") ? "\\" : "/";
+            if (clean.endsWith("/") || clean.endsWith("\\")) {
+                return clean + id + ".bin";
+            }
+            return clean + sep + id + ".bin";
+        }
+        return "/exchange/" + id + ".bin";
+    }
     public synchronized boolean managementBusy(UUID id) {
         return active != null && (id == null || active.equals(id));
     }
-
     public boolean enabled() {
         return enabled && Files.isExecutable(simulator);
     }
-
     public synchronized List<Map<String, Object>> recent() throws IOException {
         if (Files.isDirectory(root)) {
             try (var files = Files.list(root)) {
@@ -90,7 +110,6 @@ public class IqService {
                         })
                 .toList();
     }
-
     public synchronized void delete(UUID id) throws IOException {
         if (id.equals(active)) {
             throw new IllegalStateException("생성 중인 파일은 취소 후 삭제하세요.");
@@ -104,14 +123,12 @@ public class IqService {
         Files.deleteIfExists(root.resolve(id + ".context.json"));
         jobs.remove(id);
     }
-
     public synchronized Map<String, Object> start() throws IOException {
         if (!enabled()) {
             throw new IllegalStateException("I/Q 생성기를 설정하세요.");
         }
         throw new IllegalArgumentException("GNSS 입력을 선택하세요.");
     }
-
     public static String earthInput(List<byte[]> records, server.common.DtnModels.Pvt pvt) {
         if (pvt == null || !pvt.isPositionValid() || !pvt.isVelocityValid()) {
             throw new IllegalArgumentException("유효 PVT 필요");
@@ -200,11 +217,9 @@ public class IqService {
         }
         return text.toString();
     }
-
     public synchronized Map<String, Object> start(String earthInput) throws IOException {
         return start(earthInput, null);
     }
-
     public synchronized Map<String, Object> start(String earthInput, UUID inputId)
             throws IOException {
         if (earthInput == null
@@ -240,7 +255,6 @@ public class IqService {
         Thread.ofVirtual().name("iq-generate").start(() -> generate(id, earthInput));
         return status(id);
     }
-
     private void generate(UUID id, String earthInput) {
         Path work = root.resolve("work-" + id), part = root.resolve(id + ".bin.part");
         try {
@@ -331,7 +345,7 @@ public class IqService {
                 Files.move(part, root.resolve(id + ".bin"), StandardCopyOption.ATOMIC_MOVE);
                 IqFile file =
                         new IqFile(
-                                "/exchange/" + id + ".bin",
+                                formatFilePath(id),
                                 EXPECTED_BYTES,
                                 digest,
                                 90,
@@ -362,7 +376,6 @@ public class IqService {
             }
         }
     }
-
     public synchronized Map<String, Object> status(UUID id) throws IOException {
         Map<String, Object> job = jobs.get(id);
         if (job == null && Files.isRegularFile(root.resolve(id + ".json"))) {
@@ -394,7 +407,6 @@ public class IqService {
         }
         return result;
     }
-
     public synchronized void cancel(UUID id) {
         if (!id.equals(active)) {
             return;
@@ -405,11 +417,9 @@ public class IqService {
         }
         set(id, "CANCELLED", "생성 취소", null);
     }
-
     private boolean cancelled(UUID id) {
         return jobs.containsKey(id) && "CANCELLED".equals(jobs.get(id).get("state"));
     }
-
     private void set(UUID id, String state, String message, IqFile file) {
         var value = new LinkedHashMap<String, Object>();
         value.put("id", id);
@@ -433,7 +443,6 @@ public class IqService {
             jobs.remove(jobs.keySet().iterator().next());
         }
     }
-
     public IqFile completed(UUID id) throws IOException {
         var job = status(id);
         if (!"READY".equals(job.get("state"))) {
@@ -441,9 +450,20 @@ public class IqService {
         }
         IqFile file = (IqFile) job.get("file");
         verify(file);
+        String clientPath = formatFilePath(id);
+        if (!clientPath.equals(file.filePath())) {
+            file =
+                    new IqFile(
+                            clientPath,
+                            file.sizeBytes(),
+                            file.sha256(),
+                            file.durationSeconds(),
+                            file.sampleRateHz(),
+                            file.sampleFormat(),
+                            file.quantizationBits());
+        }
         return file;
     }
-
     /** Old files remain file-integrity-only; never invent missing generation metadata. */
     public IqReceiver.Source source(UUID id, IqFile file) throws IOException {
         Path context = root.resolve(id + ".context.json");
@@ -460,14 +480,14 @@ public class IqService {
         IqReceiver.validate(source.metadata());
         return source;
     }
-
     public Path path(IqFile file) throws IOException {
-        if (file == null
-                || file.filePath() == null
-                || !file.filePath().matches("/exchange/[0-9a-fA-F-]{36}\\.bin")) {
+        if (file == null || file.filePath() == null) {
             throw new IllegalArgumentException("허용되지 않은 I/Q 공유 경로");
         }
-        String name = file.filePath().substring("/exchange/".length());
+        String name = extractFileName(file.filePath());
+        if (name == null || !name.matches("[0-9a-fA-F-]{36}\\.bin")) {
+            throw new IllegalArgumentException("허용되지 않은 I/Q 공유 경로: " + file.filePath());
+        }
         UUID.fromString(name.substring(0, 36));
         Path path = root.resolve(name);
         if (Files.isSymbolicLink(path)
@@ -477,7 +497,6 @@ public class IqService {
         }
         return path;
     }
-
     public Map<String, Object> verify(IqFile file) throws IOException {
         if (file == null
                 || file.sizeBytes() != EXPECTED_BYTES
@@ -503,7 +522,6 @@ public class IqService {
                 "filePath",
                 file.filePath());
     }
-
     public List<List<Integer>> preview(IqFile file) throws IOException {
         try (var in = Files.newInputStream(path(file))) {
             byte[] bytes = in.readNBytes(64);
@@ -514,7 +532,6 @@ public class IqService {
             return values;
         }
     }
-
     private static String sha256(Path path) throws IOException {
         var digest = Hashing.sha256Digest();
         try (var in = Files.newInputStream(path)) {
@@ -529,7 +546,6 @@ public class IqService {
         }
         return Hashing.hex(digest.digest());
     }
-
     @PreDestroy
     public synchronized void close() {
         if (process != null) {

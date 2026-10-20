@@ -68,6 +68,10 @@ lnis:
   storage:
     data-directory: ${LNIS_DATA_DIR:./data}
     cleanup-delay: ${LNIS_CLEANUP_DELAY:PT10M}
+  iq:
+    directory: ${LNIS_IQ_DIRECTORY:/exchange}
+    host-path: ${LNIS_IQ_HOST_PATH:${LNIS_IQ_HOST_DIRECTORY:}}
+    enabled: ${LNIS_IQ_ENABLED:false}
 
 ---
 
