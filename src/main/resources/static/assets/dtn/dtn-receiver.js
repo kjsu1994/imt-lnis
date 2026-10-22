@@ -430,10 +430,10 @@ function render3DCube(data) {
     <circle id="cube-target-dot" cx="${pTarget.x.toFixed(1)}" cy="${pTarget.y.toFixed(1)}" r="5.5" fill="${targetColor}" stroke="#ffffff" stroke-width="1.8" style="cursor: pointer;" />
 
     <!-- Floating Target Badge -->
-    <g transform="translate(${(pTarget.x + 8).toFixed(1)}, ${(pTarget.y - 18).toFixed(1)})">
-      <rect x="0" y="0" width="86" height="26" rx="4" fill="rgba(15, 23, 42, 0.88)" />
-      <text x="6" y="11" fill="#f8fafc" font-size="8.5" font-family="monospace" font-weight="700">ΔR ${positionDifference(data.deltaR)}</text>
-      <text x="6" y="21" fill="#38bdf8" font-size="8" font-family="monospace">ΔU ${(data.deltaU >= 0 ? '+' : '')}${positionDifference(Math.abs(data.deltaU))}</text>
+    <g transform="translate(${(pTarget.x + 10).toFixed(1)}, ${(pTarget.y - 20).toFixed(1)})">
+      <rect x="0" y="0" width="130" height="39" rx="6" fill="rgba(15, 23, 42, 0.92)" stroke="rgba(255, 255, 255, 0.15)" stroke-width="1" />
+      <text x="10" y="16" fill="#f8fafc" font-size="12.5" font-family="monospace" font-weight="700">ΔR ${positionDifference(data.deltaR)}</text>
+      <text x="10" y="31" fill="#38bdf8" font-size="12" font-family="monospace" font-weight="600">ΔU ${(data.deltaU >= 0 ? '+' : '')}${positionDifference(Math.abs(data.deltaU))}</text>
     </g>
 
     <!-- Top Left Range Marker -->

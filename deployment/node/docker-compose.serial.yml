@@ -1,6 +1,0 @@
-services:
-  node:
-    devices:
-      - ${LNIS_SERIAL_DEVICE:?Linux GNSS 장치의 절대 경로를 설정하세요}:/dev/ttyUSB0
-    group_add:
-      - ${LNIS_SERIAL_GID:-20}

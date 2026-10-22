@@ -9,7 +9,7 @@ services:
     network_mode: none
     volumes:
       - ./DB:/app/data
-      - ./exchange:/exchange
+      - ./exchange:/exchange  # <-- 센더의 C:\lnis-compose\exchange 폴더를 마운트
     restart: "no"
 
   node:

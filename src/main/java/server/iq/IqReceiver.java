@@ -495,7 +495,10 @@ public class IqReceiver {
                                     initial.getVelocityMetersPerSecond().clone());
                             result.setReceiverClockBiasSeconds(
                                     initial.getReceiverClockBiasSeconds());
-                            result.setSatellitesUsed(initial.getSatellitesUsed());
+                            result.setSatellitesUsed(
+                                    p.getSatellitesUsed() > 0
+                                            ? p.getSatellitesUsed()
+                                            : initial.getSatellitesUsed());
                             result.setMessage("송신 초기 PVT의 등속 궤적 · 동일 샘플 시각");
                             return result;
                         })
