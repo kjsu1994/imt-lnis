@@ -200,11 +200,8 @@ class DtnPresetTest {
         c.setMaxLtpReceiveUdpPacketSizeBytes(65536);
         c.setAcsSendPeriodMilliseconds(1000);
         var bdsSettings = new DtnPresetService.Settings("GNSS_RAW", "DTN", "HDTN", "BEIDOU", true, c);
-        var bds = service.save(null, new DtnPresetService.Save("BDS Preset", null, bdsSettings));
-        assertEquals("BEIDOU", bds.settings().pvtConstellation());
-
-        var loaded = service.list().stream().filter(v -> v.name().equals("BDS Preset")).findFirst().orElseThrow();
-        assertEquals("BEIDOU", loaded.settings().pvtConstellation());
+        assertThrows(ResponseStatusException.class,
+                () -> service.save(null, new DtnPresetService.Save("BDS Preset", null, bdsSettings)));
 
         var invalid = new DtnPresetService.Settings("GNSS_RAW", "DTN", "HDTN", "GLONASS_UNKNOWN", true, c);
         assertThrows(ResponseStatusException.class, () -> service.save(null, new DtnPresetService.Save("Invalid", null, invalid)));

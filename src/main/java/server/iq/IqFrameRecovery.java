@@ -11,13 +11,15 @@ import java.util.*;
 
 /** Uses only PocketSDR CRC-verified subblocks from a single decoded RF frame. */
 final class IqFrameRecovery {
-    record Recovered(List<IqNavigation> navigation, Set<Integer> prns) {}
+    record Recovered(List<IqNavigation> navigation, Set<Integer> prns,
+            List<AfsPvtFrameCodec.DelayPayload> frames) {}
 
     private IqFrameRecovery() {}
 
     static Recovered read(Path tracking, IqMetadata metadata) throws IOException {
         Map<String, byte[][]> pending = new HashMap<>();
-        Map<Integer, AfsPvtFrameCodec.Payload> recovered = new TreeMap<>();
+        Map<Integer, AfsPvtFrameCodec.DelayPayload> recovered = new TreeMap<>();
+        Map<Integer, byte[][]> receivedBits = new HashMap<>();
         try (var reader = Files.newBufferedReader(tracking)) {
             String line;
             while ((line = reader.readLine()) != null) {
@@ -47,7 +49,8 @@ final class IqFrameRecovery {
                 if (Arrays.stream(parts).anyMatch(Objects::isNull)) {
                     continue;
                 }
-                var payload = AfsPvtFrameCodec.decode(parts[0], parts[1], parts[2]);
+                var frame = AfsPvtFrameCodec.decodeDelay(parts[0], parts[1], parts[2], null);
+                var payload = frame.observation();
                 if (payload.epoch() != 0
                         || payload.prn() != prn
                         || payload.week() != metadata.week()
@@ -55,14 +58,16 @@ final class IqFrameRecovery {
                         || payload.navigation() == null) {
                     throw new IOException("I/Q 프레임과 시험 Epoch/PRN 불일치");
                 }
-                var previous = recovered.putIfAbsent(prn, payload);
+                var previous = recovered.putIfAbsent(prn, frame);
                 if (previous != null) {
-                    var before = AfsPvtFrameCodec.encode(previous);
-                    if (!Arrays.equals(before.sb2(), parts[0])
-                            || !Arrays.equals(before.sb3(), parts[1])
-                            || !Arrays.equals(before.sb4(), parts[2])) {
+                    var before = receivedBits.get(prn);
+                    if (!Arrays.equals(before[0], parts[0])
+                            || !Arrays.equals(before[1], parts[1])
+                            || !Arrays.equals(before[2], parts[2])) {
                         throw new IOException("I/Q 반복 프레임 내용 불일치");
                     }
+                } else {
+                    receivedBits.put(prn, parts.clone());
                 }
             }
         }
@@ -70,16 +75,16 @@ final class IqFrameRecovery {
             throw new IOException("I/Q 계산용 AFS 프레임 복원 부족: " + recovered.size() + "/4 PRN");
         }
         // Validate common epoch/ionosphere state without using original RAWX in the RF solver.
-        AfsPvtFrameCodec.records(new ArrayList<>(recovered.values()));
+        AfsPvtFrameCodec.records(recovered.values().stream().map(AfsPvtFrameCodec.DelayPayload::observation).toList());
         List<IqNavigation> navigation = new ArrayList<>();
-        var first = recovered.values().iterator().next();
+        var first = recovered.values().iterator().next().observation();
         if (first.ionosphere() != null) {
             navigation.add(nav(first.ionPrn(), first.ionosphere()));
         }
         for (var payload : recovered.values()) {
-            for (int[] words : payload.navigation()) navigation.add(nav(payload.prn(), words));
+            for (int[] words : payload.observation().navigation()) navigation.add(nav(payload.observation().prn(), words));
         }
-        return new Recovered(List.copyOf(navigation), Set.copyOf(recovered.keySet()));
+        return new Recovered(List.copyOf(navigation), Set.copyOf(recovered.keySet()), List.copyOf(recovered.values()));
     }
 
     private static IqNavigation nav(int prn, int[] words) {

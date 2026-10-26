@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class UbxGrawImportTest {
     @Test void readsRealReceiverArchiveWhenAvailable() throws Exception {
-        var file = java.nio.file.Path.of("real-gnss-source.ubx");
+        var file = java.nio.file.Path.of("test2.ubx");
         org.junit.jupiter.api.Assumptions.assumeTrue(java.nio.file.Files.isRegularFile(file));
         byte[] raw = java.nio.file.Files.readAllBytes(file);
         var info = UbxGrawImport.receiverInfo(raw);

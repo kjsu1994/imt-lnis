@@ -50,7 +50,7 @@ class AfsPvtFrameIntegrationTest {
                     assertEquals(i % 2, bits.sb3()[i]);
                 }
                 for (int i = AfsPvtFrameCodec.SB4_USED; i < 846; i++) {
-                    assertEquals(0, bits.sb4()[i]);
+                    assertEquals((i - AfsPvtFrameCodec.SB4_USED) % 2, bits.sb4()[i]);
                 }
                 byte[] encoded = afs.encode(33, bits.sb2(), bits.sb3(), bits.sb4());
                 assertEquals(750, encoded.length);
@@ -59,7 +59,7 @@ class AfsPvtFrameIntegrationTest {
                 decoded.add(
                         AfsPvtFrameCodec.decode(recovered.sb2(), recovered.sb3(), recovered.sb4()));
             }
-            assertEquals(
+            NativePvtIntegrationTest.assertPvtClose(
                     reference.calculate(source),
                     receiver.calculate(AfsPvtFrameCodec.records(decoded)));
         }
@@ -74,7 +74,7 @@ class AfsPvtFrameIntegrationTest {
             var prepared = processor.prepare(id, NativePvtIntegrationTest.validSample());
             Transfer transfer =
                     json.readValue(json.writeValueAsBytes(prepared.getTransfer()), Transfer.class);
-            assertEquals(4, transfer.getSchemaVersion());
+            assertEquals(6, transfer.getSchemaVersion());
             assertEquals(AfsPvtFrameCodec.FORMAT, transfer.getFormat());
             assertEquals(
                     96,
@@ -84,7 +84,7 @@ class AfsPvtFrameIntegrationTest {
             assertEquals(
                     5, transfer.getSatellites().stream().mapToInt(s -> s.frames().size()).sum());
             var result = processor.receive(id, transfer);
-            assertEquals(prepared.getPvt(), result.getPvt());
+            NativePvtIntegrationTest.assertPvtClose(prepared.getPvt(), result.getPvt());
             assertEquals(
                     server.common.DtnObservationView.fromRecords(source).records(),
                     result.getObservations().records());
@@ -208,12 +208,18 @@ class AfsPvtFrameIntegrationTest {
                         List.of());
         IqReceiver.validate(noAssistance);
         var receiver = new IqReceiver("unused", nativePath.toString());
-        var result = receiver.calculate(root.resolve("tracking.log"), noAssistance);
+        var start = java.time.Instant.parse("2026-10-26T00:00:00.123456789Z");
+        var result = receiver.calculate(root.resolve("tracking.log"), noAssistance,
+                new server.pvt.DtnDelay.Timing(start, start.plusSeconds(20)));
         assertTrue(result.pvt().stream().anyMatch(Pvt::isPositionValid));
         assertTrue(result.pvt().stream().anyMatch(Pvt::isVelocityValid));
-        assertTrue(result.observations().get("assistance").toString().contains("AFS SB2"));
+        assertEquals("IQ_FRAME", result.observations().get("source"));
+        assertEquals(1, result.pvt().size());
+        assertFalse(((List<?>) result.observations().get("trackingEpochs")).isEmpty());
         var reference = IqReceiver.references(m, List.of(source.reference()), result.pvt());
-        var comparison = IqReceiver.comparison(reference, result.pvt());
+        var comparison = server.pvt.DtnComparison.delay(reference, result.pvt(), result.delayEvidence());
+        assertEquals(20, result.pvt().getFirst().getReceiverClockBiasSeconds()
+                - source.reference().getReceiverClockBiasSeconds(), 1e-8);
         assertEquals("MEASURED", comparison.get("verdict"));
         json.writerWithDefaultPrettyPrinter()
                 .writeValue(root.resolve("pvt-comparison.json").toFile(), comparison);

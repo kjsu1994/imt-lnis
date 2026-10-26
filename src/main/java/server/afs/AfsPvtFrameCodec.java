@@ -10,9 +10,9 @@ import java.util.*;
  * FEC is deliberately outside this class. Both DTN and the I/Q modulator use these bits.
  */
 public final class AfsPvtFrameCodec {
-    public static final String FORMAT = "LNIS-AFS-GNSS-v4";
-    public static final int TYPE = 63, VERSION = 2;
-    public static final int SB2_PRIMARY_USED = 284, SB2_USED = 801, SB3_USED = 0, SB4_USED = 506;
+    public static final String FORMAT = "LNIS-AFS-GNSS-v6";
+    public static final int TYPE = 63, VERSION = 6;
+    public static final int SB2_PRIMARY_USED = 284, SB2_USED = 801, SB3_USED = 0, SB4_USED = 670;
     private static final UUID INTERNAL_ID = new UUID(0, 0);
     // LNAV subframe, bit offset (parity stripped), AFS SB2 offset, bit count.
     private static final int[][] FIELDS = {
@@ -138,102 +138,16 @@ public final class AfsPvtFrameCodec {
         return List.copyOf(result);
     }
 
+    /** I/Q uses the observation's virtual time axis; reception rebases it to the trial start. */
     public static Blocks encode(Payload p) {
         validate(p);
-        byte[] sb2 = new byte[1176];
-        put(sb2, 0, 13, p.week());
-        put(sb2, 13, 9, (int) (p.tow() / 1200));
-        if (p.navigation() != null) {
-            for (int[] f : FIELDS) {
-                put(sb2, f[2], f[3], read(p.navigation()[f[0]], f[1], f[3]));
-            }
-        }
-        Bits b2 = new Bits(sb2, SB2_PRIMARY_USED);
-        b2.write(TYPE, 6);
-        b2.write(VERSION, 8);
-        b2.write(2, 3);
-        b2.write(p.epoch(), 32);
-        b2.write(p.prn(), 8);
-        b2.write(p.navigation() == null ? 0 : 1, 1);
-        for (int i = 0; i < 720; i++) {
-            if (!MAPPED[i]) {
-                b2.write(p.navigation() == null ? 0 : read(p.navigation()[i / 240], i % 240, 1), 1);
-            }
-        }
-        for (int i = SB2_USED; i < sb2.length; i++) {
-            sb2[i] = (byte) (i % 2);
-        }
-        byte[] sb3 = new byte[846];
-        for (int i = 0; i < sb3.length; i++) {
-            sb3[i] = (byte) (i % 2);
-        }
-        Bits b4 = header(p, 4);
-        b4.write(p.measurement(), 8);
-        b4.write(p.week(), 16);
-        b4.write(Double.doubleToRawLongBits(p.tow()), 64);
-        b4.write(Double.doubleToRawLongBits(p.range()), 64);
-        b4.write(Float.floatToRawIntBits(p.doppler()), 32);
-        b4.write(p.cn0(), 8);
-        b4.write(p.status(), 8);
-        b4.write(p.ionosphere() == null ? 0 : 1, 1);
-        b4.write(p.ionPrn(), 8);
-        for (int i = 0; i < 10; i++) {
-            b4.write(p.ionosphere() == null ? 0 : p.ionosphere()[i], 24);
-        }
-        return new Blocks(sb2, sb3, b4.data);
+        Instant anchor = Instant.ofEpochSecond(315964800L + p.week() * 604800L)
+                .plusNanos(Math.round(p.tow() * 1_000_000_000L));
+        return encodeDelay(p, anchor);
     }
 
     public static Payload decode(byte[] sb2, byte[] sb3, byte[] sb4) {
-        checkBits(sb2, 1176);
-        checkBits(sb3, 846);
-        Bits b2 = new Bits(sb2, SB2_PRIMARY_USED), b4 = new Bits(sb4);
-        int[] h2 = readHeader(b2, 2), h4 = readHeader(b4, 4);
-        if (!Arrays.equals(h2, h4)) {
-            throw invalid("SB2/SB4 식별 불일치");
-        }
-        boolean hasNav = b2.read(1) != 0;
-        int[][] nav = new int[3][10];
-        for (int i = 0; i < 720; i++) {
-            if (!MAPPED[i]) {
-                write(nav[i / 240], i % 240, 1, b2.read(1));
-            }
-        }
-        for (int[] f : FIELDS) {
-            write(nav[f[0]], f[1], f[3], read(sb2, f[2], f[3]));
-        }
-        int measurement = (int) b4.read(8), week = (int) b4.read(16);
-        double tow = Double.longBitsToDouble(b4.read(64)),
-                range = Double.longBitsToDouble(b4.read(64));
-        float doppler = Float.intBitsToFloat((int) b4.read(32));
-        int cn0 = (int) b4.read(8), status = (int) b4.read(8);
-        boolean hasIon = b4.read(1) != 0;
-        int ionPrn = (int) b4.read(8);
-        int[] ion = new int[10];
-        for (int i = 0; i < 10; i++) {
-            ion[i] = (int) b4.read(24);
-        }
-        Payload p =
-                new Payload(
-                        h2[0],
-                        measurement,
-                        week,
-                        tow,
-                        h2[1],
-                        range,
-                        doppler,
-                        cn0,
-                        status,
-                        hasNav ? nav : null,
-                        ionPrn,
-                        hasIon ? ion : null);
-        // Canonical re-encoding also checks all unused bits, flags and the SB2 time fields.
-        Blocks canonical = encode(p);
-        if (!Arrays.equals(sb2, canonical.sb2())
-                || !Arrays.equals(sb3, canonical.sb3())
-                || !Arrays.equals(sb4, canonical.sb4())) {
-            throw invalid("예약 비트/시각/존재 플래그 불일치");
-        }
-        return p;
+        return decodeDelay(sb2, sb3, sb4, null).observation();
     }
 
     /** Build solver-only records. Original envelopes and non-PVT values never enter this path. */
@@ -304,14 +218,34 @@ public final class AfsPvtFrameCodec {
 
     public record DelayPayload(Payload observation, server.pvt.DelayTime transmitAt, Instant startedAt) {}
 
-    /** v5는 SB4 의사거리 대신 가상 송신 시각을 전달한다. */
+    /** AFS and I/Q share this single SB layout: navigation, padding, and virtual transmit time. */
     public static Blocks encodeDelay(Payload p, Instant start) {
-        Blocks original = encode(p);
-        byte[] sb2 = original.sb2().clone();
-        put(sb2, SB2_PRIMARY_USED + 6, 8, 3);
-        byte[] sb3 = original.sb3().clone();
+        validate(p);
+        byte[] sb2 = new byte[1176];
+        put(sb2, 0, 13, p.week());
+        put(sb2, 13, 9, (int) (p.tow() / 1200));
+        if (p.navigation() != null) {
+            for (int[] f : FIELDS) {
+                put(sb2, f[2], f[3], read(p.navigation()[f[0]], f[1], f[3]));
+            }
+        }
+        Bits b2 = new Bits(sb2, SB2_PRIMARY_USED);
+        b2.write(TYPE, 6);
+        b2.write(VERSION, 8);
+        b2.write(2, 3);
+        b2.write(p.epoch(), 32);
+        b2.write(p.prn(), 8);
+        b2.write(p.navigation() == null ? 0 : 1, 1);
+        for (int i = 0; i < 720; i++) {
+            if (!MAPPED[i]) {
+                b2.write(p.navigation() == null ? 0 : read(p.navigation()[i / 240], i % 240, 1), 1);
+            }
+        }
+        for (int i = SB2_USED; i < sb2.length; i++) sb2[i] = (byte) (i % 2);
+        byte[] sb3 = new byte[846];
+        for (int i = 0; i < sb3.length; i++) sb3[i] = (byte) (i % 2);
         Bits b4 = header(p, 4);
-        put(b4.data, 6, 8, 3);
+        put(b4.data, 6, 8, VERSION);
         b4.write(p.measurement(), 8);
         b4.write(p.week(), 16);
         b4.write(Double.doubleToRawLongBits(p.tow()), 64);
@@ -359,6 +293,7 @@ public final class AfsPvtFrameCodec {
         var anchor = new server.pvt.DelayTime(b4.read(64), b4.read(50));
         if (anchor.femtoseconds() % 1_000_000 != 0) throw invalid("시험 시작 시각 정밀도 오류");
         Instant start = Instant.ofEpochSecond(anchor.seconds(), anchor.femtoseconds() / 1_000_000);
+        if (received == null) received = start;
         if (received.isBefore(start)) throw invalid("음수 지연: PC 시계 동기화를 확인하세요.");
         boolean empty = h2[1] == 0;
         if (empty ? !transmit.equals(anchor) : transmit.until(start) <= 0) {
@@ -369,7 +304,7 @@ public final class AfsPvtFrameCodec {
                 hasNav ? nav : null, ionPrn, hasIon ? ion : null);
         Blocks expected = encode(p);
         byte[] canonical2 = expected.sb2().clone();
-        put(canonical2, SB2_PRIMARY_USED + 6, 8, 3);
+        put(canonical2, SB2_PRIMARY_USED + 6, 8, VERSION);
         if (!Arrays.equals(sb2, canonical2) || !Arrays.equals(sb3, expected.sb3())) {
             throw invalid("SB2/SB3 시간 또는 예약 비트 오류");
         }
@@ -383,8 +318,8 @@ public final class AfsPvtFrameCodec {
     }
 
     private static int[] readDelayHeader(Bits bits, int block) {
-        if (bits.read(6) != TYPE || bits.read(8) != 3 || bits.read(3) != block) {
-            throw invalid("지연 확장 버전/블록 오류");
+        if (bits.read(6) != TYPE || bits.read(8) != VERSION || bits.read(3) != block) {
+            throw invalid("지원하지 않는 프레임입니다. 현재 규격으로 다시 생성하세요.");
         }
         return new int[] {(int) bits.read(32), (int) bits.read(8)};
     }

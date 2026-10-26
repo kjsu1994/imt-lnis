@@ -42,6 +42,7 @@ services:
       LNIS_DATA_DIR: /app/data
       LNIS_IQ_ENABLED: ${LNIS_IQ_ENABLED:-false}
       LNIS_IQ_DIRECTORY: /exchange
+      LNIS_IQ_HOST_PATH: ${LNIS_IQ_HOST_PATH:-}
       OMP_NUM_THREADS: "2"
       dtn_adapter: ${dtn_adapter:-}
       LNIS_DTN_SEND_TOKEN: ${LNIS_DTN_SEND_TOKEN:-}

@@ -66,6 +66,12 @@ public final class DtnModels {
         private List<Pvt> referencePvt;
     }
 
+    public static void requireGps(String value) {
+        if (value != null && !value.isBlank() && !"GPS".equalsIgnoreCase(value.trim())) {
+            throw new IllegalArgumentException("PVT 계산은 GPS L1 C/A만 지원합니다.");
+        }
+    }
+
     public record ReferenceSnapshot(UUID testId, String payloadSha256,
             String sourceSha256, String grawBase64, List<Pvt> referencePvt) {}
 

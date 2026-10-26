@@ -48,7 +48,7 @@ class NativeDiagnosticRemovalTest {
             var baseline =
                     receiver.calculate(
                             root.resolve("tracking-" + fixture + "-baseline-1.log"), frameOnly);
-            assertTrue(baseline.pvt().size() >= 10, fixture);
+            assertEquals(1, baseline.pvt().size(), fixture);
             for (int round = 1; round <= 3; round++) {
                 Path before = root.resolve("tracking-" + fixture + "-baseline-" + round + ".log");
                 Path after = root.resolve("tracking-" + fixture + "-candidate-" + round + ".log");

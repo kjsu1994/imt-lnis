@@ -12,7 +12,6 @@ import server.dtn.DtnRepository;
 import server.dtn.DtnService;
 
 import java.net.URI;
-import java.util.List;
 
 /** 후보 연결 테스트와 주소 적용을 분리하고, 시험 시작과 주소 변경이 겹치지 않도록 조정한다. */
 @Service
@@ -48,7 +47,7 @@ public class NodeConnectionService {
         result.setBaseUrl(address == null ? "" : address.toString());
         result.setPeerAgentId(properties.getPeerAgentId());
         result.setTokenConfigured(!properties.getManagementToken().isBlank());
-        result.setEditable(true);
+        result.setEditable(!busy());
         result.setBusy(busy());
         result.setPeerOnline(connection.online());
         result.setReverseOnline(connection.reverseOnline());
@@ -102,8 +101,7 @@ public class NodeConnectionService {
     }
 
     private boolean busy() {
-        return !jobs.findByStateIn(List.of("PREPARING", "WAITING_RECEIVER", "CALCULATING"))
-                .isEmpty();
+        return dtn.managementBusy() || jobs.peerAddressBusy();
     }
 
     URI address(NodeConnectionDto.AddressRequest request) {

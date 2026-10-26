@@ -399,7 +399,16 @@ public class IqService {
         result.put("expectedBytes", EXPECTED_BYTES);
         if (job.get("file") instanceof IqFile file && "READY".equals(job.get("state"))) {
             try {
-                result.put("preview", preview(file));
+                Path context = root.resolve(id + ".context.json");
+                var source = Files.isRegularFile(context)
+                        ? json.readValue(context.toFile(), IqReceiver.Source.class) : null;
+                if (source == null || source.metadata() == null
+                        || !IqReceiver.FRAME_METHOD.equals(source.metadata().pvtMethod())) {
+                    result.put("state", "REGENERATE");
+                    result.put("message", "현재 프레임 규격으로 다시 생성하세요.");
+                } else {
+                    result.put("preview", preview(file));
+                }
             } catch (IOException | IllegalArgumentException error) {
                 result.put("state", "FAILED");
                 result.put("message", "저장된 파일이 없거나 읽을 수 없습니다.");

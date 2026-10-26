@@ -133,65 +133,6 @@ body[data-page^="dtn-"] .card .dtn-payload-header > h2 { margin: 0 auto 0 0; fon
  * PVT 계산 대상 (Constellation)
  * ========================================================= */
 
-.pvt-constellation-section {
-    margin-bottom: 20px;
-    padding: 14px;
-    border: 1px solid var(--line);
-    border-radius: 9px;
-    background: #fbfcfc;
-}
-
-.pvt-constellation-title {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 10px;
-}
-
-.pvt-constellation-title span {
-    color: var(--muted);
-    font-size: 12px;
-    font-weight: 700;
-}
-
-.pvt-constellation-title strong {
-    color: var(--navy);
-    font-size: 13px;
-}
-
-.pvt-constellation-selector {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 8px;
-}
-
-.pvt-constellation-button {
-    padding: 11px 10px;
-    border: 1px solid var(--line);
-    background: #f5f8f8;
-    font-weight: 700;
-    cursor: pointer;
-}
-
-.pvt-constellation-button:hover {
-    border-color: var(--teal);
-}
-
-.pvt-constellation-button.active {
-    border-color: var(--teal);
-    background: var(--teal);
-    color: #fff;
-}
-
-.pvt-constellation-button:disabled {
-    cursor: not-allowed;
-    opacity: .6;
-}
-
-/* =========================================================
- * DTN / HDTN 전송 방식
- * ========================================================= */
-
 .transport-mode-section {
     margin-bottom: 20px;
 
@@ -3765,4 +3706,24 @@ button.satellite-select.constellation-badge[aria-pressed="true"] {
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 105px;
+}
+
+.iq-tracking-viewport { max-height: 240px; overflow: auto; }
+
+@media (max-width: 820px) {
+  .receiver-trial-toolbar .receiver-selection,
+  .receiver-trial-toolbar .receiver-flow-container {
+    min-width: 0;
+    max-width: 100%;
+    flex-shrink: 1;
+    flex-wrap: wrap;
+  }
+  .receiver-meta-inline {
+    flex-wrap: wrap;
+    max-width: 100%;
+    height: auto;
+    padding-left: 0;
+    border-left: 0;
+    gap: 4px 10px;
+  }
 }

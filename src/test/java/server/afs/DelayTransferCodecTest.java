@@ -77,7 +77,7 @@ public class DelayTransferCodecTest {
         var blocks = AfsPvtFrameCodec.encodeDelay(payload, start);
         assertEquals(801, AfsPvtFrameCodec.SB2_USED);
         assertEquals(0, AfsPvtFrameCodec.SB3_USED);
-        assertEquals(506, AfsPvtFrameCodec.SB4_USED);
+        assertEquals(670, AfsPvtFrameCodec.SB4_USED);
         for (int i = AfsPvtFrameCodec.SB2_USED; i < 1176; i++) assertEquals(i % 2, blocks.sb2()[i]);
         for (int i = 0; i < 846; i++) assertEquals(i % 2, blocks.sb3()[i]);
         for (int i = 670; i < 846; i++) assertEquals((i - 670) % 2, blocks.sb4()[i]);

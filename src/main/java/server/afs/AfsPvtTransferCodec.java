@@ -51,18 +51,18 @@ public final class AfsPvtTransferCodec {
                                 .map(AfsMetadataCodec::record)
                                 .toList()));
         AfsMetadataCodec.group(transfer);
-        transfer.setSchemaVersion(4);
+        transfer.setSchemaVersion(6);
         transfer.setFormat(AfsPvtFrameCodec.FORMAT);
     }
 
     public static Restored restore(Transfer transfer, NativeAfsCodec codec) {
-        if (transfer.getSchemaVersion() != 4
+        if (transfer.getSchemaVersion() != 6
                 || !AfsPvtFrameCodec.FORMAT.equals(transfer.getFormat())
                 || !DtnModels.PROFILE.equals(transfer.getProfile())
                 || !"AFS_METADATA".equals(transfer.getTestType())
                 || transfer.getFile() != null
                 || transfer.getGrawBase64() != null) {
-            throw new IllegalArgumentException("AFS v4 전송 형식 오류");
+            throw new IllegalArgumentException("현재 AFS 전송 형식이 아닙니다. 다시 생성하세요.");
         }
         Transfer flat = AfsMetadataCodec.ungroup(transfer);
         List<byte[]> source = new ArrayList<>();

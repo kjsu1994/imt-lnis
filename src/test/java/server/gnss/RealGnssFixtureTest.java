@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class RealGnssFixtureTest {
     @Test void everySavedMeasurementAndNavigationWordExistsInTheActualUbxArchive() throws Exception {
-        byte[] raw = Files.readAllBytes(Path.of("real-gnss-source.ubx"));
+        byte[] raw = Files.readAllBytes(Path.of("test2.ubx"));
         var parser = new UbloxParser();
         List<GrawCodec.Message> source = new ArrayList<>();
         for (int offset = 0; offset < raw.length; offset += 8192) {

@@ -21,8 +21,9 @@ import java.util.*;
 class IqReceiveFormatTest {
     @ParameterizedTest
     @CsvSource({
-        "1,LNIS-IQ-FILE-v1,legacy,true",
-        "2,LNIS-IQ-FILE-v2,frame,true",
+        "1,LNIS-IQ-FILE-v1,legacy,false",
+        "2,LNIS-IQ-FILE-v2,frame,false",
+        "3,LNIS-IQ-FILE-v3,frame,true",
         "1,LNIS-IQ-FILE-v2,frame,false",
         "2,LNIS-IQ-FILE-v1,frame,false",
         "2,LNIS-IQ-FILE-v2,legacy,false"

@@ -512,3 +512,5 @@ delete globalThis.document;
 console.log('PASS: GPS LNAV / QZSS / BDS B1I / GAL I/NAV parameter decoding, SB2/SB3 mappings, originating words and DOM inspector');
 console.log('PASS: Active navigation subframe keys, multi-epoch history replacement and PVT active filter');
 
+
+assert.equal(getActivePvtNavigationItems([{message:{constellationId:3,satelliteId:4,words:[1<<12]}}], [0], 1).size, 0);

@@ -23,7 +23,7 @@ class IqReceiverTest {
         }
         return new IqMetadata(
                 "AFSD",
-                IqReceiver.METHOD,
+                IqReceiver.FRAME_METHOD,
                 week,
                 tow,
                 "ECEF_CONSTANT_VELOCITY",
@@ -41,10 +41,10 @@ class IqReceiverTest {
                         IqReceiver.validate(
                                 new IqMetadata(
                                         "AFSD",
-                                        IqReceiver.METHOD,
+                                        IqReceiver.FRAME_METHOD,
                                         2400,
                                         100000,
-                                        m.trajectory(),
+                                        "INVALID",
                                         m.prns(),
                                         m.gpsLnav().subList(1, 12))));
         assertThrows(
@@ -83,7 +83,7 @@ class IqReceiverTest {
     }
 
     @Test
-    void predictsReferenceAtSampleTimeWithoutChangingReceivedPosition() {
+    void keepsOriginalOneEpochReferenceWithoutTrajectoryExtrapolation() {
         var m = metadata(2400, 604799);
         Pvt initial = new Pvt();
         initial.setWeek(2400);
@@ -94,15 +94,15 @@ class IqReceiverTest {
         initial.setVelocityMetersPerSecond(new double[] {4, 5, 6});
         initial.setReceiverClockBiasSeconds(0.0);
         Pvt received = new Pvt();
-        received.setWeek(2401);
-        received.setTowSeconds(1);
+        received.setWeek(2400);
+        received.setTowSeconds(604799);
         received.setPositionValid(true);
         received.setVelocityValid(true);
         received.setEcefMeters(new double[] {10, 12, 15});
         received.setVelocityMetersPerSecond(new double[] {4, 5, 6});
         received.setReceiverClockBiasSeconds(0.0);
         var refs = IqReceiver.references(m, List.of(initial), List.of(received));
-        assertArrayEquals(new double[] {9, 12, 15}, refs.getFirst().getEcefMeters());
+        assertArrayEquals(new double[] {1, 2, 3}, refs.getFirst().getEcefMeters());
         assertArrayEquals(new double[] {10, 12, 15}, received.getEcefMeters());
         var comparison = IqReceiver.comparison(refs, List.of(received));
         assertEquals("MEASURED", comparison.get("verdict"));

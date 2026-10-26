@@ -101,6 +101,12 @@ class HdtnConfigTransferTest {
                                         "IQ_INTERLEAVED_INT8",
                                         2);
                             });
+            var reference = new Pvt();
+            reference.setWeek(2400);
+            reference.setTowSeconds(100000);
+            var metadata = new IqMetadata("AFSD", server.iq.IqReceiver.FRAME_METHOD, 2400,
+                    100000, "ECEF_CONSTANT_VELOCITY", List.of(19), List.of());
+            when(iq.source(eq(inputId), any())).thenReturn(new server.iq.IqReceiver.Source("digest", metadata, reference));
             ReflectionTestUtils.setField(service, "iq", iq);
             HdtnConfig settings = new HdtnConfig();
             settings.setMaxNumberOfBundlesInPipeline(75);
@@ -131,6 +137,8 @@ class HdtnConfigTransferTest {
             prepareIq.countDown();
             if (!"IQ_SAMPLE".equals(type)) {
                 Transfer transfer = new Transfer();
+                transfer.setSchemaVersion(6);
+                transfer.setFormat(server.afs.AfsPvtFrameCodec.FORMAT);
                 transfer.setTestId(job.getId());
                 transfer.setTestType(type);
                 AgentResult result = new AgentResult();
@@ -205,7 +213,6 @@ class HdtnConfigTransferTest {
                                 "HDTN",
                                 "HDTN",
                                 null,
-                                server.pvt.PvtConstellation.GPS,
                                 new DtnConfig()));
     }
 }

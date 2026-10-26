@@ -1,15 +1,16 @@
-import {initPresetControls, renderTrialSettings, trialOption, colorTrialSelection, initWaitingCancellation, initTrialSettingsDialog} from './dtn-settings.js?v=20261007-clean-layout';
+import {initPresetControls, renderTrialSettings, trialOption, colorTrialSelection, initWaitingCancellation, initTrialSettingsDialog} from './dtn-settings.js?v=20261026-frame6';
 import {requestJson} from '../common/http.js?v=20261001-review';
-import {initGnssControls} from './dtn-gnss.js?v=20261001-review';
-import {createDtnLog} from './dtn-log.js?v=20261001-review';
-import {initAdapterHealth, validAdapterUrl} from './dtn-adapter-health.js?v=20260922-compact-settings';
-import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20261001-review';
-import {createObservationView, numeric, renderClockBias, receiverInformation} from './dtn-observations.js?v=20261013-nav-params';
+import {initGnssControls} from './dtn-gnss.js?v=20261026-frame6';
+import {createDtnLog} from './dtn-log.js?v=20261026-frame6';
+import {initAdapterHealth, validAdapterUrl} from './dtn-adapter-health.js?v=20261026-frame6';
+import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20261026-frame6';
+import {createObservationView, numeric, renderClockBias, receiverInformation} from './dtn-observations.js?v=20261026-frame6';
 
 const $ = id => document.getElementById(id);
 const payload = createPayloadViewer($('dtn-payload'), {sentOnly: true});
 let inputId = null, agents = [], busy = false, job = null, config = {}, peerConfig = null;
-let selectedType = 'AFS_METADATA', senderMode = 'DTN', receiverMode = 'HDTN', pvtConstellation = 'GPS';
+let selectedType = 'AFS_METADATA', senderMode = 'DTN', receiverMode = 'HDTN';
+const pvtConstellation = 'GPS';
 let pvt = [], inputPvt = [], epochIndex = 0, reportKey = '', lastAgentState = '';
 let polling = false, inputMode = 'upload';
 let delayChoices = [], preparedEpoch = null, inputView = false;
@@ -408,7 +409,7 @@ const presets = initPresetControls({read: () => ({
   if (!['GNSS_RAW', 'AFS_METADATA', 'IQ_SAMPLE'].includes(settings.testType)
       || !['DTN', 'HDTN'].includes(settings.senderMode) || !['DTN', 'HDTN'].includes(settings.receiverMode)) throw new Error('프리셋 설정을 확인하세요.');
   selectedType = settings.testType; senderMode = settings.senderMode; receiverMode = settings.receiverMode;
-  pvtConstellation = settings.pvtConstellation || 'GPS';
+  if (settings.pvtConstellation && settings.pvtConstellation !== 'GPS') log('이전 프리셋의 PVT 계산 대상을 GPS L1 C/A로 적용합니다.', 'WARN');
   if (settings.hdtnConfig) {
     const configValues = Object.fromEntries(Object.keys(hdtnRules).map(key => [key, hdtnValue(key, String(settings.hdtnConfig?.[key] ?? ''))]));
     for (const [key, value] of Object.entries(configValues)) if ($('hdtn-' + key)) $('hdtn-' + key).value = String(value);
@@ -427,12 +428,6 @@ const presets = initPresetControls({read: () => ({
     const selected = button.dataset.senderMode === senderMode && button.dataset.receiverMode === receiverMode;
     button.classList.toggle('active', selected); button.setAttribute('aria-pressed', String(selected));
   }
-  for (const button of document.querySelectorAll('.pvt-constellation-button')) {
-    const selected = button.dataset.constellation === pvtConstellation;
-    button.classList.toggle('active', selected); button.setAttribute('aria-pressed', String(selected));
-    if (selected && $('dtn-pvt-constellation-state')) $('dtn-pvt-constellation-state').textContent = button.textContent;
-  }
-  if ($('dtn-pvt-constellation')) $('dtn-pvt-constellation').value = pvtConstellation;
   $('dtn-transport-mode-state').textContent = senderMode + ' → ' + receiverMode + ' · 전송 요청에 포함';
   updateInputPanels();
   updateDtnControls();
@@ -774,12 +769,12 @@ function updateControls() {
   for (const id of ['capture-use', 'capture-retry', 'capture-discard']) $(id).disabled = busy;
   $('iq-cancel').disabled = !generatingIq();
   $('iq-saved').disabled = locked();
-  $('iq-delete').disabled = locked() || iqJob?.state !== 'READY';
+  $('iq-delete').disabled = locked() || !['READY', 'REGENERATE'].includes(iqJob?.state);
   for (const id of ['dtn-upload', 'dtn-graw-file', 'dtn-send-url', 'dtn-adapter-save']) $(id).disabled = locked();
   if ($('dtn-replay')) $('dtn-replay').disabled = locked();
   $('dtn-refresh').disabled = locked() || tx?.state !== 'READY';
-  for (const button of document.querySelectorAll('.test-type-button,.transport-mode-button,.pvt-constellation-button,.input-mode')) button.disabled = locked();
-  for (const id of ['dtn-connection-test', 'dtn-connection-save', 'dtn-receiver-ip', 'dtn-receiver-port']) $(id).disabled = busy || (!pendingCapture && locked()) || !peerConfig?.editable;
+  for (const button of document.querySelectorAll('.test-type-button,.transport-mode-button,.input-mode')) button.disabled = locked();
+  for (const id of ['dtn-connection-test', 'dtn-connection-save', 'dtn-receiver-ip', 'dtn-receiver-port']) $(id).disabled = busy || (!pendingCapture && locked()) || peerConfig?.busy || !peerConfig?.editable;
   $('dtn-message').textContent = selectedType !== 'IQ_SAMPLE'
     ? active() ? (locked() ? '송신 준비·어댑터 요청 중입니다.' : '이전 시험 수신 대기 · 다음 시험을 전송할 수 있습니다.') : !inputId ? 'GNSS 입력을 준비하세요.' : !urlValid() ? '어댑터 전송 URL을 입력하세요.' : !adapterOnline ? '송신 어댑터 데몬 연결을 확인하세요.' : ''
     : active() ? (locked() ? '송신 준비·어댑터 요청 중입니다.' : '이전 시험 수신 대기 · 다음 시험을 전송할 수 있습니다.') : generatingIq() ? '90초 I/Q 생성 중입니다.'
@@ -1019,22 +1014,6 @@ for (const button of document.querySelectorAll('.transport-mode-button')) button
   $('dtn-transport-mode-state').textContent = senderMode + ' → ' + receiverMode + ' · 전송 요청에 포함';
   updateInputSummary(); updateDtnControls(); updateHdtnControls(); updateAdapterTabBadges();
 };
-for (const button of document.querySelectorAll('.pvt-constellation-button')) button.onclick = async () => {
-  pvtConstellation = button.dataset.constellation || 'GPS';
-  for (const other of document.querySelectorAll('.pvt-constellation-button')) {
-    other.classList.toggle('active', other === button); other.setAttribute('aria-pressed', String(other === button));
-  }
-  if ($('dtn-pvt-constellation')) $('dtn-pvt-constellation').value = pvtConstellation;
-  if ($('dtn-pvt-constellation-state')) $('dtn-pvt-constellation-state').textContent = button.textContent;
-  updateInputSummary();
-  await reloadInputPvt();
-  if (inputId && delayMode()) {
-    await loadDelayEpochs();
-  }
-  view.render();
-  renderPvt();
-  updateControls();
-};
 async function connectPeer(save) {
   if (!$('dtn-receiver-ip').reportValidity() || !$('dtn-receiver-port').reportValidity()) return;
   busy = true; updateControls(); destination('확인 중');
@@ -1200,6 +1179,7 @@ async function poll() {
     agents = await request('/agents');
     if (peerConfig) {
       const connection = await request('/node/connection');
+      peerConfig = connection;
       gnss.setPeerTime(connection.peerGnssTimeState);
       updateClockSkewWarning(connection);
       if ($('dtn-receiver-ip').value === connection.ip && Number($('dtn-receiver-port').value) === connection.port)

@@ -32,6 +32,13 @@ public interface DtnRepository extends JpaRepository<DtnJob, UUID> {
 
     List<ReferenceTask> findTasksByReferenceStatus(String status);
 
+    @org.springframework.data.jpa.repository.Query("""
+            select (count(e) > 0) from DtnJob e
+            where e.state in ('PREPARING', 'WAITING_DTN', 'WAITING_RECEIVER', 'CALCULATING')
+               or e.cancelPending = true or e.referenceStatus = 'WAITING'
+            """)
+    boolean peerAddressBusy();
+
     boolean existsByState(String state);
 
     boolean existsByStateIn(List<String> states);

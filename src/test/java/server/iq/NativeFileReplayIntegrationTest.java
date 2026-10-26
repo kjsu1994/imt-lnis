@@ -43,14 +43,15 @@ class NativeFileReplayIntegrationTest {
 
         for (String file : List.of("tracking-0-20.log", "tracking-1-1.log", "tracking-2-20.log")) {
             var result = receiver.calculate(root.resolve(file), frameOnly);
-            assertEquals(69, result.pvt().size(), file);
-            for (int i = 0; i < result.pvt().size(); i++) {
-                var pvt = result.pvt().get(i);
-                assertEquals(metadata.week(), pvt.getWeek(), file);
-                assertEquals(metadata.towSeconds() + 21 + i, pvt.getTowSeconds(), file);
-                assertTrue(pvt.isPositionValid(), file + " position at epoch " + i);
-                assertTrue(pvt.isVelocityValid(), file + " velocity at epoch " + i);
-            }
+            assertEquals(1, result.pvt().size(), file);
+            var pvt = result.pvt().getFirst();
+            assertEquals(metadata.week(), pvt.getWeek(), file);
+            assertEquals(metadata.towSeconds(), pvt.getTowSeconds(), file);
+            assertTrue(pvt.isPositionValid(), file);
+            assertTrue(pvt.isVelocityValid(), file);
+            var tracking = (List<?>) result.observations().get("trackingEpochs");
+            assertEquals(69, tracking.size(), file);
+            assertEquals(89, ((Number) ((Map<?, ?>) tracking.getLast()).get("elapsedSeconds")).intValue(), file);
             var reference =
                     IqReceiver.references(metadata, List.of(source.reference()), result.pvt());
             reports.add(

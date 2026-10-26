@@ -35,23 +35,7 @@ public final class NativePvtCodec implements AutoCloseable {
                 byte[] message,
                 int messageSize);
 
-        int lnis_pvt_navigation(
-                Pointer context, int sys, int prn, int week, int[] words, int count);
-
-        int lnis_pvt_solve(
-                Pointer context,
-                int navsys,
-                int week,
-                double tow,
-                double[] observations,
-                int count,
-                double[] result,
-                byte[] message,
-                int messageSize);
     }
-
-    /** RTKLIB SYS_* 비트와 동일한 값이다. */
-    static final int SYS_GPS = 0x01, SYS_GAL = 0x08, SYS_BDS = 0x20;
 
     private final Api api;
     private final Pointer context;
@@ -69,12 +53,6 @@ public final class NativePvtCodec implements AutoCloseable {
 
     /** 수집 레코드 순서대로 항법정보를 갱신해 Sender/Receiver의 동일 초기 상태를 보장한다. */
     public List<Pvt> calculate(List<byte[]> records) {
-        return calculate(records, PvtConstellation.GPS);
-    }
-
-    /** 선택한 위성군의 항법·관측값만 RTKLIB에 전달한다. GPS는 기존 경로를 그대로 사용한다. */
-    public List<Pvt> calculate(List<byte[]> records, PvtConstellation target) {
-        PvtConstellation constellation = target == null ? PvtConstellation.GPS : target;
         int week =
                 records.stream()
                         .map(GrawCodec::decode)
@@ -88,19 +66,18 @@ public final class NativePvtCodec implements AutoCloseable {
         for (byte[] record : records) {
             var message = GrawCodec.decode(record).message();
             if (message instanceof GrawCodec.NavigationUpdate nav) {
-                navigation(nav, week, constellation);
+                navigation(nav, week);
             } else if (message instanceof GrawCodec.ObservationEpoch epoch) {
                 week = epoch.week();
-                results.add(solve(epoch, constellation));
+                results.add(solveGps(epoch));
             }
         }
         return results;
     }
 
     private void navigation(
-            GrawCodec.NavigationUpdate nav, int week, PvtConstellation constellation) {
+            GrawCodec.NavigationUpdate nav, int week) {
         if (nav.constellationId() == 0
-                && constellation.includesGps()
                 && nav.signalId() == 0
                 && nav.words().size() == 10) {
             // SFRBX v2의 signalId 위치는 reserved0일 수 있어 0만으로 LNAV를 판별할 수 없다.
@@ -120,69 +97,7 @@ public final class NativePvtCodec implements AutoCloseable {
             if (status < 0) {
                 throw new IllegalArgumentException("유효하지 않은 GPS LNAV 항법 데이터입니다.");
             }
-        } else if (nav.constellationId() == 3
-                && constellation.includesBeidou()
-                && nav.words().size() == 10) {
-            // UBX-SFRBX BeiDou D1: word마다 하위 30 bit가 항법 비트다.
-            int[] words =
-                    nav.words().stream().mapToInt(word -> (int) (word & 0x3fffffffL)).toArray();
-            // 형식이 맞지 않는 page(D2 등)는 계산에서만 제외한다.
-            api.lnis_pvt_navigation(context, SYS_BDS, nav.satelliteId(), week, words, 10);
-        } else if (nav.constellationId() == 2
-                && constellation.includesGalileo()
-                && nav.words().size() == 8) {
-            // UBX-SFRBX Galileo I/NAV: even/odd page 2개의 32-bit word 8개.
-            int[] words = nav.words().stream().mapToInt(Long::intValue).toArray();
-            api.lnis_pvt_navigation(context, SYS_GAL, nav.satelliteId(), week, words, 8);
         }
-    }
-
-    private Pvt solve(GrawCodec.ObservationEpoch epoch, PvtConstellation constellation) {
-        if (constellation == PvtConstellation.GPS) {
-            return solveGps(epoch);
-        }
-        var observations =
-                epoch.observations().stream()
-                        .filter(o -> (o.trackingStatus() & 1) != 0)
-                        .filter(constellation::accepts)
-                        .filter(distinctSatellite())
-                        .toList();
-        Pvt pvt = new Pvt();
-        pvt.setWeek(epoch.week());
-        pvt.setTowSeconds(epoch.receiverTowSeconds());
-        if (observations.isEmpty()) {
-            pvt.setMessage("유효한 " + constellation.label() + " 관측값 없음");
-            return pvt;
-        }
-        int count = Math.min(observations.size(), 64);
-        double[] input = new double[count * 5];
-        for (int i = 0; i < count; i++) {
-            var o = observations.get(i);
-            input[i * 5] = PvtConstellation.rtklibSystem(o.constellationId());
-            input[i * 5 + 1] = o.satelliteId();
-            input[i * 5 + 2] = o.pseudorangeMeters();
-            input[i * 5 + 3] = o.dopplerHz();
-            input[i * 5 + 4] = o.carrierToNoiseDbHz();
-        }
-        double[] result = new double[9];
-        byte[] error = new byte[256];
-        int status =
-                api.lnis_pvt_solve(
-                        context,
-                        constellation.navsys(),
-                        epoch.week(),
-                        epoch.receiverTowSeconds(),
-                        input,
-                        count,
-                        result,
-                        error,
-                        error.length);
-        return toPvt(pvt, status, result, error);
-    }
-
-    private static java.util.function.Predicate<GrawCodec.Observation> distinctSatellite() {
-        var seen = new java.util.HashSet<Integer>();
-        return o -> seen.add(o.constellationId() * 256 + o.satelliteId());
     }
 
     private Pvt solveGps(GrawCodec.ObservationEpoch epoch) {

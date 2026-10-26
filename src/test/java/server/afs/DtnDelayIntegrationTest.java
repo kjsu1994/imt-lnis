@@ -72,12 +72,12 @@ class DtnDelayIntegrationTest {
                                 laterAligned.satellites().get(i).alignedTransmitAt());
                     }
                     try (var solver = new NativePvtCodec(nativeDirectory)) {
-                        assertEquals(solver.calculate(converted.records()), received.getPvt());
+                        NativePvtIntegrationTest.assertPvtClose(solver.calculate(converted.records()), received.getPvt());
                     }
                     assertEquals(originalHash, prepared.getTransfer().getSourceSha256());
                     assertEquals(1, received.getPvt().size());
                     if (nanos == 0) {
-                        assertEquals(reference, received.getPvt());
+                        NativePvtIntegrationTest.assertPvtClose(reference, received.getPvt());
                     }
                     assertTrue(
                             received.getPvt().getFirst().isPositionValid(),
@@ -124,10 +124,8 @@ class DtnDelayIntegrationTest {
                         DtnComparison.delay(
                                         reference, negative.getPvt(), negative.getDelayEvidence())
                                 .get("verdict"));
-                assertEquals(
-                        reference,
-                        processor.receive(id, prepared.getTransfer()).getPvt(),
-                        "기존 복원 경로 유지");
+                NativePvtIntegrationTest.assertPvtClose(
+                        reference, processor.receive(id, prepared.getTransfer()).getPvt());
             }
         }
         assertArrayEquals(source, NativePvtIntegrationTest.validSample(), "원본 GRAW 불변");

@@ -303,7 +303,7 @@ public final class AfsMetadataCodec {
     /** Restore original record/measurement ordering, not PRN order, before the existing hash/PVT path. */
     static Transfer ungroup(Transfer transfer) {
         boolean embedded = server.afs.AfsPvtFrameCodec.FORMAT.equals(transfer.getFormat());
-        if (transfer.getSchemaVersion() != (embedded ? 4 : 3)
+        if (transfer.getSchemaVersion() != (embedded ? 6 : 3)
                 || transfer.getFrames() != null
                 || !(transfer.getMetadata() instanceof AfsGroupedMetadata metadata)
                 || metadata.commonRecords() == null

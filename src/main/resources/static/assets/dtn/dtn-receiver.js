@@ -1,10 +1,10 @@
-import {renderTrialSettings, trialOption, colorTrialSelection, initWaitingCancellation, initTrialSettingsDialog} from './dtn-settings.js?v=20261007-clean-layout';
+import {renderTrialSettings, trialOption, colorTrialSelection, initWaitingCancellation, initTrialSettingsDialog} from './dtn-settings.js?v=20261026-frame6';
 import {requestJson} from '../common/http.js?v=20261001-review';
-import {initGnssControls} from './dtn-gnss.js?v=20261001-review';
-import {createDtnLog} from './dtn-log.js?v=20261001-review';
-import {initAdapterHealth} from './dtn-adapter-health.js?v=20260922-compact-structure';
-import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20261001-review';
-import {createObservationView, numeric, renderClockBias} from './dtn-observations.js?v=20261013-nav-params';
+import {initGnssControls} from './dtn-gnss.js?v=20261026-frame6';
+import {createDtnLog} from './dtn-log.js?v=20261026-frame6';
+import {initAdapterHealth} from './dtn-adapter-health.js?v=20261026-frame6';
+import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20261026-frame6';
+import {createObservationView, numeric, renderClockBias} from './dtn-observations.js?v=20261026-frame6';
 
 const $ = id => document.getElementById(id);
 const payloadViewer = createPayloadViewer($('dtn-payload'), {receivedOnly: true});

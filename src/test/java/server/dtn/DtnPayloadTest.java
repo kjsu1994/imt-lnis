@@ -71,7 +71,7 @@ class DtnPayloadTest {
     void setUp() throws Exception {
         job.setId(UUID.randomUUID());
         job.setState("WAITING_DTN");
-        original = "{\r\n  \"testId\": \"" + job.getId() + "\",\r\n  \"note\": \"한글 원문\"\r\n}\r\n";
+        original = "{\r\n  \"schemaVersion\": 6, \"format\": \"LNIS-AFS-GNSS-v6\",\r\n  \"testId\": \"" + job.getId() + "\",\r\n  \"note\": \"한글 원문\"\r\n}\r\n";
         job.setSentJson(objectMapper.writeValueAsString(objectMapper.readTree(original)));
         when(repository.findById(job.getId())).thenReturn(Optional.of(job));
         ReflectionTestUtils.setField(service, "receiveToken", "test-token");

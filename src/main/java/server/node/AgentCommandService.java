@@ -37,13 +37,7 @@ public class AgentCommandService {
     public void prepare(String agentId, UUID id, byte[] data, boolean raw,
             java.time.Instant startedAt, BiConsumer<String, String> progress,
             Consumer<AgentResult> result) {
-        prepare(agentId, id, data, raw, startedAt, server.pvt.PvtConstellation.GPS, progress, result);
-    }
-
-    public void prepare(String agentId, UUID id, byte[] data, boolean raw,
-            java.time.Instant startedAt, server.pvt.PvtConstellation constellation,
-            BiConsumer<String, String> progress, Consumer<AgentResult> result) {
-        local.runtime(agentId).worker().prepare(id, data, raw, startedAt, constellation, progress, result);
+        local.runtime(agentId).worker().prepare(id, data, raw, startedAt, progress, result);
     }
 
     public void receive(

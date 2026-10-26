@@ -67,16 +67,17 @@ class NodeConnectionServiceTest {
     }
 
     @Test
-    void activeDtnPreventsAddressChangeWhileWaitingDtnAllowsIt() {
-        when(jobs.findByStateIn(List.of("PREPARING", "WAITING_RECEIVER", "CALCULATING")))
-                .thenReturn(List.of(new DtnJob()));
+    void pendingDtnPreventsAddressChangeUntilSettled() {
+        when(jobs.peerAddressBusy()).thenReturn(true);
+        assertTrue(service.configuration().isBusy());
+        assertFalse(service.configuration().isEditable());
+        clearInvocations(connection);
         assertThrows(
                 IllegalStateException.class, () -> service.save(request("192.168.1.30", 8088)));
         verifyNoInteractions(settings, connection);
 
         reset(jobs);
-        when(jobs.findByStateIn(List.of("PREPARING", "WAITING_RECEIVER", "CALCULATING")))
-                .thenReturn(List.of());
+        when(jobs.peerAddressBusy()).thenReturn(false);
         doAnswer(
                         call -> {
                             properties.applyPeerAddress(call.getArgument(0));

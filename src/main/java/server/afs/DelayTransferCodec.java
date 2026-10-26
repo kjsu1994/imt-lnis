@@ -13,7 +13,7 @@ import java.util.*;
 
 /** 원본·Reference 없이 송신 시각으로 계산하는 RAW/AFS 공통 전달 규격. */
 public final class DelayTransferCodec {
-    public static final String AFS = "LNIS-AFS-GNSS-v5";
+    public static final String AFS = AfsPvtFrameCodec.FORMAT;
     public static final String RAW = "LNIS-GRAW-DELAY-v2";
     private static final ObjectMapper JSON = new ObjectMapper().findAndRegisterModules()
             .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
@@ -21,7 +21,7 @@ public final class DelayTransferCodec {
     private DelayTransferCodec() {}
 
     public static boolean supports(Transfer value) {
-        return value != null && (AFS.equals(value.getFormat()) || RAW.equals(value.getFormat()));
+        return value != null && ((AFS.equals(value.getFormat()) && value.getMetadata() == null) || RAW.equals(value.getFormat()));
     }
 
     public record Restored(List<byte[]> records, DtnDelay.Evidence evidence, JsonNode receivedValues) {}
@@ -32,7 +32,7 @@ public final class DelayTransferCodec {
         Transfer transfer = new Transfer();
         transfer.setTestId(id);
         transfer.setTestType(raw ? "GNSS_RAW" : "AFS_METADATA");
-        transfer.setSchemaVersion(raw ? 2 : 5);
+        transfer.setSchemaVersion(raw ? 2 : 6);
         transfer.setFormat(raw ? RAW : AFS);
         if (raw) {
             transfer.setRaw(rawValues(records, start));
@@ -108,7 +108,7 @@ public final class DelayTransferCodec {
                     && "GNSS_RAW".equals(transfer.getTestType()) && transfer.getSatellites() == null) {
                 return restoreRaw(transfer.getRaw(), timing);
             }
-            if (!AFS.equals(transfer.getFormat()) || transfer.getSchemaVersion() != 5
+            if (!AFS.equals(transfer.getFormat()) || transfer.getSchemaVersion() != 6
                     || !"AFS_METADATA".equals(transfer.getTestType()) || transfer.getRaw() != null
                     || transfer.getSatellites() == null || transfer.getFrames() != null) {
                 throw new IllegalArgumentException("지연 전송 형식 오류");
@@ -181,12 +181,7 @@ public final class DelayTransferCodec {
         }
         if (frames.isEmpty() || frames.size() > 32) throw new IllegalArgumentException("프레임 개수 오류");
         frames.sort(Comparator.comparingInt(Frame::getIndex));
-        List<AfsPvtFrameCodec.Payload> payloads = new ArrayList<>();
-        ObjectNode wire = JSON.createObjectNode();
-        wire.put("startedAt", timing.startedAt().toString());
-        var observations = wire.putArray("observations");
-        List<DtnDelay.Satellite> satellites = new ArrayList<>();
-        DtnDelay.Time original = null;
+        List<AfsPvtFrameCodec.DelayPayload> decodedFrames = new ArrayList<>();
         for (int i = 0; i < frames.size(); i++) {
             Frame frame = frames.get(i);
             if (frame.getIndex() != i || frame.getFrameBase64() == null
@@ -197,17 +192,42 @@ public final class DelayTransferCodec {
             if (!decoded.sb2Valid() || !decoded.sb3Valid() || !decoded.sb4Valid()) {
                 throw new IllegalArgumentException("AFS CRC 오류");
             }
-            var restored = AfsPvtFrameCodec.decodeDelay(decoded.sb2(), decoded.sb3(), decoded.sb4(), timing.receivedAt());
+            var restored = AfsPvtFrameCodec.decodeDelay(decoded.sb2(), decoded.sb3(), decoded.sb4(), null);
             var v = restored.observation();
-            DtnDelay.Time epoch = new DtnDelay.Time(v.week(), v.tow());
             if (!restored.startedAt().equals(timing.startedAt()) || v.epoch() != 0
-                    || (original != null && !original.equals(epoch))
                     || !Objects.equals(frame.getPrn(), v.prn()) || frame.getWeek() != v.week()
                     || frame.getAfsItow() != (int) (v.tow() / 1200)
                     || frame.getToi() != (int) (v.tow() % 1200 / 12)) {
                 throw new IllegalArgumentException("프레임 시각/시험 조건 불일치");
             }
+            decodedFrames.add(restored);
+        }
+        return restoreDecoded(decodedFrames, timing);
+    }
+
+    /** Only CRC-verified decoded frames enter here; both AFS and I/Q use the same delay math. */
+    public static Restored restoreDecoded(List<AfsPvtFrameCodec.DelayPayload> frames, DtnDelay.Timing timing) {
+        if (timing == null || timing.seconds() < 0 || frames.isEmpty() || frames.size() > 32) {
+            throw new IllegalArgumentException("지연 시각 또는 복호 프레임 오류");
+        }
+        List<AfsPvtFrameCodec.Payload> payloads = new ArrayList<>();
+        ObjectNode wire = JSON.createObjectNode();
+        wire.put("startedAt", timing.startedAt().toString());
+        var observations = wire.putArray("observations");
+        List<DtnDelay.Satellite> satellites = new ArrayList<>();
+        DtnDelay.Time original = null;
+        Set<Integer> prns = new HashSet<>();
+        Instant anchor = frames.getFirst().startedAt();
+        for (var restored : frames) {
+            var v = restored.observation();
+            var epoch = new DtnDelay.Time(v.week(), v.tow());
+            if (v.epoch() != 0 || !prns.add(v.prn()) || !anchor.equals(restored.startedAt())
+                    || original != null && !original.equals(epoch)) {
+                throw new IllegalArgumentException("복호 프레임 Epoch/PRN/기준시각 불일치");
+            }
             original = epoch;
+            var aligned = restored.transmitAt().rebase(restored.startedAt(), timing.startedAt());
+            double range = v.prn() == 0 ? 0 : aligned.rangeAt(timing.receivedAt());
             ObjectNode observation = observations.addObject();
             observation.put("constellationId", 0);
             observation.put("satelliteId", v.prn());
@@ -218,10 +238,12 @@ public final class DelayTransferCodec {
             observation.put("carrierToNoiseDbHz", v.cn0());
             observation.put("trackingStatus", v.status());
             observation.set("transmitAt", JSON.valueToTree(restored.transmitAt()));
-            if (v.prn() != 0) satellites.add(satellite(observation, v.range()));
+            observation.set("alignedTransmitAt", JSON.valueToTree(aligned));
+            observation.put("frameAnchor", restored.startedAt().toString());
+            if (v.prn() != 0) satellites.add(satellite(observation, range));
             var shifted = DtnDelay.shift(v.week(), v.tow(), timing.seconds());
             payloads.add(new AfsPvtFrameCodec.Payload(v.epoch(), v.measurement(), shifted.week(),
-                    shifted.towSeconds(), v.prn(), v.range(), v.doppler(), v.cn0(), v.status(),
+                    shifted.towSeconds(), v.prn(), range, v.doppler(), v.cn0(), v.status(),
                     v.navigation(), v.ionPrn(), v.ionosphere()));
         }
         return new Restored(AfsPvtFrameCodec.records(payloads), evidence(timing, original, satellites), wire);

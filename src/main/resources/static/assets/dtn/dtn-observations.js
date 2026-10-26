@@ -226,6 +226,7 @@ export function getActivePvtNavigationItems(navigation, navigationPositions, epo
       continue;
     }
     const msg = item?.message || item || {};
+    if (msg.constellationId !== 0 || (msg.signalId ?? 0) !== 0) continue;
     const satKey = msg.constellationId + ':' + msg.satelliteId;
     const sfKey = navigationSubframeKey(item);
     if (!sfKey) continue;
@@ -785,22 +786,7 @@ export function isObservationEligible(o, targetConstellation = 'GPS') {
   if (!prValid || !Number.isFinite(o.pseudorangeMeters) || o.pseudorangeMeters <= 0 || !Number.isFinite(o.dopplerHz)) {
     return false;
   }
-  const target = String(targetConstellation || 'GPS').toUpperCase();
-  if (target === 'GPS') {
-    return o.constellationId === 0 && o.signalId === 0;
-  }
-  if (target === 'BEIDOU') {
-    return o.constellationId === 3 && (o.signalId === 0 || o.signalId === 1);
-  }
-  if (target === 'GALILEO') {
-    return o.constellationId === 2 && (o.signalId === 0 || o.signalId === 1);
-  }
-  if (target === 'ALL') {
-    return (o.constellationId === 0 && o.signalId === 0)
-      || (o.constellationId === 3 && (o.signalId === 0 || o.signalId === 1))
-      || (o.constellationId === 2 && (o.signalId === 0 || o.signalId === 1));
-  }
-  return false;
+  return o.constellationId === 0 && o.signalId === 0;
 }
 
 export function observationCells(o, receiverTowSeconds, targetConstellation = 'GPS') {
@@ -907,8 +893,8 @@ export function observationCounts(data, index = 0, results = [], evidence = null
     || wire?.observations || epoch?.observations || [];
   const eligible = evidence?.error ? [] : (epoch?.observations || []).filter(o =>
     isObservationEligible(o, targetConstellation));
-  const target = String(targetConstellation || 'GPS').toUpperCase();
-  const matching = new Set(displayed.filter(o => isObservationEligible(o, targetConstellation)).map(o => o.constellationId + ':' + o.satelliteId));
+  const target = 'GPS';
+  const matching = new Set(displayed.filter(o => o.constellationId === 0 && o.signalId === 0).map(o => o.constellationId + ':' + o.satelliteId));
   const nav = precedingNavigation(data, index);
   const complete = (nav == null || target !== 'GPS') ? null : [...matching].filter(sv => {
     const prn = Number(sv.split(':')[1]);
@@ -988,6 +974,10 @@ export function createObservationView(container, onSelect = () => {}, role = '')
       <div class="epoch-table-viewport"><table class="epoch-observation-table navigation-linked">
         <thead><tr><th>방송 위성</th><th>내용</th><th>관측 기준</th><th>원문</th></tr></thead>
         <tbody data-common-body></tbody></table></div></details>
+    <details data-iq-tracking hidden><summary>RF 추적 관측값 · 진단용</summary>
+      <div class="epoch-table-viewport iq-tracking-viewport"><table class="epoch-observation-table">
+        <thead><tr><th>파일 시각 (s)</th><th>PRN</th><th>추적 의사거리 (m)</th><th>Doppler (Hz)</th><th>C/N₀ (dB-Hz)</th></tr></thead>
+        <tbody data-iq-tracking-body></tbody></table></div></details>
     <details data-record-details><summary>저장된 전체 필드 보기 · JSON</summary><pre data-records class="log"></pre></details>
     `;
   const hideTransmitEstimate = role === '송신 원본' || role === '송신 비교원본';
@@ -1203,6 +1193,8 @@ export function createObservationView(container, onSelect = () => {}, role = '')
       } else if (iq) {
         timingText = isActive ? '복호·보조 정보 · PVT 활성' : '복호·보조 정보';
         timingClass = isActive ? 'timing-active-pvt' : '';
+      } else if (item.message.constellationId !== 0 || item.message.signalId !== 0) {
+        timingText = '현재 PVT 계산 대상 아님';
       } else if (position == null || epochPosition == null) {
         timingText = '순서 확인 불가';
       } else if (position < epochPosition) {
@@ -1281,11 +1273,7 @@ export function createObservationView(container, onSelect = () => {}, role = '')
     common.forEach(item => appendMessage(commonBody, item));
   }
 
-  function activeConstellation() {
-    const el = typeof document !== 'undefined' && typeof document?.getElementById === 'function'
-      ? document.getElementById('dtn-pvt-constellation') : null;
-    return report?.pvtConstellation || el?.value || 'GPS';
-  }
+  function activeConstellation() { return 'GPS'; }
 
 
   function renderPvtStatus() {
@@ -1296,7 +1284,7 @@ export function createObservationView(container, onSelect = () => {}, role = '')
       role === '수신 원본' ? delayEvidence : null, activeSys);
     container.querySelector('[data-count]').textContent = data
       ? '관측 ' + counts.satellites + '위성 · ' + counts.signals + '신호' : '관측 신호 —';
-    const activeLabel = {GPS: 'GPS L1', BEIDOU: 'BeiDou B1I', GALILEO: 'Galileo E1', ALL: 'Multi-GNSS'}[activeSys] || activeSys;
+    const activeLabel = 'GPS L1';
     container.querySelector('[data-pvt-counts]').textContent = data
       ? activeLabel + ' ' + counts.gps + ' · 입력 대상 ' + counts.eligible
 
@@ -1317,7 +1305,30 @@ export function createObservationView(container, onSelect = () => {}, role = '')
     container.querySelector('[data-pvt-status]').hidden = !data;
   }
 
+  function renderTracking() {
+    const details = container.querySelector('[data-iq-tracking]');
+    if (!details) return;
+    const epochs = data?.trackingEpochs || [];
+    details.hidden = !epochs.length;
+    const target = container.querySelector('[data-iq-tracking-body]');
+    target.replaceChildren();
+    for (const epoch of epochs) {
+      for (const observation of epoch.observations || []) {
+        const row = document.createElement('tr');
+        for (const value of [numeric(epoch.elapsedSeconds), observation.satelliteId,
+          numeric(observation.pseudorangeMeters), numeric(observation.dopplerHz),
+          numeric(observation.carrierToNoiseDbHz, 1)]) {
+          const cell = document.createElement('td');
+          cell.textContent = String(value);
+          row.append(cell);
+        }
+        target.append(row);
+      }
+    }
+  }
+
   function render(notify = true) {
+    renderTracking();
     if (data?.receivedValues) { renderWire(notify); return; }
     container.querySelector('[data-integrity]').hidden = true;
     const item = data?.epochs?.[Number(select.value)];
@@ -1482,6 +1493,12 @@ export function createObservationView(container, onSelect = () => {}, role = '')
       : status === 'UNAVAILABLE' ? '비교 불가' : '비교 대기';
     integrity.className = 'pill ' + (status === 'COMPLETE' ? 'online' : status === 'MISMATCH' ? 'error' : 'warning');
     integrity.title = '송신 시 의도한 변환·제외를 적용한 뒤 전달 대상 데이터만 대조합니다. 원본 의사거리와 Reference는 별도 조회하며 수신 PVT 계산에 사용하지 않습니다.';
+    if (data.source === 'IQ_FRAME') {
+      integrity.hidden = !report?.fileResult;
+      integrity.textContent = report?.fileResult?.verdict === 'PASS' ? '파일 일치' : '파일 검증 확인';
+      integrity.className = 'pill ' + (report?.fileResult?.verdict === 'PASS' ? 'online' : 'warning');
+      integrity.title = 'I/Q 파일의 크기·SHA-256 검증 결과입니다. PVT 비교 결과와 구분합니다.';
+    }
     container.querySelector('[data-title]').textContent = '수신 원본 GNSS 관측값';
     container.querySelector('[data-observation-title]').textContent = '관측값 · RAWX';
     container.querySelector('[data-range-heading]').textContent = '원본 의사거리 (m)';
@@ -1494,7 +1511,7 @@ export function createObservationView(container, onSelect = () => {}, role = '')
     container.querySelector('[data-transmit-heading]').title = '송신부가 원본 의사거리에서 역산하고 시험 시작 시각에 맞춰 보정한 가상 송신 시각입니다.';
     container.querySelector('[data-delay-summary]').hidden = true;
     container.querySelector('[data-frame-input]').hidden = true;
-    container.querySelector('[data-source]').textContent = rawEpoch ? '수신 RAW JSON' : 'AFS 프레임 복원';
+    container.querySelector('[data-source]').textContent = data.source === 'IQ_FRAME' ? 'I/Q 프레임 복원 · 공통 지연 PVT' : rawEpoch ? '수신 RAW JSON' : 'AFS 프레임 복원';
     container.querySelector('[data-nav]').textContent = '항법정보 ' + (data.navigationCount ?? 0) + '건';
     container.querySelector('[data-count]').textContent = '관측 신호 ' + values.length;
     container.querySelector('[data-status]').textContent = '';
@@ -1515,7 +1532,7 @@ export function createObservationView(container, onSelect = () => {}, role = '')
       cells[10] = delayEvidence?.error ? '계산 불가' : conversions.length > 1 ? '확인 불가'
         : converted ? observationCells(converted, tow)[10] : '계산값 없음';
       if (!rawEpoch) cells[8] = '—';
-      const stamp = observation.transmitAt;
+      const stamp = observation.alignedTransmitAt || observation.transmitAt;
       cells[11] = stamp ? String(stamp.seconds) + '.' + String(stamp.femtoseconds).padStart(15, '0') : '—';
       cells.splice(4, 0, numeric(delayEvidence?.error ? null : converted?.pseudorangeMeters));
       const row = document.createElement('tr');

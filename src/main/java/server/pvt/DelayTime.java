@@ -31,6 +31,15 @@ public record DelayTime(long seconds, long femtoseconds) {
         return new DelayTime(seconds, fraction);
     }
 
+    /** Move a stored frame to the trial clock without losing sub-nanosecond propagation time. */
+    public DelayTime rebase(Instant anchor, Instant trialStart) {
+        long shifted = Math.addExact(seconds,
+                Math.subtractExact(trialStart.getEpochSecond(), anchor.getEpochSecond()));
+        long fraction = femtoseconds + (trialStart.getNano() - (long) anchor.getNano()) * 1_000_000L;
+        return new DelayTime(Math.addExact(shifted, Math.floorDiv(fraction, SCALE)),
+                Math.floorMod(fraction, SCALE));
+    }
+
     private BigDecimal decimal() {
         return BigDecimal.valueOf(seconds).add(BigDecimal.valueOf(femtoseconds, 15));
     }

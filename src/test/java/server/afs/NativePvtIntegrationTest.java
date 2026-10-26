@@ -114,8 +114,8 @@ public class NativePvtIntegrationTest {
             var wire =
                     mapper.readValue(
                             mapper.writeValueAsBytes(tx.getTransfer()), DtnModels.Transfer.class);
-            assertEquals(4, wire.getSchemaVersion());
-            assertEquals("LNIS-AFS-GNSS-v4", wire.getFormat());
+            assertEquals(6, wire.getSchemaVersion());
+            assertEquals(AfsPvtFrameCodec.FORMAT, wire.getFormat());
             assertInstanceOf(DtnModels.AfsGroupedMetadata.class, wire.getMetadata());
             assertNull(wire.getFrames());
             assertEquals(32, wire.getSatellites().size());
@@ -162,7 +162,7 @@ public class NativePvtIntegrationTest {
             var pvt = tx.getPvt().getFirst();
             assertTrue(pvt.isPositionValid(), pvt.getMessage());
             assertTrue(pvt.isVelocityValid());
-            assertEquals(tx.getPvt(), rx.getPvt());
+            assertPvtClose(tx.getPvt(), rx.getPvt());
             double[] expected = {-3049086.2377217, 4046274.10244263, 3861624.97495251};
             for (int i = 0; i < 3; i++) {
                 assertEquals(expected[i], pvt.getEcefMeters()[i], 0.01);
@@ -264,4 +264,25 @@ public class NativePvtIntegrationTest {
         }
         return value;
     }
+    /** A femtosecond timestamp quantizes the input range below a micrometre. */
+    public static void assertPvtClose(List<DtnModels.Pvt> expected, List<DtnModels.Pvt> actual) {
+        assertEquals(expected.size(), actual.size());
+        for (int i = 0; i < expected.size(); i++) {
+            var a = expected.get(i);
+            var b = actual.get(i);
+            assertEquals(a.getWeek(), b.getWeek());
+            assertEquals(a.getTowSeconds(), b.getTowSeconds());
+            assertEquals(a.isPositionValid(), b.isPositionValid());
+            assertEquals(a.isVelocityValid(), b.isVelocityValid());
+            assertEquals(a.getSatellitesUsed(), b.getSatellitesUsed());
+            if (a.isPositionValid()) {
+                assertArrayEquals(a.getEcefMeters(), b.getEcefMeters(), 1e-5);
+                assertEquals(a.getReceiverClockBiasSeconds(), b.getReceiverClockBiasSeconds(), 1e-12);
+            }
+            if (a.isVelocityValid()) {
+                assertArrayEquals(a.getVelocityMetersPerSecond(), b.getVelocityMetersPerSecond(), 1e-7);
+            }
+        }
+    }
+
 }

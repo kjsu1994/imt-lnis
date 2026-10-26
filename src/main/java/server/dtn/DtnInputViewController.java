@@ -70,13 +70,13 @@ public class DtnInputViewController {
             @RequestParam(required = false) String constellation) throws java.io.IOException {
         var records = records(id);
         long started = System.nanoTime();
-        var target = server.pvt.PvtConstellation.parse(constellation);
+        DtnModels.requireGps(constellation);
         if (logs != null) {
-            logs.add(id, "INPUT", "PVT", true, "지구 PVT 계산·수집 결과 조회 시작 (" + target.name() + ")");
+            logs.add(id, "INPUT", "PVT", true, "지구 PVT 계산·수집 결과 조회 시작 (GPS)");
         }
         try {
             String captured = inputs.get(id).capturedPvtJson();
-            if (captured != null && (constellation == null || target == server.pvt.PvtConstellation.GPS)) {
+            if (captured != null) {
                 java.util.List<DtnModels.Pvt> result =
                         json.readValue(
                                 captured, new com.fasterxml.jackson.core.type.TypeReference<>() {});
@@ -89,9 +89,7 @@ public class DtnInputViewController {
             if (calculator == null) {
                 throw new IllegalStateException("PVT 미리보기는 통합 노드 실행에서 지원됩니다.");
             }
-            var result = target == server.pvt.PvtConstellation.GPS
-                    ? calculator.calculate(records)
-                    : calculator.calculate(records, target);
+            var result = calculator.calculate(records);
             if (logs != null) {
                 logs.pvt(id, "INPUT", result, started);
             }
@@ -111,7 +109,8 @@ public class DtnInputViewController {
     public java.util.List<DtnService.EpochChoice> delayEpochs(
             @PathVariable UUID id,
             @RequestParam(required = false, defaultValue = "GPS") String constellation) {
-        return dtnService.delayEpochs(id, server.pvt.PvtConstellation.parse(constellation));
+        DtnModels.requireGps(constellation);
+        return dtnService.delayEpochs(id);
     }
 
     private java.util.List<byte[]> records(UUID id) {

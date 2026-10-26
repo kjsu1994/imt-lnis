@@ -208,6 +208,7 @@ public class NodeDtnService implements DtnNodeLink {
     public synchronized DtnRemoteResult accept(
             NodeDtnRegistration registration, server.common.ServiceClock.Stamp receiverClock) {
         requireReceiver();
+        DtnModels.requireGps(registration.getPvtConstellation());
         validateParticipants(registration.getSenderAgentId(), registration.getReceiverAgentId());
         if (registration.getTestId() == null
                 || !(DtnModels.PROFILE.equals(registration.getProfile())

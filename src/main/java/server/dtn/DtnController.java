@@ -24,7 +24,6 @@ import server.gnss.GrawCodec;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import server.pvt.DtnComparison;
 import server.pvt.DtnDelay;
-import server.pvt.PvtConstellation;
 
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -210,7 +209,7 @@ public class DtnController {
         @jakarta.validation.constraints.Pattern(regexp = "RESTORE|DELAY")
         private String comparisonMode;
 
-        @jakarta.validation.constraints.Pattern(regexp = "GPS|BEIDOU|GALILEO|ALL")
+        @jakarta.validation.constraints.Pattern(regexp = "GPS")
         private String pvtConstellation = "GPS";
 
         private DtnDelay.Epoch selectedEpoch;
@@ -285,7 +284,7 @@ public class DtnController {
         if ("RESTORE".equals(request.getComparisonMode()) && !"IQ_SAMPLE".equals(request.getTestType())) {
             throw new IllegalArgumentException("RAW·AFS는 지연 반영 PVT 시험으로 통합되었습니다.");
         }
-        var constellation = PvtConstellation.parse(request.getPvtConstellation());
+        DtnModels.requireGps(request.getPvtConstellation());
         if (!"IQ_SAMPLE".equals(request.getTestType())) {
             String senderMode = request.getSenderMode();
             String receiverMode = request.getReceiverMode();
@@ -293,7 +292,7 @@ public class DtnController {
                 senderMode = "DTN";
                 receiverMode = "HDTN";
             }
-            if (constellation == PvtConstellation.GPS && request.getDtnConfig() == null) {
+            if (request.getDtnConfig() == null) {
                 dtnJob =
                         dtnService.createDelay(
                                 inputId,
@@ -319,7 +318,6 @@ public class DtnController {
                                 request.getHdtnConfig(),
                                 request.getSelectedEpoch(),
                                 startedAt,
-                                constellation,
                                 request.getDtnConfig());
             }
         } else if (request.getHdtnConfig() != null || request.getDtnConfig() != null) {
@@ -328,7 +326,7 @@ public class DtnController {
                 senderMode = "DTN";
                 receiverMode = "HDTN";
             }
-            if (constellation == PvtConstellation.GPS && request.getDtnConfig() == null) {
+            if (request.getDtnConfig() == null) {
                 dtnJob =
                         dtnService.create(
                                 inputId,
@@ -350,7 +348,6 @@ public class DtnController {
                                 senderMode,
                                 receiverMode,
                                 request.getHdtnConfig(),
-                                constellation,
                                 request.getDtnConfig());
             }
         } else if (request.getSenderMode() != null || request.getReceiverMode() != null) {

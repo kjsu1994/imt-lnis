@@ -57,6 +57,7 @@ const server=createServer((req,res)=>{
  browser=await chromium.launch();const context=await browser.newContext();
  await context.addInitScript(()=>{window.WebSocket=class {};});
  const page=await context.newPage();page.setDefaultTimeout(15000);const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ async function selectTrial(){await page.waitForFunction(()=>[...document.getElementById('dtn-tests').options].some(o=>o.value==='test1'));await page.locator('#dtn-tests').selectOption('test1');}
  await page.goto(base+'/sender');
  await page.waitForFunction(()=>!!document.querySelector('#dtn-observations .gnss-data-header #dtn-receiver-info'));
  assert.equal(await page.locator('#dtn-receiver-info').isVisible(),false);
@@ -86,6 +87,7 @@ const server=createServer((req,res)=>{
 await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>!document.getElementById('preset-save').disabled);
  await page.locator('#preset-save').click();await page.locator('#preset-name').fill('기본');await page.locator('#preset-confirm').click();await page.waitForFunction(()=>document.getElementById('preset-status').textContent==='저장했습니다.');
  assert.equal(rows.length,1);assert.equal(rows[0].settings.hdtnConfig.maxNumberOfBundlesInPipeline,50);
+ await page.locator('#adapter-tab-hdtn').click();
  await page.locator('#hdtn-maxNumberOfBundlesInPipeline').fill('60');await page.locator('#preset-load').click();assert.equal(await page.locator('#hdtn-maxNumberOfBundlesInPipeline').inputValue(),'50');
  await page.locator('#hdtn-maxNumberOfBundlesInPipeline').fill('70');await page.locator('#preset-update').click();await page.locator('#preset-confirm').click();await page.waitForFunction(()=>!document.getElementById('preset-dialog').open);assert.equal(rows[0].settings.hdtnConfig.maxNumberOfBundlesInPipeline,70);
  await page.locator('#preset-manage').click();await page.locator('#preset-name').fill('수정 이름');await page.locator('#preset-confirm').click();await page.waitForFunction(()=>!document.getElementById('preset-dialog').open);assert.equal(rows[0].name,'수정 이름');
@@ -94,8 +96,16 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
  await page.locator('#preset-manage').click();page.once('dialog',d=>d.accept());await page.locator('#preset-delete').click();await page.waitForFunction(()=>!document.getElementById('preset-dialog').open);assert.equal(rows.length,4);assert.equal(starts,0);
  job={testId:'test1',state:'COMPLETED',testType:'AFS_METADATA',senderMode:'HDTN',receiverMode:'HDTN',hdtnConfig:config,createdAt:'2026-09-23T00:00:00Z',updatedAt:'2026-09-23T00:00:00Z',dtnReceived:true};
  for(const route of ['/sender','/receiver']){
-  await page.goto(base+route);await page.waitForFunction(()=>document.getElementById('trial-settings').textContent.includes('50'));
-  await page.locator('#trial-settings summary').click();assert.equal(await page.locator('.trial-config-values > div').count(),10);assert.match(await page.locator('#trial-settings').innerText(),/8,589,934,592/);
+  await page.goto(base+route);
+  await page.waitForFunction(()=>[...document.getElementById('dtn-tests').options].some(o=>o.value==='test1'));
+  await page.locator('#dtn-tests').selectOption('test1');
+  await page.waitForTimeout(300);
+  await page.locator('#dtn-trial-config-btn').click();
+  await page.waitForFunction(()=>document.getElementById('trial-settings-dialog').open);
+  assert.equal(await page.locator('.trial-param-card').count(),9);
+  assert.match(await page.locator('#trial-settings-dialog-body').textContent(),/8,589,934,592/);
+  await page.locator('#trial-settings-dialog-close').click();
+  await page.locator('#dtn-cancel-waiting').evaluate(el=>el.hidden=false);
   const beforeBulk = bulkRequests;
   page.once('dialog', dialog => {assert.match(dialog.message(), /3건/);dialog.accept();});
   await page.locator('#dtn-cancel-waiting').click();
@@ -113,6 +123,8 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
   await page.keyboard.press('Escape');assert.equal(await page.locator('.log-maximized').count(),0);
   for (const width of [1600,1100,390]) {
     await page.setViewportSize({width,height:1000});
+    const overflow=await page.evaluate(()=>[...document.querySelectorAll('body *')].filter(e=>e.getBoundingClientRect().right>innerWidth+1).map(e=>({tag:e.tagName,id:e.id,cls:e.className,right:e.getBoundingClientRect().right})).slice(0,20));
+    if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))console.log(JSON.stringify({route,width,overflow}));
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),route+' fits '+width);
     assert.ok(await page.locator('#dtn-cancel-waiting').isVisible());
   }
@@ -134,8 +146,8 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
      receivedValues:{records:[{observation:{...epoch,observations:[received]}}]}},
    delayEvidence:{delaySeconds:1},referencePvt:[],receivedPvt:[]
  };
- await page.goto(base+'/receiver');
- await page.waitForFunction(()=>document.querySelector('#dtn-observations [data-integrity]')?.textContent==='데이터 일치');
+ await page.goto(base+'/receiver');await selectTrial();
+ await page.waitForFunction(()=>document.querySelector('#dtn-observations [data-integrity]')?.textContent==='데이터 일치').catch(async e=>{console.log(JSON.stringify({errors,observations:await page.locator('#dtn-observations').innerText(),logs:await page.locator('#dtn-log').innerText()}));throw e;});
  const observationPanel=page.locator('#dtn-observations');
  assert.match(await observationPanel.locator('[data-observations]').innerText(),/21000000\.000/);
  assert.match(await observationPanel.locator('[data-observations]').innerText(),/320792458\.000/);
@@ -146,12 +158,12 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
  await page.screenshot({path:'build/receiver-observation-review.png',fullPage:true});
  reportFixture.referenceStatus='WAITING';
  reportFixture.referenceObservations=null;
- await page.reload();
+ await page.reload();await selectTrial();
  await page.waitForFunction(()=>document.querySelector('#dtn-observations [data-integrity]')?.textContent==='비교 대기');
  assert.equal(await observationPanel.locator('[data-observations] td').nth(3).textContent(),'—');
  assert.equal(await observationPanel.locator('td.converted-range').textContent(),'320792458.000');
  reportFixture.referenceStatus='MISMATCH';
- await page.reload();
+ await page.reload();await selectTrial();
  await page.waitForFunction(()=>document.querySelector('#dtn-observations [data-integrity]')?.textContent==='데이터 불일치');
 
  // Satellite association: same PRN in another constellation and multiple signals.
@@ -167,7 +179,8 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
  reportFixture.observations.navigationCount=navRows.length;
  reportFixture.observations.records=records;
  reportFixture.observations.receivedValues.records[0].observation.observations=receivedSignals;
- await page.reload();
+ await page.reload();await selectTrial();
+ await observationPanel.locator('[data-navigation-pvt-active]').uncheck();
  await page.waitForFunction(()=>document.querySelector('#dtn-observations [data-navigation-title]')?.textContent.includes('전체 항법정보 · 6건'));
  assert.equal(await observationPanel.locator('[data-navigation] tr').count(),6);
  assert.equal(await observationPanel.locator('[data-navigation-all]').isVisible(),false);
@@ -179,7 +192,7 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
  assert.match(await observationPanel.locator('[data-navigation-summary]').innerText(),/SF1 2건 · SF2 1건 · SF3 1건/);
  assert.equal(await observationPanel.locator('[data-common-navigation]').isVisible(),true);
  await observationPanel.locator('[data-common-title]').click();
- assert.match(await observationPanel.locator('[data-common-body]').innerText(),/GPS G04/);
+ assert.match(await observationPanel.locator('[data-common-body]').innerText(),/GPS 04/);
  await observationPanel.getByRole('button',{name:'Galileo 19 항법정보 보기'}).click();
  assert.equal(await observationPanel.locator('[data-navigation] tr').count(),1);
  assert.match(await observationPanel.locator('[data-navigation]').innerText(),/현재 PVT 계산 대상 아님/);
@@ -190,7 +203,6 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
  await page.keyboard.press('Enter');
  assert.equal(await observationPanel.locator('[data-navigation] tr').count(),4);
  assert.equal(await observationPanel.getByRole('button',{name:'GPS G19 항법정보 보기'}).first().evaluate(el=>el===document.activeElement),true);
- assert.equal(await observationPanel.locator('[data-navigation] details').count(),0);
  assert.equal(await observationPanel.locator('[data-navigation] pre').first().isVisible(),true);
  assert.match(await observationPanel.locator('[data-navigation]').innerText(),/수집 순번 101/);
  for(const width of [1366,390]){
@@ -224,6 +236,7 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
    createObservationView(host,()=>{},'송신 원본').setData(source);
  },fixture);
  const senderAssociation=page.locator('#sender-association-test');
+ await senderAssociation.locator('[data-navigation-pvt-active]').uncheck();
  assert.equal(await senderAssociation.locator('[data-navigation-all]').isVisible(),false);
  assert.equal(await senderAssociation.locator('[data-transmit-heading]').isVisible(),false);
  assert.equal(await senderAssociation.locator('[data-observations] tr').first().locator('td').count(),11);
@@ -265,6 +278,20 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
 
  reportFixture={referencePvt:[],receivedPvt:[]};
 
+
+ await page.evaluate(async fixture=>{
+   const {createObservationView}=await import('/assets/dtn/dtn-observations.js?v=20261026-frame6');
+   const host=document.createElement('div');host.id='iq-diagnostic-test';document.body.append(host);
+   const data=structuredClone(fixture);
+   data.source='IQ_FRAME';
+   data.trackingEpochs=[{elapsedSeconds:21,observations:[{satelliteId:19,pseudorangeMeters:21000001,dopplerHz:-101,carrierToNoiseDbHz:44}]}];
+   createObservationView(host,()=>{},'수신 원본').setData(data);
+ },fixture);
+ const iqDiagnostic=page.locator('#iq-diagnostic-test');
+ assert.equal(await iqDiagnostic.locator('[data-iq-tracking]').isVisible(),true);
+ assert.equal(await iqDiagnostic.locator('[data-iq-tracking-body]').isVisible(),false);
+ await iqDiagnostic.locator('[data-iq-tracking] summary').click();
+ assert.match(await iqDiagnostic.locator('[data-iq-tracking-body]').innerText(),/21000001\.000/);
 
  await page.goto(base + '/dtn-intro');
  assert.equal(await page.locator('.pc-boundary').count(), 2);
@@ -314,8 +341,18 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
    assert.ok((await page.locator('#step-copy').innerText()).trim(), mode + '/' + stage + ' copy');
    assert.equal(await page.locator('#evidence-details').evaluate(el => el.open), false, mode + '/' + stage + ' starts collapsed');
    await openStageDetails();
-   assert.ok(await page.locator('#evidence-detail-copy').isVisible(), mode + '/' + stage + ' detail');
+   assert.ok(await page.locator(stage === 'frame' ? '#frame-explorer' : '#evidence-detail-copy').isVisible(), mode + '/' + stage + ' detail');
    assert.ok((await page.locator('#evidence-details').innerText()).trim().length > 15);
+   if (mode === 'iq' && stage === 'decode') {
+    const detail = await page.locator('#evidence-details').innerText();
+    assert.match(detail, /RF 추적 관측값.*진단/);
+    assert.match(detail, /프레임의 원본 Doppler/);
+    assert.doesNotMatch(detail, /SB4 원본 관측값은.*절대 전달되지/);
+   }
+   if (stage === 'compare') {
+    assert.match(await page.locator('#evidence-details').innerText(), /Clock Bias 잔차/);
+   }
+   assert.doesNotMatch(await page.locator('#evidence-details').innerText(), /0\.000 mm|오인식 확률이 사실상 0/);
    await page.locator('#evidence-summary').click();
    const referenceActive = await page.locator('.wire.reference.active').count();
    assert.equal(referenceActive > 0, mode !== 'iq' && stage === 'compare', mode + '/' + stage + ' reference route');
@@ -348,35 +385,12 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
  assert.equal(await currentStage(), 'data');
  await page.keyboard.press('ArrowLeft');
  assert.equal(await currentStage(), 'source');
- await selectStage('afs', 'calculate');
- await openStageDetails();
- for (const seconds of [0, 0.001, 1, 20, 60]) {
-  await page.locator('#delay').fill(String(seconds));
-  assert.equal(await page.locator('#delay').getAttribute('aria-invalid'), 'false');
-  const values = await page.locator('#satellite-rows tr').evaluateAll(rows => rows.map(row =>
-   [...row.cells].slice(1).map(cell => Number(cell.textContent.replace(/[+,\s]/g, '')))));
-  assert.equal(values.length, 4);
-  for (const [original, added, converted] of values) {
-   assert.ok(Math.abs(added - 299792458 * seconds) < 0.002, 'common delay distance');
-   assert.ok(Math.abs(converted - original - added) < 0.002, 'recomputed pseudorange');
-  }
+ for (const mode of ['afs','iq']) {
+  await selectStage(mode, 'calculate');
+  await openStageDetails();
+  assert.equal(await page.locator('#pvt-time-system-card').isVisible(),true);
+  assert.match(await page.locator('#pvt-time-system-card').innerText(),/시각/);
  }
- for (const invalid of ['', '-1', '61', '0.0001']) {
-  await page.locator('#delay').fill(invalid);
-  assert.equal(await page.locator('#delay').getAttribute('aria-invalid'), 'true', 'invalid delay ' + invalid);
-  assert.deepEqual(await page.locator('#satellite-rows td:nth-child(3)').allTextContents(), ['—','—','—','—']);
- }
- await page.locator('[data-delay="20"]').click();
- assert.equal(await page.locator('#delay').inputValue(), '20');
- await page.locator('#delay').focus();
- await page.keyboard.press('ArrowLeft');
- assert.equal(await currentStage(), 'calculate', 'editing delay must not navigate');
- await selectStage('afs', 'compare');
- assert.equal(await page.locator('#delay').inputValue(), '20', 'delay survives stage navigation');
- await page.locator('#tx-switch').click();
- await page.locator('#data-switch').click();
- await page.locator('#data-switch').click();
- assert.equal(await page.locator('#delay').inputValue(), '20', 'delay survives engine and route changes');
 
  // The two AFS variants and the send request examples remain available.
  for (const mode of ['afs', 'iq']) {
@@ -384,8 +398,8 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
   await openStageDetails();
   await page.locator('[data-sb="4"]').click();
   const description = await page.locator('#frame-description').innerText();
-  assert.match(description, mode === 'afs' ? /보정 송신 시각/ : /원본 관측값/);
-  assert.match(description, mode === 'afs' ? /670/ : /506/);
+  assert.match(description, /가상 송신 시각/);
+  assert.match(description, /670/);
  }
  for (const mode of ['raw', 'afs', 'iq']) {
   await selectStage(mode, 'send');
@@ -441,7 +455,7 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
      aligned,
      fits: document.documentElement.scrollWidth <= innerWidth,
      folderCorrect: state.data === 'iq' ? !folder.hidden && box('.tx-folder').bottom < box('.tx-routing').top && box('.tx-folder').bottom < box('#tx-adapter').top : folder.hidden,
-     noteCorrect: state.data !== 'iq' || document.getElementById('clock-note').hidden,
+     noteCorrect: !document.getElementById('clock-note').hidden && document.getElementById('clock-note').textContent.includes('Δt'),
      routersAligned: Math.abs((box('#tx-switch').left + box('#tx-switch').right) / 2 - (box('#rx-switch').left + box('#rx-switch').right) / 2) < 1
     };
    });

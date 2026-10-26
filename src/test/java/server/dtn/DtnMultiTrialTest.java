@@ -52,7 +52,7 @@ class DtnMultiTrialTest {
         job.setSenderAgentId("sender-1");
         job.setReceiverAgentId("receiver-1");
         job.setCreatedAt(Instant.now().minusSeconds(86400));
-        job.setSentJson("{\"testId\":\"" + job.getId() + "\"}");
+        job.setSentJson("{\"schemaVersion\":6,\"format\":\"LNIS-AFS-GNSS-v6\",\"testId\":\"" + job.getId() + "\"}");
         jobs.put(job.getId(), job);
         return job;
     }
