@@ -74,7 +74,12 @@ public class IqController {
                                     () ->
                                             new IllegalArgumentException(
                                                     "유효한 지구 위치·속도와 GPS 항법정보가 필요합니다."));
-            return iq.start(IqService.earthInput(records, pvt), request.inputId());
+            String earthInput = IqService.earthInput(records, pvt, message -> {
+                if (logs != null) {
+                    logs.add(request.inputId(), "INPUT", "I/Q 입력", false, message);
+                }
+            });
+            return iq.start(earthInput, request.inputId());
         } catch (Exception error) {
             if (logs != null) {
                 logs.add(

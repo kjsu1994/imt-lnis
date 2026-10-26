@@ -130,14 +130,45 @@ public class IqService {
         throw new IllegalArgumentException("GNSS 입력을 선택하세요.");
     }
     public static String earthInput(List<byte[]> records, server.common.DtnModels.Pvt pvt) {
+        return earthInput(records, pvt, message -> {});
+    }
+
+    public static String earthInput(List<byte[]> records, server.common.DtnModels.Pvt pvt,
+            java.util.function.Consumer<String> report) {
         if (pvt == null || !pvt.isPositionValid() || !pvt.isVelocityValid()) {
             throw new IllegalArgumentException("유효 PVT 필요");
         }
-        var text =
-                new StringBuilder("LNIS-IQ-EARTH-2 ")
-                        .append(pvt.getWeek())
-                        .append(' ')
-                        .append(pvt.getTowSeconds());
+        int epochIndex = -1;
+        for (int i = 0; i < records.size(); i++) {
+            var message = server.gnss.GrawCodec.decode(records.get(i)).message();
+            if (message instanceof server.gnss.GrawCodec.ObservationEpoch epoch
+                    && epoch.week() == pvt.getWeek()
+                    && Double.compare(epoch.receiverTowSeconds(), pvt.getTowSeconds()) == 0) {
+                epochIndex = i;
+                break;
+            }
+        }
+        if (epochIndex < 0) {
+            throw new IllegalArgumentException("PVT 관측 시각 불일치");
+        }
+        var epoch = new server.pvt.DtnDelay.Epoch(epochIndex, pvt.getWeek(), pvt.getTowSeconds());
+        var selected = server.gnss.GrawCodec.splitLengthPrefixed(
+                server.pvt.DtnDelay.select(records, epoch));
+        var frames = server.afs.AfsPvtFrameCodec.select(selected);
+        var excluded = frames.stream()
+                .filter(p -> p.prn() != 0 && p.navigation() == null)
+                .map(p -> p.prn()).toList();
+        if (!excluded.isEmpty()) {
+            report.accept("I/Q 생성 제외 PRN " + excluded + " · 선행 GPS LNAV 서브프레임 1·2·3 미확보 또는 불일치");
+        }
+        var ready = frames.stream().filter(p -> p.prn() != 0 && p.navigation() != null).toList();
+        if (ready.size() < 4) {
+            throw new IllegalArgumentException("I/Q 생성 불가 · 관측값과 선행 GPS LNAV가 준비된 위성 "
+                    + ready.size() + "개 · 최소 4개 필요");
+        }
+        report.accept("I/Q 생성 대상 PRN " + ready.stream().map(p -> p.prn()).toList());
+        var text = new StringBuilder("LNIS-IQ-EARTH-2 ")
+                .append(pvt.getWeek()).append(' ').append(pvt.getTowSeconds());
         for (double value : pvt.getEcefMeters()) {
             text.append(' ').append(value);
         }
@@ -145,66 +176,16 @@ public class IqService {
             text.append(' ').append(value);
         }
         text.append(' ').append(pvt.getReceiverClockBiasSeconds()).append('\n');
-        boolean found = false;
-        for (byte[] record : records) {
-            var message = server.gnss.GrawCodec.decode(record).message();
-            if (message instanceof server.gnss.GrawCodec.NavigationUpdate nav
-                    && nav.constellationId() == 0
-                    && nav.signalId() == 0
-                    && nav.words().size() == 10
-                    && ((nav.words().getFirst() >>> 22) & 255) == 0x8b) {
-                text.append("N ").append(nav.satelliteId());
-                for (long word : nav.words()) {
-                    text.append(' ').append((word >>> 6) & 0xffffff);
+        // Native navigation, selected PRNs and RF frames must use the same coherent snapshot.
+        for (var payload : ready) {
+            for (int[] words : payload.navigation()) {
+                text.append("N ").append(payload.prn());
+                for (int word : words) {
+                    text.append(' ').append(word);
                 }
                 text.append('\n');
-            } else if (message instanceof server.gnss.GrawCodec.ObservationEpoch epoch
-                    && epoch.week() == pvt.getWeek()
-                    && Double.compare(epoch.receiverTowSeconds(), pvt.getTowSeconds()) == 0) {
-                epoch.observations().stream()
-                        .filter(
-                                o ->
-                                        o.constellationId() == 0
-                                                && o.signalId() == 0
-                                                && (o.trackingStatus() & 1) != 0)
-                        .map(o -> o.satelliteId())
-                        .distinct()
-                        .forEach(prn -> text.append("P ").append(prn).append('\n'));
-                found = true;
-                break;
             }
-        }
-        if (!found) {
-            throw new IllegalArgumentException("PVT 관측 시각 불일치");
-        }
-        var selectedEpoch =
-                new server.pvt.DtnDelay.Epoch(
-                        java.util.stream.IntStream.range(0, records.size())
-                                .filter(
-                                        i -> {
-                                            var m =
-                                                    server.gnss.GrawCodec.decode(records.get(i))
-                                                            .message();
-                                            return m
-                                                            instanceof
-                                                            server.gnss.GrawCodec.ObservationEpoch e
-                                                    && e.week() == pvt.getWeek()
-                                                    && Double.compare(
-                                                                    e.receiverTowSeconds(),
-                                                                    pvt.getTowSeconds())
-                                                            == 0;
-                                        })
-                                .findFirst()
-                                .orElseThrow(),
-                        pvt.getWeek(),
-                        pvt.getTowSeconds());
-        var selected =
-                server.gnss.GrawCodec.splitLengthPrefixed(
-                        server.pvt.DtnDelay.select(records, selectedEpoch));
-        for (var payload : server.afs.AfsPvtFrameCodec.select(selected)) {
-            if (payload.prn() == 0) {
-                continue;
-            }
+            text.append("P ").append(payload.prn()).append('\n');
             var blocks = server.afs.AfsPvtFrameCodec.encode(payload);
             text.append("F ").append(payload.prn());
             for (byte[] bits : List.of(blocks.sb2(), blocks.sb3(), blocks.sb4())) {
@@ -316,14 +297,10 @@ public class IqService {
                     return;
                 }
             }
-            if (running.exitValue() != 0 || Files.size(part) != EXPECTED_BYTES) {
-                throw new IOException(
-                        "I/Q 생성 실패: exit="
-                                + running.exitValue()
-                                + ", bytes="
-                                + Files.size(part)
-                                + ", expected="
-                                + EXPECTED_BYTES);
+            long bytes = Files.isRegularFile(part) ? Files.size(part) : 0;
+            if (running.exitValue() != 0 || bytes != EXPECTED_BYTES) {
+                throw new IOException(generationFailure(running.exitValue(), bytes,
+                        work.resolve("generation.log")));
             }
             trace(
                     id,
@@ -376,6 +353,23 @@ public class IqService {
             }
         }
     }
+    static String generationFailure(int exit, long bytes, Path log) {
+        String detail;
+        try (var input = new RandomAccessFile(log.toFile(), "r")) {
+            input.seek(Math.max(0, input.length() - 4096));
+            byte[] tail = new byte[(int) (input.length() - input.getFilePointer())];
+            input.readFully(tail);
+            detail = new String(tail, java.nio.charset.StandardCharsets.UTF_8).strip();
+            if (detail.isEmpty()) {
+                detail = "생성기 로그 없음";
+            }
+        } catch (IOException error) {
+            detail = "생성기 로그 조회 실패: " + error.getClass().getSimpleName();
+        }
+        return "I/Q 생성 실패 · 종료 코드 " + exit + " · 출력 " + bytes + " / "
+                + EXPECTED_BYTES + " bytes · 생성기: " + detail;
+    }
+
     public synchronized Map<String, Object> status(UUID id) throws IOException {
         Map<String, Object> job = jobs.get(id);
         if (job == null && Files.isRegularFile(root.resolve(id + ".json"))) {

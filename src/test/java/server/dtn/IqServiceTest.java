@@ -127,7 +127,7 @@ class IqServiceTest {
             assertEquals(
                     java.util.List.of("P 19", "P 23", "P 24", "P 28", "P 29"),
                     input.lines().filter(line -> line.startsWith("P ")).toList());
-            assertEquals(96, input.lines().filter(line -> line.startsWith("N ")).count());
+            assertEquals(15, input.lines().filter(line -> line.startsWith("N ")).count());
             pvt.setTowSeconds(100001);
             assertThrows(IllegalArgumentException.class, () -> IqService.earthInput(records, pvt));
             pvt.setPositionValid(false);
