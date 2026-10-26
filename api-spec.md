@@ -46,6 +46,9 @@ AFS와 I/Q는 Type 63 / Version 6의 같은 SB 구성을 사용합니다.
 SB4에는 가상 송신 시각·기준 시각·원본 Doppler·C/N0·유효성·전리층 정보를 넣습니다.
 I/Q도 실제 RF 프레임 복호 후 위 계산을 수행하며 RF 추적 관측값은 trackingEpochs 진단 자료로 분리합니다.
 I/Q 파일 생성 후 대기와 수신 후 복호시간은 지연에 합산하지 않습니다.
+송신 시험 시작 시 파일 존재·크기·형식을 확인하고 생성 시 SHA-256을 재사용합니다. 송신 파일의 전체 해시는 다시 계산하지 않습니다.
+수신부는 복호 전·후 전체 SHA-256 검증을 유지하며 검증 진행률·읽은 용량·경과 시간·처리속도를 로그로 표시합니다.
+생성 후 전체 해시 계산 중에는 I/Q 상태가 GENERATING이며 phase=VERIFYING과 verificationBytes·verificationTotalBytes·verificationElapsedMillis를 제공합니다.
 PC 시계 동기화가 전제이며 음수 지연은 비교 불가로 처리합니다.
 
 ## 서비스 간 비교자료

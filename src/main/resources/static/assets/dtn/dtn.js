@@ -787,7 +787,10 @@ function renderIq() {
   if(iqJob?.id && !job?.testId) logView.setContext(iqJob.id,'IQ');
   if (!iqJob) { $('iq-state').textContent = '파일 선택 또는 생성 대기'; renderIqFile($('iq-file'), null, ''); $('iq-progress').value = 0; return; }
   $('iq-state').textContent = iqJob.message;
-  $('iq-progress').value = Math.min(100, 100 * (iqJob.generatedBytes || 0) / (iqJob.expectedBytes || 1));
+  const verifying = iqJob.phase === 'VERIFYING';
+  $('iq-progress').value = Math.min(100, 100 * (verifying ? iqJob.verificationBytes || 0 : iqJob.generatedBytes || 0)
+    / (verifying ? iqJob.verificationTotalBytes || 1 : iqJob.expectedBytes || 1));
+  $('iq-progress').setAttribute('aria-label', verifying ? 'I/Q 파일 검증' : 'I/Q 파일 생성');
   renderIqFile($('iq-file'), iqJob.file ? {...iqJob.file, preview:iqJob.preview} : null, '송신 파일 준비 완료');
 }
 async function loadIqFiles() {

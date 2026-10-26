@@ -269,6 +269,11 @@ assert.equal(healthCalls, callsBeforeHidden);
 context.document.visibilityState = 'visible';
 console.log('PASS: busy status, stale response ignored and hidden tab skips polling');
 
+vm.runInContext("iqJob={id:'hashing',state:'GENERATING',phase:'VERIFYING',message:'SHA-256 검증 25%',generatedBytes:2160000000,expectedBytes:2160000000,verificationBytes:540000000,verificationTotalBytes:2160000000};renderIq();", context);
+assert.equal(elements.get('iq-progress').value, 25, 'hash progress must not show completed generation as 100%');
+assert.equal(elements.get('iq-progress')['aria-label'], 'I/Q 파일 검증');
+assert.equal(elements.get('iq-state').textContent, 'SHA-256 검증 25%');
+vm.runInContext("iqJob=null;renderIq();", context);
 vm.runInContext("job=null; selectedType='IQ_SAMPLE'; inputId=null; config.iqEnabled=true; updateControls();", context);
 assert.equal(elements.get('iq-generate').disabled, true, 'GNSS input required for generation');
 vm.runInContext("inputId='captured'; updateControls();", context);

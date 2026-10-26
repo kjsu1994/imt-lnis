@@ -411,7 +411,7 @@ public class DtnService {
             job.setTestStartedAt(startedAt == null ? Instant.now() : startedAt);
             job.setPvtConstellation("GPS");
             beginLog(job, inputId);
-            update(job, "PREPARING", "I/Q 파일 무결성 확인 중");
+            update(job, "PREPARING", "I/Q 송신 파일 준비 확인 중");
             startTask(
                     job.getId(),
                     "iq-prepare",
@@ -611,7 +611,7 @@ public class DtnService {
                     job.getId(),
                     "I/Q 검증",
                     false,
-                    "송신 파일 크기·SHA-256 확인 완료 · " + file.sizeBytes() + " bytes · " + file.sha256());
+                    "송신 파일 존재·크기 확인 완료 · " + file.sizeBytes() + " bytes · 생성 시 SHA-256 사용 · " + file.sha256());
             Transfer transfer = new Transfer();
             transfer.setTestId(job.getId());
             transfer.setTestType(job.getTestType());
@@ -1534,7 +1534,8 @@ public class DtnService {
                     true,
                     "수신 파일 존재·크기·SHA-256 확인 시작 · " + transfer.getFile().filePath());
             long started = System.nanoTime();
-            var result = new LinkedHashMap<>(iq.verify(transfer.getFile()));
+            var result = new LinkedHashMap<>(iq.verify(transfer.getFile(),
+                    progress -> trace(job.getId(), "수신 파일 검증", true, progress.message())));
             trace(
                     job.getId(),
                     "I/Q 검증",
@@ -1563,7 +1564,8 @@ public class DtnService {
                                 new DtnDelay.Timing(job.getTestStartedAt(), job.getReceivedAt()),
                                 message -> trace(job.getId(), "I/Q 복원", true, message));
                 // File verification and PVT accuracy are different results.
-                iq.verify(transfer.getFile()); // Detect replacement/modification during tracking.
+                iq.verify(transfer.getFile(),
+                        progress -> trace(job.getId(), "복호 후 파일 재검증", true, progress.message()));
                 reference =
                         IqReceiver.references(metadata, transfer.getReferencePvt(), decoded.pvt());
                 comparison =

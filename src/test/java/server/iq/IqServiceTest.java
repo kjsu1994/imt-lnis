@@ -88,6 +88,63 @@ class IqServiceTest {
         }
     }
 
+    @Test
+    void dispatchReusesGenerationDigestButStillChecksPathSizeAndFormat() throws Exception {
+        var json = new com.fasterxml.jackson.databind.ObjectMapper();
+        var service = new IqService(json, directory.toString(), "unused", false);
+        UUID id = UUID.randomUUID();
+        Path bin = directory.resolve(id + ".bin");
+        Files.write(bin, new byte[] {1, -1, 3, -3});
+        var file = new server.common.DtnModels.IqFile("/exchange/" + id + ".bin",
+                IqService.EXPECTED_BYTES, "A".repeat(64), 90, 12000000, "IQ_INTERLEAVED_INT8", 2);
+        json.writeValue(directory.resolve(id + ".json").toFile(), file);
+        json.writeValue(directory.resolve(id + ".context.json").toFile(),
+                Map.of("metadata", Map.of("pvtMethod", IqReceiver.FRAME_METHOD)));
+        try (var files = org.mockito.Mockito.mockStatic(Files.class, org.mockito.Mockito.CALLS_REAL_METHODS)) {
+            files.when(() -> Files.size(bin)).thenReturn(IqService.EXPECTED_BYTES);
+            assertEquals(file, service.completed(id), "dispatch must not recalculate the digest");
+            var error = assertThrows(java.io.IOException.class, () -> service.verify(file));
+            assertTrue(error.getMessage().contains("검증 중 파일 크기 변경"),
+                    "receiver verification must still read all file bytes");
+            files.when(() -> Files.size(bin)).thenReturn(4L);
+            assertThrows(IllegalArgumentException.class, () -> service.completed(id));
+        }
+        Files.delete(bin);
+        assertThrows(IllegalStateException.class, () -> service.completed(id));
+        assertThrows(IllegalArgumentException.class, () -> service.path(
+                new server.common.DtnModels.IqFile("/exchange/../secret", file.sizeBytes(),
+                        file.sha256(), 90, 12000000, "IQ_INTERLEAVED_INT8", 2)));
+    }
+
+    @Test
+    void hashReportsProgressAndMatchesDigestWithoutChangingReadSize() throws Exception {
+        Path file = directory.resolve("checksum.bin");
+        byte[] data = new byte[1024 * 1024 + 7];
+        new Random(26).nextBytes(data);
+        Files.write(file, data);
+        var progress = new ArrayList<IqService.VerificationProgress>();
+        String actual = IqService.sha256(file, data.length, progress::add);
+        assertEquals(server.common.Hashing.hex(
+                java.security.MessageDigest.getInstance("SHA-256").digest(data)), actual);
+        assertEquals(0, progress.getFirst().checkedBytes());
+        assertEquals(data.length, progress.getLast().checkedBytes());
+        assertTrue(progress.getLast().message().contains("100%"));
+        assertTrue(progress.getLast().message().contains("MB/s"));
+        assertThrows(java.io.IOException.class,
+                () -> IqService.sha256(file, data.length + 1, value -> {}));
+        assertThrows(java.util.concurrent.CancellationException.class,
+                () -> IqService.sha256(file, data.length, value -> {
+                    throw new java.util.concurrent.CancellationException("cancelled");
+                }));
+        Thread.currentThread().interrupt();
+        try {
+            assertThrows(java.io.IOException.class,
+                    () -> IqService.sha256(file, data.length, value -> {}));
+        } finally {
+            Thread.interrupted();
+        }
+    }
+
     private static Pvt reference(int week, double tow) {
         var pvt = new Pvt();
         pvt.setWeek(week);

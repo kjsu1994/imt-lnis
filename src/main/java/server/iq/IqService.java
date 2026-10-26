@@ -311,8 +311,21 @@ public class IqService {
                             + " bytes · 생성 소요 "
                             + ((System.nanoTime() - started) / 1_000_000)
                             + " ms");
-            trace(id, "I/Q 검증", true, "SHA-256 계산 시작 · 아직 전송 준비 완료가 아닙니다.");
-            String digest = sha256(part);
+            String digest = sha256(part, EXPECTED_BYTES, progress -> {
+                synchronized (this) {
+                    if (!id.equals(active) || cancelled(id)) {
+                        throw new java.util.concurrent.CancellationException("검증 취소");
+                    }
+                    var job = jobs.get(id);
+                    job.put("phase", "VERIFYING");
+                    job.put("verificationBytes", progress.checkedBytes());
+                    job.put("verificationTotalBytes", progress.totalBytes());
+                    job.put("verificationElapsedMillis", progress.elapsedMillis());
+                    job.put("message", progress.message());
+                    job.put("updatedAt", Instant.now().toString());
+                }
+                trace(id, "I/Q 검증", true, progress.message());
+            });
             var context = IqReceiver.source(earthInput, digest);
             trace(id, "I/Q 검증", true, "SHA-256 계산 완료 · " + digest);
             synchronized (this) {
@@ -452,7 +465,8 @@ public class IqService {
             throw new IllegalStateException("완료된 I/Q 파일만 전송할 수 있습니다.");
         }
         IqFile file = (IqFile) job.get("file");
-        verify(file);
+        // Reuse the generation digest; the receiver still verifies the complete file.
+        checkedPath(file);
         String clientPath = formatFilePath(id);
         if (!clientPath.equals(file.filePath())) {
             file =
@@ -501,19 +515,14 @@ public class IqService {
         return path;
     }
     public Map<String, Object> verify(IqFile file) throws IOException {
-        if (file == null
-                || file.sizeBytes() != EXPECTED_BYTES
-                || file.durationSeconds() != 90
-                || file.sampleRateHz() != 12_000_000
-                || file.quantizationBits() != 2
-                || !"IQ_INTERLEAVED_INT8".equals(file.sampleFormat())
-                || file.sha256() == null
-                || !file.sha256().matches("[0-9A-F]{64}")) {
-            throw new IllegalArgumentException("I/Q 파일 메타데이터 오류");
-        }
-        Path path = path(file);
-        if (Files.size(path) != file.sizeBytes() || !sha256(path).equals(file.sha256())) {
-            throw new IllegalArgumentException("I/Q 크기 또는 SHA-256 불일치");
+        return verify(file, progress -> {});
+    }
+
+    public Map<String, Object> verify(IqFile file,
+            java.util.function.Consumer<VerificationProgress> report) throws IOException {
+        Path path = checkedPath(file);
+        if (!sha256(path, file.sizeBytes(), report).equals(file.sha256())) {
+            throw new IllegalArgumentException("I/Q SHA-256 불일치");
         }
         return Map.of(
                 "verdict",
@@ -525,6 +534,24 @@ public class IqService {
                 "filePath",
                 file.filePath());
     }
+    private Path checkedPath(IqFile file) throws IOException {
+        if (file == null
+                || file.sizeBytes() != EXPECTED_BYTES
+                || file.durationSeconds() != 90
+                || file.sampleRateHz() != 12_000_000
+                || file.quantizationBits() != 2
+                || !"IQ_INTERLEAVED_INT8".equals(file.sampleFormat())
+                || file.sha256() == null
+                || !file.sha256().matches("[0-9A-F]{64}")) {
+            throw new IllegalArgumentException("I/Q 파일 메타데이터 오류");
+        }
+        Path path = path(file);
+        if (Files.size(path) != file.sizeBytes()) {
+            throw new IllegalArgumentException("I/Q 파일 크기 불일치");
+        }
+        return path;
+    }
+
     public List<List<Integer>> preview(IqFile file) throws IOException {
         try (var in = Files.newInputStream(path(file))) {
             byte[] bytes = in.readNBytes(64);
@@ -535,8 +562,22 @@ public class IqService {
             return values;
         }
     }
-    private static String sha256(Path path) throws IOException {
+    public record VerificationProgress(long checkedBytes, long totalBytes, long elapsedMillis) {
+        public String message() {
+            long percent = Math.min(100, checkedBytes * 100 / Math.max(1, totalBytes));
+            double megabytesPerSecond = checkedBytes / 1_000_000.0 / Math.max(.001, elapsedMillis / 1000.0);
+            return String.format(Locale.ROOT,
+                    "SHA-256 검증 %d%% · %.2f / %.2f GB · 경과 %d초 · %.1f MB/s",
+                    percent, checkedBytes / 1_000_000_000.0, totalBytes / 1_000_000_000.0,
+                    elapsedMillis / 1000, megabytesPerSecond);
+        }
+    }
+
+    static String sha256(Path path, long totalBytes,
+            java.util.function.Consumer<VerificationProgress> report) throws IOException {
         var digest = Hashing.sha256Digest();
+        long started = System.nanoTime(), reported = started, checked = 0;
+        report.accept(new VerificationProgress(0, totalBytes, 0));
         try (var in = Files.newInputStream(path)) {
             byte[] buffer = new byte[1024 * 1024];
             int count;
@@ -545,9 +586,22 @@ public class IqService {
                     throw new IOException("검증 중단");
                 }
                 digest.update(buffer, 0, count);
+                checked += count;
+                long now = System.nanoTime();
+                if (now - reported >= TimeUnit.SECONDS.toNanos(5)) {
+                    report.accept(new VerificationProgress(checked, totalBytes,
+                            (now - started) / 1_000_000));
+                    reported = now;
+                }
             }
         }
-        return Hashing.hex(digest.digest());
+        if (checked != totalBytes) {
+            throw new IOException("I/Q 검증 중 파일 크기 변경 · " + checked + " / " + totalBytes + " bytes");
+        }
+        String hash = Hashing.hex(digest.digest());
+        report.accept(new VerificationProgress(checked, totalBytes,
+                (System.nanoTime() - started) / 1_000_000));
+        return hash;
     }
     @PreDestroy
     public synchronized void close() {

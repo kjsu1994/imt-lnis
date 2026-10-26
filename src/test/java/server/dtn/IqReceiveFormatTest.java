@@ -43,7 +43,7 @@ class IqReceiveFormatTest {
         var iq = mock(IqService.class);
         ReflectionTestUtils.setField(service, "iq", iq);
         // Stop at the file boundary; malformed envelopes must never reach disk verification.
-        when(iq.verify(any())).thenThrow(new IOException("verification boundary reached"));
+        when(iq.verify(any(), any())).thenThrow(new IOException("verification boundary reached"));
         var transfer = new Transfer();
         transfer.setSchemaVersion(version);
         transfer.setFormat(format);
@@ -73,7 +73,7 @@ class IqReceiveFormatTest {
         when(repository.findById(job.getId())).thenReturn(Optional.of(job));
         when(repository.save(any())).thenAnswer(call -> call.getArgument(0));
         ReflectionTestUtils.invokeMethod(service, "verifyIq", job);
-        verify(iq, times(accepted ? 1 : 0)).verify(any());
+        verify(iq, times(accepted ? 1 : 0)).verify(any(), any());
         assertEquals("FAILED", job.getState());
         if (accepted) {
             assertEquals("verification boundary reached", job.getMessage());
