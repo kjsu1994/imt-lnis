@@ -341,12 +341,12 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
    assert.ok((await page.locator('#step-copy').innerText()).trim(), mode + '/' + stage + ' copy');
    assert.equal(await page.locator('#evidence-details').evaluate(el => el.open), false, mode + '/' + stage + ' starts collapsed');
    await openStageDetails();
-   assert.ok(await page.locator(stage === 'frame' ? '#frame-explorer' : '#evidence-detail-copy').isVisible(), mode + '/' + stage + ' detail');
+   assert.ok(await page.locator(stage === 'frame' ? '#frame-explorer' : '.evidence-detail-body').isVisible(), mode + '/' + stage + ' detail');
    assert.ok((await page.locator('#evidence-details').innerText()).trim().length > 15);
    if (mode === 'iq' && stage === 'decode') {
     const detail = await page.locator('#evidence-details').innerText();
     assert.match(detail, /RF 추적 관측값.*진단/);
-    assert.match(detail, /프레임의 원본 Doppler/);
+    assert.match(detail, /프레임.*원본 Doppler/);
     assert.doesNotMatch(detail, /SB4 원본 관측값은.*절대 전달되지/);
    }
    if (stage === 'compare') {
@@ -358,6 +358,51 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
    assert.equal(referenceActive > 0, mode !== 'iq' && stage === 'compare', mode + '/' + stage + ' reference route');
   }
  }
+
+ // On-screen arrows share keyboard navigation and stop at route boundaries.
+ await selectStage('afs','source');
+ assert.equal(await page.locator('#step-prev').isDisabled(),true);
+ await page.locator('#step-next').click();
+ assert.equal(await currentStage(),'data');
+ await page.locator('#step-prev').click();
+ assert.equal(await currentStage(),'source');
+ await selectStage('iq','compare');
+ assert.equal(await page.locator('#step-next').isDisabled(),true);
+ await page.locator('#step-prev').click();
+ assert.equal(await currentStage(),'calculate');
+
+ // Documentation distinguishes the official frame structure from LNIS contents.
+ await selectStage('afs', 'frame');
+ await openStageDetails();
+ for (let block=0; block<=4; block++) {
+  await page.locator('[data-sb="'+block+'"]').click();
+  const text=await page.locator('#sb-detail-view').innerText();
+  assert.doesNotMatch(text,/NASA 표준 부합|107₈|MSG-G6|CC63F74536F49E04A0|동일 제공/);
+  assert.equal(await page.locator('#sb-detail-view thead th').count(),5);
+  if(block===0) assert.match(text,/CC63F74536F49E04A/);
+  if(block===1) assert.match(text,/763₈/);
+  if(block===3) assert.match(text,/구현하지 않/);
+ }
+ for(const mode of ['raw','afs','iq']) {
+  await selectStage(mode,'send');
+  await openStageDetails();
+  const request=JSON.parse(await page.locator('#request-json').innerText());
+  assert.equal(request.hdtnConfig.maxSumOfBundleBytesInPipeline,3000000000);
+  assert.equal(request.hdtnConfig.maxBundleSizeBytes,3000000000);
+  assert.equal(request.hdtnConfig.tcpclMaxSegmentSizeBytes,200000);
+  assert.equal(request.hdtnConfig.storageDeletionPolicy,'never');
+  assert.equal(await page.locator('#send-engine-fields [data-iq-only]').isVisible(),mode==='iq');
+  await selectStage(mode,'receive');
+  await openStageDetails();
+  assert.equal(await page.locator('#receive-engine-fields [data-iq-only]').isVisible(),mode==='iq');
+  assert.doesNotMatch(await page.locator('#evidence-details').innerText(),/영구|인입된 모든 본문/);
+ }
+ await selectStage('afs','restore');
+ await openStageDetails();
+ assert.match(await page.locator('#restore-engine-fields').innerText(),/BCH 오류 정정을 수행하지/);
+ await selectStage('iq','decode');
+ await openStageDetails();
+ assert.match(await page.locator('#decode-engine-fields').innerText(),/복호 후/);
 
  // Route and engine switches preserve the current semantic stage.
  await selectStage('afs', 'calculate');
