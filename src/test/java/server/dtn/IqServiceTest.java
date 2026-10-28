@@ -89,7 +89,7 @@ class IqServiceTest {
                 () -> service.path(file("/exchange/" + id + ".bin")));
         Files.write(directory.resolve(id + ".bin"), new byte[] {1, -1, 3, -3});
         assertThrows(
-                IllegalArgumentException.class,
+                IqService.FileMismatchException.class,
                 () -> service.verify(file("/exchange/" + id + ".bin")));
         assertEquals(
                 java.util.List.of(java.util.List.of(1, -1), java.util.List.of(3, -3)),

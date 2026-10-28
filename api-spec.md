@@ -51,6 +51,8 @@ I/Q도 실제 RF 프레임 복호 후 위 계산을 수행하며 RF 추적 관�
 I/Q 파일 생성 후 대기와 수신 후 복호시간은 지연에 합산하지 않습니다.
 송신 시험 시작 시 파일 존재·크기·형식을 확인하고 생성 시 SHA-256을 재사용합니다. 송신 파일의 전체 해시는 다시 계산하지 않습니다.
 수신부는 복호 전·후 전체 SHA-256 검증을 유지하며 검증 진행률·읽은 용량·경과 시간·처리속도를 로그로 표시합니다.
+I/Q 보고서의 `observations`는 `IQ_FRAME` 복원 관측·항법정보와 `trackingEpochs`의 RF 추적값을 제공합니다. `referenceObservations`는 I/Q에서 반환하지 않으며 Reference PVT·비교 결과는 유지합니다. 관측값 조회는 PVT Epoch 개수와 독립적입니다.
+화면의 `data-integrity`는 `fileResult.verdict`와 `comparison.verdict`를 구분해 함께 표시합니다. 파일 크기·SHA-256 불일치는 `fileResult.verdict=FAIL`로 기록하며, 복호 실패만으로 파일 불일치를 판정하지 않습니다. 지연 시험의 `MEASURED`는 PVT 차이 측정 완료이며 원본과 같은 값이라는 뜻은 아닙니다.
 생성 후 전체 해시 계산 중에는 I/Q 상태가 GENERATING이며 phase=VERIFYING과 verificationBytes·verificationTotalBytes·verificationElapsedMillis를 제공합니다.
 PC 시계 동기화가 전제이며 음수 지연은 비교 불가로 처리합니다.
 

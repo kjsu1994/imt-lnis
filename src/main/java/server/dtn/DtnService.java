@@ -1524,6 +1524,11 @@ public class DtnService {
                             + " · "
                             + ((System.nanoTime() - started) / 1_000_000)
                             + " ms");
+            synchronized (this) {
+                if (!"CALCULATING".equals(get(job.getId()).getState())) return;
+                job.setFileResultJson(objectMapper.writeValueAsString(result));
+                dtnRepository.save(job);
+            }
             result.put("preview", iq.preview(transfer.getFile()));
             IqReceiver.Result decoded = null;
             List<Pvt> reference = List.of();
@@ -1579,6 +1584,10 @@ public class DtnService {
         } catch (Exception error) {
             synchronized (this) {
                 if ("CALCULATING".equals(get(job.getId()).getState())) {
+                    if (error instanceof IqService.FileMismatchException) {
+                        job.setFileResultJson(objectMapper.valueToTree(Map.of(
+                                "verdict", "FAIL", "message", error.getMessage())).toString());
+                    }
                     fail(job, error);
                 }
             }

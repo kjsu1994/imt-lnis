@@ -4,7 +4,7 @@ import {initGnssControls} from './dtn-gnss.js?v=20261026-frame6';
 import {createDtnLog} from './dtn-log.js?v=20261026-frame6';
 import {initAdapterHealth} from './dtn-adapter-health.js?v=20261026-frame6';
 import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20261026-frame6';
-import {createObservationView, numeric, renderClockBias} from './dtn-observations.js?v=20261026-frame6';
+import {createObservationView, numeric, renderClockBias} from './dtn-observations.js?v=20261028-iq-observations';
 
 const $ = id => document.getElementById(id);
 const payloadViewer = createPayloadViewer($('dtn-payload'), {receivedOnly: true});
@@ -1051,7 +1051,7 @@ function renderSummary(job) {
   $('dtn-cancel').textContent = job?.state === 'CALCULATING' ? '계산 중지' : job?.state === 'WAITING_DTN' ? '대기 종료' : '시험 중지';
   if ($('trial-settings')) renderTrialSettings($('trial-settings'), job);
   trialDialogHandler?.updateDialog(job);
-  $('dtn-observations').hidden = job?.testType === 'IQ_SAMPLE' && !job?.receivedEpochs;
+  $('dtn-observations').hidden = job?.testType === 'IQ_SAMPLE' && !job?.receivedEpochs && !job?.dtnReceived;
   $('received-observation-card').hidden = $('dtn-observations').hidden && $('reference-panel').hidden;
   $('receiver-type').textContent = job ? trialTypeLabel(job.testType) : '시험 선택 대기';
   $('receiver-mode').textContent = job?.senderMode && job?.receiverMode ? job.senderMode + ' → ' + job.receiverMode : '경로 정보 없음';
@@ -1099,8 +1099,8 @@ async function renderTest(force = false) {
     observations.setData(null);
   }
   if (!job) return;
-  const event = job.testId + ':' + job.state + ':' + job.updatedAt;
-  if (!job.receivedEpochs) return;
+  const event = job.testId + ':' + job.state + ':' + job.updatedAt + ':' + (job.fileResult?.verdict || '');
+  if (!job.receivedEpochs && !(job.testType === 'IQ_SAMPLE' && job.dtnReceived)) return;
   if (!force && reportKey === event) return;
   try {
     const report = await get('/dtn/tests/' + encodeURIComponent(job.testId) + '/report');

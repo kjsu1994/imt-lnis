@@ -280,19 +280,55 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
  reportFixture={referencePvt:[],receivedPvt:[]};
 
 
- await page.evaluate(async fixture=>{
-   const {createObservationView}=await import('/assets/dtn/dtn-observations.js?v=20261026-frame6');
-   const host=document.createElement('div');host.id='iq-diagnostic-test';document.body.append(host);
-   const data=structuredClone(fixture);
-   data.source='IQ_FRAME';
-   data.trackingEpochs=[{elapsedSeconds:21,observations:[{satelliteId:19,pseudorangeMeters:21000001,dopplerHz:-101,carrierToNoiseDbHz:44}]}];
-   createObservationView(host,()=>{},'수신 원본').setData(data);
- },fixture);
- const iqDiagnostic=page.locator('#iq-diagnostic-test');
- assert.equal(await iqDiagnostic.locator('[data-iq-tracking]').isVisible(),true);
- assert.equal(await iqDiagnostic.locator('[data-iq-tracking-body]').isVisible(),false);
- await iqDiagnostic.locator('[data-iq-tracking] summary').click();
- assert.match(await iqDiagnostic.locator('[data-iq-tracking-body]').innerText(),/21000001\.000/);
+ // The actual receiver page shows decoded I/Q data even without a PVT result.
+ const iqSignals=[received,{...received,satelliteId:23}].map(value=>({...value,week:2400,towSeconds:100000}));
+ const iqNavigation=[...navRows.slice(0,3),...navRows.slice(0,3).map(row=>({...row,message:{...row.message,satelliteId:23}}))];
+ job={...job,testType:'IQ_SAMPLE',state:'INCONCLUSIVE',dtnReceived:true,receivedEpochs:0,fileResult:{verdict:'PASS'}};
+ reportFixture={testType:'IQ_SAMPLE',comparisonMode:'DELAY',fileResult:{verdict:'PASS'},comparison:{verdict:'INCONCLUSIVE'},
+   referenceObservations:{epochs:[{observation:epoch}]},referencePvt:[],receivedPvt:[],
+   observations:{source:'IQ_FRAME',epochs:[{observation:{...epoch,observations:[{...original,pseudorangeMeters:320792458},
+     {...original,satelliteId:23,pseudorangeMeters:321792458}]}}],navigation:iqNavigation,navigationCount:6,
+     records:[...iqNavigation.map(()=>({type:'NAVIGATION_UPDATE'})),{type:'OBSERVATION_EPOCH'}],
+     receivedValues:{observations:iqSignals},trackingEpochs:[{elapsedSeconds:21,observations:[
+       {satelliteId:19,pseudorangeMeters:21000001,dopplerHz:-101,carrierToNoiseDbHz:44,carrierPhaseCycles:123.5}]}]}};
+ await page.goto(base+'/receiver');await selectTrial();
+ await page.waitForFunction(()=>document.querySelector('#dtn-observations [data-integrity]')?.textContent==='파일 일치 · PVT 비교 불가');
+ assert.equal(await observationPanel.isVisible(),true);
+ assert.equal(await observationPanel.locator('[data-observations] tr').count(),2);
+ assert.equal(await observationPanel.locator('[data-navigation-pvt-active]').isChecked(),false);
+ assert.equal(await observationPanel.locator('[data-navigation] tr').count(),6);
+ assert.equal(await observationPanel.locator('[data-navigation] pre').first().isVisible(),true);
+ assert.equal(await observationPanel.locator('[data-range-heading]').isVisible(),false);
+ assert.equal(await observationPanel.locator('[data-phase-heading]').isVisible(),false);
+ assert.doesNotMatch(await observationPanel.locator('[data-observations]').innerText(),/21000000\.000/);
+ assert.match(await observationPanel.locator('[data-observations]').innerText(),/320792458\.000/);
+ assert.equal(await observationPanel.locator('td.converted-range').first().evaluate(el=>getComputedStyle(el).color),'rgb(180, 35, 24)');
+ assert.equal(await observationPanel.locator('[data-iq-tracking-body]').isVisible(),true);
+ assert.match(await observationPanel.locator('[data-iq-tracking-body]').innerText(),/21000001\.000/);
+ assert.match(await observationPanel.locator('[data-iq-tracking-body]').innerText(),/123\.500/);
+ for(const width of [1366,390]){
+  await page.setViewportSize({width,height:900});
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'I/Q observations fit '+width);
+  await observationPanel.screenshot({path:'build/iq-received-observations-'+width+'.png'});
+ }
+ await page.setViewportSize({width:1600,height:1000});
+ for(const [file,pvt,label,tone] of [['PASS','MEASURED','파일 일치 · PVT 측정 완료','online'],
+   ['PASS','FAIL','파일 일치 · PVT 불일치','error'],['FAIL','MEASURED','파일 불일치 · PVT 측정 완료','error'],
+   [null,'MEASURED','파일 검증 미확인 · PVT 측정 완료','warning']]){
+  reportFixture.fileResult={verdict:file};reportFixture.comparison={verdict:pvt};
+  await page.reload();await selectTrial();
+  await page.waitForFunction(label=>document.querySelector('#dtn-observations [data-integrity]')?.textContent===label,label);
+  assert.equal(await observationPanel.locator('[data-integrity]').getAttribute('class'),'pill '+tone);
+ }
+ // I/Q must not leave hidden columns or filters on a subsequent AFS trial.
+ job={...job,testType:'AFS_METADATA',receivedEpochs:1};
+ reportFixture={comparisonMode:'DELAY',referenceStatus:'COMPLETE',referenceObservations:{epochs:[{observation:epoch}]},
+   referencePvt:[],receivedPvt:[],observations:{...reportFixture.observations,source:undefined}};
+ await page.reload();await selectTrial();
+ await page.waitForFunction(()=>document.querySelector('#dtn-observations [data-integrity]')?.textContent==='데이터 일치');
+ assert.equal(await observationPanel.locator('[data-range-heading]').isVisible(),true);
+ assert.equal(await observationPanel.locator('[data-phase-heading]').isVisible(),true);
+ assert.equal(await observationPanel.locator('[data-navigation-pvt-active]').isChecked(),true);
 
  await page.goto(base + '/dtn-intro');
  assert.equal(await page.locator('.pc-boundary').count(), 2);

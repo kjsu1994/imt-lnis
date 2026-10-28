@@ -518,6 +518,11 @@ public class IqService {
         }
         return path;
     }
+    /** A confirmed size/hash mismatch is distinct from a missing file or decoder failure. */
+    public static class FileMismatchException extends IllegalArgumentException {
+        public FileMismatchException(String message) { super(message); }
+    }
+
     public Map<String, Object> verify(IqFile file) throws IOException {
         return verify(file, progress -> {});
     }
@@ -526,7 +531,7 @@ public class IqService {
             java.util.function.Consumer<VerificationProgress> report) throws IOException {
         Path path = checkedPath(file);
         if (!sha256(path, file.sizeBytes(), report).equals(file.sha256())) {
-            throw new IllegalArgumentException("I/Q SHA-256 불일치");
+            throw new FileMismatchException("I/Q SHA-256 불일치");
         }
         return Map.of(
                 "verdict",
@@ -551,7 +556,7 @@ public class IqService {
         }
         Path path = path(file);
         if (Files.size(path) != file.sizeBytes()) {
-            throw new IllegalArgumentException("I/Q 파일 크기 불일치");
+            throw new FileMismatchException("I/Q 파일 크기 불일치");
         }
         return path;
     }

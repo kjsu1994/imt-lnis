@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {numeric, clockBias, renderClockBias, observationCells, navigationCells, createObservationView, transmitTime, pvtInputStatus, lockTime, unclassifiedNavigation, navigationLabel, receiverInformation, observationCounts, decodeNavigationParameters, renderNavigationParametersDetails, navigationSubframeKey, getActivePvtNavigationItems} from '../../main/resources/static/assets/dtn/dtn-observations.js';
+import {numeric, iqIntegrity, clockBias, renderClockBias, observationCells, navigationCells, createObservationView, transmitTime, pvtInputStatus, lockTime, unclassifiedNavigation, navigationLabel, receiverInformation, observationCounts, decodeNavigationParameters, renderNavigationParametersDetails, navigationSubframeKey, getActivePvtNavigationItems} from '../../main/resources/static/assets/dtn/dtn-observations.js';
 
 assert.equal(numeric(null), '—');
 assert.equal(numeric(NaN), '—');
@@ -514,3 +514,56 @@ console.log('PASS: Active navigation subframe keys, multi-epoch history replacem
 
 
 assert.equal(getActivePvtNavigationItems([{message:{constellationId:3,satelliteId:4,words:[1<<12]}}], [0], 1).size, 0);
+
+globalThis.document = {createElement: element};
+globalThis.Option = function(text, value) { this.text = text; this.value = value; };
+
+// I/Q file identity must not be inferred from a successful PVT calculation.
+for (const [file, pvt, label, tone] of [
+  ['PASS','MEASURED','파일 일치 · PVT 측정 완료','online'],
+  ['PASS','INCONCLUSIVE','파일 일치 · PVT 비교 불가','warning'],
+  ['PASS','FAIL','파일 일치 · PVT 불일치','error'],
+  ['FAIL','MEASURED','파일 불일치 · PVT 측정 완료','error'],
+  [null,'MEASURED','파일 검증 미확인 · PVT 측정 완료','warning'],
+  ['PASS',null,'파일 일치 · PVT 비교 대기','warning']
+]) assert.deepEqual(iqIntegrity({verdict:file},{verdict:pvt}),{label,tone});
+
+assert.deepEqual(iqIntegrity({verdict:'PASS'},null,'FAILED'),{label:'파일 일치 · PVT 비교 불가',tone:'warning'});
+assert.deepEqual(iqIntegrity({verdict:'FAIL'},null,'FAILED'),{label:'파일 불일치 · PVT 비교 불가',tone:'error'});
+
+const iqWire = {constellationId:0,satelliteId:9,signalId:0,week:2400,towSeconds:100021,
+  dopplerHz:raw.dopplerHz,carrierToNoiseDbHz:raw.carrierToNoiseDbHz,trackingStatus:3,
+  transmitAt:{seconds:1790000000,femtoseconds:123456789000000}};
+const iqData = {...original,source:'IQ_FRAME',receivedValues:{observations:[iqWire]},
+  trackingEpochs:[{elapsedSeconds:21,observations:[{satelliteId:9,pseudorangeMeters:21000001,
+    dopplerHz:-101,carrierToNoiseDbHz:44,carrierPhaseCycles:123.5}]}]};
+const iqReport = {testType:'IQ_SAMPLE',fileResult:{verdict:'PASS'},comparison:{verdict:'MEASURED'},
+  referenceObservations:original};
+receiverView.setData(iqData,false,null,iqReport);
+let iqRow=nodes.get('[data-observations]').children[0];
+assert.equal(nodes.get('[data-integrity]').textContent,'파일 일치 · PVT 측정 완료');
+assert.equal(nodes.get('[data-range-heading]').hidden,true);
+assert.equal(nodes.get('[data-phase-heading]').hidden,true);
+assert.equal(nodes.get('[data-navigation-pvt-active]').checked,false);
+assert.equal(nodes.get('[data-pvt-filter]').checked,false);
+assert.equal(nodes.get('[data-navigation]').children.length,1);
+assert.equal(iqRow.children[3].textContent,'—','I/Q never reads Reference pseudorange');
+for(const i of [3,5,8,9]) assert.equal(iqRow.children[i].hidden,true);
+assert.equal(iqRow.children[4].textContent,numeric(raw.pseudorangeMeters));
+assert.equal(iqRow.children[4].className,'converted-range');
+assert.equal(iqRow.children[10].textContent,'PR 유효');
+assert.equal(nodes.get('[data-iq-tracking]').open,true);
+assert.equal(nodes.get('[data-iq-tracking-body]').children[0].children[5].textContent,'123.500');
+receiverView.setData({...iqData,epochs:[]},false,null,{...iqReport,comparison:{verdict:'INCONCLUSIVE'}});
+assert.equal(nodes.get('[data-observations]').children.length,1,'received values remain visible without PVT');
+assert.equal(nodes.get('[data-integrity]').textContent,'파일 일치 · PVT 비교 불가');
+receiverView.setData({...wireView,receivedValues:{observations:[{...wireObservation,week:2400,towSeconds:100021}]}},false,null,{referenceStatus:'COMPLETE',referenceObservations:original});
+assert.equal(nodes.get('[data-range-heading]').hidden,false);
+assert.equal(nodes.get('[data-phase-heading]').hidden,false);
+assert.equal(nodes.get('[data-navigation-pvt-active]').checked,true);
+assert.equal(nodes.get('[data-observations]').children[0].children[3].textContent,numeric(raw.pseudorangeMeters));
+assert.equal(nodes.get('[data-integrity]').textContent,'데이터 일치');
+console.log('PASS: I/Q decoded values without original comparison, file/PVT separation, phase diagnostics and RAW/AFS reset');
+
+delete globalThis.document;
+delete globalThis.Option;

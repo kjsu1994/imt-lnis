@@ -430,7 +430,7 @@ public class DtnController {
         report.put("delayEvidence", evidence);
         report.put("referenceStatus", job.getReferenceStatus());
         report.put("referenceMessage", job.getReferenceMessage());
-        report.put("referenceObservations", job.getReferenceSourceBase64() == null ? null
+        report.put("referenceObservations", "IQ_SAMPLE".equals(job.getTestType()) || job.getReferenceSourceBase64() == null ? null
                 : navigationView(objectMapper.valueToTree(
                         server.common.DtnObservationView.fromRecords(server.gnss.GrawCodec.splitLengthPrefixed(
                                 Base64.getDecoder().decode(job.getReferenceSourceBase64()))))));

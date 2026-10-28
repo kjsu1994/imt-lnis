@@ -77,6 +77,43 @@ class IqReceiveFormatTest {
         assertEquals("FAILED", job.getState());
         if (accepted) {
             assertEquals("verification boundary reached", job.getMessage());
+            assertNull(job.getFileResultJson(), "I/O failure is not proof of a mismatch");
+            job.setState("CALCULATING");
+            doThrow(new IqService.FileMismatchException("I/Q SHA-256 불일치")).when(iq).verify(any(), any());
+            ReflectionTestUtils.invokeMethod(service, "verifyIq", job);
+            assertEquals("FAIL", json.readTree(job.getFileResultJson()).path("verdict").asText());
+
+            var receiver = mock(IqReceiver.class);
+            ReflectionTestUtils.setField(service, "iqReceiver", receiver);
+            doReturn(Map.of("verdict", "PASS")).when(iq).verify(any(), any());
+            doThrow(new IOException("decoder failed")).when(receiver).decode(any(), any(), any(), any());
+            job.setFileResultJson(null);
+            job.setState("CALCULATING");
+            ReflectionTestUtils.invokeMethod(service, "verifyIq", job);
+            assertEquals("FAILED", job.getState());
+            assertEquals("decoder failed", job.getMessage());
+            assertEquals("PASS", json.readTree(job.getFileResultJson()).path("verdict").asText(),
+                    "decoder failure must retain the verified file result");
+
+            doReturn(Map.of("verdict", "PASS"))
+                    .doThrow(new IqService.FileMismatchException("I/Q 파일 크기 불일치"))
+                    .when(iq).verify(any(), any());
+            doReturn(new IqReceiver.Result(List.of(), Map.of())).when(receiver).decode(any(), any(), any(), any());
+            job.setState("CALCULATING");
+            ReflectionTestUtils.invokeMethod(service, "verifyIq", job);
+            assertEquals("FAIL", json.readTree(job.getFileResultJson()).path("verdict").asText(),
+                    "a mismatch after decoding overrides the earlier PASS");
+
+            clearInvocations(receiver);
+            doAnswer(call -> {
+                job.setState("CANCELLED");
+                return Map.of("verdict", "PASS");
+            }).when(iq).verify(any(), any());
+            job.setState("CALCULATING");
+            ReflectionTestUtils.invokeMethod(service, "verifyIq", job);
+            assertEquals("CANCELLED", job.getState());
+            verify(receiver, never()).decode(any(), any(), any(), any());
+
         }
     }
 }

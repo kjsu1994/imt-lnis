@@ -63,6 +63,7 @@ const context = {
     assert.ok(!options?.method || options.method === 'GET', 'Receiver screen must not start a test');
     requests.push(url);
     const body = url.includes('/adapter-health?') ? {checkedAt:'2026-09-22T00:00:00Z',adapter:{status:healthState,message:healthState==='ready'?'정상연결':healthState==='busy'?'시험대기':'연결실패',elapsedMillis:5,url:'http://adapter:8080/receiver/health'}}
+      : url.includes('/dtn/receipts') ? []
       : url.endsWith('/node') ? {baseUrl: 'http://192.168.1.72:8089'}
       : url.endsWith('/agents') ? [{role: 'RECEIVER', state: 'BUSY'}, {role: 'SENDER', state: 'READY'}]
       : url.endsWith('/config') ? {receiveConfigured: true}
@@ -324,3 +325,25 @@ await context.poll(true);
 assert.equal(vm.runInContext('polling', context), false);
 gnssControls.poll = normalGnssPoll;
 console.log('PASS: selected-trial receipts remain reachable beyond global history and GNSS errors release polling');
+
+// I/Q observation loading must not require a valid or existing PVT epoch.
+vm.runInContext("selectionPinned=false; selectedId='';", context);
+elements.get('dtn-tests').value='';
+nextTests=[{testId:'iq-no-pvt',testType:'IQ_SAMPLE',state:'INCONCLUSIVE',dtnReceived:true,
+  receivedEpochs:0,updatedAt:'2026-10-28T00:00:00Z',fileResult:{verdict:'PASS'}}];
+report={testType:'IQ_SAMPLE',state:'INCONCLUSIVE',observations:{source:'IQ_FRAME',receivedValues:{observations:[]}},
+  fileResult:{verdict:'PASS'},comparison:{verdict:'INCONCLUSIVE'}};
+await context.poll(true);
+elements.get('dtn-tests').value='iq-no-pvt';
+const beforeRequests=requests.length;
+await context.renderTest(true);
+assert.equal(elements.get('dtn-observations').hidden,false);
+assert.ok(requests.slice(beforeRequests).some(url=>url.endsWith('/iq-no-pvt/report')));
+const reportLoads=()=>requests.filter(url=>url.endsWith('/iq-no-pvt/report')).length;
+const countAfterLoad=reportLoads();
+await context.renderTest();
+assert.equal(reportLoads(),countAfterLoad,'unchanged I/Q reports are cached');
+nextTests=[{...nextTests[0],fileResult:{verdict:'FAIL'}}];
+await context.poll();
+assert.equal(reportLoads(),countAfterLoad+1,'a changed file verdict invalidates the report');
+console.log('PASS: I/Q received observations load independently of PVT epochs with cached reports');

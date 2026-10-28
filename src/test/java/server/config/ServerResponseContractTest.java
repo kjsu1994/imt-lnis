@@ -271,4 +271,26 @@ class ServerResponseContractTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.comparison").doesNotExist());
     }
+    @Test
+    void iqReportKeepsReceivedValuesAndPvtWithoutReadingOriginalGnss() throws Exception {
+        UUID id = UUID.randomUUID();
+        var job = new DtnJob();
+        job.setId(id);
+        job.setTestType("IQ_SAMPLE");
+        job.setState("INCONCLUSIVE");
+        job.setReferenceSourceBase64("invalid original must never be decoded for IQ");
+        job.setReferenceJson("[{\"week\":2400,\"ecefMeters\":[1,2,3]}]");
+        job.setComparisonJson("{\"verdict\":\"INCONCLUSIVE\"}");
+        job.setFileResultJson("{\"verdict\":\"PASS\"}");
+        job.setObservationsJson("{\"source\":\"IQ_FRAME\",\"receivedValues\":{\"observations\":[{\"satelliteId\":19}]}}");
+        when(dtnService.get(id)).thenReturn(job);
+        mvc.perform(get("/lnis/api/v1/dtn/tests/" + id + "/report"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.observations.receivedValues.observations[0].satelliteId").value(19))
+                .andExpect(jsonPath("$.referenceObservations").doesNotExist())
+                .andExpect(jsonPath("$.referencePvt[0].ecefMeters[0]").value(1))
+                .andExpect(jsonPath("$.fileResult.verdict").value("PASS"))
+                .andExpect(jsonPath("$.comparison.verdict").value("INCONCLUSIVE"));
+    }
+
 }
