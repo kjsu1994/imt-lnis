@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
@@ -27,6 +28,7 @@ import java.util.UUID;
 @Service
 @Profile("node")
 @RequiredArgsConstructor
+@Slf4j
 public class NodeDtnService implements DtnNodeLink {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private server.management.DataManagementGuard managementGuard;
@@ -82,23 +84,7 @@ public class NodeDtnService implements DtnNodeLink {
             }
         }
         try {
-            NodeDtnRegistration registration = new NodeDtnRegistration();
-            registration.setTestId(job.getId());
-            registration.setComparisonMode(job.getComparisonMode());
-            registration.setPvtConstellation(job.getPvtConstellation() == null ? "GPS" : job.getPvtConstellation());
-            registration.setTestStartedAt(job.getTestStartedAt());
-            if (job.getSenderClockJson() != null) {
-                registration.setSenderClock(mapper.readValue(job.getSenderClockJson(), server.common.ServiceClock.Stamp.class));
-            }
-            if (job.getSelectedEpochJson() != null) {
-                registration.setSelectedEpoch(
-                        mapper.readValue(job.getSelectedEpochJson(), DtnDelay.Epoch.class));
-            }
-            registration.setSenderAgentId(job.getSenderAgentId());
-            registration.setReceiverAgentId(job.getReceiverAgentId());
-            registration.setProfile(mapper.readTree(job.getSentJson()).path("profile").asText());
-            registration.setPayloadSha256(
-                    DtnPayloadDigest.sha256(mapper, mapper.readTree(job.getSentJson())));
+            NodeDtnRegistration registration = registration(job);
             DtnRemoteResult accepted =
                     peerClient.exchange(
                             "/lnis/api/v1/node/peer/dtn/tests",
@@ -118,6 +104,85 @@ public class NodeDtnService implements DtnNodeLink {
         } catch (java.io.IOException error) {
             throw new IllegalArgumentException("송신 JSON 검증 실패", error);
         }
+    }
+
+    public NodeDtnRegistration registration(UUID id) throws java.io.IOException {
+        if (!sender()) throw new ResponseStatusException(HttpStatus.CONFLICT, "송신 노드 전용 API입니다.");
+        DtnJob job = repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        validateParticipants(job.getSenderAgentId(), job.getReceiverAgentId());
+        if (job.getSentJson() == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "전송 원문이 없는 시험입니다.");
+        }
+        return registration(job);
+    }
+
+    private NodeDtnRegistration registration(DtnJob job) throws java.io.IOException {
+        var payload = mapper.readTree(job.getSentJson());
+        NodeDtnRegistration registration = new NodeDtnRegistration();
+        registration.setTestType(job.getTestType() == null ? payload.path("testType").asText(null) : job.getTestType());
+        registration.setSenderMode(job.getSenderMode() == null ? payload.path("senderMode").asText(null) : job.getSenderMode());
+        registration.setReceiverMode(job.getReceiverMode() == null ? payload.path("receiverMode").asText(null) : job.getReceiverMode());
+        registration.setTestId(job.getId());
+        registration.setComparisonMode(job.getComparisonMode());
+        registration.setPvtConstellation(job.getPvtConstellation() == null ? "GPS" : job.getPvtConstellation());
+        registration.setTestStartedAt(job.getTestStartedAt());
+        if (job.getSenderClockJson() != null) {
+            registration.setSenderClock(mapper.readValue(job.getSenderClockJson(), server.common.ServiceClock.Stamp.class));
+        }
+        if (job.getSelectedEpochJson() != null) {
+            registration.setSelectedEpoch(
+                    mapper.readValue(job.getSelectedEpochJson(), DtnDelay.Epoch.class));
+        }
+        registration.setSenderAgentId(job.getSenderAgentId());
+        registration.setReceiverAgentId(job.getReceiverAgentId());
+        registration.setProfile(payload.path("profile").asText());
+        registration.setPayloadSha256(
+                DtnPayloadDigest.sha256(mapper, payload));
+        return registration;
+    }
+
+    @org.springframework.context.event.EventListener(org.springframework.boot.context.event.ApplicationReadyEvent.class)
+    public void restoreTrialMetadataAfterStart() {
+        if (!sender()) Thread.ofVirtual().name("dtn-trial-metadata").start(() -> {
+            try {
+                restoreMissingTrialMetadata();
+            } catch (RuntimeException error) {
+                log.warn("시험 유형 보완 실패 · {}", error.getClass().getSimpleName());
+            }
+        });
+    }
+
+    /** 기동 시 한 번만 조회한다. 연결 실패 시 기존 기록은 미확인으로 남긴다. */
+    void restoreMissingTrialMetadata() {
+        var ids = repository.findMissingTrialMetadata();
+        if (ids.isEmpty()) return;
+        try {
+            if (!peerClient.status().isOnline()) {
+                log.warn("시험 유형 보완 보류 · 송신 노드 실행기 미준비 · {}건", ids.size());
+                return;
+            }
+        } catch (RuntimeException error) {
+            log.warn("시험 유형 보완 보류 · 송신 노드 연결 확인 불가 · {}건", ids.size());
+            return;
+        }
+        int restored = 0;
+        for (UUID id : ids) {
+            try {
+                var registration = peerClient.exchange("/lnis/api/v1/node/peer/dtn/tests/" + id + "/registration",
+                        null, NodeDtnRegistration.class, 8192);
+                if (registration == null || !id.equals(registration.getTestId()) || registration.getTestType() == null) {
+                    continue;
+                }
+                validateParticipants(registration.getSenderAgentId(), registration.getReceiverAgentId());
+                validateTrialMetadata(registration);
+                DtnJob existing = repository.findById(id).orElse(null);
+                if (existing != null) restored += fillExistingTrialMetadata(existing, registration);
+            } catch (RuntimeException error) {
+                log.debug("시험 유형 보완 불가 · testId={} · {}", id, error.getClass().getSimpleName());
+            }
+        }
+        log.info("시험 유형 보완 · 확인 {} / {}건 · 시험 상태·원문·결과 유지", restored, ids.size());
     }
 
     @Override
@@ -227,6 +292,7 @@ public class NodeDtnService implements DtnNodeLink {
                         || registration.getSelectedEpoch() == null)) {
             throw new IllegalArgumentException("지연 시험의 시작 시각/Epoch 누락");
         }
+        validateTrialMetadata(registration);
         if (managementGuard != null) {
             managementGuard.requirePresent("DTN", registration.getTestId());
         }
@@ -236,25 +302,14 @@ public class NodeDtnService implements DtnNodeLink {
                     && existing.getExpectedPayloadSha256() == null) {
                 return view(existing);
             }
-            if (!java.util.Objects.equals(
-                            registration.getComparisonMode(), existing.getComparisonMode())
-                    || !java.util.Objects.equals(
-                            registration.getTestStartedAt(), existing.getTestStartedAt())
-                    || !java.util.Objects.equals(
-                            registration.getSelectedEpoch() == null
-                                    ? null
-                                    : mapper.valueToTree(registration.getSelectedEpoch())
-                                            .toString(),
-                            existing.getSelectedEpochJson())
-                    || !registration.getPayloadSha256().equals(existing.getExpectedPayloadSha256())
-                    || !registration.getSenderAgentId().equals(existing.getSenderAgentId())
-                    || !registration.getReceiverAgentId().equals(existing.getReceiverAgentId())) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 등록된 시험 내용과 다릅니다.");
-            }
+            fillExistingTrialMetadata(existing, registration);
             return view(existing);
         }
         DtnJob job = new DtnJob();
         job.setId(registration.getTestId());
+        job.setTestType(registration.getTestType());
+        job.setSenderMode(registration.getSenderMode());
+        job.setReceiverMode(registration.getReceiverMode());
         job.setSenderAgentId(registration.getSenderAgentId());
         job.setReceiverAgentId(registration.getReceiverAgentId());
         job.setExpectedPayloadSha256(registration.getPayloadSha256());
@@ -281,6 +336,51 @@ public class NodeDtnService implements DtnNodeLink {
             logs.add(job.getId(), "TEST", "시험 등록", false, "시험 접수 완료 · 외부 DTN/HDTN 데이터 수신 대기");
         }
         return view(job);
+    }
+
+    private int fillExistingTrialMetadata(DtnJob existing, NodeDtnRegistration registration) {
+        if (!java.util.Objects.equals(
+                        registration.getComparisonMode(), existing.getComparisonMode())
+                || !java.util.Objects.equals(
+                        registration.getTestStartedAt(), existing.getTestStartedAt())
+                || !java.util.Objects.equals(
+                        registration.getSelectedEpoch() == null
+                                ? null
+                                : mapper.valueToTree(registration.getSelectedEpoch())
+                                        .toString(),
+                        existing.getSelectedEpochJson())
+                || !registration.getPayloadSha256().equals(existing.getExpectedPayloadSha256())
+                || !registration.getSenderAgentId().equals(existing.getSenderAgentId())
+                || !registration.getReceiverAgentId().equals(existing.getReceiverAgentId())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 등록된 시험 내용과 다릅니다.");
+        }
+        if (conflicts(existing.getTestType(), registration.getTestType())
+                || conflicts(existing.getSenderMode(), registration.getSenderMode())
+                || conflicts(existing.getReceiverMode(), registration.getReceiverMode())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 등록된 시험 유형·경로와 다릅니다.");
+        }
+        if (existing.getTestType() == null && registration.getTestType() != null
+                || existing.getSenderMode() == null && registration.getSenderMode() != null
+                || existing.getReceiverMode() == null && registration.getReceiverMode() != null) {
+            return repository.fillTrialMetadata(existing.getId(), registration.getPayloadSha256(),
+                    registration.getTestType(), registration.getSenderMode(), registration.getReceiverMode());
+        }
+        return 0;
+    }
+
+    private static boolean conflicts(String stored, String incoming) {
+        return stored != null && incoming != null && !stored.equals(incoming);
+    }
+
+    private static void validateTrialMetadata(NodeDtnRegistration registration) {
+        if (registration.getTestType() != null
+                && !java.util.List.of("GNSS_RAW", "AFS_METADATA", "IQ_SAMPLE").contains(registration.getTestType())
+                || registration.getSenderMode() != null
+                && !java.util.List.of("DTN", "HDTN").contains(registration.getSenderMode())
+                || registration.getReceiverMode() != null
+                && !java.util.List.of("DTN", "HDTN").contains(registration.getReceiverMode())) {
+            throw new IllegalArgumentException("지원하지 않는 시험 유형·경로입니다.");
+        }
     }
 
     public DtnRemoteResult localResult(UUID testId) {

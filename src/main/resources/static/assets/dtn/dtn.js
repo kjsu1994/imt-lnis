@@ -1,4 +1,4 @@
-import {initPresetControls, renderTrialSettings, trialOption, colorTrialSelection, initWaitingCancellation, initTrialSettingsDialog} from './dtn-settings.js?v=20261026-frame6';
+import {initPresetControls, renderTrialSettings, trialTypeLabel, trialOption, colorTrialSelection, initWaitingCancellation, initTrialSettingsDialog} from './dtn-settings.js?v=20261028-trial-types';
 import {requestJson} from '../common/http.js?v=20261001-review';
 import {initGnssControls} from './dtn-gnss.js?v=20261026-frame6';
 import {createDtnLog} from './dtn-log.js?v=20261026-frame6';
@@ -462,7 +462,7 @@ function updateAdapterStripPill(text, tone, className) {
 }
 
 function updateInputSummary() {
-  const type = {GNSS_RAW: 'GNSS RAW', AFS_METADATA: 'AFS Frame', IQ_SAMPLE: 'I/Q Sample'}[selectedType];
+  const type = trialTypeLabel(selectedType);
   const sysLabel = pvtConstellation !== 'GPS' ? ' (' + pvtConstellation + ')' : '';
   if ($('dtn-condition-summary')) {
     $('dtn-condition-summary').textContent = type + sysLabel + ' · ' + senderMode + ' → ' + receiverMode + (delayMode() ? ' · 지연 반영 1 Epoch' : '');
@@ -474,7 +474,7 @@ function updateInputSummary() {
     $('dtn-input-summary').title = epoch ? '다음 전송: Week ' + epoch.week + ' / TOW ' + epoch.towSeconds + ' s' : '';
   }
 
-  if ($('hud-type')) $('hud-type').textContent = type;
+  if ($('hud-type')) $('hud-type').textContent = trialTypeLabel(selectedType, true);
   if ($('hud-route')) $('hud-route').textContent = senderMode + ' → ' + receiverMode;
   if ($('hud-constellation')) $('hud-constellation').textContent = pvtConstellation;
   if ($('hud-engine')) {
@@ -1066,7 +1066,8 @@ function renderSummary() {
   if (!job) return;
   const names = {PREPARING: job.testType === 'IQ_SAMPLE' ? 'I/Q 파일 확인 중' : '입력 준비·기준 PVT 계산 중', WAITING_DTN: '외부 전달·수신 대기', WAITING_RECEIVER: '수신 처리 대기',
     CALCULATING: '복원·PVT 계산 중', COMPLETED: '처리 완료', FAILED: '시험 실패', INCONCLUSIVE: '수신 완료 · PVT 비교 불가', CANCELLED: '취소'};
-  pill('dtn-test-status', job.state === 'WAITING_DTN' && job.message?.startsWith('수신 검증 실패') ? '검증 실패 · 재수신 대기' : names[job.state] || job.state, active() ? 'warning' : job.verdict === 'PASS' ? 'online' : 'warning');
+  const status = job.state === 'WAITING_DTN' && job.message?.startsWith('수신 검증 실패') ? '검증 실패 · 재수신 대기' : names[job.state] || job.state;
+  pill('dtn-test-status', '선택 시험 · ' + trialTypeLabel(job.testType, true) + ' · ' + status, active() ? 'warning' : job.verdict === 'PASS' ? 'online' : 'warning');
 
   $('dtn-test-detail').textContent = job.testId + ' · ' + (job.message || '');
   payload.setJob(job);

@@ -687,6 +687,10 @@ class IndependentNodeIntegrationTest {
                 assertEquals("WAITING_DTN", tx.get(id).getState());
                 assertEquals("ACCEPTED", tx.get(id).getSendStatus());
                 assertEquals("WAITING_DTN", rx.get(id).getState());
+                assertEquals(type, rx.get(id).getTestType());
+                assertEquals("HDTN", rx.get(id).getSenderMode());
+                assertEquals("HDTN", rx.get(id).getReceiverMode());
+                assertNull(rx.get(id).getReceivedJson(), "사전 등록만으로 유형을 표시하며 실제 수신으로 처리하지 않는다.");
             }
             assertEquals(3, new java.util.HashSet<>(ids).size());
             for (var context : java.util.List.of(sender, receiver)) {
@@ -699,6 +703,15 @@ class IndependentNodeIntegrationTest {
                 context.getBean(DtnService.class).tick();
             }
             HttpClient http = HttpClient.newHttpClient();
+            URI registrationUrl = URI.create("http://127.0.0.1:" + senderPort
+                    + "/lnis/api/v1/node/peer/dtn/tests/" + ids.get(1) + "/registration");
+            assertEquals(401, http.send(HttpRequest.newBuilder(registrationUrl).GET().build(),
+                    HttpResponse.BodyHandlers.ofString()).statusCode());
+            var registration = http.send(HttpRequest.newBuilder(registrationUrl)
+                    .header("Authorization", "Bearer test-node-management").GET().build(),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, registration.statusCode());
+            assertEquals("GNSS_RAW", new ObjectMapper().readTree(registration.body()).path("testType").asText());
             for (int index : new int[] {2, 0, 1, 2}) {
                 var request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + receiverPort
                                 + "/lnis/api/v1/dtn/receive"))

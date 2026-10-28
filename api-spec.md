@@ -54,6 +54,14 @@ I/Q 파일 생성 후 대기와 수신 후 복호시간은 지연에 합산하�
 생성 후 전체 해시 계산 중에는 I/Q 상태가 GENERATING이며 phase=VERIFYING과 verificationBytes·verificationTotalBytes·verificationElapsedMillis를 제공합니다.
 PC 시계 동기화가 전제이며 음수 지연은 비교 불가로 처리합니다.
 
+## 서비스 간 시험 등록 정보
+
+내부 관리 채널의 `POST /lnis/api/v1/node/peer/dtn/tests`는 `testType`, `senderMode`, `receiverMode`를 함께 등록합니다. 이전 호출과의 호환을 위해 세 필드는 선택값이며, 누락 시 AFS로 간주하지 않습니다. 허용값은 각각 `GNSS_RAW|AFS_METADATA|IQ_SAMPLE`, `DTN|HDTN`, `DTN|HDTN`입니다.
+
+`GET /lnis/api/v1/node/peer/dtn/tests/{testId}/registration`은 송신 노드 전용이며 관리 토큰 인증이 필요합니다. 시험 유형·경로·참여 노드·시각·Epoch·전송 해시를 반환하며 GNSS 원문·프레임·I/Q 파일·Reference PVT는 포함하지 않습니다.
+
+수신 노드는 기동 시 한 번, 유형·경로가 누락된 기존 기록을 위 API로 확인합니다. 시험 ID·참여 노드·전송 해시·비교 조건이 같을 때 누락된 세 필드만 채우며 시험 상태·수정 시각·원문·결과는 유지합니다. 연결 실패나 불일치 기록은 그대로 두고, 다음 기동 때 다시 확인합니다. 외부 어댑터 전달 규격은 변경하지 않습니다.
+
 ## 서비스 간 비교자료
 
 GET /lnis/api/v1/node/peer/dtn/tests/{testId}/reference

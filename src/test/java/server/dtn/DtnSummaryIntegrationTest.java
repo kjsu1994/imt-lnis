@@ -122,7 +122,7 @@ class DtnSummaryIntegrationTest {
         assertEquals(0, complete.get("velocityComparableEpochs"));
         assertEquals(true, first.getFirst().get("dtnReceived"));
         assertEquals(false, first.getFirst().get("receivedPayloadAvailable"));
-        assertEquals("AFS_METADATA", first.getFirst().get("testType"));
+        assertNull(first.getFirst().get("testType"), "누락된 유형을 AFS로 추정하지 않는다.");
         assertEquals("RESTORE", first.getFirst().get("comparisonMode"));
         assertEquals("GPS", first.getFirst().get("pvtConstellation"));
         assertNull(first.getFirst().get("hdtnConfig"));
@@ -147,5 +147,38 @@ class DtnSummaryIntegrationTest {
         assertThrows(IllegalArgumentException.class, () -> service.recent(100001, null));
         assertEquals("목록 상태 오류", assertThrows(IllegalArgumentException.class,
                 () -> service.recent(0, "FAILED")).getMessage());
+    }
+
+    @Test
+    void fillsOnlyMissingMetadataWithoutChangingStateResultsOrDeletedRecords() {
+        DtnJob job = job(0);
+        job.setTestType(null);
+        job.setSenderMode(null);
+        job.setReceiverMode(null);
+        job.setState("CANCELLED");
+        job.setUpdatedAt(Instant.parse("2026-10-28T01:00:00Z"));
+        jobs.saveAndFlush(job);
+        em.clear();
+        assertTrue(jobs.findMissingTrialMetadata().contains(job.getId()));
+        assertEquals(0, jobs.fillTrialMetadata(job.getId(), "b".repeat(64), "IQ_SAMPLE", "DTN", "HDTN"));
+        assertEquals(1, jobs.fillTrialMetadata(job.getId(), job.getExpectedPayloadSha256(), "IQ_SAMPLE", "DTN", "HDTN"));
+        DtnJob filled = jobs.findById(job.getId()).orElseThrow();
+        assertEquals("IQ_SAMPLE", filled.getTestType());
+        assertEquals("DTN", filled.getSenderMode());
+        assertEquals("HDTN", filled.getReceiverMode());
+        assertEquals("CANCELLED", filled.getState());
+        assertEquals(job.getUpdatedAt(), filled.getUpdatedAt());
+        assertEquals(job.getSentJson(), filled.getSentJson());
+        assertEquals(job.getReceivedRawJson(), filled.getReceivedRawJson());
+        assertEquals(job.getReceiverJson(), filled.getReceiverJson());
+        assertEquals(job.getComparisonJson(), filled.getComparisonJson());
+        assertFalse(jobs.findMissingTrialMetadata().contains(job.getId()));
+        assertEquals(0, jobs.fillTrialMetadata(job.getId(), job.getExpectedPayloadSha256(), "GNSS_RAW", "DTN", "HDTN"));
+        assertEquals(1, jobs.fillTrialMetadata(job.getId(), job.getExpectedPayloadSha256(), null, null, null));
+        assertEquals("IQ_SAMPLE", jobs.findById(job.getId()).orElseThrow().getTestType());
+        jobs.deleteById(job.getId());
+        jobs.flush();
+        assertEquals(0, jobs.fillTrialMetadata(job.getId(), job.getExpectedPayloadSha256(), "IQ_SAMPLE", "DTN", "HDTN"));
+        assertFalse(jobs.existsById(job.getId()));
     }
 }

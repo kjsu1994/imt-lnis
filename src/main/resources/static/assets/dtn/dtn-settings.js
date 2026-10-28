@@ -1,6 +1,11 @@
 import {requestJson} from '../common/http.js?v=20261001-review';
 
 const types = {GNSS_RAW: 'RAW', AFS_METADATA: 'AFS', IQ_SAMPLE: 'I/Q'};
+const fullTypes = {GNSS_RAW: 'GNSS RAW', AFS_METADATA: 'AFS Frame', IQ_SAMPLE: 'I/Q Sample'};
+
+export function trialTypeLabel(type, compact = false) {
+  return (compact ? types : fullTypes)[type] || (compact ? '미확인' : '유형 미확인');
+}
 const trialStates = {PREPARING: '준비 중', WAITING_DTN: '수신 대기', WAITING_RECEIVER: '계산 대기',
   CALCULATING: '계산 중', COMPLETED: '완료', INCONCLUSIVE: '비교 불가', FAILED: '실패', CANCELLED: '종료'};
 
@@ -16,7 +21,7 @@ export function trialStatus(job) {
 
 export function trialOption(job, date, suffix = '') {
   const status = trialStatus(job);
-  const option = new Option(date + ' · ' + status.label + suffix + ' · ' + job.testId.slice(0, 8), job.testId);
+  const option = new Option('[' + trialTypeLabel(job.testType, true) + '] ' + date + ' · ' + status.label + suffix + ' · ' + job.testId.slice(0, 8), job.testId);
   option.className = 'trial-' + status.tone;
   return option;
 }

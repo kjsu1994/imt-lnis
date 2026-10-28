@@ -127,6 +127,32 @@ public interface DtnRepository extends JpaRepository<DtnJob, UUID> {
     List<SummaryRow> findSummaries(@org.springframework.data.repository.query.Param("state") String state,
             org.springframework.data.domain.Pageable page);
 
+    @org.springframework.data.jpa.repository.Query("""
+            select j.id from DtnJob j
+            where j.expectedPayloadSha256 is not null
+              and (j.testType is null or j.senderMode is null or j.receiverMode is null)
+            """)
+    List<UUID> findMissingTrialMetadata();
+
+    /** 결과·상태를 덮어쓰지 않고 검증된 표시 정보만 보완한다. */
+    @org.springframework.transaction.annotation.Transactional
+    @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
+    @org.springframework.data.jpa.repository.Query("""
+            update DtnJob j
+            set j.testType = coalesce(j.testType, :type),
+                j.senderMode = coalesce(j.senderMode, :senderMode),
+                j.receiverMode = coalesce(j.receiverMode, :receiverMode)
+            where j.id = :id and j.expectedPayloadSha256 = :digest
+              and (j.testType is null or :type is null or j.testType = :type)
+              and (j.senderMode is null or :senderMode is null or j.senderMode = :senderMode)
+              and (j.receiverMode is null or :receiverMode is null or j.receiverMode = :receiverMode)
+            """)
+    int fillTrialMetadata(@org.springframework.data.repository.query.Param("id") UUID id,
+            @org.springframework.data.repository.query.Param("digest") String digest,
+            @org.springframework.data.repository.query.Param("type") String type,
+            @org.springframework.data.repository.query.Param("senderMode") String senderMode,
+            @org.springframework.data.repository.query.Param("receiverMode") String receiverMode);
+
     List<DtnJob> findByCancelPendingTrue();
 
     List<DtnJob> findByReferenceStatus(String status);

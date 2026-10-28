@@ -113,6 +113,9 @@ for (const testType of ['GNSS_RAW', 'AFS_METADATA', 'IQ_SAMPLE']) {
     assert.equal(elements.get('receiver-mode').textContent, senderMode + ' → ' + receiverMode);
   }
 }
+context.renderSummary({state:'WAITING_DTN'});
+assert.equal(elements.get('receiver-type').textContent, '유형 미확인');
+assert.equal(elements.get('receive-state').textContent, '외부 번들 수신 대기');
 context.renderSummary(null);
 assert.equal(elements.get('dtn-observations').hidden, false);
 assert.equal(elements.get('receiver-mode').textContent, '경로 정보 없음');

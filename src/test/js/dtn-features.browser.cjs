@@ -49,7 +49,8 @@ const server=createServer((req,res)=>{
  try{
   const file=resolve(root, (path==='/sender'?'dtn-sender.html':path==='/receiver'?'dtn-receiver.html':path==='/dtn-intro'?'dtn-intro.html':path.replace(/^\/lnis\//,'')).replace(/^\//,''));
   if(!file.startsWith(root+require('node:path').sep))throw Error('path');
-  res.writeHead(200,{'Content-Type':{'.js':'text/javascript','.html':'text/html','.css':'text/css','.png':'image/png'}[extname(file)]||'text/plain'});res.end(readFileSync(file));
+  const content=readFileSync(file);
+  res.writeHead(200,{'Content-Type':{'.js':'text/javascript','.html':'text/html','.css':'text/css','.png':'image/png'}[extname(file)]||'text/plain'});res.end(content);
  }catch{res.writeHead(404);res.end();}
 });
 (async()=>{
@@ -536,5 +537,39 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
  await selectStage('afs', 'calculate');
  await openStageDetails();
  await captureIntro('build/intro-calculation-review.png');
+
+ // The next transfer and selected history are separate sources of truth.
+ const typed = await context.newPage();
+ await typed.setViewportSize({width:1366,height:900});
+ typed.on('pageerror', error => errors.push(error.message));
+ job={testId:'test1',state:'WAITING_DTN',testType:'GNSS_RAW',senderMode:'DTN',receiverMode:'HDTN',
+   createdAt:'2026-10-28T00:00:00Z',updatedAt:'2026-10-28T00:00:00Z',receivedEpochs:0};
+ await typed.goto(base+'/sender');
+ await typed.waitForFunction(()=>document.querySelector('#dtn-tests option[value="test1"]'));
+ await typed.locator('#dtn-settings-open').click();
+ for(const [type,label] of [['GNSS_RAW','RAW'],['AFS_METADATA','AFS'],['IQ_SAMPLE','I/Q']]){
+  await typed.locator('.test-type-button[data-test-type="'+type+'"]').click();
+  assert.equal(await typed.locator('#hud-type').innerText(),label);
+ }
+ await typed.locator('#dtn-settings-close').click();
+ await typed.locator('#dtn-tests').selectOption('test1');
+ await typed.waitForFunction(()=>document.getElementById('dtn-test-status').textContent.includes('RAW'));
+ assert.match(await typed.locator('#dtn-config-hud').innerText(),/다음 전송/);
+ assert.equal(await typed.locator('#hud-type').innerText(),'I/Q');
+ assert.match(await typed.locator('#dtn-test-status').innerText(),/선택 시험 · RAW/);
+ assert.match(await typed.locator('#dtn-tests option[value="test1"]').innerText(),/^\[RAW\]/);
+ await typed.screenshot({path:'build/trial-type-sender.png',fullPage:true});
+ for(const [type,label,short] of [['GNSS_RAW','GNSS RAW','RAW'],['AFS_METADATA','AFS Frame','AFS'],
+   ['IQ_SAMPLE','I/Q Sample','I/Q'],[null,'유형 미확인','미확인']]){
+  job={...job,testType:type};
+  await typed.goto(base+'/receiver');
+  await typed.waitForFunction(()=>document.querySelector('#dtn-tests option[value="test1"]'));
+  await typed.locator('#dtn-tests').selectOption('test1');
+  await typed.waitForFunction(expected=>document.getElementById('receiver-type').textContent===expected,label);
+  assert.ok((await typed.locator('#dtn-tests option[value="test1"]').innerText()).startsWith('['+short+']'));
+  assert.match(await typed.locator('#receive-state').innerText(),/외부 번들 수신 대기/);
+ }
+ await typed.screenshot({path:'build/trial-type-receiver.png',fullPage:true});
+ await typed.close();
  assert.deepEqual(errors,[]);await browser.close();console.log('PASS: preset CRUD/apply/capacity/shared list, trial settings, viewport fullscreen, waiting batch cancellation, scoped intro and responsive layout.');
 })().catch(e=>{console.error(e);process.exitCode=1;}).finally(async()=>{await browser?.close();server.close();});

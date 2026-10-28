@@ -1,4 +1,4 @@
-import {renderTrialSettings, trialOption, colorTrialSelection, initWaitingCancellation, initTrialSettingsDialog} from './dtn-settings.js?v=20261026-frame6';
+import {renderTrialSettings, trialTypeLabel, trialOption, colorTrialSelection, initWaitingCancellation, initTrialSettingsDialog} from './dtn-settings.js?v=20261028-trial-types';
 import {requestJson} from '../common/http.js?v=20261001-review';
 import {initGnssControls} from './dtn-gnss.js?v=20261026-frame6';
 import {createDtnLog} from './dtn-log.js?v=20261026-frame6';
@@ -1053,8 +1053,7 @@ function renderSummary(job) {
   trialDialogHandler?.updateDialog(job);
   $('dtn-observations').hidden = job?.testType === 'IQ_SAMPLE' && !job?.receivedEpochs;
   $('received-observation-card').hidden = $('dtn-observations').hidden && $('reference-panel').hidden;
-  const types = {GNSS_RAW: 'GNSS RAW', AFS_METADATA: 'AFS Frame', IQ_SAMPLE: 'I/Q Sample'};
-  $('receiver-type').textContent = types[job?.testType] || '시험 선택 대기';
+  $('receiver-type').textContent = job ? trialTypeLabel(job.testType) : '시험 선택 대기';
   $('receiver-mode').textContent = job?.senderMode && job?.receiverMode ? job.senderMode + ' → ' + job.receiverMode : '경로 정보 없음';
   if ($('receiver-constellation')) $('receiver-constellation').textContent = job?.pvtConstellation || 'GPS';
   $('receiver-iq').hidden = job?.testType !== 'IQ_SAMPLE';

@@ -16,6 +16,12 @@ import java.util.UUID;
 @NoArgsConstructor
 public class NodeDtnRegistration {
     @NotNull private UUID testId;
+    @Pattern(regexp = "GNSS_RAW|AFS_METADATA|IQ_SAMPLE")
+    private String testType;
+    @Pattern(regexp = "DTN|HDTN")
+    private String senderMode;
+    @Pattern(regexp = "DTN|HDTN")
+    private String receiverMode;
     private String comparisonMode;
     private String pvtConstellation = "GPS";
     private java.time.Instant testStartedAt;

@@ -47,6 +47,14 @@ public class NodeDtnController {
         return dtnService.referenceSnapshot(testId);
     }
 
+    @GetMapping("/{testId}/registration")
+    public NodeDtnRegistration registration(@PathVariable UUID testId,
+            @RequestHeader(value = "Authorization", required = false) String authorization)
+            throws java.io.IOException {
+        authentication.authenticate(authorization);
+        return service.registration(testId);
+    }
+
     @PostMapping
     public ResponseEntity<DtnRemoteResult> register(HttpServletRequest request) throws Exception {
         // 인증 전에 JSON을 역직렬화하지 않고 작은 관리 요청만 허용한다.

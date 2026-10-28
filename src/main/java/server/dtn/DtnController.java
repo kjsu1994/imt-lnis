@@ -595,7 +595,7 @@ public class DtnController {
     private Map<String, Object> summary(DtnRepository.SummaryView job) throws Exception {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("testId", job.getId());
-        result.put("testType", job.getTestType() == null ? "AFS_METADATA" : job.getTestType());
+        result.put("testType", job.getTestType());
         result.put("senderMode", job.getSenderMode());
         result.put("receiverMode", job.getReceiverMode());
         result.put(

@@ -86,4 +86,112 @@ class NodeFailureTest {
         assertEquals("FAILED", calculating.getState());
         verify(repository, times(2)).save(any());
     }
+
+    private NodeDtnRegistration registration(UUID id, String type) {
+        var registration = new NodeDtnRegistration();
+        registration.setTestId(id);
+        registration.setSenderAgentId("sender-1");
+        registration.setReceiverAgentId("receiver-1");
+        registration.setProfile("IQ_SAMPLE".equals(type) ? "LANS-AFS-IQ-v1" : DtnModels.PROFILE);
+        registration.setPayloadSha256("a".repeat(64));
+        registration.setTestType(type);
+        registration.setSenderMode("DTN");
+        registration.setReceiverMode("HDTN");
+        return registration;
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"GNSS_RAW", "AFS_METADATA", "IQ_SAMPLE"})
+    void preRegistrationKeepsTypeAndRouteBeforeAnyExternalBodyArrives(String type) {
+        var repository = mock(DtnRepository.class);
+        var service = new NodeDtnService(properties, mock(NodePeerClient.class), repository, mapper);
+        var request = registration(UUID.randomUUID(), type);
+        service.accept(request);
+        var saved = org.mockito.ArgumentCaptor.forClass(DtnJob.class);
+        verify(repository).saveAndFlush(saved.capture());
+        assertEquals(type, saved.getValue().getTestType());
+        assertEquals("DTN", saved.getValue().getSenderMode());
+        assertEquals("HDTN", saved.getValue().getReceiverMode());
+        assertEquals("WAITING_DTN", saved.getValue().getState());
+        assertNull(saved.getValue().getReceivedJson());
+        assertNull(saved.getValue().getReceivedAt());
+        request.setTestType("unexpected");
+        assertThrows(IllegalArgumentException.class, () -> service.accept(request));
+    }
+
+    @Test
+    void sendsAndExportsOnlyRegistrationMetadataWithTheSamePayloadDigest() throws Exception {
+        var sender = new NodeProperties(new MockEnvironment().withProperty("lnis.node.role", "sender"));
+        var peer = mock(NodePeerClient.class);
+        var status = new NodeDto.StatusResponse();
+        status.setOnline(true);
+        when(peer.status()).thenReturn(status);
+        var repository = mock(DtnRepository.class);
+        var service = new NodeDtnService(sender, peer, repository, mapper);
+        var job = new DtnJob();
+        job.setId(UUID.randomUUID());
+        job.setTestType("IQ_SAMPLE");
+        job.setSenderMode("HDTN");
+        job.setReceiverMode("DTN");
+        job.setSenderAgentId("sender-1");
+        job.setReceiverAgentId("receiver-1");
+        job.setSentJson("{\"testType\":\"IQ_SAMPLE\",\"profile\":\"LANS-AFS-IQ-v1\",\"file\":{\"sizeBytes\":2160000000}}");
+        when(repository.findById(job.getId())).thenReturn(Optional.of(job));
+        var accepted = new server.dtn.DtnRemoteResult();
+        accepted.setTestId(job.getId());
+        when(peer.exchange(eq("/lnis/api/v1/node/peer/dtn/tests"), any(), eq(server.dtn.DtnRemoteResult.class), anyInt()))
+                .thenReturn(accepted);
+        service.register(job);
+        var sent = org.mockito.ArgumentCaptor.forClass(NodeDtnRegistration.class);
+        verify(peer).exchange(eq("/lnis/api/v1/node/peer/dtn/tests"), sent.capture(), eq(server.dtn.DtnRemoteResult.class), anyInt());
+        assertEquals(mapper.valueToTree(sent.getValue()), mapper.valueToTree(service.registration(job.getId())));
+        assertEquals("IQ_SAMPLE", sent.getValue().getTestType());
+        assertEquals("HDTN", sent.getValue().getSenderMode());
+        assertEquals("DTN", sent.getValue().getReceiverMode());
+        assertEquals(DtnPayloadDigest.sha256(mapper, mapper.readTree(job.getSentJson())), sent.getValue().getPayloadSha256());
+        var metadata = mapper.valueToTree(sent.getValue());
+        for (String excluded : java.util.List.of("file", "frames", "grawBase64", "referencePvt")) {
+            assertFalse(metadata.has(excluded));
+        }
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> new NodeDtnService(properties, peer, repository, mapper).registration(job.getId()));
+    }
+
+    @Test
+    void legacyRepairChecksIdentityAndDigestAndNeverRecreatesDeletedRecords() {
+        var repository = mock(DtnRepository.class);
+        var peer = mock(NodePeerClient.class);
+        var service = new NodeDtnService(properties, peer, repository, mapper);
+        var status = new NodeDto.StatusResponse();
+        status.setOnline(true);
+        when(peer.status()).thenReturn(status);
+        UUID good = UUID.randomUUID(), wrongDigest = UUID.randomUUID(), wrongId = UUID.randomUUID(), deleted = UUID.randomUUID();
+        when(repository.findMissingTrialMetadata()).thenReturn(java.util.List.of(good, wrongDigest, wrongId, deleted));
+        for (UUID id : java.util.List.of(good, wrongDigest, wrongId)) {
+            var job = new DtnJob();
+            job.setId(id);
+            job.setExpectedPayloadSha256("a".repeat(64));
+            job.setSenderAgentId("sender-1");
+            job.setReceiverAgentId("receiver-1");
+            job.setState("CANCELLED");
+            when(repository.findById(id)).thenReturn(Optional.of(job));
+        }
+        for (UUID id : java.util.List.of(good, wrongDigest, wrongId, deleted)) {
+            var response = registration(id.equals(wrongId) ? UUID.randomUUID() : id, "IQ_SAMPLE");
+            if (id.equals(wrongDigest)) response.setPayloadSha256("b".repeat(64));
+            when(peer.exchange(eq("/lnis/api/v1/node/peer/dtn/tests/" + id + "/registration"), isNull(),
+                    eq(NodeDtnRegistration.class), eq(8192))).thenReturn(response);
+        }
+        service.restoreMissingTrialMetadata();
+        verify(repository).fillTrialMetadata(good, "a".repeat(64), "IQ_SAMPLE", "DTN", "HDTN");
+        verify(repository, times(1)).fillTrialMetadata(any(), any(), any(), any(), any());
+        verify(repository, never()).saveAndFlush(any());
+        verify(repository, never()).save(any());
+        assertEquals("CANCELLED", repository.findById(good).orElseThrow().getState());
+        doThrow(new IllegalStateException("offline")).when(peer).status();
+        clearInvocations(repository, peer);
+        service.restoreMissingTrialMetadata();
+        verify(repository, never()).fillTrialMetadata(any(), any(), any(), any(), any());
+        verify(peer, never()).exchange(anyString(), any(), any(), anyInt());
+    }
 }

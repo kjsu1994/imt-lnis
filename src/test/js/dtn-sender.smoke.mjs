@@ -91,7 +91,7 @@ const context = {
   },
   numeric, renderClockBias, receiverInformation,
   URLSearchParams,
-  Option: function(text, value) { this.value = value; },
+  Option: function(text, value) { this.text = text; this.value = value; },
   location: {protocol: 'http:', host: '127.0.0.1:18090'}, WebSocket: class {},
   window: {scrollY: 250, scrollTo({top}) { this.scrollY = top; }, addEventListener() {}},
   requestAnimationFrame: fn => fn(),
@@ -648,3 +648,14 @@ assert.equal(savedAddresses.get('lnis.hdtnConfig.v1'), hdtnBefore, 'engine setti
 context.localStorage.setItem = () => { throw new Error('storage unavailable'); };
 assert.doesNotThrow(() => elements.get('dtn-routingMode').onchange());
 console.log('PASS: DTN validation, repair, reset lock, custom routes and independent unavailable storage');
+
+for (const [testType, label] of [['GNSS_RAW','RAW'],['AFS_METADATA','AFS'],['IQ_SAMPLE','I/Q'],[null,'미확인']]) {
+  const option = context.trialOption({testId:'type-test',testType,state:'WAITING_DTN'}, '오늘');
+  assert.match(option.text, new RegExp('^\\[' + label.replace('/','\\/') + '\\] 오늘'));
+  assert.equal(option.value,'type-test');
+}
+vm.runInContext("selectedType='IQ_SAMPLE'; job={testId:'old-trial',testType:'GNSS_RAW',state:'COMPLETED'}; renderSummary(); updateControls();", context);
+assert.match(elements.get('dtn-test-status').textContent,/선택 시험 · RAW · 처리 완료/);
+assert.equal(vm.runInContext('selectedType',context),'IQ_SAMPLE','viewing history must not change the next transfer');
+assert.match(html,/다음 전송 ·/);
+console.log('PASS: typed history options, unknown type, selected trial status and independent next transfer');
