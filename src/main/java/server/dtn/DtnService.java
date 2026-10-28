@@ -29,7 +29,6 @@ import server.pvt.DtnComparison;
 import server.pvt.DtnDelay;
 import server.pvt.DtnPvtCalculator;
 
-import java.io.ByteArrayOutputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -545,14 +544,16 @@ public class DtnService {
                 || input.receivedSize() > DtnModels.MAX_INPUT_BYTES) {
             throw new IllegalArgumentException("수집 종료 후 1 MiB 이하의 입력을 확정하세요.");
         }
-        ByteArrayOutputStream data = new ByteArrayOutputStream();
-        for (long i = 0; i < input.chunkCount(); i++) {
-            data.writeBytes(inputBufferService.chunk(inputId, i));
+        try {
+            return inputBufferService.readChunks(input, DtnModels.MAX_INPUT_BYTES);
+        } catch (IllegalArgumentException invalid) {
+            // 송신 준비의 크기 불일치 응답은 기존 IllegalStateException 계약을 유지한다.
+            if ("입력 크기 불일치".equals(invalid.getMessage())
+                    || "입력 크기 초과".equals(invalid.getMessage())) {
+                throw new IllegalStateException("입력 크기 불일치", invalid);
+            }
+            throw invalid;
         }
-        if (data.size() != input.receivedSize()) {
-            throw new IllegalStateException("입력 크기 불일치");
-        }
-        return data.toByteArray();
     }
 
     public synchronized void recordClock(DtnJob job, server.common.ServiceClock.Stamp stamp, boolean sender) {
@@ -621,14 +622,7 @@ public class DtnService {
             transfer.setSenderMode(senderMode);
             transfer.setReceiverMode(receiverMode);
             transfer.setFile(file);
-            transfer.setHdtnConfig(
-                    job.getHdtnConfigJson() == null
-                            ? null
-                            : objectMapper.readValue(job.getHdtnConfigJson(), HdtnConfig.class));
-            transfer.setDtnConfig(
-                    job.getDtnConfigJson() == null
-                            ? null
-                            : objectMapper.readValue(job.getDtnConfigJson(), DtnConfig.class));
+            applyTransferConfig(job, transfer);
             var source = iq.source(inputId, file);
             if (source == null) {
                 throw new IllegalArgumentException("현재 프레임 규격으로 I/Q 파일을 다시 생성하세요.");
@@ -1181,18 +1175,7 @@ public class DtnService {
                 }
                 result.getTransfer().setSenderMode(job.getSenderMode());
                 result.getTransfer().setReceiverMode(job.getReceiverMode());
-                result.getTransfer()
-                        .setHdtnConfig(
-                                job.getHdtnConfigJson() == null
-                                        ? null
-                                        : objectMapper.readValue(
-                                                job.getHdtnConfigJson(), HdtnConfig.class));
-                result.getTransfer()
-                        .setDtnConfig(
-                                job.getDtnConfigJson() == null
-                                        ? null
-                                        : objectMapper.readValue(
-                                                job.getDtnConfigJson(), DtnConfig.class));
+                applyTransferConfig(job, result.getTransfer());
                 job.setSentJson(objectMapper.writeValueAsString(
                         server.afs.DelayTransferCodec.packet(objectMapper, result.getTransfer())));
                 update(job, "WAITING_DTN", "외부 DTN 전달 및 수신 대기");
@@ -1850,6 +1833,14 @@ public class DtnService {
         DataMismatchException(String message) { super(message); }
     }
 
+    private void applyTransferConfig(DtnJob job, Transfer transfer)
+            throws com.fasterxml.jackson.core.JsonProcessingException {
+        transfer.setHdtnConfig(job.getHdtnConfigJson() == null ? null
+                : objectMapper.readValue(job.getHdtnConfigJson(), HdtnConfig.class));
+        transfer.setDtnConfig(job.getDtnConfigJson() == null ? null
+                : objectMapper.readValue(job.getDtnConfigJson(), DtnConfig.class));
+    }
+
     private void validateReference(DtnJob job, ReferenceSnapshot snapshot) throws Exception {
         if (snapshot == null || !job.getId().equals(snapshot.testId())
                 || !Objects.equals(job.getExpectedPayloadSha256(), snapshot.payloadSha256())
@@ -1869,10 +1860,7 @@ public class DtnService {
         }
         expected.setSenderMode(job.getSenderMode());
         expected.setReceiverMode(job.getReceiverMode());
-        expected.setHdtnConfig(job.getHdtnConfigJson() == null ? null
-                : objectMapper.readValue(job.getHdtnConfigJson(), HdtnConfig.class));
-        expected.setDtnConfig(job.getDtnConfigJson() == null ? null
-                : objectMapper.readValue(job.getDtnConfigJson(), DtnConfig.class));
+        applyTransferConfig(job, expected);
         expected.setPvtConstellation(job.getPvtConstellation() == null ? "GPS" : job.getPvtConstellation());
         String hash = DtnPayloadDigest.sha256(objectMapper,
                 objectMapper.readTree(objectMapper.writeValueAsBytes(

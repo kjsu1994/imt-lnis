@@ -40,8 +40,8 @@ Every physical-layer frame structure, forward error correction (FEC) code, navig
 | :--- | :--- | :--- |
 | **AFS Physical Frame & Subframe Architecture** | • 6,000-symbol physical frame (`SP` 68b + `SB1` 52b + `SB2` 2,400b + `SB3` 1,740b + `SB4` 1,740b)<br>• 500 symbols/sec transmission rate (12-second frame period) | • **NASA LunaNet Signal-In-Space (LSIS) Recommended Standard — Volume A: Augmented Forward Signal (AFS), Version 1.0** ([NASA Technical Document, Feb 2025](https://www.nasa.gov/wp-content/uploads/2025/02/lunanet-signal-in-space-recommended-standard-augmented-forward-signal-vol-a.pdf))<br>• **NASA LSIS Baseline V5.0 (Detailed Specification)**, *pp. 34–38 (Section 3.2 Frame Structure, Figure 9, Tables 12–15)* |
 | **Synchronization Pattern (`SP`, 68 bits)** | • Fixed 68-bit hex sequence `0xCC63F74536F49E04A` (MSB-first)<br>• Minimum aperiodic autocorrelation peak sidelobe (PSL = 4) for frame boundary lock and phase ambiguity resolution | • **NASA LSIS Vol. A v1.0 / Baseline V5.0**, *Table 12 (68-bit Synchronization Pattern, p. 35)*<br>• **S. E. Kocabas & A. Atalar (2003)**, *"Binary sequences with low aperiodic autocorrelation for synchronization"*, IEEE Communications Letters, Vol. 7, No. 1, pp. 36–38 |
-| **Subframe 1 (`SB1`, 52 bits)** | • 9-bit data (`FID` 2 bits + `TOI` 7 bits)<br>• Uncoded MSB (`FID[1]`) + $(51, 8)$ Systematic BCH encoding (generator polynomial $107_8$ / `0x47`, LFSR) + bit-by-bit XOR mask | • **NASA LSIS Vol. A v1.0 / Baseline V5.0**, *Section 3.3 (Subframe 1 BCH (51,8) Encoding, pp. 35–36)* |
-| **Subframes 2, 3 & 4 (`SB2`–`SB4`, 5,880 bits)** | • 24-bit `CRC-24Q` (`0x1864CFB`) error detection<br>• Rate $1/2$ 5G NR Quasi-Cyclic LDPC (Base Graph 2, lifting factor $Z=24$ for SB2, $Z=18$ for SB3/SB4) with systematic puncturing ($2Z$) and parity shortening<br>• $98 \times 60$ Block Interleaver ($5,880$ symbols: column-write, row-read) | • **NASA LSIS Vol. A v1.0 / Baseline V5.0**, *Sections 3.4–3.6 (CRC-24Q, LDPC Encoding & $98 \times 60$ Block Interleaver, pp. 36–38)*<br>• **3GPP TS 38.212** *(NR; Multiplexing and channel coding — LDPC Base Graph 2)* |
+| **Subframe 1 (`SB1`, 52 bits)** | • 9-bit data (`FID` 2 bits + `TOI` 7 bits)<br>• Uncoded MSB (`FID[1]`) + $(51, 8)$ Systematic BCH encoding (generator polynomial $763_8$ (standard notation)) + bit-by-bit XOR mask | • **NASA LSIS Vol. A v1.0 / Baseline V5.0**, *Section 3.3 (Subframe 1 BCH (51,8) Encoding, pp. 35–36)* |
+| **Subframes 2, 3 & 4 (`SB2`–`SB4`, 5,880 bits)** | • 24-bit `CRC-24Q` (`0x1864CFB`) error detection<br>• AFS SF2/SF3 LDPC parity-check matrices with the specified puncturing<br>• $98 \times 60$ Block Interleaver ($5,880$ symbols: 60 rows × 98 columns, row-write, column-read) | • **NASA LSIS Vol. A v1.0 / Baseline V5.0**, *Sections 3.4–3.6 (CRC-24Q, LDPC Encoding & $98 \times 60$ Block Interleaver, pp. 36–38)* |
 | **AFS Baseband Modulation, PRN Codes & RF Tracking** | • Weil-based 10,230-chip PRN sequences (`008_Weil1500hex210prns.txt`)<br>• I/Q baseband signal synthesis (`afs_sim`) and asynchronous FFT/correlator signal acquisition & tracking (`pocket_trk`) | • **LANS-AFS-SIM** ([`osqzss/LANS-AFS-SIM`](https://github.com/osqzss/LANS-AFS-SIM), Copyright © 2025 Takuji Ebinuma)<br>• **PocketSDR-AFS** ([`osqzss/PocketSDR-AFS`](https://github.com/osqzss/PocketSDR-AFS), Copyright © 2021–2025 T. Takasu & T. Ebinuma)<br>• **LDPC-codes** ([`radfordneal/LDPC-codes`](https://github.com/radfordneal/LDPC-codes), Radford M. Neal, commit `74a8e28`) |
 | **GPS L1 C/A Navigation Message (LNAV)** | • 300-bit LNAV Subframes 1–3 (Week, ITOW, SV Clock, Broadcast Ephemeris)<br>• Subframe 4 Page 18 (8-parameter Klobuchar Ionospheric Correction $\alpha_0..\alpha_3, \beta_0..\beta_3$) | • **IS-GPS-200N** *(Navstar GPS Space Segment / Navigation User Segment Interfaces)*, *Section 20.3.3 (Subframes 1–3 Ephemeris & Subframe 4 Page 18 Ionospheric Model)* |
 | **GNSS Receiver Raw Binary Protocol (UBX)** | • `UBX-RXM-RAWX` (Multi-GNSS raw pseudorange, carrier phase, Doppler, $C/N_0$, tracking lock status)<br>• `UBX-RXM-SFRBX` (Raw navigation subframe words) & `UBX-MON-VER` (Hardware/firmware inspection) | • **u-blox ZED-F9T-10B Integration Manual**, Doc. `UBX-20033630`, *Section 3.12.1.2 (Broadcast Navigation Data `UBX-RXM-SFRBX` & Raw Measurements `UBX-RXM-RAWX`)* |
@@ -72,7 +72,7 @@ flowchart LR
   subgraph Receiver["Receiver Node (LNIS + Native Codec)"]
     F --> G{"Payload Decoder"}
     G -->|GNSS_RAW| H1["Pseudorange Rebuild<br/>P'ᵢ = c(R - T*ᵢ)"]
-    G -->|AFS_METADATA| H2["BCH / LDPC Decode →<br/>P'ᵢ = c(R - T*ᵢ)"]
+    G -->|AFS_METADATA| H2["SP / SB1 Check + LDPC / CRC →<br/>P'ᵢ = c(R - T*ᵢ)"]
     G -->|IQ_SAMPLE| H3["pocket_trk RF Tracking<br/>$IQOBS / $IQAFS"]
     H1 & H2 & H3 --> I["Reconstructed PVT<br/>(RTKLIB pntpos)"]
     I --> J["REST Verification vs.<br/>Sender Reference PVT"]
@@ -92,7 +92,7 @@ Only GPS L1 C/A is used for new PVT calculations. Other constellations remain vi
 | Trial Type | Payload Transmitted via DTN/HDTN Adapter | Receiver Processing Pipeline |
 | :--- | :--- | :--- |
 | **`GNSS_RAW`** | JSON containing 1 selected epoch of observations where raw pseudoranges $P_i$ are replaced by virtual transmission timestamps $T^*_i$, plus broadcast navigation subframes (`LNIS-DELAY-RAW-v2`). | Reconstructs delayed pseudorange $P'_i = c(R - T^*_i)$ at arrival time $R \rightarrow$ computes PVT $\rightarrow$ compares against Sender Reference. |
-| **`AFS_METADATA`** | Per-satellite **6,000-bit AFS physical frames** (`LNIS-AFS-GNSS-v6`, 750 bytes/SV) containing consolidated LNAV ephemeris, perturbation, and clock data (`SB2`, 801/1,176b), standard `0101` padding (`SB3`, 846b), and virtual transmission timestamps (`SB4`, 670/846b). Original pseudoranges and Reference PVT are **excluded** from the payload. | Demodulates `SP`/`SB1`, decodes $98\times60$ interleaved LDPC blocks (`SB2`–`SB4`), reconstructs $P'_i = c(R - T^*_i)$, computes PVT, and fetches Sender Reference via out-of-band REST for verification. |
+| **`AFS_METADATA`** | Per-satellite **6,000-bit AFS physical frames** (`LNIS-AFS-GNSS-v6`, 750 bytes/SV) containing consolidated LNAV ephemeris, perturbation, and clock data (`SB2`, 801/1,176b), standard `0101` padding (`SB3`, 846b), and virtual transmission timestamps (`SB4`, 670/846b). Original pseudoranges and Reference PVT are **excluded** from the payload. | Checks packed `SP`/`SB1` fields, decodes $98\times60$ interleaved LDPC blocks (`SB2`–`SB4`), reconstructs $P'_i = c(R - T^*_i)$, computes PVT, and fetches Sender Reference via out-of-band REST for verification. |
 | **`IQ_SAMPLE`** | Metadata manifest (`LNIS-IQ-FILE-v3`: file path, size, SHA-256) referencing a 90-second synthesized RF I/Q binary file generated by `afs_sim`. | Verifies file integrity $\rightarrow$ executes `pocket_trk` baseband correlator tracking $\rightarrow$ decodes `$IQAFS` frames and reconstructs common-delay pseudoranges; `$IQOBS` stays diagnostic $\rightarrow$ computes `AFS_IQ_FRAME_PVT-v3`. |
 
 ---
@@ -102,9 +102,9 @@ Only GPS L1 C/A is used for new PVT calculations. Other constellations remain vi
 ### 3.1 Dual Role of Satellite Transmission Time vs. Virtual Delayed Time
 A critical architectural distinction in LNIS is how two different timestamps are used during PVT computation:
 
-1. **Original Satellite Transmission Time ($t_{\text{tx}}$, carried in `SB1`/`SB2`)**:
-   - Represents the true GNSS epoch ($t_0$) when the satellites broadcast the signal.
-   - Used by RTKLIB (`ephemeris.c:satpos()`) to evaluate Keplerian orbital mechanics and determine the exact **3D satellite coordinates $(X_i, Y_i, Z_i)$ and satellite clock bias ($dt^s_i$)** at the moment of signal emission.
+1. **Original GNSS Observation Epoch ($t_0$, carried in `SB4`)**:
+   - Preserves the RAWX observation epoch. It is distinct from satellite transmission time and from the trial start timestamp.
+   - RTKLIB estimates satellite transmission time from the observation epoch and pseudorange, then applies satellite clock corrections and ephemeris to compute satellite coordinates. `SB1`/`SB2` do not carry each satellite's original transmission timestamp.
 2. **Virtual Delayed Transmission Time ($T^*_i$, carried in `SB4` / `DelayTransferCodec`)**:
    - Synthesized at the moment the DTN trial starts ($S$) by subtracting each satellite's original travel time ($P_i / c$) from $S$:
      $$T^*_i = S - \frac{P_i}{c}$$
@@ -157,11 +157,11 @@ In `AFS_METADATA` mode, LNIS encodes one **6,000-bit (750-byte) physical frame p
   └── SB1 (Frame ID & Time of Interval) : 52 bits  (1b FID[1] + 51b BCH(51,8) of FID[0]||TOI[6:0])
 
 [98 × 60 Block Interleaved Payload: 5,880 bits]
-  ├── SB2 (Unified Clock, Ephemeris & Perturbations) : 1,176 data bits + 24b CRC-24Q = 1,200b ──(5G NR LDPC BG2, Z=24)──► 2,400 symbols
-  ├── SB3 (Almanac Slot / Standard 0101 Padding)     :   846 data bits + 24b CRC-24Q =   870b ──(5G NR LDPC BG2, Z=18)──► 1,740 symbols
-  └── SB4 (LNIS Delayed Obs & Iono)                  :   846 data bits + 24b CRC-24Q =   870b ──(5G NR LDPC BG2, Z=18)──► 1,740 symbols
+  ├── SB2 (Unified Clock, Ephemeris & Perturbations) : 1,176 data bits + 24b CRC-24Q = 1,200b ──(AFS SF2 LDPC)──► 2,400 symbols
+  ├── SB3 (Almanac Slot / Standard 0101 Padding)     :   846 data bits + 24b CRC-24Q =   870b ──(AFS SF3 LDPC)──► 1,740 symbols
+  └── SB4 (LNIS Delayed Obs & Iono)                  :   846 data bits + 24b CRC-24Q =   870b ──(AFS SF3 LDPC)──► 1,740 symbols
                                                                                                                   Total = 5,880 symbols
-  └──► Written into 98 columns × 60 rows matrix (column-wise write, row-wise read)
+  └──► Written into 60 rows × 98 columns matrix (row-wise write, column-wise read)
 
 [Final Transmitted Physical Frame: 6,000 bits = 750 Bytes (12 seconds @ 500 sps)]
   [ SP (68b) ][ SB1 (52b) ][ Interleaved SB2 · SB3 · SB4 (5,880b) ]
@@ -260,15 +260,30 @@ LNIS uses a reproducible, containerized multi-stage build (`native/Dockerfile`) 
 # 1. Compile Linux .so, I/Q binaries, and Windows .dll inside isolated Docker toolchain
 .\gradlew.bat nativeBuild
 
-# 2. Run Java unit/integration tests, ArchUnit checks, and browser JS smoke tests
+# 2. Run Java, ArchUnit, JS smoke, Playwright browser, native-source and deployment checks
+# Install Playwright separately; set PLAYWRIGHT_MODULE if it is outside Node module resolution.
+# Example: $env:PLAYWRIGHT_MODULE = "C:\tools\node_modules\playwright"
 .\gradlew.bat check bootJar -PnativeCandidate=build/native-pvt
 
 # 3. Package standalone Linux deployment archive (build/distributions/lnis-node-linux.zip)
 .\gradlew.bat linuxNodeDistZip
 
 # 4. Synchronize static documentation page (src/main/resources/static/dtn-intro.html -> docs/index.html)
-.\gradlew.bat syncIntroDocs
+.\gradlew.bat syncIntroDocs verifyIntroDocs
 ```
+
+`check` verifies documentation without modifying it. `syncIntroDocs` copies the service guide and both logo assets into `docs/`; it does not publish a website. `browserTest` runs the existing browser checks independently against local mock APIs.
+
+Large I/Q replay fixtures are optional and are not created by `check`. Tests that require missing fixtures are reported as skipped:
+
+| Verification | Input | Command |
+| :--- | :--- | :--- |
+| F9T source | Pinned gzip-compressed UBX recording (SHA-256 checked by `F9tExampleTest`) | `./gradlew test --tests server.afs.F9tExampleTest -Pf9tExampleSource=<path> --rerun-tasks` |
+| Decoded I/Q common-delay PVT | `LNIS_IQ_SMOKE_DIRECTORY`: `source.json`, `tracking.log` | `./gradlew test --tests server.iq.AfsPvtFrameIntegrationTest --rerun-tasks` |
+| Native diagnostic removal comparison | `LNIS_NATIVE_LOG_COMPARISON`: before/after tracking fixtures | `./gradlew test --tests server.iq.NativeDiagnosticRemovalTest --rerun-tasks` |
+| File replay observation retention | `LNIS_IQ_REPLAY_DIRECTORY`: source and tracking fixtures | `./gradlew test --tests server.iq.NativeFileReplayIntegrationTest --rerun-tasks` |
+
+Set environment variables before starting Gradle. Use `gradlew.bat` on Windows and add `-PnativeCandidate=build/native-pvt` when testing rebuilt Windows libraries. These fixture tests replay recorded outputs; they do not replace a live serial/adapter/RF test.
 
 ### 7.2 Repository Structure
 
@@ -289,7 +304,7 @@ LnisServer/
 ├── native/
 │   ├── vendor/       # Upstream sources: LANS-AFS-SIM, PocketSDR-AFS (with RTKLIB), LDPC-codes
 │   ├── patches/      # Auditable patches (01-korean-comments through 06-file-replay)
-│   ├── lnis_afs.c    # JNA ABI wrapper for AFS BCH/LDPC/Interleaver encoding & decoding
+│   ├── lnis_afs_codec.c # JNA ABI wrapper for AFS BCH/LDPC/Interleaver encoding & decoding
 │   ├── lnis_pvt.c    # JNA ABI wrapper for RTKLIB pntpos() & decode_frame()
 │   └── README.md     # Native provenance, SHA-256 verification & patch documentation
 └── deployment/node/  # Docker Compose templates, .env.example & Windows Serial Bridge scripts

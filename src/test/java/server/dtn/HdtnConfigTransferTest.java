@@ -86,7 +86,8 @@ class HdtnConfigTransferTest {
             when(input.receivedSize()).thenReturn(1L);
             when(input.chunkCount()).thenReturn(1L);
             when(inputs.get(inputId)).thenReturn(input);
-            when(inputs.chunk(inputId, 0)).thenReturn(new byte[] {1});
+            when(inputs.readChunks(input, server.common.DtnModels.MAX_INPUT_BYTES))
+                    .thenReturn(new byte[] {1});
             IqService iq = mock(IqService.class);
             when(iq.completed(inputId))
                     .thenAnswer(
@@ -120,6 +121,10 @@ class HdtnConfigTransferTest {
             settings.setMaxBundleSizeBytes(10485760L);
             settings.setStorageDeletionPolicy("DELETE_AFTER_FORWARDING");
             JsonNode expected = json.readTree(json.writeValueAsBytes(settings));
+            DtnConfig dtnSettings = new DtnConfig();
+            dtnSettings.setRoutingMode("StaticPlan");
+            dtnSettings.setSdrHeapSizeBytes(3500000000L);
+            JsonNode expectedDtn = json.valueToTree(dtnSettings);
             DtnJob job =
                     configured
                             ? service.create(
@@ -130,10 +135,11 @@ class HdtnConfigTransferTest {
                                     type,
                                     "DTN",
                                     "HDTN",
-                                    settings)
+                                    settings, dtnSettings)
                             : service.create(
                                     inputId, "sender-1", "receiver-1", url, type, "DTN", "HDTN");
             settings.setMaxNumberOfBundlesInPipeline(999);
+            dtnSettings.setRoutingMode("ChangedAfterStart");
             prepareIq.countDown();
             if (!"IQ_SAMPLE".equals(type)) {
                 Transfer transfer = new Transfer();
@@ -150,12 +156,13 @@ class HdtnConfigTransferTest {
             assertNotNull(body, job.getMessage());
             JsonNode wire = json.readTree(body);
             assertEquals(type, wire.path("testType").asText());
-            assertFalse(wire.has("dtnConfig"));
             if (configured) {
+                assertEquals(expectedDtn, wire.get("dtnConfig"));
                 assertEquals(expected, wire.get("hdtnConfig"));
                 assertEquals(expected, json.readTree(job.getHdtnConfigJson()));
             } else {
                 assertFalse(wire.has("hdtnConfig"));
+                assertFalse(wire.has("dtnConfig"));
                 assertNull(job.getHdtnConfigJson());
             }
             assertArrayEquals(body, service.payload(job.getId(), "sent").getBody());

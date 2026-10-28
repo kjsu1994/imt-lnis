@@ -87,7 +87,14 @@ tasks.register('webTest') {
     }
 }
 
+tasks.register('browserTest', Exec) {
+    group = 'verification'
+    description = 'Playwright로 설정·전체화면·안내 화면을 검사한다. PLAYWRIGHT_MODULE로 설치 경로를 지정할 수 있다.'
+    commandLine 'node', 'src/test/js/dtn-features.browser.cjs'
+}
+
 tasks.named('check') {
+    dependsOn tasks.named('browserTest')
     dependsOn tasks.named('webTest')
     dependsOn 'nativeSourceTest'
 }
@@ -247,9 +254,13 @@ tasks.named('linuxNodeDistZip') {
     from(layout.buildDirectory.dir('windows-serial-bridge')) { into 'serial-bridge' }
 }
 // Service guide is the source; publishing only changes links for the static site.
+def introAssets = ['logo_v3.png', 'imt_logo.png']
 def introForDocs = {
-    file('src/main/resources/static/dtn-intro.html').getText('UTF-8')
-            .replace('/lnis/assets/common/logo_v3.png', './logo_v3.png')
+    def html = file('src/main/resources/static/dtn-intro.html').getText('UTF-8')
+    introAssets.each { name ->
+        html = html.replace("/lnis/assets/common/$name", "./$name")
+    }
+    html
             .replace('<a class="brand" href="/" aria-label="시험 화면으로 이동" title="시험 화면으로 이동">',
                     '<a class="brand" href="./" aria-label="안내 처음으로" title="안내 처음으로">')
 }
@@ -261,7 +272,7 @@ tasks.register('syncIntroDocs') {
         file('docs').mkdirs()
         file('docs/index.html').setText(introForDocs(), 'UTF-8')
         copy {
-            from 'src/main/resources/static/assets/common/logo_v3.png'
+            from introAssets.collect { "src/main/resources/static/assets/common/$it" }
             into 'docs'
         }
     }
@@ -272,8 +283,11 @@ tasks.register('verifyIntroDocs') {
     description = '안내 설명과 공개 문서의 불일치를 검사한다. 파일을 수정하지 않는다.'
     doLast {
         if (file('docs/index.html').getText('UTF-8') != introForDocs()
-                || !Arrays.equals(file('docs/logo_v3.png').bytes,
-                        file('src/main/resources/static/assets/common/logo_v3.png').bytes)) {
+                || introAssets.any { name ->
+                    !file("docs/$name").isFile()
+                            || !Arrays.equals(file("docs/$name").bytes,
+                                    file("src/main/resources/static/assets/common/$name").bytes)
+                }) {
             throw new GradleException('Run syncIntroDocs to update the published guide from the service source.')
         }
     }

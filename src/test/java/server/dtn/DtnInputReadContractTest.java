@@ -34,6 +34,15 @@ class DtnInputReadContractTest {
         when(input.chunkCount()).thenReturn(chunks);
     }
 
+    private byte[] senderInput() {
+        var service = new DtnService(mock(DtnRepository.class),
+                mock(server.node.AgentCommandService.class),
+                mock(server.node.AgentRepository.class),
+                mock(server.node.AgentConnectionRegistry.class), inputs,
+                new com.fasterxml.jackson.databind.ObjectMapper());
+        return org.springframework.test.util.ReflectionTestUtils.invokeMethod(service, "readInput", id);
+    }
+
     private MockMvc mvc() {
         return MockMvcBuilders.standaloneSetup(
                         new DtnInputViewController(
@@ -63,7 +72,7 @@ class DtnInputReadContractTest {
         first[0] = 12;
         when(repository.getChunk(id, 0)).thenReturn(first);
         when(repository.getChunk(id, 1)).thenReturn(new byte[] {34});
-        byte[] result = inputs.readChunks(input, DtnModels.MAX_INPUT_BYTES);
+        byte[] result = senderInput();
         assertEquals(DtnModels.MAX_INPUT_BYTES, result.length);
         assertEquals(12, result[0]);
         assertEquals(34, result[result.length - 1]);
@@ -76,6 +85,8 @@ class DtnInputReadContractTest {
     void preservesMissingChunkResponse() throws Exception {
         prepare(10, 1);
         rejectsBoth("Input chunk not found");
+        assertEquals("Input chunk not found",
+                assertThrows(IllegalArgumentException.class, this::senderInput).getMessage());
     }
 
     @Test
@@ -84,6 +95,8 @@ class DtnInputReadContractTest {
         when(repository.getChunk(id, 0)).thenReturn(new byte[DtnModels.MAX_INPUT_BYTES]);
         when(repository.getChunk(id, 1)).thenReturn(new byte[] {1});
         rejectsBoth("입력 크기 초과");
+        assertEquals("입력 크기 불일치",
+                assertThrows(IllegalStateException.class, this::senderInput).getMessage());
         verify(repository, never()).getChunk(id, 2);
     }
 
@@ -92,12 +105,16 @@ class DtnInputReadContractTest {
         prepare(2, 1);
         when(repository.getChunk(id, 0)).thenReturn(new byte[] {1});
         rejectsBoth("입력 크기 불일치");
+        assertEquals("입력 크기 불일치",
+                assertThrows(IllegalStateException.class, this::senderInput).getMessage());
     }
 
     @Test
     void preservesFeatureSpecificIncompleteMessages() throws Exception {
         prepare(10, 1);
         when(input.complete()).thenReturn(false);
+        assertEquals("수집 종료 후 1 MiB 이하의 입력을 확정하세요.",
+                assertThrows(IllegalArgumentException.class, this::senderInput).getMessage());
         MockMvc mvc = mvc();
         mvc.perform(get("/lnis/api/v1/dtn/inputs/" + id + "/observations"))
                 .andExpect(status().isBadRequest())

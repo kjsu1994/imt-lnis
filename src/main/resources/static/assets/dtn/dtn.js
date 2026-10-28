@@ -119,14 +119,14 @@ function hdtnValue(key, raw) {
   return raw;
 }
 
-function readHdtnConfig() {
+function readAdapterConfig(prefix, rules, validate) {
   const result = {};
   let firstError = null;
-  for (const key of Object.keys(hdtnRules)) {
-    const input = $('hdtn-' + key), error = $('hdtn-' + key + '-error');
+  for (const key of Object.keys(rules)) {
+    const input = $(prefix + '-' + key), error = $(prefix + '-' + key + '-error');
     if (!input) continue;
     try {
-      result[key] = hdtnValue(key, input.value.trim());
+      result[key] = validate(key, input.value.trim());
       input.removeAttribute('aria-invalid');
       if (error) { error.hidden = true; error.textContent = ''; }
     } catch (failure) {
@@ -139,65 +139,85 @@ function readHdtnConfig() {
   return result;
 }
 
-function saveHdtnConfig(settings) {
-  try { localStorage.setItem(hdtnStorageKey, JSON.stringify(settings)); }
+function saveAdapterConfig(storageKey, settings) {
+  try { localStorage.setItem(storageKey, JSON.stringify(settings)); }
   catch { /* Current values still apply when browser storage is unavailable. */ }
 }
 
-function initializeHdtnConfig() {
+function initializeAdapterConfig({prefix, rules, storageKey, validate, uses, resetMessage}) {
   let saved = {}, restored = [];
   try {
-    saved = JSON.parse(localStorage.getItem(hdtnStorageKey) || '{}') || {};
+    saved = JSON.parse(localStorage.getItem(storageKey) || '{}') || {};
   } catch { /* Use defaults for unavailable or malformed storage. */ }
-  for (const [key, rule] of Object.entries(hdtnRules)) {
+  for (const [key, rule] of Object.entries(rules)) {
     let value = rule.default;
     if (Object.hasOwn(saved, key)) {
-      try { value = hdtnValue(key, String(saved[key])); }
+      try { value = validate(key, String(saved[key])); }
       catch { restored.push(rule.label); }
     }
-    const input = $('hdtn-' + key);
+    const input = $(prefix + '-' + key);
     if (!input) continue;
     input.value = String(value);
     input.oninput = input.onchange = () => {
-      try { saveHdtnConfig(readHdtnConfig()); } catch { /* Keep invalid edits visible, never persist them. */ }
-      updateHdtnControls();
+      try { saveAdapterConfig(storageKey, readAdapterConfig(prefix, rules, validate)); } catch { /* Keep invalid edits visible, never persist them. */ }
+      updateAdapterControls(prefix, rules, validate, uses);
     };
   }
-  const values = readHdtnConfig();
-  if (restored.length) saveHdtnConfig(values);
-  if ($('hdtn-config-notice')) {
-    $('hdtn-config-notice').hidden = !restored.length;
-    $('hdtn-config-notice').textContent = restored.length ? '새 형식에 맞춰 기본값 복구: ' + restored.join(', ') : '';
+  const values = readAdapterConfig(prefix, rules, validate);
+  if (restored.length) saveAdapterConfig(storageKey, values);
+  if ($(prefix + '-config-notice')) {
+    $(prefix + '-config-notice').hidden = !restored.length;
+    $(prefix + '-config-notice').textContent = restored.length ? '새 형식에 맞춰 기본값 복구: ' + restored.join(', ') : '';
   }
-  if ($('hdtn-reset')) {
-    $('hdtn-reset').onclick = () => {
-      if (locked() || !usesHdtn()) return;
-      for (const [key, value] of Object.entries(hdtnDefaults)) {
-        const el = $('hdtn-' + key);
-        if (el) el.value = String(value);
+  if ($(prefix + '-reset')) {
+    $(prefix + '-reset').onclick = () => {
+      if (locked() || !uses()) return;
+      for (const [key, rule] of Object.entries(rules)) {
+        const el = $(prefix + '-' + key);
+        if (el) el.value = String(rule.default);
       }
-      saveHdtnConfig(readHdtnConfig());
-      if ($('hdtn-config-notice')) {
-        $('hdtn-config-notice').hidden = false;
-        $('hdtn-config-notice').textContent = '고급 설정을 포함한 HDTN 전체 값을 기본값으로 복원했습니다.';
+      saveAdapterConfig(storageKey, readAdapterConfig(prefix, rules, validate));
+      if ($(prefix + '-config-notice')) {
+        $(prefix + '-config-notice').hidden = false;
+        $(prefix + '-config-notice').textContent = resetMessage;
       }
-      updateHdtnControls();
+      updateAdapterControls(prefix, rules, validate, uses);
     };
   }
 }
 
-function updateHdtnControls() {
-  for (const key of Object.keys(hdtnDefaults)) {
-    const el = $('hdtn-' + key);
-    if (el) el.disabled = locked() || !usesHdtn();
+function updateAdapterControls(prefix, rules, validate, uses) {
+  const enabled = uses();
+  for (const key of [...Object.keys(rules), 'reset']) {
+    const el = $(prefix + '-' + key);
+    if (el) el.disabled = locked() || !enabled;
   }
-  if ($('hdtn-reset')) $('hdtn-reset').disabled = locked() || !usesHdtn();
-  let message = 'DTN → DTN 경로에서는 전송하지 않습니다.';
-  if (usesHdtn()) {
-    try { readHdtnConfig(); message = '다음 시험 적용 · 자동 저장'; }
+  let message = prefix === 'hdtn'
+    ? 'DTN → DTN 경로에서는 전송하지 않습니다.'
+    : 'HDTN → HDTN 경로에서는 전송하지 않습니다.';
+  if (enabled) {
+    try { readAdapterConfig(prefix, rules, validate); message = '다음 시험 적용 · 자동 저장'; }
     catch (error) { message = error.message; }
   }
-  if ($('hdtn-config-state')) $('hdtn-config-state').textContent = message;
+  if ($(prefix + '-config-state')) $(prefix + '-config-state').textContent = message;
+}
+
+function readHdtnConfig() {
+  return readAdapterConfig('hdtn', hdtnRules, hdtnValue);
+}
+
+function saveHdtnConfig(settings) {
+  saveAdapterConfig(hdtnStorageKey, settings);
+}
+
+function initializeHdtnConfig() {
+  initializeAdapterConfig({prefix: 'hdtn', rules: hdtnRules, storageKey: hdtnStorageKey,
+    validate: hdtnValue, uses: usesHdtn,
+    resetMessage: '고급 설정을 포함한 HDTN 전체 값을 기본값으로 복원했습니다.'});
+}
+
+function updateHdtnControls() {
+  updateAdapterControls('hdtn', hdtnRules, hdtnValue, usesHdtn);
 }
 
 const dtnRules = {
@@ -263,84 +283,21 @@ function dtnValue(key, raw) {
 }
 
 function readDtnConfig() {
-  const result = {};
-  let firstError = null;
-  for (const key of Object.keys(dtnRules)) {
-    const input = $('dtn-' + key), error = $('dtn-' + key + '-error');
-    if (!input) continue;
-    try {
-      result[key] = dtnValue(key, input.value.trim());
-      input.removeAttribute('aria-invalid');
-      if (error) { error.hidden = true; error.textContent = ''; }
-    } catch (failure) {
-      input.setAttribute('aria-invalid', 'true');
-      if (error) { error.hidden = false; error.textContent = failure.message; }
-      if (!firstError) { failure.field = key; firstError = failure; }
-    }
-  }
-  if (firstError) throw firstError;
-  return result;
+  return readAdapterConfig('dtn', dtnRules, dtnValue);
 }
 
 function saveDtnConfig(settings) {
-  try { localStorage.setItem(dtnStorageKey, JSON.stringify(settings)); }
-  catch { /* Current values still apply when browser storage is unavailable. */ }
+  saveAdapterConfig(dtnStorageKey, settings);
 }
 
 function initializeDtnConfig() {
-  let saved = {}, restored = [];
-  try {
-    saved = JSON.parse(localStorage.getItem(dtnStorageKey) || '{}') || {};
-  } catch { /* Use defaults for unavailable or malformed storage. */ }
-  for (const [key, rule] of Object.entries(dtnRules)) {
-    let value = rule.default;
-    if (Object.hasOwn(saved, key)) {
-      try { value = dtnValue(key, String(saved[key])); }
-      catch { restored.push(rule.label); }
-    }
-    const input = $('dtn-' + key);
-    if (!input) continue;
-    input.value = String(value);
-    input.oninput = input.onchange = () => {
-      try { saveDtnConfig(readDtnConfig()); } catch { /* Keep invalid edits visible, never persist them. */ }
-      updateDtnControls();
-    };
-  }
-  const values = readDtnConfig();
-  if (restored.length) saveDtnConfig(values);
-  if ($('dtn-config-notice')) {
-    $('dtn-config-notice').hidden = !restored.length;
-    $('dtn-config-notice').textContent = restored.length ? '새 형식에 맞춰 기본값 복구: ' + restored.join(', ') : '';
-  }
-  if ($('dtn-reset')) {
-    $('dtn-reset').onclick = () => {
-      if (locked() || !usesDtn()) return;
-      for (const [key, value] of Object.entries(dtnDefaults)) {
-        const el = $('dtn-' + key);
-        if (el) el.value = String(value);
-      }
-      saveDtnConfig(readDtnConfig());
-      if ($('dtn-config-notice')) {
-        $('dtn-config-notice').hidden = false;
-        $('dtn-config-notice').textContent = 'DTN 전체 설정을 기본값으로 복원했습니다.';
-      }
-      updateDtnControls();
-    };
-  }
+  initializeAdapterConfig({prefix: 'dtn', rules: dtnRules, storageKey: dtnStorageKey,
+    validate: dtnValue, uses: usesDtn,
+    resetMessage: 'DTN 전체 설정을 기본값으로 복원했습니다.'});
 }
 
 function updateDtnControls() {
-  for (const key of Object.keys(dtnDefaults)) {
-    const el = $('dtn-' + key);
-    if (el) el.disabled = locked() || !usesDtn();
-  }
-  if ($('dtn-reset')) $('dtn-reset').disabled = locked() || !usesDtn();
-  let message = 'HDTN → HDTN 경로에서는 전송하지 않습니다.';
-  if (usesDtn()) {
-    try { readDtnConfig(); message = '다음 시험 적용 · 자동 저장'; }
-    catch (error) { message = error.message; }
-  }
-  if ($('dtn-config-state')) $('dtn-config-state').textContent = message;
+  updateAdapterControls('dtn', dtnRules, dtnValue, usesDtn);
 }
 
 let activeAdapterTab = 'dtn';
