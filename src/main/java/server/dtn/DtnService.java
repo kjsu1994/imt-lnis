@@ -890,19 +890,15 @@ public class DtnService {
                         });
     }
 
-    /** 브라우저 저장소에 의존하지 않아 별도 수신 PC에서도 최근 시험을 볼 수 있다. */
-    public List<DtnJob> recent() {
-        return dtnRepository.findTop50ByOrderByCreatedAtDesc();
-    }
-
-    public List<DtnJob> recent(int page, String state) {
+    /** 목록은 원문을 제외한 요약 조회를 사용한다. */
+    public List<DtnRepository.SummaryView> recent(int page, String state) {
         if (page < 0 || page > 100000) throw new IllegalArgumentException("목록 페이지 오류");
         var paging = org.springframework.data.domain.PageRequest.of(page, 50);
-        if (state == null || state.isBlank()) {
-            return dtnRepository.findAllByOrderByCreatedAtDescIdDesc(paging);
+        if (state != null && state.isBlank()) state = null;
+        if (state != null && !"WAITING_DTN".equals(state)) {
+            throw new IllegalArgumentException("목록 상태 오류");
         }
-        if (!"WAITING_DTN".equals(state)) throw new IllegalArgumentException("목록 상태 오류");
-        return dtnRepository.findByStateOrderByCreatedAtDescIdDesc(state, paging);
+        return new ArrayList<>(dtnRepository.findSummaries(state, paging));
     }
 
     /* 저장된 시험 조회: 존재하지 않으면 기존 조회 오류를 전달한다. */

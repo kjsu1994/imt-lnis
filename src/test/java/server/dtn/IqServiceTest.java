@@ -152,4 +152,67 @@ class IqServiceTest {
         assertFalse(Files.exists(directory.resolve(id + ".json")));
         assertTrue(Files.exists(directory.resolve(other + ".bin")));
     }
+
+    private UUID storedFile(int number, java.time.Instant time) throws Exception {
+        UUID id = new UUID(0, number);
+        Path metadata = directory.resolve(id + ".json");
+        new ObjectMapper().writeValue(metadata.toFile(), file("/exchange/" + id + ".bin"));
+        Files.setLastModifiedTime(metadata, java.nio.file.attribute.FileTime.from(time));
+        return id;
+    }
+
+    @Test
+    void listsNewestFiftyAcrossRestartAndKeepsStoredTimes() throws Exception {
+        var base = java.time.Instant.parse("2026-10-28T00:00:00Z");
+        for (int i = 1; i <= 65; i++) storedFile(i, base.plusSeconds(i));
+        var expected = java.util.stream.IntStream.rangeClosed(16, 65)
+                .mapToObj(i -> new UUID(0, i)).toList().reversed();
+        var first = service();
+        assertEquals(expected, first.recent().stream().map(row -> row.get("id")).toList());
+        assertEquals(expected, first.recent().stream().map(row -> row.get("id")).toList());
+        assertEquals(expected, service().recent().stream().map(row -> row.get("id")).toList());
+        assertEquals(base.plusSeconds(65).toString(), first.status(new UUID(0, 65)).get("updatedAt"));
+        first.delete(new UUID(0, 65));
+        assertEquals(new UUID(0, 64), first.recent().getFirst().get("id"));
+        assertEquals(50, first.recent().size());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void recentFilesCannotEvictActiveGenerationOrPreventCancellation() throws Exception {
+        var base = java.time.Instant.parse("2026-10-28T00:00:00Z");
+        for (int i = 1; i <= 60; i++) storedFile(i, base.plusSeconds(i));
+        var service = service();
+        UUID active = new UUID(0, 100);
+        var jobs = (java.util.Map<UUID, java.util.Map<String, Object>>)
+                org.springframework.test.util.ReflectionTestUtils.getField(service, "jobs");
+        jobs.put(active, java.util.Map.of("id", active, "state", "GENERATING",
+                "updatedAt", base.minusSeconds(1).toString()));
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "active", active);
+        var rows = service.recent();
+        assertEquals(50, rows.size());
+        assertEquals(active, rows.getFirst().get("id"));
+        assertEquals("GENERATING", rows.getFirst().get("state"));
+        service.status(new UUID(0, 1));
+        assertEquals(50, jobs.size());
+        assertEquals("GENERATING", service.status(active).get("state"));
+        assertThrows(IllegalStateException.class, () -> service.delete(active));
+        service.cancel(active);
+        assertEquals("CANCELLED", service.status(active).get("state"));
+    }
+
+    @Test
+    void emptyMalformedAndEqualTimestampFilesHaveStableLists() throws Exception {
+        var service = service();
+        assertTrue(service.recent().isEmpty());
+        var time = java.time.Instant.parse("2026-10-28T00:00:00Z");
+        UUID second = storedFile(2, time), first = storedFile(1, time);
+        Files.writeString(directory.resolve(new UUID(0, 3) + ".json"), "not json");
+        Files.writeString(directory.resolve("------------------------------------.json"), "{}");
+        Files.writeString(directory.resolve(first + ".context.json"), "{}");
+        assertEquals(java.util.List.of(first, second),
+                service.recent().stream().map(row -> row.get("id")).toList());
+        assertEquals(java.util.List.of(first, second),
+                service().recent().stream().map(row -> row.get("id")).toList());
+    }
 }

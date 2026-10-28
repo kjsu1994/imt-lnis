@@ -15,7 +15,7 @@ import java.util.UUID;
         @Index(name = "dtn_job_cancel_pending", columnList = "cancelPending")
 })
 @Data
-public class DtnJob {
+public class DtnJob implements DtnRepository.SummaryView {
     @Id private UUID id;
     private UUID inputId;
     private UUID iqFileId;
@@ -91,4 +91,29 @@ public class DtnJob {
     @Lob private String observationsJson;
 
     @Lob private String fileResultJson;
+
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public boolean isDtnReceived() {
+        return receivedJson != null || receivedAt != null;
+    }
+
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public boolean isSentPayloadAvailable() {
+        return sentJson != null;
+    }
+
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public boolean isReceivedPayloadAvailable() {
+        return receivedJson != null;
+    }
+
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public boolean isReceivedOriginalAvailable() {
+        return receivedRawJson != null;
+    }
+
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public boolean isComparisonOnSender() {
+        return expectedPayloadSha256 != null;
+    }
 }

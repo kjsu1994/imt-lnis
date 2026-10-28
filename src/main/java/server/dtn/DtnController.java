@@ -241,7 +241,7 @@ public class DtnController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(required = false) String state) throws Exception {
         List<Map<String, Object>> response = new ArrayList<>();
-        for (DtnJob job : dtnService.recent(page, state)) {
+        for (DtnRepository.SummaryView job : dtnService.recent(page, state)) {
             response.add(summary(job));
         }
 
@@ -592,7 +592,7 @@ public class DtnController {
         }
     }
 
-    private Map<String, Object> summary(DtnJob job) throws Exception {
+    private Map<String, Object> summary(DtnRepository.SummaryView job) throws Exception {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("testId", job.getId());
         result.put("testType", job.getTestType() == null ? "AFS_METADATA" : job.getTestType());
@@ -632,11 +632,11 @@ public class DtnController {
         result.put("createdAt", job.getCreatedAt());
         result.put("updatedAt", job.getUpdatedAt());
         result.put("receivedAt", job.getReceivedAt());
-        result.put("dtnReceived", job.getReceivedJson() != null || job.getReceivedAt() != null);
-        result.put("sentPayloadAvailable", job.getSentJson() != null);
-        result.put("receivedPayloadAvailable", job.getReceivedJson() != null);
-        result.put("receivedOriginalAvailable", job.getReceivedRawJson() != null);
-        result.put("comparisonOnSender", job.getExpectedPayloadSha256() != null);
+        result.put("dtnReceived", job.isDtnReceived());
+        result.put("sentPayloadAvailable", job.isSentPayloadAvailable());
+        result.put("receivedPayloadAvailable", job.isReceivedPayloadAvailable());
+        result.put("receivedOriginalAvailable", job.isReceivedOriginalAvailable());
+        result.put("comparisonOnSender", job.isComparisonOnSender());
         result.put(
                 "receivedEpochs",
                 job.getReceiverJson() == null

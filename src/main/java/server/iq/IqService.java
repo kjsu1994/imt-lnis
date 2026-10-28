@@ -78,37 +78,38 @@ public class IqService {
         return enabled && Files.isExecutable(simulator);
     }
     public synchronized List<Map<String, Object>> recent() throws IOException {
+        Map<UUID, Instant> updated = new HashMap<>();
+        jobs.forEach((id, job) -> updated.put(id,
+                Instant.parse((String) job.getOrDefault("updatedAt", Instant.EPOCH.toString()))));
         if (Files.isDirectory(root)) {
             try (var files = Files.list(root)) {
-                for (Path file :
-                        files.filter(
-                                        p ->
-                                                p.getFileName()
-                                                        .toString()
-                                                        .matches("[0-9a-f-]{36}\\.json"))
-                                .limit(50)
-                                .toList()) {
-                    UUID id = UUID.fromString(file.getFileName().toString().substring(0, 36));
-                    if (!jobs.containsKey(id)) {
-                        try {
-                            status(id);
-                        } catch (IOException | IllegalArgumentException ignored) {
-                        }
+                for (Path file : files.filter(p -> p.getFileName().toString()
+                        .matches("[0-9a-f-]{36}\\.json")).toList()) {
+                    try {
+                        UUID id = UUID.fromString(file.getFileName().toString().substring(0, 36));
+                        Instant modified = Files.getLastModifiedTime(file).toInstant();
+                        updated.merge(id, modified, (memory, stored) -> memory.isAfter(stored) ? memory : stored);
+                    } catch (IOException | IllegalArgumentException ignored) {
+                        /* 삭제 중이거나 잘못된 저장 정보는 목록에서 제외한다. */
                     }
                 }
             }
         }
-        return jobs.keySet().stream().toList().reversed().stream()
-                .map(
-                        id -> {
-                            try {
-                                return status(id);
-                            } catch (IOException error) {
-                                return Map.<String, Object>of(
-                                        "id", id, "state", "FAILED", "message", "파일 조회 실패");
-                            }
-                        })
-                .toList();
+        var order = Comparator.comparing((UUID id) -> !id.equals(active))
+                .thenComparing(updated::get, Comparator.reverseOrder())
+                .thenComparing(UUID::toString);
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (UUID id : updated.keySet().stream().sorted(order).toList()) {
+            try {
+                result.add(status(id));
+            } catch (IOException | IllegalArgumentException error) {
+                if (jobs.containsKey(id)) {
+                    result.add(Map.of("id", id, "state", "FAILED", "message", "파일 조회 실패"));
+                }
+            }
+            if (result.size() == 50) break;
+        }
+        return result;
     }
     public synchronized void delete(UUID id) throws IOException {
         if (id.equals(active)) {
@@ -385,10 +386,13 @@ public class IqService {
 
     public synchronized Map<String, Object> status(UUID id) throws IOException {
         Map<String, Object> job = jobs.get(id);
-        if (job == null && Files.isRegularFile(root.resolve(id + ".json"))) {
-            IqFile file = json.readValue(root.resolve(id + ".json").toFile(), IqFile.class);
+        Path metadata = root.resolve(id + ".json");
+        if (job == null && Files.isRegularFile(metadata)) {
+            Instant storedAt = Files.getLastModifiedTime(metadata).toInstant();
+            IqFile file = json.readValue(metadata.toFile(), IqFile.class);
             set(id, "READY", "저장된 I/Q 파일", file);
             job = jobs.get(id);
+            job.put("updatedAt", storedAt.toString());
         }
         if (job == null) {
             throw new IllegalArgumentException("I/Q 작업을 찾을 수 없습니다.");
@@ -456,7 +460,7 @@ public class IqService {
                     message);
         }
         if (jobs.size() > 50) {
-            jobs.remove(jobs.keySet().iterator().next());
+            jobs.keySet().stream().filter(key -> !key.equals(active)).findFirst().ifPresent(jobs::remove);
         }
     }
     public IqFile completed(UUID id) throws IOException {
