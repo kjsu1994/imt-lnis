@@ -83,7 +83,7 @@ flowchart LR
 
 AFS and I/Q use one frame layout (Type 63, version 6; SB4 670/846 bits). GPS L1 C/A PRN signal channels remain separate. I/Q frames store a generation anchor A and virtual transmit time T=A−P/c. After actual RF frame decoding, the receiver rebases T to trial start S and computes P′=c×(R−[T+S−A]) using the original frame Doppler. Time spent waiting after file generation and time spent decoding are excluded; R is completion of the receive request body. RF tracking measurements remain separate diagnostics.
 
-Sender dispatch checks file existence, size and format, and reuses the generation SHA-256 without re-reading the complete file. Receiver SHA-256 checks before and after decoding remain mandatory. Full hash progress includes bytes read, elapsed time and throughput. Changes to the sender file after generation are detected at the receiver, not during dispatch.
+Sender dispatch checks file existence, size and format, and reuses the generation SHA-256 without re-reading the complete file. The receiver verifies the complete SHA-256 once before decoding, then checks file size, modification time and identity after decoding. The shared file must remain unchanged during processing. Full hash progress includes bytes read, elapsed time and throughput. Changes to the sender file after generation are detected at the receiver, not during dispatch.
 
 Only GPS L1 C/A is used for new PVT calculations. Other constellations remain visible as received data. Existing results and files are retained; older I/Q layouts must be regenerated for new trials. Sender/receiver PC clocks must be synchronized.
 

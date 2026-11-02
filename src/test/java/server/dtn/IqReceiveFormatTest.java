@@ -5,8 +5,10 @@ import static org.mockito.Mockito.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import server.common.DtnModels.*;
@@ -16,9 +18,14 @@ import server.iq.IqService;
 import server.node.*;
 
 import java.io.IOException;
+import java.nio.file.*;
+import java.nio.file.attribute.FileTime;
+import java.time.Instant;
 import java.util.*;
 
 class IqReceiveFormatTest {
+    @TempDir Path directory;
+
     @ParameterizedTest
     @CsvSource({
         "1,LNIS-IQ-FILE-v1,legacy,false",
@@ -42,6 +49,8 @@ class IqReceiveFormatTest {
                         json);
         var iq = mock(IqService.class);
         ReflectionTestUtils.setField(service, "iq", iq);
+        Path bin = Files.write(directory.resolve("sample.bin"), new byte[] {1, 2, 3, 4});
+        when(iq.path(any())).thenReturn(bin);
         // Stop at the file boundary; malformed envelopes must never reach disk verification.
         when(iq.verify(any(), any())).thenThrow(new IOException("verification boundary reached"));
         var transfer = new Transfer();
@@ -95,14 +104,14 @@ class IqReceiveFormatTest {
             assertEquals("PASS", json.readTree(job.getFileResultJson()).path("verdict").asText(),
                     "decoder failure must retain the verified file result");
 
-            doReturn(Map.of("verdict", "PASS"))
-                    .doThrow(new IqService.FileMismatchException("I/Q 파일 크기 불일치"))
-                    .when(iq).verify(any(), any());
-            doReturn(new IqReceiver.Result(List.of(), Map.of())).when(receiver).decode(any(), any(), any(), any());
+            doAnswer(call -> {
+                Files.setLastModifiedTime(bin, FileTime.from(Instant.now().plusSeconds(10)));
+                return new IqReceiver.Result(List.of(), Map.of());
+            }).when(receiver).decode(any(), any(), any(), any());
             job.setState("CALCULATING");
             ReflectionTestUtils.invokeMethod(service, "verifyIq", job);
             assertEquals("FAIL", json.readTree(job.getFileResultJson()).path("verdict").asText(),
-                    "a mismatch after decoding overrides the earlier PASS");
+                    "a file change after decoding overrides the earlier PASS");
 
             clearInvocations(receiver);
             doAnswer(call -> {
@@ -114,6 +123,99 @@ class IqReceiveFormatTest {
             assertEquals("CANCELLED", job.getState());
             verify(receiver, never()).decode(any(), any(), any(), any());
 
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"unchanged", "size", "modified", "replaced", "removed", "cancelled"})
+    void verifiesHashOnceAndPublishesResultsOnlyForUnchangedActiveTrial(String change) throws Exception {
+        var json = new ObjectMapper().findAndRegisterModules();
+        var repository = mock(DtnRepository.class);
+        var service = new DtnService(repository, mock(AgentCommandService.class),
+                mock(AgentRepository.class), mock(AgentConnectionRegistry.class),
+                mock(InputBufferService.class), json);
+        var iq = mock(IqService.class);
+        var receiver = mock(IqReceiver.class);
+        ReflectionTestUtils.setField(service, "iq", iq);
+        ReflectionTestUtils.setField(service, "iqReceiver", receiver);
+        Path bin = Files.write(directory.resolve("sample.bin"), new byte[] {1, 2, 3, 4});
+        when(iq.path(any())).thenReturn(bin);
+        if (change.equals("replaced")) {
+            org.junit.jupiter.api.Assumptions.assumeTrue(
+                    Files.readAttributes(bin, java.nio.file.attribute.BasicFileAttributes.class).fileKey() != null,
+                    "File identity is not provided on this filesystem; covered by the Linux verification.");
+        }
+        when(iq.verify(any(), any())).thenReturn(Map.of("verdict", "PASS"));
+        var start = Instant.parse("2026-11-02T00:00:00Z");
+        var timing = new server.pvt.DtnDelay.Timing(start, start.plusSeconds(2));
+        var evidence = new server.pvt.DtnDelay.Evidence(timing, 2, 2 * server.pvt.DtnDelay.C,
+                new server.pvt.DtnDelay.Time(2400, 100000),
+                new server.pvt.DtnDelay.Time(2400, 100002), List.of(), null);
+        var reference = new Pvt();
+        reference.setWeek(2400);
+        reference.setTowSeconds(100000);
+        reference.setPositionValid(true);
+        reference.setVelocityValid(true);
+        reference.setEcefMeters(new double[] {1, 2, 3});
+        reference.setVelocityMetersPerSecond(new double[] {4, 5, 6});
+        reference.setReceiverClockBiasSeconds(0.0);
+        var received = json.readValue(json.writeValueAsString(reference), Pvt.class);
+        received.setTowSeconds(100002);
+        received.setReceiverClockBiasSeconds(2.0);
+        var transfer = new Transfer();
+        transfer.setSchemaVersion(3);
+        transfer.setFormat("LNIS-IQ-FILE-v3");
+        transfer.setTestType("IQ_SAMPLE");
+        transfer.setFile(new IqFile("/exchange/" + UUID.randomUUID() + ".bin",
+                IqService.EXPECTED_BYTES, "A".repeat(64), 90, 12000000, "IQ_INTERLEAVED_INT8", 2));
+        transfer.setMetadata(new IqMetadata("AFSD", IqReceiver.FRAME_METHOD, 2400, 100000,
+                "ECEF_CONSTANT_VELOCITY", List.of(19, 23, 24, 28), List.of()));
+        transfer.setReferencePvt(List.of(reference));
+        var job = new DtnJob();
+        job.setId(UUID.randomUUID());
+        job.setTestType("IQ_SAMPLE");
+        job.setState("CALCULATING");
+        job.setTestStartedAt(start);
+        job.setReceivedAt(timing.receivedAt());
+        job.setReceivedJson(json.writeValueAsString(transfer));
+        when(repository.findById(job.getId())).thenReturn(Optional.of(job));
+        when(repository.save(any())).thenAnswer(call -> call.getArgument(0));
+        when(receiver.decode(any(), any(), any(), any())).thenAnswer(call -> {
+            var modified = Files.getLastModifiedTime(bin);
+            switch (change) {
+                case "size" -> Files.write(bin, new byte[] {1});
+                case "modified" -> {
+                    Files.write(bin, new byte[] {4, 3, 2, 1});
+                    Files.setLastModifiedTime(bin, FileTime.from(modified.toInstant().plusSeconds(2)));
+                }
+                case "replaced" -> {
+                    Path other = Files.write(directory.resolve("other.bin"), new byte[] {4, 3, 2, 1});
+                    Files.setLastModifiedTime(other, modified);
+                    Files.move(other, bin, StandardCopyOption.REPLACE_EXISTING);
+                }
+                case "removed" -> Files.delete(bin);
+                case "cancelled" -> job.setState("CANCELLED");
+            }
+            return new IqReceiver.Result(List.of(received), Map.of("source", "IQ_FRAME"), evidence);
+        });
+
+        ReflectionTestUtils.invokeMethod(service, "verifyIq", job);
+
+        verify(iq, times(1)).verify(any(), any());
+        verify(receiver, times(1)).decode(eq(bin), any(), eq(timing), any());
+        if (change.equals("unchanged")) {
+            assertEquals("COMPLETED", job.getState());
+            assertEquals("PASS", json.readTree(job.getFileResultJson()).path("verdict").asText());
+            assertEquals("MEASURED", json.readTree(job.getComparisonJson()).path("verdict").asText());
+            assertEquals(json.valueToTree(List.of(received)), json.readTree(job.getReceiverJson()));
+            assertEquals(evidence, json.readValue(job.getDelayEvidenceJson(), server.pvt.DtnDelay.Evidence.class));
+        } else {
+            assertEquals(change.equals("cancelled") ? "CANCELLED" : "FAILED", job.getState());
+            assertNull(job.getReceiverJson());
+            assertNull(job.getComparisonJson());
+            if (List.of("size", "modified", "replaced").contains(change)) {
+                assertEquals("FAIL", json.readTree(job.getFileResultJson()).path("verdict").asText());
+            }
         }
     }
 }

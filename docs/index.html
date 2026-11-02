@@ -441,7 +441,7 @@
 
                         <tr><th scope="row">3 · 프레임 복호</th><td>SP 동기, SB1 복호, 디인터리빙, LDPC·CRC 검증</td><td>검증된 서브블록에서 항법정보와 관측정보 복원</td></tr>
 
-                        <tr><th scope="row">4 · 처리 후 확인</th><td>복호 후 파일 SHA-256 재확인</td><td>처리 중 파일 변경 여부 확인</td></tr>
+                        <tr><th scope="row">4 · 처리 후 확인</th><td>복호 후 크기·수정시각·파일 식별 확인</td><td>변경 감지 시 결과 저장 중단. SHA-256은 복호 전 한 번 검증</td></tr>
 
                         <tr><th scope="row">5 · PVT 입력 구성</th><td>프레임의 가상 송신 시각·원본 Doppler·항법정보 사용</td><td>RF 추적 관측값은 별도 진단용. Reference는 결과 비교용</td></tr>
                       </tbody>

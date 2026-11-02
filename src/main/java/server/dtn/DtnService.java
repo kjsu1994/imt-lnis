@@ -36,6 +36,9 @@ import java.net.http.HttpResponse;
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.security.MessageDigest;
 import java.time.*;
 import java.util.*;
@@ -1518,6 +1521,8 @@ public class DtnService {
                     "I/Q 검증",
                     true,
                     "수신 파일 존재·크기·SHA-256 확인 시작 · " + transfer.getFile().filePath());
+            var filePath = iq.path(transfer.getFile());
+            var before = Files.readAttributes(filePath, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
             long started = System.nanoTime();
             var result = new LinkedHashMap<>(iq.verify(transfer.getFile(),
                     progress -> trace(job.getId(), "수신 파일 검증", true, progress.message())));
@@ -1553,9 +1558,15 @@ public class DtnService {
                                 metadata,
                                 new DtnDelay.Timing(job.getTestStartedAt(), job.getReceivedAt()),
                                 message -> trace(job.getId(), "I/Q 복원", true, message));
-                // File verification and PVT accuracy are different results.
-                iq.verify(transfer.getFile(),
-                        progress -> trace(job.getId(), "복호 후 파일 재검증", true, progress.message()));
+                // shortcut: assumes no shared-file writes during decoding; use a private snapshot if that changes.
+                var after = Files.readAttributes(iq.path(transfer.getFile()),
+                        BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+                if (!after.isRegularFile() || before.size() != after.size()
+                        || !before.lastModifiedTime().equals(after.lastModifiedTime())
+                        || !Objects.equals(before.fileKey(), after.fileKey())) {
+                    throw new IqService.FileMismatchException("I/Q 처리 중 파일 변경 · 크기·수정시각·파일 식별 확인 실패");
+                }
+                trace(job.getId(), "복호 후 파일 확인", true, "크기·수정시각·파일 식별 유지 확인 완료");
                 reference =
                         IqReceiver.references(metadata, transfer.getReferencePvt(), decoded.pvt());
                 comparison =
