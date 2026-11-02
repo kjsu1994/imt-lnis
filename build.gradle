@@ -307,3 +307,44 @@ tasks.register('deploymentTest', Exec) {
 }
 
 tasks.named('check') { dependsOn tasks.named('deploymentTest') }
+
+// Customer manual remains separate from the public intro site.
+tasks.register('userManualPdf', Exec) {
+    group = 'documentation'
+    description = '오프라인 사용자 설명서를 검사하고 A4 가로 PDF를 생성한다.'
+    inputs.file('scripts/export-user-manual.cjs')
+    inputs.files(fileTree('manual') { exclude '*.pdf', '*.docx' })
+    outputs.file(layout.buildDirectory.file('distributions/lnis-user-manual.pdf'))
+    outputs.file('manual/lnis-user-manual.pdf')
+    commandLine 'node', 'scripts/export-user-manual.cjs'
+}
+
+tasks.register('userManualDistZip', Zip) {
+    group = 'documentation'
+    description = '사용자 설명서 HTML·화면 이미지·PDF를 오프라인 배포용으로 묶는다.'
+    dependsOn tasks.named('userManualPdf')
+    archiveFileName = 'lnis-user-manual.zip'
+    destinationDirectory = layout.buildDirectory.dir('distributions')
+    from('manual') { into 'lnis-user-manual' }
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+}
+
+// Bundle the published manual without requiring Playwright for an application build.
+def applicationVersion = project.version.toString()
+tasks.named('processResources') {
+    filteringCharset = 'UTF-8'
+    inputs.property('applicationVersion', applicationVersion)
+    filesMatching(['static/dtn-sender.html', 'static/dtn-receiver.html']) {
+        filter { line -> line.replace('@lnisVersion@', applicationVersion) }
+    }
+    from('manual') {
+        exclude '*.docx'
+        into 'static/user-manual'
+    }
+    mustRunAfter tasks.named('userManualPdf')
+}
+
+tasks.named('browserTest') {
+    dependsOn tasks.named('processResources')
+}

@@ -123,4 +123,34 @@ class WebPageControllerTest {
         }
         mvc.perform(get("/lnis/api/v1/discovery")).andExpect(status().isNotFound());
     }
+    @Test
+    void servesBundledManualAndPublishedPdf() throws Exception {
+        mvc.perform(get("/user-manual"))
+                .andExpect(status().isFound())
+                .andExpect(redirectedUrl("/user-manual/"));
+        mvc.perform(get("/user-manual/"))
+                .andExpect(status().isOk())
+                .andExpect(forwardedUrl("/user-manual/index.html"));
+        mvc.perform(get("/user-manual/index.html"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("PDF 다운로드")));
+        mvc.perform(get("/user-manual/assets/Kari_logo.png"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith("image/png"));
+        byte[] pdf = mvc.perform(get("/user-manual/lnis-user-manual.pdf"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith("application/pdf"))
+                .andReturn().getResponse().getContentAsByteArray();
+        org.junit.jupiter.api.Assertions.assertTrue(pdf.length > 10000);
+        org.junit.jupiter.api.Assertions.assertEquals(
+                "%PDF-", new String(pdf, 0, 5, java.nio.charset.StandardCharsets.US_ASCII));
+        for (String role : java.util.List.of("sender", "receiver")) {
+            mvc.perform(get("/dtn-" + role + ".html"))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(org.hamcrest.Matchers.containsString("imtplus")))
+                    .andExpect(content().string(org.hamcrest.Matchers.not(
+                            org.hamcrest.Matchers.containsString("@lnisVersion@"))));
+        }
+    }
+
 }

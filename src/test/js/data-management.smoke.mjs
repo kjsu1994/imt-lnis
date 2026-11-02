@@ -50,6 +50,6 @@ assert.equal(elements.get('tests-enabled').checked,false);
 assert.equal(elements.get('files-enabled').checked,false);
 for(const name of ['dtn-sender.html','dtn-receiver.html']) {
  const page=readFileSync(new URL(name,base),'utf8');
- assert.match(page,/<a[^>]*class="data-management-entry"[^>]*hidden/);
+ assert.match(page,/<a[^>]*class="data-management-entry"[^>]*href="\/lnis\/data-manager"[^>]*aria-label="데이터 관리"/);
 }
-console.log('PASS: local management UI requires preview/confirmation, defaults retention off, and hides entry links');
+console.log('PASS: local management UI requires preview/confirmation, defaults retention off, and retains local management entry links');

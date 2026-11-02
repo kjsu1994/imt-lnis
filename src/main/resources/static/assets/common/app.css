@@ -28,3 +28,53 @@ header:has(> .data-management-entry:not([hidden])) { padding-left: max(50px, cla
 .data-management-entry:focus-visible { outline: 2px solid #79d6ce; outline-offset: 3px; }
 .data-management-entry[hidden] { display: none !important; }
 .data-management-entry svg { display: block; }
+
+/* 밝은 본문 배경을 이어 기관 로고의 원래 색상을 유지한다. */
+body[data-page^="dtn-"] > header {
+  background: transparent;
+  color: var(--ink);
+  border-bottom: 1px solid var(--line);
+  box-shadow: none;
+}
+body[data-page^="dtn-"] .data-management-entry {
+  color: #526871;
+  border-color: #c7d4d8;
+  background: #ffffff80;
+}
+body[data-page^="dtn-"] .data-management-entry:hover {
+  color: var(--teal);
+  border-color: var(--teal);
+  background: #fff;
+}
+body[data-page^="dtn-"] .data-management-entry:focus-visible { outline-color: var(--teal); }
+body[data-page^="dtn-"] .role-nav a { color: #526871; }
+body[data-page^="dtn-"] .role-nav a:is(.active, :hover) { background: #dfe8e9; color: var(--teal); }
+
+/* 기관 로고는 안내 링크·설정 버튼과 별도로 배치한다. */
+.role-nav .kari-logo { display: block; width: clamp(130px, 16vw, 200px); height: auto; align-self: center; }
+@media (max-width: 850px) {
+  body[data-page^="dtn-"] .role-nav { align-self: center; }
+  body[data-page^="dtn-"] .header-center-logo { display: none; }
+}
+
+/* 안내 아이콘 아래에 같은 크기로 설명서를 배치한다. */
+header > .user-manual-entry { top: 80px; }
+.site-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px 12px;
+  width: min(1440px, calc(100% - 36px));
+  margin: 0 auto;
+  padding: 0 24px 24px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+.software-version { white-space: nowrap; font-variant-numeric: tabular-nums; }
+body:has(.log-maximized) .user-manual-entry,
+body:has(.log-maximized) > .site-footer { display: none; }
+@media (max-width: 600px) {
+  body[data-page="dtn-sender"] .site-footer { padding-left: 12px; padding-right: 110px; }
+}

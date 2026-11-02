@@ -4,7 +4,7 @@ const {createServer} = require('node:http');
 const {readFileSync} = require('node:fs');
 const {resolve, extname} = require('node:path');
 const assert = require('node:assert/strict');
-const root = resolve(__dirname, '../../main/resources/static');
+const root = resolve(__dirname, '../../../build/resources/main/static');
 const config = {maxNumberOfBundlesInPipeline:50,maxSumOfBundleBytesInPipeline:50000000,maxBundleSizeBytes:10485760,
   tcpclMaxSegmentSizeBytes:20000,neighborDepletedStorageDelaySeconds:10,enforceBundlePriority:false,
   storageDeletionPolicy:'DELETE_AFTER_FORWARDING',totalStorageCapacityBytes:8589934592,maxLtpReceiveUdpPacketSizeBytes:65536,acsSendPeriodMilliseconds:1000};
@@ -47,10 +47,10 @@ const server=createServer((req,res)=>{
   });return;
  }
  try{
-  const file=resolve(root, (path==='/sender'?'dtn-sender.html':path==='/receiver'?'dtn-receiver.html':path==='/dtn-intro'?'dtn-intro.html':path.replace(/^\/lnis\//,'')).replace(/^\//,''));
+  const file=resolve(root, (path==='/sender'?'dtn-sender.html':path==='/receiver'?'dtn-receiver.html':path==='/dtn-intro'?'dtn-intro.html':path==='/user-manual/'?'user-manual/index.html':path.replace(/^\/lnis\//,'')).replace(/^\//,''));
   if(!file.startsWith(root+require('node:path').sep))throw Error('path');
   const content=readFileSync(file);
-  res.writeHead(200,{'Content-Type':{'.js':'text/javascript','.html':'text/html','.css':'text/css','.png':'image/png'}[extname(file)]||'text/plain'});res.end(content);
+  res.writeHead(200,{'Content-Type':{'.js':'text/javascript','.html':'text/html','.css':'text/css','.png':'image/png','.pdf':'application/pdf'}[extname(file)]||'text/plain'});res.end(content);
  }catch{res.writeHead(404);res.end();}
 });
 (async()=>{
@@ -101,6 +101,24 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
   await page.waitForFunction(()=>[...document.getElementById('dtn-tests').options].some(o=>o.value==='test1'));
   await page.locator('#dtn-tests').selectOption('test1');
   await page.waitForTimeout(300);
+
+  const manualLink = page.getByRole('link', {name:'사용자 설명서 · 새 탭에서 열기'});
+  assert.equal(await manualLink.getAttribute('href'), '/user-manual/');
+  assert.equal(await manualLink.getAttribute('target'), '_blank');
+  assert.match(await page.locator('.site-footer').innerText(), /© 2026 imtplus\. All rights reserved\./);
+  assert.match(await page.locator('.software-version').innerText(), /^v\d+\.\d+\.\d+$/);
+  assert.notEqual(await page.locator('.site-footer').evaluate(e=>getComputedStyle(e).position), 'fixed');
+  const popupPromise = page.waitForEvent('popup');
+  await manualLink.click();
+  const manualPage = await popupPromise;
+  await manualPage.waitForLoadState();
+  assert.match(await manualPage.title(), /사용자 설명서/);
+  assert.equal(await manualPage.getByRole('link', {name:'PDF 다운로드'}).getAttribute('href'), 'lnis-user-manual.pdf');
+  await manualPage.close();
+  const pdfResponse = await context.request.get(base+'/user-manual/lnis-user-manual.pdf');
+  assert.equal(pdfResponse.status(), 200);
+  assert.ok((await pdfResponse.body()).subarray(0,5).equals(Buffer.from('%PDF-')));
+
   await page.locator('#dtn-trial-config-btn').click();
   await page.waitForFunction(()=>document.getElementById('trial-settings-dialog').open);
   assert.equal(await page.locator('.trial-param-card').count(),9);
@@ -115,6 +133,8 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
   assert.match(await page.locator('#dtn-log').innerText(),/종료 2건/);
   await page.locator('#dtn-log-fullscreen').click();
   await page.waitForFunction(()=>!!document.querySelector('.log-maximized'));
+  assert.ok(await page.locator('.user-manual-entry').isHidden());
+  assert.ok(await page.locator('.site-footer').isHidden());
   const viewportLog = await page.locator('.log-maximized').boundingBox();
   assert.equal(viewportLog.x,0);assert.equal(viewportLog.y,0);
   assert.equal(Math.round(viewportLog.width),page.viewportSize().width);
@@ -122,12 +142,38 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
   await page.locator('#dtn-log-detail').click();
   await page.waitForFunction(()=>document.getElementById('dtn-log').textContent.includes('상세 확인'));
   await page.keyboard.press('Escape');assert.equal(await page.locator('.log-maximized').count(),0);
+  assert.ok(await page.locator('.user-manual-entry').isVisible());
+  assert.ok(await page.locator('.site-footer').isVisible());
   for (const width of [1600,1100,390]) {
     await page.setViewportSize({width,height:1000});
     const overflow=await page.evaluate(()=>[...document.querySelectorAll('body *')].filter(e=>e.getBoundingClientRect().right>innerWidth+1).map(e=>({tag:e.tagName,id:e.id,cls:e.className,right:e.getBoundingClientRect().right})).slice(0,20));
     if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))console.log(JSON.stringify({route,width,overflow}));
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),route+' fits '+width);
     assert.ok(await page.locator('#dtn-cancel-waiting').isVisible());
+
+    await page.evaluate(()=>scrollTo(0,0));
+    const helpGeometry = await page.evaluate(()=>{
+      const help=document.querySelector('.user-manual-entry').getBoundingClientRect();
+      const intro=document.querySelector('a[href="/dtn-intro"]').getBoundingClientRect();
+      const brand=document.querySelector('.dtn-brand').getBoundingClientRect();
+      const header=document.querySelector('header').getBoundingClientRect();
+      return help.top>=intro.bottom && help.bottom<=header.bottom && help.right<brand.left
+        && Math.abs(help.left-intro.left)<1 && help.width===intro.width && help.height===intro.height;
+    });
+    assert.ok(helpGeometry,route+' manual icon below intro at '+width);
+    await page.screenshot({path:'build/manual-entry-'+route.slice(1)+'-'+width+'.png'});
+    await page.locator('.site-footer').scrollIntoViewIfNeeded();
+    const footerGeometry = await page.evaluate(()=>{
+      const link=document.querySelector('.user-manual-entry').getBoundingClientRect();
+      const settings=document.getElementById('dtn-settings-open')?.getBoundingClientRect();
+      const overlap=(a,b)=>a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;
+      const text=[...document.querySelector('.site-footer').children].map(e=>e.getBoundingClientRect());
+      return {linkFits:link.left>=0&&link.right<=innerWidth,
+        noOverlap:text.every(r=>!settings||!overlap(settings,r))};
+    });
+    assert.ok(footerGeometry.linkFits && footerGeometry.noOverlap, JSON.stringify({route,width,footerGeometry}));
+    await page.screenshot({path:'build/footer-'+route.slice(1)+'-'+width+'.png'});
+
   }
   await page.setViewportSize({width:1600,height:1000});
   await page.screenshot({path:'build/frontend-review-'+route.slice(1)+'.png',fullPage:true});

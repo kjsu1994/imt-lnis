@@ -1,5 +1,7 @@
 # LNIS — Lunar Navigation & Delay-Tolerant Networking Integration System
 
+**사용자 설명서:** [실제 화면·실행 순서·결과 해석·관리자 부록](manual/index.html) · 오프라인 HTML / A4 가로 PDF. `gradlew userManualDistZip`으로 `build/distributions/lnis-user-manual.pdf`와 HTML·이미지·PDF ZIP을 생성합니다. 기존 Playwright 설치본을 사용하며 필요하면 `PLAYWRIGHT_MODULE`에 모듈 경로를 지정합니다. 문서에는 내부 IP·포트·시험 ID가 포함됩니다. [Word 편집본](manual/lnis-user-manual.docx)은 본문·표를 직접 수정할 수 있습니다. Word 수정 사항은 웹 설명서·PDF에 자동 반영되지 않습니다. 송수신 화면 좌측 상단의 동작 안내 아이콘 아래 문서 아이콘은 `/user-manual/`을 새 탭에서 엽니다. HTML·이미지·PDF는 서비스에 함께 포함되며, 설명서 갱신 후 `userManualDistZip`으로 배포용 PDF도 갱신합니다.
+
 ![Java](https://img.shields.io/badge/Java-21%20LTS-007396?logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.16-6DB33F?logo=springboot&logoColor=white)
 ![Native Codec](https://img.shields.io/badge/Native-C%2FC%2B%2B%20(JNA)-00599C?logo=c&logoColor=white)

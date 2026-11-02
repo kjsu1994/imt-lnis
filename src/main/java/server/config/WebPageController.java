@@ -11,6 +11,16 @@ public class WebPageController {
         return "forward:/data-management.html";
     }
 
+    @GetMapping("/user-manual")
+    String userManualRoot() {
+        return "redirect:/user-manual/";
+    }
+
+    @GetMapping("/user-manual/")
+    String userManual() {
+        return "forward:/user-manual/index.html";
+    }
+
     @GetMapping("/dtn-intro")
     String dtnIntro() {
         return "forward:/dtn-intro.html";
