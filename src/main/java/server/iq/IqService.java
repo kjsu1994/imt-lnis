@@ -139,22 +139,7 @@ public class IqService {
         if (pvt == null || !pvt.isPositionValid() || !pvt.isVelocityValid()) {
             throw new IllegalArgumentException("유효 PVT 필요");
         }
-        int epochIndex = -1;
-        for (int i = 0; i < records.size(); i++) {
-            var message = server.gnss.GrawCodec.decode(records.get(i)).message();
-            if (message instanceof server.gnss.GrawCodec.ObservationEpoch epoch
-                    && epoch.week() == pvt.getWeek()
-                    && Double.compare(epoch.receiverTowSeconds(), pvt.getTowSeconds()) == 0) {
-                epochIndex = i;
-                break;
-            }
-        }
-        if (epochIndex < 0) {
-            throw new IllegalArgumentException("PVT 관측 시각 불일치");
-        }
-        var epoch = new server.pvt.DtnDelay.Epoch(epochIndex, pvt.getWeek(), pvt.getTowSeconds());
-        var selected = server.gnss.GrawCodec.splitLengthPrefixed(
-                server.pvt.DtnDelay.select(records, epoch));
+        var selected = server.gnss.GrawCodec.splitLengthPrefixed(selectedInput(records, pvt));
         var frames = server.afs.AfsPvtFrameCodec.select(selected);
         var excluded = frames.stream()
                 .filter(p -> p.prn() != 0 && p.navigation() == null)
@@ -199,11 +184,34 @@ public class IqService {
         }
         return text.toString();
     }
+
+    static byte[] selectedInput(List<byte[]> records, server.common.DtnModels.Pvt pvt) {
+        int epochIndex = -1;
+        for (int i = 0; i < records.size(); i++) {
+            var message = server.gnss.GrawCodec.decode(records.get(i)).message();
+            if (message instanceof server.gnss.GrawCodec.ObservationEpoch epoch
+                    && epoch.week() == pvt.getWeek()
+                    && Double.compare(epoch.receiverTowSeconds(), pvt.getTowSeconds()) == 0) {
+                epochIndex = i;
+                break;
+            }
+        }
+        if (epochIndex < 0) {
+            throw new IllegalArgumentException("PVT 관측 시각 불일치");
+        }
+        var epoch = new server.pvt.DtnDelay.Epoch(epochIndex, pvt.getWeek(), pvt.getTowSeconds());
+        return server.pvt.DtnDelay.select(records, epoch);
+    }
+
     public synchronized Map<String, Object> start(String earthInput) throws IOException {
         return start(earthInput, null);
     }
-    public synchronized Map<String, Object> start(String earthInput, UUID inputId)
-            throws IOException {
+    public Map<String, Object> start(String earthInput, UUID inputId) throws IOException {
+        return start(earthInput, inputId, null, null);
+    }
+
+    public synchronized Map<String, Object> start(String earthInput, UUID inputId,
+            String grawBase64, server.common.DtnModels.Pvt reference) throws IOException {
         if (earthInput == null
                 || !(earthInput.startsWith("LNIS-IQ-EARTH-1 ")
                         || earthInput.startsWith("LNIS-IQ-EARTH-2 "))) {
@@ -234,10 +242,11 @@ public class IqService {
                         + "건");
         active = id;
         set(id, "GENERATING", "GNSS 기반 90초 AFS I/Q 생성 중 · PRN별 SB2·SB3·SB4 반복", null);
-        Thread.ofVirtual().name("iq-generate").start(() -> generate(id, earthInput));
+        Thread.ofVirtual().name("iq-generate").start(() -> generate(id, earthInput, grawBase64, reference));
         return status(id);
     }
-    private void generate(UUID id, String earthInput) {
+    private void generate(UUID id, String earthInput, String grawBase64,
+            server.common.DtnModels.Pvt reference) {
         Path work = root.resolve("work-" + id), part = root.resolve(id + ".bin.part");
         try {
             Files.createDirectory(work);
@@ -327,7 +336,9 @@ public class IqService {
                 }
                 trace(id, "I/Q 검증", true, progress.message());
             });
-            var context = IqReceiver.source(earthInput, digest);
+            var generated = IqReceiver.source(earthInput, digest);
+            var context = new IqReceiver.Source(digest, generated.metadata(),
+                    reference == null ? generated.reference() : reference, grawBase64);
             trace(id, "I/Q 검증", true, "SHA-256 계산 완료 · " + digest);
             synchronized (this) {
                 if (!id.equals(active) || cancelled(id)) {
@@ -491,7 +502,8 @@ public class IqService {
         if (!Files.exists(context)) {
             return null;
         }
-        if (Files.isSymbolicLink(context) || Files.size(context) > 1_048_576) {
+        if (Files.isSymbolicLink(context)
+                || Files.size(context) > 2L * server.common.DtnModels.MAX_INPUT_BYTES + 65536) {
             throw new IOException("I/Q 생성 메타데이터 경로·크기 오류");
         }
         var source = json.readValue(context.toFile(), IqReceiver.Source.class);
@@ -499,6 +511,17 @@ public class IqService {
             throw new IOException("I/Q 파일과 생성 메타데이터 불일치");
         }
         IqReceiver.validate(source.metadata());
+        if (source.grawBase64() != null) {
+            byte[] input = Base64.getDecoder().decode(source.grawBase64());
+            if (input.length > server.common.DtnModels.MAX_INPUT_BYTES) {
+                throw new IOException("I/Q 원본 관측값 크기 초과");
+            }
+            var view = server.common.DtnObservationView.fromRecords(server.gnss.GrawCodec.splitLengthPrefixed(input));
+            if (view.epochs().size() != 1 || view.epochs().getFirst().observation().week() != source.metadata().week()
+                    || Double.compare(view.epochs().getFirst().observation().receiverTowSeconds(), source.metadata().towSeconds()) != 0) {
+                throw new IOException("I/Q 원본 관측값 Epoch 불일치");
+            }
+        }
         return source;
     }
     public Path path(IqFile file) throws IOException {

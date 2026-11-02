@@ -290,7 +290,23 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
      {...original,satelliteId:23,pseudorangeMeters:321792458}]}}],navigation:iqNavigation,navigationCount:6,
      records:[...iqNavigation.map(()=>({type:'NAVIGATION_UPDATE'})),{type:'OBSERVATION_EPOCH'}],
      receivedValues:{observations:iqSignals},trackingEpochs:[{elapsedSeconds:21,observations:[
-       {satelliteId:19,pseudorangeMeters:21000001,dopplerHz:-101,carrierToNoiseDbHz:44,carrierPhaseCycles:123.5}]}]}};
+       {satelliteId:19,pseudorangeMeters:21000001,dopplerHz:-101,carrierToNoiseDbHz:44,carrierPhaseCycles:123.5}]},{elapsedSeconds:22,observations:[{satelliteId:19,pseudorangeMeters:21000002,dopplerHz:-102,carrierToNoiseDbHz:43,carrierPhaseCycles:124.5},
+      {satelliteId:31,pseudorangeMeters:23000002,dopplerHz:100,carrierToNoiseDbHz:42,carrierPhaseCycles:200}]}]}};
+ const receivedReport=structuredClone(reportFixture), receivedJob={...job};
+ job={...job,state:'WAITING_DTN',referenceEpochs:1,updatedAt:'2026-11-02T00:00:00Z'};
+ reportFixture={referencePvt:[{week:2400,towSeconds:100000,positionValid:true,velocityValid:true,
+   ecefMeters:[1,2,3],velocityMetersPerSecond:[4,5,6],satellitesUsed:4,receiverClockBiasSeconds:1e-12}],
+   observations:{epochs:[{observation:epoch}],navigation:navRows,navigationCount:navRows.length,records}};
+ await page.goto(base+'/sender');await selectTrial();
+ await page.waitForFunction(()=>document.getElementById('pvt-x').textContent==='1.000');
+ assert.match(await page.locator('#dtn-observations [data-observations]').innerText(),/21000000\.000/);
+ await page.locator('#dtn-observations').screenshot({path:'build/iq-sender-history.png'});
+ reportFixture.observations=null;
+ await page.reload();await selectTrial();
+ await page.waitForFunction(()=>document.getElementById('pvt-message').textContent.includes('관측값이 저장되지'));
+ assert.equal(await page.locator('#pvt-x').textContent(),'1.000');
+ assert.doesNotMatch(await page.locator('#dtn-observations [data-observations]').innerText(),/21000000/);
+ job=receivedJob;reportFixture=receivedReport;
  await page.goto(base+'/receiver');await selectTrial();
  await page.waitForFunction(()=>document.querySelector('#dtn-observations [data-integrity]')?.textContent==='파일 일치 · PVT 비교 불가');
  assert.equal(await observationPanel.isVisible(),true);
@@ -303,9 +319,15 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
  assert.doesNotMatch(await observationPanel.locator('[data-observations]').innerText(),/21000000\.000/);
  assert.match(await observationPanel.locator('[data-observations]').innerText(),/320792458\.000/);
  assert.equal(await observationPanel.locator('td.converted-range').first().evaluate(el=>getComputedStyle(el).color),'rgb(180, 35, 24)');
- assert.equal(await observationPanel.locator('[data-iq-tracking-body]').isVisible(),true);
- assert.match(await observationPanel.locator('[data-iq-tracking-body]').innerText(),/21000001\.000/);
- assert.match(await observationPanel.locator('[data-iq-tracking-body]').innerText(),/123\.500/);
+ assert.equal(await observationPanel.locator('[data-iq-tracking-epoch]').isVisible(),true);
+ assert.equal(await observationPanel.locator('[data-iq-tracking-body]').count(),0);
+ assert.match(await observationPanel.locator('[data-observations]').innerText(),/21000001\.000/);
+ await observationPanel.locator('[data-iq-tracking-epoch]').selectOption('1');
+ assert.equal(await observationPanel.locator('[data-observations] tr').count(),3);
+ assert.match(await observationPanel.locator('[data-observations]').innerText(),/21000002\.000/);
+ assert.match(await observationPanel.locator('[data-observations]').innerText(),/23000002\.000/);
+ assert.match(await observationPanel.locator('[data-observations]').innerText(),/진단용/);
+ assert.equal(await observationPanel.locator('td.converted-range').first().textContent(),'320792458.000');
  for(const width of [1366,390]){
   await page.setViewportSize({width,height:900});
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'I/Q observations fit '+width);

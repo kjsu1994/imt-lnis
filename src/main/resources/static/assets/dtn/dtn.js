@@ -4,7 +4,7 @@ import {initGnssControls} from './dtn-gnss.js?v=20261026-frame6';
 import {createDtnLog} from './dtn-log.js?v=20261026-frame6';
 import {initAdapterHealth, validAdapterUrl} from './dtn-adapter-health.js?v=20261026-frame6';
 import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20261026-frame6';
-import {createObservationView, numeric, renderClockBias, receiverInformation} from './dtn-observations.js?v=20261028-iq-observations';
+import {createObservationView, numeric, renderClockBias, receiverInformation} from './dtn-observations.js?v=20261102-iq-history';
 
 const $ = id => document.getElementById(id);
 const payload = createPayloadViewer($('dtn-payload'), {sentOnly: true});
@@ -1072,6 +1072,23 @@ function renderSummary() {
   $('dtn-test-detail').textContent = job.testId + ' · ' + (job.message || '');
   payload.setJob(job);
 }
+async function loadTrialReport(next, version, preserve = true) {
+  const id = next.testId, key = id + ':' + next.updatedAt;
+  if (!(next.referenceEpochs || next.verdict) || key === reportKey) return;
+  const report = await request('/dtn/tests/' + encodeURIComponent(id) + '/report');
+  if (job?.testId !== id || busy || version !== jobVersion) return;
+  pvt = report.referencePvt || [];
+  inputView = false;
+  view.setData(report.observations || null, preserve);
+  $('dtn-receiver-info').hidden = !report.observations;
+  $('dtn-receiver-info-body').textContent = receiverInformation(report.observations);
+  renderPvt();
+  if (!report.observations && next.testType === 'IQ_SAMPLE') {
+    $('pvt-message').textContent = '이 시험에는 원본 GNSS 관측값이 저장되지 않았습니다.' + (pvt.length ? ' 저장된 기준 PVT만 표시합니다.' : '');
+  }
+  reportKey = key;
+}
+
 let historyPage = 0, historyVersion = 0;
 async function refreshHistory() {
   const version = ++historyVersion;
@@ -1101,6 +1118,8 @@ $('dtn-tests').onchange = async () => {
     const selected = await request('/dtn/tests/' + encodeURIComponent(id));
     if (version !== jobVersion || busy || pendingCapture) return;
     job = selected; colorTrialSelection($('dtn-tests'), job); reportKey = ''; renderSummary(); updateControls();
+    pvt = []; inputView = false; view.setData(null); $('dtn-receiver-info').hidden = true; renderPvt();
+    await loadTrialReport(selected, version, false);
   } catch (error) { log(error.message, 'ERROR'); }
 };
 
@@ -1166,16 +1185,7 @@ async function poll() {
       const next = await request('/dtn/tests/' + id);
       if (job?.testId === id && !busy && version === jobVersion) {
         job = next; renderSummary();
-        const key = id + ':' + next.updatedAt;
-        if (next.testType !== 'IQ_SAMPLE' && (next.referenceEpochs || next.verdict) && key !== reportKey) {
-          const report = await request('/dtn/tests/' + id + '/report');
-          if (job?.testId === id && !busy && version === jobVersion) {
-            pvt = report.referencePvt || [];
-            if (report.observations) { inputView = false; view.setData(report.observations, true); }
-            renderPvt(); reportKey = key;
-
-          }
-        }
+        await loadTrialReport(next, version);
       }
     }
   } catch (e) {

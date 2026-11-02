@@ -637,6 +637,12 @@ public class DtnService {
                     transfer.setFormat("LNIS-IQ-FILE-v3");
                 }
                 job.setReferenceJson(objectMapper.writeValueAsString(transfer.getReferencePvt()));
+                if (source.grawBase64() != null) {
+                    job.setReferenceSourceBase64(source.grawBase64());
+                    job.setObservationsJson(objectMapper.writeValueAsString(
+                            server.common.DtnObservationView.fromRecords(GrawCodec.splitLengthPrefixed(
+                                    Base64.getDecoder().decode(source.grawBase64())))));
+                }
             }
             synchronized (this) {
                 if (!"PREPARING".equals(get(job.getId()).getState())) {

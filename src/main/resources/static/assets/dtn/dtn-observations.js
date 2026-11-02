@@ -947,6 +947,8 @@ export function createObservationView(container, onSelect = () => {}, role = '')
     <div class="observation-header-row">
       <h3 data-observation-title>관측값 · RAWX</h3>
       <div class="multi-gnss-summary-bar" data-constellation-summary hidden></div>
+      <label class="iq-tracking-select" data-iq-tracking hidden title="RF 추적값의 파일 내 경과 시점입니다. 프레임의 1 Epoch 계산 입력은 바꾸지 않습니다.">RF 시점
+        <select data-iq-tracking-epoch aria-label="RF 추적 시점"></select></label>
       <label class="pvt-filter-toggle"><input type="checkbox" data-pvt-filter> <span>PVT 계산 위성만 보기</span></label>
     </div>
     <p data-delay-summary hidden></p>
@@ -960,6 +962,10 @@ export function createObservationView(container, onSelect = () => {}, role = '')
         <th data-deviation-heading title="PR: 의사거리, CP: 반송파 위상, D: Doppler. 단위·환산 방식이 서로 다른 수신기 코드이며 공통 오차등급이 아닙니다.">표준편차 코드 <small>PR / CP / D</small></th>
         <th>측정 유효성</th><th title="GPS L1·유효 의사거리·Doppler의 입력 조건입니다. 실제 계산 채택 여부는 아니며, 최종 사용 위성 수는 PVT 결과에 표시됩니다.">PVT 입력</th>
         <th data-transmit-heading title="관측 수신 시각 − 의사거리 / 299,792,458. 위성 시계·시스템 간 시간 보정 전 추정값이며 실제 정확도를 의미하지 않습니다. 주 경계를 넘으면 이전 주로 표시합니다.">위성 송신 시각 추정 <small>TOW(s) · 보정 전</small></th>
+        <th data-rf-range hidden class="rf-tracking-start">RF 추적 의사거리 <small>m</small></th>
+        <th data-rf-doppler hidden>RF Doppler <small>Hz</small></th>
+        <th data-rf-cno hidden>RF C/N₀ <small>dB-Hz</small></th>
+        <th data-rf-phase hidden title="RF 추적기의 상대 누적 위상입니다.">RF 반송파 위상 <small>cycle</small></th>
       </tr></thead><tbody data-observations></tbody></table></div>
     <details data-frame-input hidden>
       <summary>AFS 프레임에서 복원한 PVT 계산 입력 · 지연 적용 전</summary>
@@ -987,10 +993,6 @@ export function createObservationView(container, onSelect = () => {}, role = '')
       <div class="epoch-table-viewport"><table class="epoch-observation-table navigation-linked">
         <thead><tr><th>방송 위성</th><th>내용</th><th>관측 기준</th><th>원문</th></tr></thead>
         <tbody data-common-body></tbody></table></div></details>
-    <details data-iq-tracking hidden><summary>RF 추적 관측값 · 진단용</summary>
-      <div class="epoch-table-viewport iq-tracking-viewport"><table class="epoch-observation-table">
-        <thead><tr><th>파일 시각 (s)</th><th>PRN</th><th>추적 의사거리 (m)</th><th>Doppler (Hz)</th><th>C/N₀ (dB-Hz)</th><th title="RF 추적기의 상대 누적 위상입니다.">반송파 위상 (cycle)</th></tr></thead>
-        <tbody data-iq-tracking-body></tbody></table></div></details>
     <details data-record-details><summary>저장된 전체 필드 보기 · JSON</summary><pre data-records class="log"></pre></details>
     `;
   const hideTransmitEstimate = role === '송신 원본' || role === '송신 비교원본';
@@ -1318,30 +1320,23 @@ export function createObservationView(container, onSelect = () => {}, role = '')
     container.querySelector('[data-pvt-status]').hidden = !data;
   }
 
+  const trackingSelect = container.querySelector('[data-iq-tracking-epoch]');
+  trackingSelect.onchange = () => render(false);
+
   function renderTracking() {
-    const details = container.querySelector('[data-iq-tracking]');
-    if (!details) return;
-    const epochs = data?.trackingEpochs || [];
-    details.hidden = !epochs.length;
-    const target = container.querySelector('[data-iq-tracking-body]');
-    target.replaceChildren();
-    for (const epoch of epochs) {
-      for (const observation of epoch.observations || []) {
-        const row = document.createElement('tr');
-        for (const value of [numeric(epoch.elapsedSeconds), observation.satelliteId,
-          numeric(observation.pseudorangeMeters), numeric(observation.dopplerHz),
-          numeric(observation.carrierToNoiseDbHz, 1), numeric(observation.carrierPhaseCycles)]) {
-          const cell = document.createElement('td');
-          cell.textContent = String(value);
-          row.append(cell);
-        }
-        target.append(row);
-      }
+    const epochs = data?.source === 'IQ_FRAME' ? data.trackingEpochs || [] : [];
+    container.querySelector('[data-iq-tracking]').hidden = !epochs.length;
+    for (const field of ['range', 'doppler', 'cno', 'phase']) {
+      container.querySelector('[data-rf-' + field + ']').hidden = !epochs.length;
     }
+    const index = Math.min(Number(trackingSelect.value) || 0, Math.max(0, epochs.length - 1));
+    trackingSelect.replaceChildren(...epochs.map((epoch, i) => new Option(numeric(epoch.elapsedSeconds) + ' s', String(i))));
+    trackingSelect.value = String(index);
+    return epochs[index]?.observations || [];
   }
 
   function render(notify = true) {
-    renderTracking();
+    const tracking = renderTracking();
     const iqView = data?.source === 'IQ_FRAME' || data?.source === 'IQ_TRACKING' || report?.testType === 'IQ_SAMPLE';
     const frame = data?.source === 'IQ_FRAME';
     for (const name of ['range', 'phase', 'lock', 'deviation']) {
@@ -1355,7 +1350,7 @@ export function createObservationView(container, onSelect = () => {}, role = '')
       integrity.className = 'pill ' + result.tone;
       integrity.title = '파일 일치는 크기·SHA-256 검증 결과입니다. PVT는 Reference와 위치·속도·시계오차를 비교하며, 지연에 따른 차이를 별도로 측정합니다.';
     }
-    if (data?.receivedValues) { renderWire(notify); return; }
+    if (data?.receivedValues) { renderWire(notify, tracking); return; }
     const item = data?.epochs?.[Number(select.value)];
     const epoch = item?.observation;
     const comparison = !data?.receivedValues && !!delayEvidence && role === '수신 원본' && data?.source !== 'IQ_TRACKING';
@@ -1499,7 +1494,7 @@ export function createObservationView(container, onSelect = () => {}, role = '')
     if (notify) onSelect(Number(select.value), epoch);
   }
 
-  function renderWire(notify) {
+  function renderWire(notify, tracking) {
     const wire = data.receivedValues;
     const rawEpoch = wire.records?.find(record => record.observation)?.observation;
     const values = rawEpoch?.observations || wire.observations || [];
@@ -1543,8 +1538,17 @@ export function createObservationView(container, onSelect = () => {}, role = '')
     select.replaceChildren(new Option('Week ' + (week ?? '—') + ' / TOW ' + numeric(tow) + ' s', '0'));
     select.disabled = true;
     body.replaceChildren();
-    selectSatellite(values);
-    for (const {observation} of ordered(values)) {
+    const rows = ordered(values);
+    for (const signal of tracking) {
+      if (!values.some(o => o.constellationId === 0 && o.satelliteId === signal.satelliteId)) {
+        rows.push({observation: {constellationId: 0, satelliteId: signal.satelliteId, signalId: 0}, rfOnly: true});
+      }
+    }
+    rows.sort((a, b) => a.observation.constellationId - b.observation.constellationId
+      || a.observation.satelliteId - b.observation.satelliteId || a.observation.signalId - b.observation.signalId);
+    const displayed = rows.map(row => row.observation);
+    selectSatellite(displayed);
+    for (const {observation, rfOnly} of rows) {
       const originals = reference?.observations?.filter(o => matchSignal(o, observation)) || [];
       const original = originals.length === 1 ? originals[0] : null;
       const conversions = calculated?.observations?.filter(o => matchSignal(o, observation)) || [];
@@ -1555,7 +1559,11 @@ export function createObservationView(container, onSelect = () => {}, role = '')
       cells[10] = delayEvidence?.error ? '계산 불가' : conversions.length > 1 ? '확인 불가'
         : converted ? observationCells(converted, tow)[10] : '계산값 없음';
       if (!rawEpoch) cells[8] = '—';
-      if (iq) cells[9] = observation.trackingStatus & 1 ? 'PR 유효' : 'PR 무효';
+      if (iq) cells[9] = rfOnly ? '프레임 미복원' : observation.trackingStatus & 1 ? 'PR 유효' : 'PR 무효';
+      if (rfOnly) {
+        cells[2] = 'AFS Data · L1';
+        cells[10] = '진단용';
+      }
       const stamp = observation.alignedTransmitAt || observation.transmitAt;
       cells[11] = stamp ? String(stamp.seconds) + '.' + String(stamp.femtoseconds).padStart(15, '0') : '—';
       cells.splice(4, 0, numeric(delayEvidence?.error ? null : converted?.pseudorangeMeters));
@@ -1585,10 +1593,21 @@ export function createObservationView(container, onSelect = () => {}, role = '')
         }
         row.append(cell);
       });
+      if (tracking.length) {
+        const matches = observation.constellationId === 0
+          ? tracking.filter(signal => signal.satelliteId === observation.satelliteId) : [];
+        const rf = matches.length === 1 ? matches[0] : null;
+        [rf?.pseudorangeMeters, rf?.dopplerHz, rf?.carrierToNoiseDbHz, rf?.carrierPhaseCycles].forEach((value, index) => {
+          const cell = document.createElement('td');
+          cell.textContent = numeric(value, index === 2 ? 1 : 3);
+          if (index === 0) cell.className = 'rf-tracking-start';
+          row.append(cell);
+        });
+      }
       linkSatellite(row, observation);
       body.append(row);
     }
-    renderAssociation(values);
+    renderAssociation(displayed);
     applyPvtFilter();
     if (notify) onSelect(0, calculated);
   }
@@ -1610,7 +1629,7 @@ export function createObservationView(container, onSelect = () => {}, role = '')
         if (navFilterCheckbox) navFilterCheckbox.checked = showPvtActiveOnly;
         if (filterCheckbox) filterCheckbox.checked = false;
       }
-      if (nextIq && !preserve) container.querySelector('[data-iq-tracking]').open = true;
+      if (!preserve) trackingSelect.value = '0';
       data = next;
       delayEvidence = evidence;
       const iq = data?.source === 'IQ_TRACKING';

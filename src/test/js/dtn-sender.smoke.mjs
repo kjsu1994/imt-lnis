@@ -62,6 +62,7 @@ elements.get('dtn-settings-view').hidden = true;
 let loaded = null, currentJob = null, failUpload = false, starts = 0, lastStartBody, cancels = 0;
 let observationSelection, displayedPvt;
 let healthFetch = () => ({ok: true, json: async () => ({adapter: {status: 'ready'}})}), healthCalls = 0, healthUrl;
+let historyReport = null, historyReportRequest = null, historyReportCalls = 0;
 let gnssStatus = {state: 'DISCONNECTED', timeState: 'UNAVAILABLE'};
 const intervals = [];
 const tx = {agentId: 'sender-1', role: 'SENDER', state: 'READY'}, rx = {agentId: 'receiver-1', role: 'RECEIVER', state: 'READY'};
@@ -125,13 +126,14 @@ const context = {
     else if (url.endsWith('/observations')) body = observations;
     else if (url.includes('/delay-epochs')) body = [{epoch:{recordIndex:0,week:2400,towSeconds:1},reference:{positionValid:true}}];
     else if (url.endsWith('/tests/t1/cancel')) { cancels++; currentJob = {...currentJob, state: 'CANCELLED', cancelPending: false}; body = currentJob; }
-    else if (url.endsWith('/tests/t1')) body = currentJob;
-    else if (url.endsWith('/report')) body = {referencePvt: [{week: 2400, towSeconds: 1,
-      positionValid: false, velocityValid: false, ecefMeters: [999, 999, 999], velocityMetersPerSecond: [999, 999, 999]}], observations};
+    else if (url.endsWith('/tests/t1') || url.endsWith('/tests/t2')) body = currentJob;
+    else if (url.endsWith('/report')) { historyReportCalls++; body = historyReportRequest ? await historyReportRequest : historyReport || {referencePvt: [{week: 2400, towSeconds: 1,
+      positionValid: false, velocityValid: false, ecefMeters: [999, 999, 999], velocityMetersPerSecond: [999, 999, 999]}], observations}; }
     return {ok: true, json: async () => body};
   }
 };
 vm.createContext(context); vm.runInContext(source, context); await context.ready;
+const selectStoredTrial = elements.get('dtn-tests').onchange;
 const selectInputEpoch = observationSelection;
 assert.equal(elements.has('dtn-example'), false);
 assert.equal(html.includes('합성 GRAW 다운로드'), false);
@@ -659,3 +661,38 @@ assert.match(elements.get('dtn-test-status').textContent,/선택 시험 · RAW �
 assert.equal(vm.runInContext('selectedType',context),'IQ_SAMPLE','viewing history must not change the next transfer');
 assert.match(html,/다음 전송 ·/);
 console.log('PASS: typed history options, unknown type, selected trial status and independent next transfer');
+
+// IQ history uses the same report as RAW/AFS and never reuses another input's preview.
+context.fetch=ordinaryFetch;
+vm.runInContext("busy=false;pendingCapture=null;job=null;",context);
+currentJob={testId:'t1',testType:'IQ_SAMPLE',state:'WAITING_DTN',referenceEpochs:1,updatedAt:'iq-history'};
+historyReport={referencePvt:[{week:2400,towSeconds:1,positionValid:true,velocityValid:true,
+  ecefMeters:[10,20,30],velocityMetersPerSecond:[1,2,3],receiverClockBiasSeconds:1e-12}],observations};
+elements.get('dtn-tests').value='t1';
+await selectStoredTrial();
+assert.equal(loaded,observations);
+assert.equal(elements.get('pvt-x').textContent,'10.000');
+const once=historyReportCalls;
+await context.poll();
+assert.equal(historyReportCalls,once,'unchanged IQ history is cached');
+historyReport={...historyReport,observations:null};
+currentJob={...currentJob,updatedAt:'legacy-iq'};
+await context.poll();
+assert.equal(loaded,null,'old IQ records cannot inherit another trial original');
+assert.equal(elements.get('pvt-x').textContent,'10.000');
+assert.match(elements.get('pvt-message').textContent,/관측값이 저장되지/);
+let finishHistory;
+historyReportRequest=new Promise(resolve=>{finishHistory=resolve;});
+elements.get('dtn-tests').value='t1';
+const pendingHistory=selectStoredTrial();
+await new Promise(resolve=>setImmediate(resolve));
+historyReportRequest=null;
+const otherOriginal={epochs:[]};
+historyReport={referencePvt:[],observations:otherOriginal};
+currentJob={...currentJob,testId:'t2',testType:'GNSS_RAW',updatedAt:'other'};
+elements.get('dtn-tests').value='t2';
+await selectStoredTrial();
+finishHistory({referencePvt:[],observations});
+await pendingHistory;
+assert.equal(loaded,otherOriginal,'late IQ report cannot replace the next selected trial');
+console.log('PASS: IQ sender history originals and Reference PVT, legacy absence, cache and stale-response isolation');

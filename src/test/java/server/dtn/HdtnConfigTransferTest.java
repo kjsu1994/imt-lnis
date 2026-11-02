@@ -37,7 +37,7 @@ class HdtnConfigTransferTest {
     @Timeout(20)
     void sendsImmutableSettingsForEveryPayloadAndPreservesLegacyJson(
             String type, boolean configured) throws Exception {
-        ObjectMapper json = new ObjectMapper();
+        ObjectMapper json = new ObjectMapper().findAndRegisterModules();
         BlockingQueue<byte[]> delivered = new LinkedBlockingQueue<>();
         HttpServer adapter = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         adapter.createContext(
@@ -107,7 +107,8 @@ class HdtnConfigTransferTest {
             reference.setTowSeconds(100000);
             var metadata = new IqMetadata("AFSD", server.iq.IqReceiver.FRAME_METHOD, 2400,
                     100000, "ECEF_CONSTANT_VELOCITY", List.of(19), List.of());
-            when(iq.source(eq(inputId), any())).thenReturn(new server.iq.IqReceiver.Source("digest", metadata, reference));
+            String originalRaw = Base64.getEncoder().encodeToString(server.afs.NativePvtIntegrationTest.validSample());
+            when(iq.source(eq(inputId), any())).thenReturn(new server.iq.IqReceiver.Source("digest", metadata, reference, originalRaw));
             ReflectionTestUtils.setField(service, "iq", iq);
             HdtnConfig settings = new HdtnConfig();
             settings.setMaxNumberOfBundlesInPipeline(75);
@@ -156,6 +157,13 @@ class HdtnConfigTransferTest {
             assertNotNull(body, job.getMessage());
             JsonNode wire = json.readTree(body);
             assertEquals(type, wire.path("testType").asText());
+            if ("IQ_SAMPLE".equals(type)) {
+                assertEquals(originalRaw, job.getReferenceSourceBase64());
+                assertEquals(1, json.readTree(job.getObservationsJson()).path("epochs").size());
+                assertFalse(wire.toString().contains(originalRaw), "original GNSS stays local to the sender history");
+                assertTrue(wire.path("grawBase64").isMissingNode() || wire.path("grawBase64").isNull());
+                assertTrue(wire.path("metadata").path("grawBase64").isMissingNode());
+            }
             if (configured) {
                 assertEquals(expectedDtn, wire.get("dtnConfig"));
                 assertEquals(expected, wire.get("hdtnConfig"));

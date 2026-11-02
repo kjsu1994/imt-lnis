@@ -156,4 +156,57 @@ class IqServiceTest {
         pvt.setReceiverClockBiasSeconds(0.0);
         return pvt;
     }
+    @Test
+    void generationKeepsOneOriginalEpochAndReadsOldContextsWithoutInventingData() throws Exception {
+        var json = new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules();
+        var service = new IqService(json, directory.toString(), "unused", false);
+        var records = GrawCodec.splitLengthPrefixed(NativePvtIntegrationTest.validSample());
+        var reference = reference(2400, 100000);
+        String raw = Base64.getEncoder().encodeToString(IqService.selectedInput(records, reference));
+        var original = server.common.DtnObservationView.fromRecords(GrawCodec.splitLengthPrefixed(Base64.getDecoder().decode(raw)));
+        assertEquals(1, original.epochs().size());
+        assertFalse(original.navigation().isEmpty());
+        var generated = IqReceiver.source(IqService.earthInput(records, reference), "A".repeat(64));
+        var snapshot = new IqReceiver.Source(generated.sha256(), generated.metadata(), reference, raw);
+        UUID id = UUID.randomUUID();
+        var file = new server.common.DtnModels.IqFile("/exchange/" + id + ".bin", IqService.EXPECTED_BYTES,
+                generated.sha256(), 90, 12000000, "IQ_INTERLEAVED_INT8", 2);
+        Path context = directory.resolve(id + ".context.json");
+        json.writeValue(context.toFile(), snapshot);
+        var restored = service.source(id, file);
+        assertEquals(raw, restored.grawBase64());
+        assertEquals(json.valueToTree(reference), json.valueToTree(restored.reference()));
+        assertEquals(raw, new IqService(json, directory.toString(), "unused", false).source(id, file).grawBase64());
+        var m = generated.metadata();
+        var otherEpoch = new server.common.DtnModels.IqMetadata(m.signal(), m.pvtMethod(), m.week()+1,
+                m.towSeconds(), m.trajectory(), m.prns(), m.gpsLnav());
+        json.writeValue(context.toFile(), new IqReceiver.Source(generated.sha256(), otherEpoch, reference, raw));
+        assertThrows(java.io.IOException.class, () -> service.source(id, file));
+        json.writeValue(context.toFile(), new IqReceiver.Source(generated.sha256(), m, reference));
+        assertNull(service.source(id, file).grawBase64());
+    }
+
+    @Test
+    void controllerPassesTheActualReferenceAndSelectedOriginalToGeneration() throws Exception {
+        var iq = org.mockito.Mockito.mock(IqService.class);
+        var inputs = org.mockito.Mockito.mock(server.gnss.InputBufferService.class);
+        var calculator = org.mockito.Mockito.mock(server.pvt.DtnPvtCalculator.class);
+        var controller = new IqController(iq, org.mockito.Mockito.mock(server.dtn.DtnService.class), inputs);
+        org.springframework.test.util.ReflectionTestUtils.setField(controller, "calculator", calculator);
+        UUID id = UUID.randomUUID();
+        byte[] bytes = NativePvtIntegrationTest.validSample();
+        var input = org.mockito.Mockito.mock(server.gnss.InputBufferEntity.class);
+        org.mockito.Mockito.when(inputs.get(id)).thenReturn(input);
+        org.mockito.Mockito.when(input.complete()).thenReturn(true);
+        org.mockito.Mockito.when(input.receivedSize()).thenReturn((long) bytes.length);
+        org.mockito.Mockito.when(inputs.readChunks(input, server.common.DtnModels.MAX_INPUT_BYTES)).thenReturn(bytes);
+        var reference = reference(2400, 100000);
+        reference.setSatellitesUsed(4);
+        org.mockito.Mockito.when(calculator.calculate(org.mockito.ArgumentMatchers.anyList())).thenReturn(List.of(reference));
+        controller.start(new IqController.GenerateRequest(id));
+        String raw = Base64.getEncoder().encodeToString(IqService.selectedInput(GrawCodec.splitLengthPrefixed(bytes), reference));
+        org.mockito.Mockito.verify(iq).start(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.eq(id),
+                org.mockito.ArgumentMatchers.eq(raw), org.mockito.ArgumentMatchers.same(reference));
+    }
+
 }

@@ -251,6 +251,7 @@ docker compose ps
    - Upon bundle arrival at `/lnis/api/v1/dtn/receive`, the Receiver Node decodes the payload, reconstructs $P'_i$, runs RTKLIB SPP, and queries the Sender Node for the original Reference PVT.
    - Inspect **Payload Integrity (`PASS`/`FAIL`)**, **PVT Status (`MEASURED`/`PARTIAL`/`INCONCLUSIVE`)**, **3D Position/Velocity Deltas**, and **Clock Bias Residual**.
    - I/Q 수신 관측값은 복호된 AFS의 1 Epoch 관측·항법정보와 RF 추적값을 표시합니다. 송신 원본 GNSS를 별도로 가져와 대조하지 않으며, **파일 일치(크기·SHA-256)**와 **Reference PVT 비교 결과**를 함께 표시합니다. 프레임에 없는 수신기 필드는 표시하지 않습니다.
+   - I/Q 송신 이력은 생성 당시의 원본 1 Epoch와 기준 PVT를 보관합니다. 과거에 원본을 저장하지 않은 시험은 기준 PVT만 표시합니다. 수신 화면의 RF 시점 선택은 같은 위성 행의 추적값만 바꾸며 PVT 계산 입력은 바꾸지 않습니다.
 
 ---
 

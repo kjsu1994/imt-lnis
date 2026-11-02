@@ -79,7 +79,8 @@ public class IqController {
                     logs.add(request.inputId(), "INPUT", "I/Q 입력", false, message);
                 }
             });
-            return iq.start(earthInput, request.inputId());
+            return iq.start(earthInput, request.inputId(),
+                    Base64.getEncoder().encodeToString(IqService.selectedInput(records, pvt)), pvt);
         } catch (Exception error) {
             if (logs != null) {
                 logs.add(

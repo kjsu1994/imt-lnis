@@ -25,7 +25,11 @@ public class IqReceiver {
     public static final String METHOD = "AFS_IQ_GPS_LNAV_ASSISTED-v1";
     public static final String FRAME_METHOD = "AFS_IQ_FRAME_PVT-v3";
 
-    public record Source(String sha256, IqMetadata metadata, Pvt reference) {}
+    public record Source(String sha256, IqMetadata metadata, Pvt reference, String grawBase64) {
+        public Source(String sha256, IqMetadata metadata, Pvt reference) {
+            this(sha256, metadata, reference, null);
+        }
+    }
 
     public record Result(List<Pvt> pvt, Map<String, Object> observations,
             server.pvt.DtnDelay.Evidence delayEvidence) {
