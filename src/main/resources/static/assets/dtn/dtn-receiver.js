@@ -3,8 +3,8 @@ import {requestJson} from '../common/http.js?v=20261001-review';
 import {initGnssControls} from './dtn-gnss.js?v=20261026-frame6';
 import {createDtnLog} from './dtn-log.js?v=20261026-frame6';
 import {initAdapterHealth} from './dtn-adapter-health.js?v=20261026-frame6';
-import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20261026-frame6';
-import {createObservationView, numeric, renderClockBias} from './dtn-observations.js?v=20261103-rf-delay';
+import {createPayloadViewer} from './dtn-payload.js?v=20261026-frame6';
+import {createObservationView, numeric, renderClockBias} from './dtn-observations.js?v=20261103-pvt-filter-default';
 
 const $ = id => document.getElementById(id);
 const payloadViewer = createPayloadViewer($('dtn-payload'), {receivedOnly: true});
@@ -1073,8 +1073,6 @@ function renderSummary(job) {
   $('receiver-type').textContent = job ? trialTypeLabel(job.testType) : '시험 선택 대기';
   $('receiver-mode').textContent = job?.senderMode && job?.receiverMode ? job.senderMode + ' → ' + job.receiverMode : '경로 정보 없음';
   if ($('receiver-constellation')) $('receiver-constellation').textContent = job?.pvtConstellation || 'GPS';
-  $('receiver-iq').hidden = job?.testType !== 'IQ_SAMPLE';
-  renderIqFile($('receiver-iq-result'), job?.fileResult, job?.state === 'FAILED' ? 'I/Q 파일 검증 실패 · 로그를 확인하세요.' : 'I/Q 파일 수신·검증 대기');
   const failed = ['FAILED', 'CANCELLED'].includes(job?.state);
   const completed = ['COMPLETED', 'INCONCLUSIVE'].includes(job?.state);
   const states = {

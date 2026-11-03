@@ -108,6 +108,7 @@ const container = {querySelector(selector) {
   return nodes.get(selector);
 }};
 const view = createObservationView(container);
+assert.equal(nodes.get('[data-pvt-filter]').checked, true);
 const navigation = [{sequence: 1, message: {constellationId: 0, satelliteId: 19, words: [0x8b0000, 0]}}];
 const epochs = [{observation: {week: 2400, receiverTowSeconds: 100021,
   leapSeconds: 18, receiverStatus: 1, observations: [raw]}}];
@@ -546,7 +547,7 @@ assert.equal(nodes.get('[data-integrity]').textContent,'파일 일치 · PVT 측
 assert.equal(nodes.get('[data-range-heading]').hidden,true);
 assert.equal(nodes.get('[data-phase-heading]').hidden,true);
 assert.equal(nodes.get('[data-navigation-pvt-active]').checked,false);
-assert.equal(nodes.get('[data-pvt-filter]').checked,false);
+assert.equal(nodes.get('[data-pvt-filter]').checked,true);
 assert.equal(nodes.get('[data-navigation]').children.length,1);
 assert.equal(iqRow.children[3].textContent,'—','I/Q never reads Reference pseudorange');
 for(const i of [3,5,8,9]) assert.equal(iqRow.children[i].hidden,true);

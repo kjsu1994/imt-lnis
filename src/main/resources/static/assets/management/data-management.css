@@ -83,16 +83,63 @@ td button {
   font: 12px monospace;
   overflow-wrap: anywhere;
 }
-.policy {
-  padding: 16px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
+#brand-home { display: inline-flex; flex-shrink: 0; border-radius: 6px; }
+#brand-home:focus-visible { outline: 2px solid var(--teal); outline-offset: 5px; }
+#settings > h2 { margin-bottom: 6px; }
+.retention-description { margin: 0 0 16px; color: var(--muted); font-size: 13px; }
+.policy-columns, .policy {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 104px 230px;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
 }
-.policy input[type='checkbox'] {
-  width: auto;
+.policy-columns { color: var(--muted); font-size: 12px; background: #f3f6f6; border-radius: 8px 8px 0 0; }
+.policy { border-bottom: 1px solid var(--line); min-width: 0; }
+.policy-target { min-width: 0; font-size: 13px; }
+.policy-target small { display: block; margin-top: 2px; font-size: 11px; }
+.policy-toggle { display: inline-flex; align-items: center; gap: 8px; margin: 0; cursor: pointer; }
+.policy-toggle input {
+  appearance: none;
+  width: 30px;
+  height: 18px;
+  flex: 0 0 30px;
+  padding: 2px;
+  margin: 0;
+  border: 0;
+  border-radius: 12px;
+  background: #91a2a9;
+  cursor: pointer;
 }
-.policy label {
-  margin: 8px 0;
+.policy-toggle input::before { content: ''; display: block; width: 14px; height: 14px; border-radius: 50%; background: white; transition: transform .15s; }
+.policy-toggle input:checked { background: var(--teal); }
+.policy-toggle input:checked::before { transform: translateX(12px); }
+.policy-enabled .policy-toggle span { color: var(--teal); }
+.policy-period { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.policy-period select { width: 112px; min-width: 0; }
+.policy-period input, .policy-period select { font-size: 13px; padding: 6px 8px; }
+.policy-period :disabled { color: var(--muted); background: #f0f3f4; opacity: .7; cursor: not-allowed; }
+.policy-custom { display: flex; align-items: center; gap: 5px; margin: 0; min-width: 0; }
+.policy-custom input { width: 82px; min-width: 0; }
+.retention-protection { font-size: 12px; color: var(--muted); margin: 10px 12px; }
+.retention-save, .retention-cleanup { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; font-size: 12px; }
+.retention-save { color: var(--muted); }
+.retention-cleanup { border-top: 1px solid var(--line); margin-top: 4px; }
+.retention-save button, .retention-cleanup button { padding: 6px 12px; font-size: 12px; white-space: nowrap; }
+.retention-guide { color: var(--muted); font-size: 12px; margin: 6px 12px 20px; }
+.retention-guide summary { cursor: pointer; width: fit-content; }
+.retention-guide ul { padding-left: 18px; margin: 8px 0; }
+.retention-guide p { margin: 8px 0 0; }
+.cleanup-history-heading { font-size: 14px; margin-bottom: 8px; }
+@media (max-width: 600px) {
+  .policy-columns { display: none; }
+  .policy { grid-template-columns: 88px minmax(0, 1fr); gap: 8px; padding: 12px 0; }
+  .policy-target { grid-column: 1 / -1; }
+  .policy-period { justify-content: flex-end; flex-wrap: wrap; }
+  .policy-period select { width: 112px; }
+  .retention-protection { margin-inline: 0; }
+  .retention-save, .retention-cleanup { padding-inline: 0; }
+  .retention-guide { margin-inline: 0; }
 }
 pre {
   white-space: pre-wrap;
@@ -127,6 +174,14 @@ dialog::backdrop {
   color: #a42d2d;
 }
 .history-entry {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 16px;
   border-top: 1px solid var(--line);
-  padding: 12px 0;
+  padding: 10px 0;
+  font-size: 12px;
 }
+.history-entry > p { margin: 0; }
+.history-entry details { flex-basis: 100%; }
+.history-entry button { padding: 4px 8px; font-size: 12px; }

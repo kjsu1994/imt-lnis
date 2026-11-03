@@ -949,7 +949,7 @@ export function createObservationView(container, onSelect = () => {}, role = '')
       <div class="multi-gnss-summary-bar" data-constellation-summary hidden></div>
       <label class="iq-tracking-select" data-iq-tracking hidden title="RF 추적값의 파일 내 경과 시점입니다. 프레임의 1 Epoch 계산 입력은 바꾸지 않습니다.">RF 시점
         <select data-iq-tracking-epoch aria-label="RF 추적 시점"></select></label>
-      <label class="pvt-filter-toggle"><input type="checkbox" data-pvt-filter> <span>PVT 계산 위성만 보기</span></label>
+      <label class="pvt-filter-toggle"><input type="checkbox" data-pvt-filter checked> <span>PVT 계산 위성만 보기</span></label>
     </div>
     <p data-delay-summary hidden></p>
     <div class="epoch-table-viewport" tabindex="0" aria-label="GNSS 관측값 표">
@@ -1000,6 +1000,7 @@ export function createObservationView(container, onSelect = () => {}, role = '')
   const select = container.querySelector('[data-epoch]');
   const body = container.querySelector('[data-observations]');
   const filterCheckbox = container.querySelector('[data-pvt-filter]');
+  if (filterCheckbox) filterCheckbox.checked = true;
   const observationTable = container.querySelector('.epoch-observation-table');
   function applyPvtFilter() {
     const isFiltered = !!filterCheckbox?.checked;
@@ -1634,7 +1635,7 @@ export function createObservationView(container, onSelect = () => {}, role = '')
       if (nextIq !== previousIq) {
         showPvtActiveOnly = !nextIq;
         if (navFilterCheckbox) navFilterCheckbox.checked = showPvtActiveOnly;
-        if (filterCheckbox) filterCheckbox.checked = false;
+        if (filterCheckbox) filterCheckbox.checked = true;
       }
       if (!preserve) trackingSelect.value = '0';
       data = next;

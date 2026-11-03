@@ -10,12 +10,31 @@ const config = {maxNumberOfBundlesInPipeline:50,maxSumOfBundleBytesInPipeline:50
   storageDeletionPolicy:'DELETE_AFTER_FORWARDING',totalStorageCapacityBytes:8589934592,maxLtpReceiveUdpPacketSizeBytes:65536,acsSendPeriodMilliseconds:1000};
 let browser, bulkRequests=0;
 let rows=[], id=0, job=null, starts=0, reportFixture={referencePvt:[],receivedPvt:[]};
+let managementRole = 'sender', policySaves = 0, managementDeletes = 0, proposedPolicies;
+let retentionSettings = {tests:{enabled:false,days:7},receipts:{enabled:false,days:7},files:{enabled:false,days:30}};
+const managementItem = {key:{kind:'DTN',id:'management-test'},name:'GNSS_RAW',state:'COMPLETED'};
+const retentionPreview = () => ({token:'retention-token',role:managementRole,
+  items:[{row:managementItem,related:[],logs:1,receipts:0,evidence:0,blocked:''}]});
 const server=createServer((req,res)=>{
  const path=new URL(req.url,'http://localhost').pathname;
  const json=(value,status=200)=>{res.writeHead(status,{'Content-Type':'application/json'});res.end(JSON.stringify(value));};
  if(path.startsWith('/lnis/api/v1/')){
   let body='';req.on('data',c=>body+=c);req.on('end',()=>{
    const data=body?JSON.parse(body):{};
+   if(path.startsWith('/lnis/api/v1/data-management/')){
+    const endpoint = path.slice('/lnis/api/v1/data-management'.length);
+    if(endpoint === '/summary')return json({role:managementRole,counts:{DTN:1,RECEIPT:0},databaseBytes:1024,inputBytes:0,iqBytes:0});
+    if(endpoint === '/settings/preview'){proposedPolicies=data;return json({settings:data,preview:retentionPreview()});}
+    if(endpoint === '/settings'){
+     if(req.method === 'POST'){assert.equal(data.token,'retention-token');retentionSettings=proposedPolicies;policySaves++;}
+     return json(retentionSettings);
+    }
+    if(endpoint === '/cleanup/preview')return json(retentionPreview());
+    if(endpoint === '/delete'){assert.equal(data.token,'retention-token');managementDeletes++;return json({results:[{key:managementItem.key,status:'DELETED'}]});}
+    if(endpoint === '/items')return json({items:[],total:0});
+    if(endpoint === '/history')return json([]);
+    return json({},404);
+   }
    if(path.includes('/presets')){
     const key=path.split('/presets/')[1];const index=rows.findIndex(r=>r.id===key);
     if(req.method==='GET')return json(rows);
@@ -47,7 +66,7 @@ const server=createServer((req,res)=>{
   });return;
  }
  try{
-  const file=resolve(root, (path==='/sender'?'dtn-sender.html':path==='/receiver'?'dtn-receiver.html':path==='/dtn-intro'?'dtn-intro.html':path==='/user-manual/'?'user-manual/index.html':path.replace(/^\/lnis\//,'')).replace(/^\//,''));
+  const file=resolve(root, (['/sender','/lnis/dtntest/sender'].includes(path)?'dtn-sender.html':['/receiver','/lnis/dtntest/receiver'].includes(path)?'dtn-receiver.html':path==='/lnis/data-manager'?'data-management.html':path==='/dtn-intro'?'dtn-intro.html':path==='/user-manual/'?'user-manual/index.html':path.replace(/^\/lnis\//,'')).replace(/^\//,''));
   if(!file.startsWith(root+require('node:path').sep))throw Error('path');
   const content=readFileSync(file);
   res.writeHead(200,{'Content-Type':{'.js':'text/javascript','.html':'text/html','.css':'text/css','.png':'image/png','.pdf':'application/pdf'}[extname(file)]||'text/plain'});res.end(content);
@@ -98,6 +117,7 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
  job={testId:'test1',state:'COMPLETED',testType:'AFS_METADATA',senderMode:'HDTN',receiverMode:'HDTN',hdtnConfig:config,createdAt:'2026-09-23T00:00:00Z',updatedAt:'2026-09-23T00:00:00Z',dtnReceived:true};
  for(const route of ['/sender','/receiver']){
   await page.goto(base+route);
+  assert.equal(await page.locator('#dtn-observations [data-pvt-filter]').isChecked(),true);
   await page.waitForFunction(()=>[...document.getElementById('dtn-tests').options].some(o=>o.value==='test1'));
   await page.locator('#dtn-tests').selectOption('test1');
   await page.waitForTimeout(300);
@@ -227,6 +247,8 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
  reportFixture.observations.records=records;
  reportFixture.observations.receivedValues.records[0].observation.observations=receivedSignals;
  await page.reload();await selectTrial();
+ assert.equal(await observationPanel.locator('[data-pvt-filter]').isChecked(),true);
+ await observationPanel.locator('[data-pvt-filter]').uncheck();
  await observationPanel.locator('[data-navigation-pvt-active]').uncheck();
  await page.waitForFunction(()=>document.querySelector('#dtn-observations [data-navigation-title]')?.textContent.includes('전체 항법정보 · 6건'));
  assert.equal(await observationPanel.locator('[data-navigation] tr').count(),6);
@@ -269,6 +291,8 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
  const fixture=structuredClone(reportFixture.observations);
  await page.evaluate(fixture=>associationView.setData(fixture),fixture);
  const isolated=page.locator('#association-test');
+ assert.equal(await isolated.locator('[data-pvt-filter]').isChecked(),true);
+ await isolated.locator('[data-pvt-filter]').uncheck();
  await isolated.getByRole('button',{name:'Galileo 19 항법정보 보기'}).click();
  await page.evaluate(fixture=>associationView.setData(fixture,true),fixture);
  assert.match(await isolated.locator('[data-navigation-title]').innerText(),/Galileo/);
@@ -283,6 +307,8 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
    createObservationView(host,()=>{},'송신 원본').setData(source);
  },fixture);
  const senderAssociation=page.locator('#sender-association-test');
+ assert.equal(await senderAssociation.locator('[data-pvt-filter]').isChecked(),true);
+ await senderAssociation.locator('[data-pvt-filter]').uncheck();
  await senderAssociation.locator('[data-navigation-pvt-active]').uncheck();
  assert.equal(await senderAssociation.locator('[data-navigation-all]').isVisible(),false);
  assert.equal(await senderAssociation.locator('[data-transmit-heading]').isVisible(),false);
@@ -356,6 +382,7 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
  await page.goto(base+'/receiver');await selectTrial();
  await page.waitForFunction(()=>document.querySelector('#dtn-observations [data-integrity]')?.textContent==='파일 일치 · PVT 비교 불가');
  assert.equal(await observationPanel.isVisible(),true);
+ assert.equal(await page.locator('#receiver-iq').count(),0);
  assert.equal(await observationPanel.locator('[data-observations] tr').count(),2);
  assert.equal(await observationPanel.locator('[data-navigation-pvt-active]').isChecked(),false);
  assert.equal(await observationPanel.locator('[data-navigation] tr').count(),6);
@@ -371,6 +398,8 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
  await observationPanel.locator('[data-iq-tracking-epoch]').selectOption('1');
  assert.equal(await observationPanel.locator('[data-observations] tr').count(),3);
  assert.match(await observationPanel.locator('[data-observations]').innerText(),/21000002\.000/);
+ assert.doesNotMatch(await observationPanel.locator('[data-observations]').innerText(),/23000002\.000/);
+ await observationPanel.locator('[data-pvt-filter]').uncheck();
  assert.match(await observationPanel.locator('[data-observations]').innerText(),/23000002\.000/);
  assert.match(await observationPanel.locator('[data-observations]').innerText(),/진단용/);
  assert.equal(await observationPanel.locator('td.converted-range').first().textContent(),'320792458.000');
@@ -711,5 +740,76 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
  }
  await typed.screenshot({path:'build/trial-type-receiver.png',fullPage:true});
  await typed.close();
- assert.deepEqual(errors,[]);await browser.close();console.log('PASS: preset CRUD/apply/capacity/shared list, trial settings, viewport fullscreen, waiting batch cancellation, scoped intro and responsive layout.');
+ // Retention settings use mocked APIs; no production settings or records are changed.
+ const management = await context.newPage();
+ management.on('pageerror', error => errors.push(error.message));
+ await management.setViewportSize({width:1366,height:900});
+ await management.goto(base+'/sender');
+ const managementEntry = management.getByRole('link',{name:'데이터 관리',exact:true});
+ assert.equal(await managementEntry.getAttribute('target'),null);
+ await managementEntry.click();
+ await management.waitForURL(base+'/lnis/data-manager');
+ await management.waitForFunction(()=>document.getElementById('node').textContent.includes('송신 PC'));
+ await management.getByRole('button',{name:'보관 설정',exact:true}).click();
+ await management.waitForFunction(()=>document.querySelectorAll('.policy').length===3);
+ assert.equal(await management.locator('#settings-save').isDisabled(),true);
+ assert.equal(await management.locator('#cleanup-now').isDisabled(),true);
+ assert.equal(await management.locator('#tests-period').isDisabled(),true);
+ const retentionSwitch = management.getByRole('switch',{name:'종료된 DTN 시험 자동 삭제',exact:true});
+ await retentionSwitch.focus();
+ await management.keyboard.press('Space');
+ assert.equal(await retentionSwitch.isChecked(),true);
+ assert.equal(await management.locator('#tests-period').isEnabled(),true);
+ await management.locator('#tests-period').selectOption('custom');
+ const customDays = management.locator('#tests-days');
+ for(const invalid of ['','0','3651','1.5']){
+  await customDays.fill(invalid);
+  assert.equal(await management.locator('#settings-save').isDisabled(),true);
+ }
+ await customDays.fill('14');
+ assert.equal(await management.locator('#settings-save').isEnabled(),true);
+ assert.equal(await management.locator('#cleanup-now').isDisabled(),true);
+ for(const width of [1366,390]){
+  await management.setViewportSize({width,height:900});
+  assert.ok(await management.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'retention settings fit '+width);
+  await management.locator('#settings').screenshot({path:'build/management-retention-'+width+'.png'});
+ }
+ await management.locator('#settings-save').click();
+ await management.waitForFunction(()=>document.getElementById('confirm').open);
+ assert.equal(await management.locator('#confirm').evaluate(el=>el.open),true);
+ assert.match(await management.locator('#confirm-warning').innerText(),/다음 자동 정리/);
+ assert.equal(policySaves,0);
+ assert.equal(managementDeletes,0);
+ await management.locator('#confirm-cancel').click();
+ assert.equal(await management.locator('#settings-save').isEnabled(),true);
+ await management.locator('#settings-save').click();
+ await management.waitForFunction(()=>document.getElementById('confirm').open);
+ await management.locator('#confirm-apply').click();
+ await management.waitForFunction(()=>document.getElementById('settings-save').disabled);
+ assert.equal(policySaves,1);
+ assert.equal(retentionSettings.tests.days,14);
+ assert.equal(managementDeletes,0,'saving retention settings must not delete records');
+ assert.equal(await management.locator('#cleanup-now').isEnabled(),true);
+ await management.locator('#cleanup-now').click();
+ await management.waitForFunction(()=>document.getElementById('confirm').open);
+ assert.equal(await management.locator('#confirm-apply').getAttribute('class'),'danger');
+ assert.equal(managementDeletes,0,'cleanup requires confirmation');
+ await management.locator('#confirm-cancel').click();
+ await management.locator('#cleanup-now').click();
+ await management.waitForFunction(()=>document.getElementById('confirm').open);
+ await management.locator('#confirm-apply').click();
+ await management.waitForFunction(()=>document.getElementById('message').textContent.includes('삭제 1건'));
+ assert.equal(managementDeletes,1);
+ await management.locator('#brand-home').click();
+ await management.waitForURL(base+'/lnis/dtntest/sender');
+ managementRole='receiver';
+ await management.goto(base+'/receiver');
+ await management.getByRole('link',{name:'데이터 관리',exact:true}).click();
+ await management.waitForURL(base+'/lnis/data-manager');
+ await management.waitForFunction(()=>document.getElementById('node').textContent.includes('수신 PC'));
+ assert.equal(new URL(await management.locator('#brand-home').getAttribute('href'),base).pathname,'/lnis/dtntest/receiver');
+ await management.locator('#brand-home').click();
+ await management.waitForURL(base+'/lnis/dtntest/receiver');
+ await management.close();
+ assert.deepEqual(errors,[]);await browser.close();console.log('PASS: preset CRUD/apply/capacity/shared list, trial settings, viewport fullscreen, waiting batch cancellation, scoped intro, retention confirmation and same-tab navigation, responsive layout.');
 })().catch(e=>{console.error(e);process.exitCode=1;}).finally(async()=>{await browser?.close();server.close();});

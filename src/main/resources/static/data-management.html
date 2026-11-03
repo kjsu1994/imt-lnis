@@ -2,11 +2,11 @@
 <html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>LNIS 데이터 관리</title><link rel="icon" href="/lnis/assets/common/logo_v3.png?v=995392000e36">
 <link rel="stylesheet" href="/lnis/assets/common/app.css?v=20261103-system-logo-v2">
-<link rel="stylesheet" href="/lnis/assets/management/data-management.css?v=20261103-system-logo-v2"></head>
+<link rel="stylesheet" href="/lnis/assets/management/data-management.css?v=20261103-retention-ui"></head>
 <body>
 <header>
   <div class="management-heading">
-    <img class="management-brand" src="/lnis/assets/common/imt_logo.png" alt="imtplus" width="227" height="55">
+    <a id="brand-home" href="/" aria-label="시험 화면으로 돌아가기"><img class="management-brand" src="/lnis/assets/common/imt_logo.png" alt="imtplus" width="227" height="55"></a>
     <div><h1>데이터 관리</h1><p id="node">현재 PC 확인 중</p></div>
   </div>
   <div class="header-center-logo">
@@ -25,9 +25,27 @@
 <div class="table-scroll"><table><thead><tr><th>선택</th><th>시험·자료</th><th>상태</th><th>생성 시각</th><th>용량</th><th>관리</th></tr></thead><tbody id="rows"></tbody></table></div>
 <div class="actions"><button id="previous">이전</button><span id="page"></span><button id="next">다음</button></div>
 </section>
-<section id="settings" class="card" hidden><h2>자동 보관 기간</h2><p>자동 삭제는 기본으로 꺼져 있습니다. 시험은 종료 시점, 미연결 수신 원문은 수신 시점, 미사용 파일은 생성 시점을 기준으로 정리합니다. 보관 고정·공유 자료는 제외합니다.</p>
-<form id="settings-form"><div id="policies" class="form-grid"></div><div class="actions"><button type="submit">삭제 예정 확인 후 설정 저장</button><button type="button" id="cleanup-now">현재 설정으로 지금 정리</button></div></form>
-<p><small>10분마다 확인하며 한 번에 최대 500건을 정리합니다. 시험·수집·파일 처리 중에는 정리를 미룹니다.</small></p><h2>최근 정리 내역</h2><div id="history"></div></section>
+<section id="settings" class="card" hidden>
+  <h2>자동 보관 설정</h2>
+  <p class="retention-description">지정 기간이 지난 자료를 자동으로 삭제합니다.</p>
+  <form id="settings-form">
+    <div class="policy-columns" aria-hidden="true"><span>대상</span><span>자동 삭제</span><span>보관 기간</span></div>
+    <div id="policies"></div>
+    <p class="retention-protection">진행 중·보관 고정·공유 자료는 제외합니다.</p>
+    <div class="retention-save"><span id="policy-status" role="status" aria-live="polite">설정 불러오는 중</span><button id="settings-save" class="primary" type="submit" disabled>설정 저장</button></div>
+  </form>
+  <div class="retention-cleanup"><span>저장된 설정으로 정리</span><button type="button" id="cleanup-now" disabled>지금 정리</button></div>
+  <details class="retention-guide">
+    <summary>정리 기준 안내</summary>
+    <ul>
+      <li>종료된 시험: 시험 최종 갱신 시점 기준</li>
+      <li>시험에 연결되지 않은 수신 원문: 수신 시점 기준</li>
+      <li>미사용 입력·I/Q 파일: 생성 시점 기준</li>
+    </ul>
+    <p>보관 기간은 1~3,650일로 지정할 수 있습니다. 10분마다 확인하며 한 번에 최대 500건을 정리합니다. 시험·수집·파일 처리 중에는 정리를 미룹니다.</p>
+  </details>
+  <h2 class="cleanup-history-heading">최근 정리 내역</h2><div id="history"></div>
+</section>
 <section id="detail" class="card" hidden><div class="card-title"><h2>선택한 자료</h2><button id="close-detail">닫기</button></div><div id="detail-links" class="actions"></div><pre id="detail-content"></pre></section>
-<dialog id="confirm"><h2 id="confirm-title">삭제 대상 확인</h2><p id="confirm-note"></p><div id="preview-items"></div><p>진행 중·보관 고정·공유 자료는 서버에서 다시 확인합니다. 삭제한 자료는 이 화면에서 복원할 수 없습니다.</p><div class="actions"><button id="confirm-cancel">취소</button><button id="confirm-apply" class="danger">확인</button></div></dialog>
-</main><script type="module" src="/lnis/assets/management/data-management.js?v=20261001-review"></script></body></html>
+<dialog id="confirm"><h2 id="confirm-title">삭제 대상 확인</h2><p id="confirm-note"></p><div id="preview-items"></div><p id="confirm-warning">진행 중·보관 고정·공유 자료는 서버에서 다시 확인합니다. 삭제한 자료는 이 화면에서 복원할 수 없습니다.</p><div class="actions"><button id="confirm-cancel">취소</button><button id="confirm-apply" class="danger">확인</button></div></dialog>
+</main><script type="module" src="/lnis/assets/management/data-management.js?v=20261103-retention-ui"></script></body></html>

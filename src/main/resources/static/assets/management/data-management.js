@@ -33,7 +33,8 @@ let page = 0,
   current = [],
   selected = new Set(),
   busy = false,
-  confirmAction = null;
+  confirmAction = null,
+  savedPolicies = null;
 const node = (tag, text) => {
   const e = document.createElement(tag);
   if (text !== undefined) e.textContent = text;
@@ -84,6 +85,7 @@ async function summary() {
     (data.role === 'receiver' ? '수신 PC' : data.role === 'sender' ? '송신 PC' : '현재 서버') +
     ' · 이 PC의 데이터만 관리합니다';
   $('back').href = '/lnis/dtntest/' + (data.role === 'receiver' ? 'receiver' : 'sender');
+  $('brand-home').href = $('back').href;
   $('summary').replaceChildren();
   for (const [label, value] of [
     ['시험 기록', data.counts.DTN + '건'],
@@ -258,6 +260,11 @@ function confirm(preview, title, action, apply = '삭제 실행') {
     $('preview-items').append(p);
   }
   $('confirm-apply').textContent = apply;
+  const saving = apply === '설정 저장';
+  $('confirm-apply').className = saving ? 'primary' : 'danger';
+  $('confirm-warning').textContent = saving
+    ? '저장 후 다음 자동 정리 주기부터 적용됩니다. 이 확인 단계에서는 자료를 삭제하지 않습니다.'
+    : '진행 중·보관 고정·공유 자료는 서버에서 다시 확인합니다. 삭제한 자료는 이 화면에서 복원할 수 없습니다.';
   confirmAction = action;
   $('confirm').showModal();
 }
@@ -345,58 +352,115 @@ for (const button of document.querySelectorAll('[data-tab]'))
       page = 0;
       await load();
     });
+function readPolicies() {
+  const value = {};
+  for (const key of ['tests', 'receipts', 'files'])
+    value[key] = { enabled: $(key + '-enabled').checked, days: Number($(key + '-days').value) };
+  return value;
+}
+function validRetentionDays(days) {
+  return Number.isInteger(days) && days >= 1 && days <= 3650;
+}
+function updatePolicyState() {
+  const value = readPolicies();
+  const changed = JSON.stringify(value) !== JSON.stringify(savedPolicies);
+  const valid = Object.values(value).every((policy) => validRetentionDays(policy.days));
+  $('settings-save').disabled = !changed || !valid;
+  $('cleanup-now').disabled = changed || !Object.values(value).some((policy) => policy.enabled);
+  $('policy-status').textContent = !valid
+    ? '보관 기간은 1~3,650일의 정수로 입력하세요.'
+    : changed ? '변경사항 있음 · 저장 후 적용' : '변경사항 없음';
+}
 async function policies() {
   const settings = await request('/settings');
+  savedPolicies = settings;
   $('policies').replaceChildren();
-  for (const [key, label] of [
-    ['tests', '종료된 DTN 시험'],
-    ['receipts', '시험과 연결되지 않은 수신 원문'],
-    ['files', '사용하지 않는 입력·I/Q 파일']
+  for (const [key, label, basis] of [
+    ['tests', '종료된 DTN 시험', '시험 최종 갱신 기준'],
+    ['receipts', '시험에 연결되지 않은 수신 원문', '수신 시점 기준'],
+    ['files', '미사용 GNSS 입력·I/Q 파일', '생성 시점 기준']
   ]) {
     const box = node('div');
     box.className = 'policy';
-    box.append(node('strong', label));
+    const target = node('div');
+    target.className = 'policy-target';
+    target.append(node('strong', label), node('small', basis));
     const labelOn = node('label');
+    labelOn.className = 'policy-toggle';
     const enabled = node('input');
     enabled.type = 'checkbox';
     enabled.id = key + '-enabled';
     enabled.checked = settings[key].enabled;
-    labelOn.append(enabled, node('span', '자동 삭제 사용'));
+    enabled.setAttribute('role', 'switch');
+    enabled.setAttribute('aria-label', label + ' 자동 삭제');
+    const state = node('span');
+    labelOn.append(enabled, state);
+    const period = node('div');
+    period.className = 'policy-period';
     const select = node('select');
+    select.id = key + '-period';
+    select.setAttribute('aria-label', label + ' 보관 기간');
     for (const days of [7, 30, 90]) select.append(new Option(days + '일', days));
     select.append(new Option('직접 입력', 'custom'));
     select.value = [7, 30, 90].includes(settings[key].days) ? String(settings[key].days) : 'custom';
+    const custom = node('label');
+    custom.className = 'policy-custom';
     const days = node('input');
     days.id = key + '-days';
     days.type = 'number';
     days.min = 1;
     days.max = 3650;
+    days.step = 1;
+    days.required = true;
     days.value = settings[key].days;
     days.setAttribute('aria-label', label + ' 보관 일수');
-    days.hidden = select.value !== 'custom';
-    select.onchange = () => {
-      days.hidden = select.value !== 'custom';
-      if (!days.hidden) return;
-      days.value = select.value;
+    custom.append(days, node('span', '일'));
+    function updateControls() {
+      state.textContent = enabled.checked ? '켜짐' : '꺼짐';
+      box.classList.toggle('policy-enabled', enabled.checked);
+      select.disabled = !enabled.checked;
+      custom.hidden = select.value !== 'custom';
+      days.disabled = !enabled.checked || custom.hidden;
+    }
+    enabled.onchange = () => {
+      if (!enabled.checked && !validRetentionDays(Number(days.value)))
+        days.value = savedPolicies[key].days;
+      updateControls();
+      updatePolicyState();
     };
-    box.append(labelOn, select, days);
+    select.onchange = () => {
+      if (select.value !== 'custom') days.value = select.value;
+      updateControls();
+      updatePolicyState();
+    };
+    days.oninput = updatePolicyState;
+    updateControls();
+    period.append(select, custom);
+    box.append(target, labelOn, period);
     $('policies').append(box);
   }
+  updatePolicyState();
 }
 $('settings-form').onsubmit = (e) => {
   e.preventDefault();
-  run(async () => {
-    const value = {};
-    for (const key of ['tests', 'receipts', 'files'])
-      value[key] = { enabled: $(key + '-enabled').checked, days: Number($(key + '-days').value) };
+  return run(async () => {
+    const value = readPolicies();
+    if (JSON.stringify(value) === JSON.stringify(savedPolicies)) return;
+    if (!Object.values(value).every((policy) => validRetentionDays(policy.days)))
+      throw Error('보관 기간은 1~3,650일의 정수로 입력하세요.');
     const result = await request('/settings/preview', value);
     confirm(
       result.preview,
-      '보관 설정 저장 전 삭제 예정 확인',
+      '보관 설정 확인',
       async () => {
         await request('/settings', { token: result.preview.token });
+        savedPolicies = value;
         message('보관 설정을 저장했습니다. 다음 정리 주기부터 적용합니다.');
-        await summary();
+        try {
+          await summary();
+        } finally {
+          updatePolicyState();
+        }
       },
       '설정 저장'
     );
@@ -404,12 +468,14 @@ $('settings-form').onsubmit = (e) => {
 };
 $('cleanup-now').onclick = () =>
   run(async () => {
+    if (JSON.stringify(readPolicies()) !== JSON.stringify(savedPolicies))
+      throw Error('변경한 설정을 먼저 저장하세요.');
     const preview = await request('/cleanup/preview', {});
     if (!preview.items.length) {
       message('현재 설정으로 삭제할 자료가 없습니다.');
       return;
     }
-    confirm(preview, '현재 보관 설정으로 지금 정리', () => execute(preview));
+    confirm(preview, '저장된 보관 설정으로 지금 정리', () => execute(preview));
   });
 async function history() {
   const list = await request('/history');

@@ -29,7 +29,6 @@ let peerAddress = 'http://192.168.1.72:8090', peerSaves = 0, peerProbes = 0;
 const healthIntervals = [];
 const context = {
   numeric, renderClockBias, URL, AbortSignal,
-  renderIqFile() {},
   createDtnLog: () => ({write(msg) { console.log('DTN LOG:', msg); },setContext() {},refresh() {}}),
   document: {visibilityState:'visible', querySelectorAll() { return []; }, getElementById(id) { if (removedHealth.has(id) || optionalElements.has(id)) return null; assert.ok(elements.has(id), 'DOM missing: ' + id); return elements.get(id); }},
   createPayloadViewer(container, options) { assert.equal(options.receivedOnly, true); return {setJob() {},setReceipts(values) {shownReceipts = values;}}; },
