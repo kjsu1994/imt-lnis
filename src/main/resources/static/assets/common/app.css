@@ -31,6 +31,7 @@ header:has(> .data-management-entry:not([hidden])) { padding-left: max(50px, cla
 
 /* 밝은 본문 배경을 이어 기관 로고의 원래 색상을 유지한다. */
 body[data-page^="dtn-"] > header {
+  align-items: center;
   background: transparent;
   color: var(--ink);
   border-bottom: 1px solid var(--line);
@@ -52,9 +53,23 @@ body[data-page^="dtn-"] .role-nav a:is(.active, :hover) { background: #dfe8e9; c
 
 /* 기관 로고는 안내 링크·설정 버튼과 별도로 배치한다. */
 .role-nav .kari-logo { display: block; width: clamp(130px, 16vw, 200px); height: auto; align-self: center; }
-@media (max-width: 850px) {
+header .header-center-logo {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  line-height: 0;
+}
+header .header-center-logo img {
+  display: block;
+  width: clamp(300px, 34vw, 520px);
+  height: auto;
+  object-fit: contain;
+}
+@media (max-width: 900px) {
   body[data-page^="dtn-"] .role-nav { align-self: center; }
-  body[data-page^="dtn-"] .header-center-logo { display: none; }
+  header .header-center-logo { display: none; }
 }
 
 /* 안내 아이콘 아래에 같은 크기로 설명서를 배치한다. */

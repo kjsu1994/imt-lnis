@@ -27,8 +27,10 @@
     }
     h2, p, dl, dd { margin: 0; }
     .wrap { max-width: 1340px; margin: auto; padding: 16px 34px; }
-    .masthead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-    .brand img { display: block; width: 48px; height: 48px; object-fit: contain; }
+    .masthead { position: relative; display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .brand img { display: block; width: clamp(144px, 18vw, 182px); height: auto; object-fit: contain; }
+    .header-center-logo { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); pointer-events: none; line-height: 0; }
+    .header-center-logo img { display: block; width: clamp(260px, 28vw, 390px); height: auto; object-fit: contain; }
     .plain { border: 1px solid var(--line); border-radius: 8px; background: white; padding: 6px 12px; font-size: 13px; }
     .plain:hover { background: #eaf0f7; }
     .panel { border: 1px solid var(--line); border-radius: 14px; background: white; overflow: hidden; }
@@ -145,6 +147,7 @@
     @media (min-width: 1600px) { .wrap { max-width: 1460px; } }
     @media (max-width: 760px) {
       .wrap { padding: 12px; }
+      .header-center-logo { display: none; }
       .scroll-hint { display: block; width: 100%; font-size: 11px; }
       .explanation { padding: 10px 12px; }
       .evidence-facts { grid-template-columns: 1fr; gap: 2px; }
@@ -216,12 +219,12 @@
     </defs>
   </svg>
   <main class="wrap">
-    <header class="masthead" style="position: relative;">
+    <header class="masthead">
       <a class="brand" href="./" aria-label="안내 처음으로" title="안내 처음으로">
-        <img src="./logo_v3.png?v=995392000e36" alt="LNIS" width="56" height="56">
+        <img src="./imt_logo.png" alt="imtplus" width="227" height="55">
       </a>
-      <div class="header-center-logo" style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); pointer-events: none;">
-        <img src="/assets/common/imt_logo.png" alt="IMT Logo" style="height: 44px; max-width: 220px; object-fit: contain;">
+      <div class="header-center-logo">
+        <img src="./system_logo.png?v=20261103-v2" alt="우주 항법 및 통신 성능 검증 시스템" width="390" height="130">
       </div>
       <button class="plain" id="fullscreen" type="button">전체화면</button>
     </header>

@@ -1,8 +1,31 @@
 [hidden] {
   display: none !important;
 }
+header {
+  position: relative;
+  background: transparent;
+  color: var(--ink);
+  border-bottom: 1px solid var(--line);
+  box-shadow: none;
+}
+.management-heading {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  min-width: 0;
+}
+.management-brand {
+  display: block;
+  width: clamp(140px, 18vw, 198px);
+  height: auto;
+}
 .back {
-  color: white;
+  color: var(--navy);
+  flex-shrink: 0;
+}
+@media (max-width: 600px) {
+  .management-heading { flex-direction: column; align-items: flex-start; gap: 10px; }
+  .management-brand { width: 140px; }
 }
 header p {
   margin: 8px 0 0;

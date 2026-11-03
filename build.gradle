@@ -254,7 +254,7 @@ tasks.named('linuxNodeDistZip') {
     from(layout.buildDirectory.dir('windows-serial-bridge')) { into 'serial-bridge' }
 }
 // Service guide is the source; publishing only changes links for the static site.
-def introAssets = ['logo_v3.png', 'imt_logo.png']
+def introAssets = ['logo_v3.png', 'imt_logo.png', 'system_logo.png']
 def introForDocs = {
     def html = file('src/main/resources/static/dtn-intro.html').getText('UTF-8')
     introAssets.each { name ->

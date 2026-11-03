@@ -1,8 +1,8 @@
 /* Shared DTN header logo */
 .dtn-brand { margin: 0; line-height: 0; }
-.dtn-brand img { display: block; width: 80px; height: 80px; object-fit: contain; }
+.dtn-brand img { display: block; width: clamp(128px, 18vw, 215px); height: auto; object-fit: contain; }
 @media (max-width: 600px) {
-  .dtn-brand img { width: 64px; height: 64px; }
+  .dtn-brand img { width: clamp(100px, 30vw, 160px); }
 }
 
 /* JSON and I/Q views */
