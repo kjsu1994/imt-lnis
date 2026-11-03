@@ -1,0 +1,62 @@
+--- a/iq_earth.c
++++ b/iq_earth.c
+@@ -6,6 +6,10 @@
+ static double origin[3], motion[3], start_tow, bias;
+ static int start_week, selected[32], embedded, payload_present[32];
+ static uint8_t payload_bits[32][2868];
++/* LNIS 변경: SB4와 같은 관측값으로 파형의 시작 거리와 거리율을 보정한다. */
++static int anchored[32];
++static double anchor_range[32], anchor_doppler[32], range_offset[32], rate_offset[32];
++static double model_range(int prn, int week, double tow);
+ 
+ /* Shared Java encoder supplies unencoded SB2/SB3/SB4; upstream still applies CRC/FEC. */
+ int iq_earth_payload(int prn, int block, uint8_t *bits) {
+@@ -37,6 +40,11 @@
+             uint32_t words[10];
+             for(int j=0;j<10;j++) if(fscanf(f,"%u",&words[j])!=1) { fclose(f); return -1; }
+             if(lnis_pvt_gps_navigation(earth,prn,start_week,words,10)<0) { fclose(f); return -1; }
++        } else if(kind=='O' && !anchored[prn-1]) {
++            double range, doppler;
++            if(fscanf(f,"%lf %lf",&range,&doppler)!=2 || !isfinite(range) || range<1e7 || range>5e7
++                || !isfinite(doppler) || fabs(doppler)>20000) { fclose(f); return -1; }
++            anchor_range[prn-1]=range; anchor_doppler[prn-1]=doppler; anchored[prn-1]=1;
+         } else if(kind=='F' && embedded && !payload_present[prn-1]) {
+             char b2[1177], b3[847], b4[847];
+             if(fscanf(f,"%1176s %846s %846s",b2,b3,b4)!=3 || strlen(b2)!=1176
+@@ -54,8 +62,15 @@
+     for(int i=0;i<32;i++) {
+         eph_t *e=&earth->nav.eph[satno(SYS_GPS,i+1)-1];
+         if(selected[i] && (e->A<=0 || e->svh || fabs(timediff(gpst2time(start_week,start_tow),e->toe))>7200)) return -1;
+-        if(selected[i] && embedded && !payload_present[i]) return -1;
+-        if(selected[i]) count++;
++        if(selected[i] && (!anchored[i] || (embedded && !payload_present[i]))) return -1;
++        if(selected[i]) {
++            double first=model_range(i+1,start_week,start_tow);
++            double next=model_range(i+1,start_week,start_tow+0.1);
++            range_offset[i]=anchor_range[i]-first;
++            /* Match the original modulator's first 0.1 s range-difference interval. */
++            rate_offset[i]=-CLIGHT/FREQ1*anchor_doppler[i]-(next-first)/0.1;
++            count++;
++        }
+     }
+     return count>=4 ? count : -1;
+ }
+@@ -83,7 +98,7 @@
+     clk[1]=(c1-clk[0])/0.001;
+ }
+ 
+-double iq_earth_range(int prn,int week,double tow) {
++static double model_range(int prn,int week,double tow) {
+     double xyz[3], pos[3], vel[3], clk[2], los[3], tau=0.075, range=0;
+     iq_earth_receiver(week,tow,xyz);
+     for(int j=0;j<3;j++) {
+@@ -95,3 +110,9 @@
+        Atmospheric effects and RF receiver noise are not reconstructed from RAWX. */
+     return range+CLIGHT*(bias-clk[0]+e->tgd[0]);
+ }
++
++/* Native source stays unchanged; this correction is applied only to its build copy. */
++double iq_earth_range(int prn,int week,double tow) {
++    double elapsed=(week-start_week)*604800.0+tow-start_tow;
++    return model_range(prn,week,tow)+range_offset[prn-1]+rate_offset[prn-1]*elapsed;
++}

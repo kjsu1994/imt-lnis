@@ -105,7 +105,7 @@ class HdtnConfigTransferTest {
             var reference = new Pvt();
             reference.setWeek(2400);
             reference.setTowSeconds(100000);
-            var metadata = new IqMetadata("AFSD", server.iq.IqReceiver.FRAME_METHOD, 2400,
+            var metadata = new IqMetadata("AFSD", server.iq.IqReceiver.RF_METHOD, 2400,
                     100000, "ECEF_CONSTANT_VELOCITY", List.of(19), List.of());
             String originalRaw = Base64.getEncoder().encodeToString(server.afs.NativePvtIntegrationTest.validSample());
             when(iq.source(eq(inputId), any())).thenReturn(new server.iq.IqReceiver.Source("digest", metadata, reference, originalRaw));

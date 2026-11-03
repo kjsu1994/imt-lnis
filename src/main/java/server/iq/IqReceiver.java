@@ -24,6 +24,7 @@ import java.util.function.Consumer;
 public class IqReceiver {
     public static final String METHOD = "AFS_IQ_GPS_LNAV_ASSISTED-v1";
     public static final String FRAME_METHOD = "AFS_IQ_FRAME_PVT-v3";
+    public static final String RF_METHOD = "AFS_IQ_RF_DELAY-v1";
 
     public record Source(String sha256, IqMetadata metadata, Pvt reference, String grawBase64) {
         public Source(String sha256, IqMetadata metadata, Pvt reference) {
@@ -32,7 +33,11 @@ public class IqReceiver {
     }
 
     public record Result(List<Pvt> pvt, Map<String, Object> observations,
-            server.pvt.DtnDelay.Evidence delayEvidence) {
+            server.pvt.DtnDelay.Evidence delayEvidence, List<Pvt> rfBaselinePvt) {
+        public Result(List<Pvt> pvt, Map<String, Object> observations,
+                server.pvt.DtnDelay.Evidence delayEvidence) {
+            this(pvt, observations, delayEvidence, List.of());
+        }
         public Result(List<Pvt> pvt, Map<String, Object> observations) {
             this(pvt, observations, null);
         }
@@ -80,6 +85,8 @@ public class IqReceiver {
         ref.setVelocityValid(true);
         boolean embedded = header[0].equals("LNIS-IQ-EARTH-2");
         var framePrns = new HashSet<Integer>();
+        var frames = new HashMap<Integer, server.afs.AfsPvtFrameCodec.Payload>();
+        var anchors = new HashMap<Integer, double[]>();
         var prns = new ArrayList<Integer>();
         var nav = new ArrayList<IqNavigation>();
         for (String line : lines.subList(1, lines.size())) {
@@ -91,6 +98,14 @@ public class IqReceiver {
                         new IqNavigation(
                                 Integer.parseInt(row[1]),
                                 Arrays.stream(row).skip(2).map(Integer::valueOf).toList()));
+            } else if (row.length == 4 && row[0].equals("O")) {
+                int prn = Integer.parseInt(row[1]);
+                double range = Double.parseDouble(row[2]), doppler = Double.parseDouble(row[3]);
+                if (!Double.isFinite(range) || range < 1e7 || range > 5e7
+                        || !Double.isFinite(doppler) || Math.abs(doppler) > 20000
+                        || anchors.putIfAbsent(prn, new double[] {range, doppler}) != null) {
+                    throw new IllegalArgumentException("I/Q 파형 기준 관측값 오류");
+                }
             } else if (embedded && row.length == 5 && row[0].equals("F")) {
                 var payload =
                         server.afs.AfsPvtFrameCodec.decode(
@@ -105,6 +120,7 @@ public class IqReceiver {
                         || !framePrns.add(payload.prn())) {
                     throw new IllegalArgumentException("I/Q 생성 프레임 식별 오류");
                 }
+                frames.put(payload.prn(), payload);
             } else {
                 throw new IllegalArgumentException("I/Q 생성 입력 레코드 오류");
             }
@@ -112,10 +128,22 @@ public class IqReceiver {
         if (embedded && !framePrns.equals(new HashSet<>(prns))) {
             throw new IllegalArgumentException("I/Q 생성 프레임 누락");
         }
+        if (!anchors.isEmpty()) {
+            if (!anchors.keySet().equals(framePrns)) {
+                throw new IllegalArgumentException("I/Q 파형 기준 위성 누락");
+            }
+            anchors.forEach((prn, values) -> {
+                var frame = frames.get(prn);
+                if (Math.abs(values[0] - frame.range()) > 1e-6
+                        || Double.compare(values[1], frame.doppler()) != 0) {
+                    throw new IllegalArgumentException("I/Q 파형 기준과 SB4 관측값 불일치");
+                }
+            });
+        }
         var meta =
                 new IqMetadata(
                         "AFSD",
-                        embedded ? FRAME_METHOD : METHOD,
+                        anchors.isEmpty() ? FRAME_METHOD : RF_METHOD,
                         ref.getWeek(),
                         ref.getTowSeconds(),
                         "ECEF_CONSTANT_VELOCITY",
@@ -130,7 +158,7 @@ public class IqReceiver {
     public static void validate(IqMetadata m) {
         if (m == null
                 || !"AFSD".equals(m.signal())
-                || !FRAME_METHOD.equals(m.pvtMethod())
+                || !(FRAME_METHOD.equals(m.pvtMethod()) || RF_METHOD.equals(m.pvtMethod()))
                 || !"ECEF_CONSTANT_VELOCITY".equals(m.trajectory())
                 || m.week() < 0
                 || m.week() > 8190
@@ -146,7 +174,6 @@ public class IqReceiver {
                 || m.gpsLnav().size() > 320) {
             throw new IllegalArgumentException("I/Q PVT 메타데이터 오류");
         }
-        Map<Integer, Set<Integer>> subframes = new HashMap<>();
         for (var n : m.gpsLnav()) {
             if (n == null
                     || !m.prns().contains(n.prn())
@@ -160,17 +187,8 @@ public class IqReceiver {
             if (id < 1 || id > 5) {
                 throw new IllegalArgumentException("I/Q GPS LNAV 서브프레임 오류");
             }
-            subframes.computeIfAbsent(n.prn(), k -> new HashSet<>()).add(id);
         }
-        if (!FRAME_METHOD.equals(m.pvtMethod())
-                && m.prns().stream()
-                        .anyMatch(
-                                p ->
-                                        !subframes
-                                                .getOrDefault(p, Set.of())
-                                                .containsAll(Set.of(1, 2, 3)))) {
-            throw new IllegalArgumentException("I/Q PVT에 필요한 LNAV 1·2·3 누락");
-        }
+
     }
 
     private static void validateReference(Pvt p, IqMetadata m) {
@@ -265,14 +283,11 @@ public class IqReceiver {
                 }
                 throw new IOException("I/Q 추적 실행 실패: " + running.exitValue());
             }
-            progress.accept("탐색·추적 종료 · CRC 통과 프레임 복원·공통 지연 PVT 계산 시작");
+            progress.accept("탐색·추적 종료 · CRC 통과 항법정보 복원·PVT 계산 시작");
             var result = calculate(tracking, metadata, timing);
-            String navigationSource =
-                    FRAME_METHOD.equals(metadata.pvtMethod())
-                            ? "AFS 프레임 복원 항법정보"
-                            : "JSON 항법정보 보조 방식";
+            String navigationSource = "AFS 프레임 복원 항법정보";
             progress.accept(
-                    "지구 PVT 계산 완료 · 유효 "
+                    (RF_METHOD.equals(metadata.pvtMethod()) ? "RF 기준·지연 반영 PVT 계산 완료 · 유효 " : "지구 PVT 계산 완료 · 유효 ")
                             + result.pvt().stream().filter(Pvt::isPositionValid).count()
                             + " / "
                             + result.pvt().size()
@@ -312,6 +327,9 @@ public class IqReceiver {
     Result calculate(Path tracking, IqMetadata metadata, server.pvt.DtnDelay.Timing timing) throws IOException {
         validate(metadata);
         var recovered = IqFrameRecovery.read(tracking, metadata);
+        if (RF_METHOD.equals(metadata.pvtMethod())) {
+            return calculateRf(tracking, metadata, timing, recovered);
+        }
         var anchor = recovered.frames().getFirst().startedAt();
         var measured = timing == null ? new server.pvt.DtnDelay.Timing(anchor, anchor) : timing;
         boolean negative = measured.seconds() < 0;
@@ -352,6 +370,123 @@ public class IqReceiver {
         }
         view.put("trackingEpochs", trackingEpochs);
         return new Result(values, view, evidence);
+    }
+
+    private Result calculateRf(Path tracking, IqMetadata metadata, server.pvt.DtnDelay.Timing timing,
+            IqFrameRecovery.Recovered recovered) throws IOException {
+        var epochs = parse(tracking, metadata);
+        var frameRecords = server.afs.AfsPvtFrameCodec.records(recovered.frames().stream()
+                .map(server.afs.AfsPvtFrameCodec.DelayPayload::observation).toList());
+        var measured = timing == null ? new server.pvt.DtnDelay.Timing(
+                recovered.frames().getFirst().startedAt(), recovered.frames().getFirst().startedAt()) : timing;
+        List<byte[]> selected = null;
+        List<double[]> selectedSignals = List.of();
+        Pvt baseline = null;
+        Integer elapsed = null;
+        try (var codec = new NativePvtCodec(nativeDirectory)) {
+            for (var navigation : recovered.navigation()) {
+                codec.navigation(navigation.prn(), metadata.week(),
+                        navigation.words24().stream().mapToInt(Integer::intValue).toArray());
+            }
+            for (var entry : epochs.entrySet()) {
+                var time = server.pvt.DtnDelay.shift(metadata.week(), metadata.towSeconds(), entry.getKey());
+                var signals = entry.getValue().values().stream()
+                        .filter(v -> recovered.prns().contains((int) v[0])).toList();
+                var records = rfRecords(frameRecords, time, signals);
+                var value = signals.isEmpty() ? codec.calculate(records).getFirst()
+                        : solveRf(codec, time, signals, 0);
+                if (selected == null || value.isPositionValid()) {
+                    selected = records;
+                    selectedSignals = signals;
+                    baseline = value;
+                    elapsed = entry.getKey();
+                }
+                if (value.isPositionValid()) break;
+            }
+            if (selected == null) {
+                selected = rfRecords(frameRecords,
+                        new server.pvt.DtnDelay.Time(metadata.week(), metadata.towSeconds()), List.of());
+                baseline = codec.calculate(selected).getFirst();
+                baseline.setMessage("RF 추적 관측값 없음 · SB4 관측값으로 대체하지 않습니다.");
+            }
+            var converted = server.pvt.DtnDelay.convert(selected, measured);
+            List<Pvt> values;
+            if (converted.evidence().error() == null) {
+                values = selectedSignals.isEmpty() ? codec.calculate(converted.records())
+                        : List.of(solveRf(codec, converted.evidence().shiftedTime(), selectedSignals,
+                                converted.evidence().addedMeters()));
+            } else {
+                var invalid = new Pvt();
+                invalid.setWeek(baseline.getWeek());
+                invalid.setTowSeconds(baseline.getTowSeconds());
+                invalid.setMessage(converted.evidence().error());
+                values = List.of(invalid);
+            }
+            var json = new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules();
+            var view = json.<Map<String, Object>>convertValue(
+                    server.common.DtnObservationView.fromRecords(converted.records()),
+                    new com.fasterxml.jackson.core.type.TypeReference<>() {});
+            var original = (server.gnss.GrawCodec.ObservationEpoch) server.gnss.GrawCodec.decode(
+                    selected.getLast()).message();
+            var wire = json.createObjectNode();
+            var observations = wire.putArray("observations");
+            for (var o : original.observations()) {
+                var row = observations.addObject();
+                row.setAll((com.fasterxml.jackson.databind.node.ObjectNode) json.valueToTree(o));
+                var signal = epochs.get(elapsed).get(o.satelliteId());
+                row.put("dopplerHz", signal[2]);
+                row.put("carrierToNoiseDbHz", signal[3]);
+                row.put("week", original.week());
+                row.put("towSeconds", original.receiverTowSeconds());
+                if (measured.seconds() >= 0) {
+                    row.set("alignedTransmitAt", json.valueToTree(
+                            server.pvt.DelayTime.transmit(measured.startedAt(), o.pseudorangeMeters())));
+                }
+            }
+            wire.put("week", original.week());
+            wire.put("towSeconds", original.receiverTowSeconds());
+            view.put("source", "IQ_RF");
+            view.put("receivedValues", wire);
+            view.put("selectedElapsedSeconds", elapsed);
+            view.put("assistance", "RF 추적 관측값 · 항법정보는 CRC 통과 AFS 프레임에서 복원");
+            view.put("trackingEpochs", epochs.entrySet().stream().map(entry -> Map.of(
+                    "elapsedSeconds", entry.getKey(), "observations", entry.getValue().values().stream()
+                            .map(v -> Map.of("satelliteId", (int) v[0], "pseudorangeMeters", v[1],
+                                    "dopplerHz", v[2], "carrierToNoiseDbHz", v[3],
+                                    "carrierPhaseCycles", -v[4])).toList())).toList());
+            return new Result(values, view, converted.evidence(), List.of(baseline));
+        }
+    }
+
+    private static Pvt solveRf(NativePvtCodec codec, server.pvt.DtnDelay.Time time,
+            List<double[]> signals, double addedMeters) {
+        double[] input = new double[signals.size() * 4];
+        for (int i = 0; i < signals.size(); i++) {
+            var signal = signals.get(i);
+            input[i * 4] = signal[0];
+            input[i * 4 + 1] = signal[1] + addedMeters;
+            input[i * 4 + 2] = signal[2];
+            input[i * 4 + 3] = signal[3];
+        }
+        return codec.solve(time.week(), time.towSeconds(), input);
+    }
+
+    private static List<byte[]> rfRecords(List<byte[]> frames, server.pvt.DtnDelay.Time time,
+            List<double[]> signals) {
+        var records = new ArrayList<byte[]>();
+        for (byte[] record : frames) {
+            if (server.gnss.GrawCodec.decode(record).message() instanceof server.gnss.GrawCodec.NavigationUpdate) {
+                records.add(record);
+            }
+        }
+        var observations = signals.stream().map(v -> new server.gnss.GrawCodec.Observation(
+                v[1], -v[4], (float) v[2], 0, (int) v[0], 0, 0, 0,
+                (int) Math.round(v[3]), 0, 0, 0, 1)).toList();
+        var epoch = new server.gnss.GrawCodec.ObservationEpoch(
+                time.towSeconds(), time.week(), 0, 0, 1, observations);
+        records.add(server.gnss.GrawCodec.encode(new server.gnss.GrawCodec.Envelope(
+                new UUID(0, 0), new UUID(0, records.size() + 1L), records.size(), java.time.Instant.EPOCH, epoch)));
+        return records;
     }
 
     static SortedMap<Integer, SortedMap<Integer, double[]>> parse(Path tracking, IqMetadata m)
@@ -429,7 +564,7 @@ public class IqReceiver {
         }
         Pvt initial = reference.getFirst();
         validateReference(initial, m);
-        if (FRAME_METHOD.equals(m.pvtMethod())) return List.of(initial);
+        if (FRAME_METHOD.equals(m.pvtMethod()) || RF_METHOD.equals(m.pvtMethod())) return List.of(initial);
         return List.of();
     }
 

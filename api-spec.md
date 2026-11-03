@@ -33,13 +33,13 @@
 
 AFS_METADATA는 기존 API 식별자를 유지합니다. 화면에서는 AFS Frame으로 표시합니다.
 RAW·AFS 시험은 원본 GNSS 및 Reference를 어댑터로 보내지 않습니다.
-I/Q의 pvtMethod는 AFS_IQ_FRAME_PVT-v3입니다. 전달된 Reference는 비교용이며 복호나 PVT 입력으로 사용하지 않습니다.
+새 I/Q의 pvtMethod는 `AFS_IQ_RF_DELAY-v1`입니다. 기존 `AFS_IQ_FRAME_PVT-v3` 수신 대기 시험은 기존 방식으로 처리합니다. 전달된 Reference는 별도 참고자료이며 복호나 RF PVT 입력으로 사용하지 않습니다.
 GPS L1 C/A만 PVT에 사용합니다. pvtConstellation은 생략하거나 GPS를 지정합니다. 다른 값은 거절합니다.
 
 ## 공통 지연 계산
 
 S = 시험 시작 접수 시각, R = 수신 본문 수신 완료 시각입니다.
-AFS는 프레임 기준 A=S, I/Q는 생성 당시 기준 A를 사용합니다.
+AFS는 프레임 기준 A=S를 사용합니다. I/Q 프레임은 생성 기준 A를 보관하지만 새 RF 계산은 아래 별도 경로를 사용합니다.
 
 - 프레임 송신 시각: Tᵢ=A−Pᵢ/c
 - 시험 시작 기준 보정: T*ᵢ=Tᵢ+(S−A)
@@ -47,12 +47,14 @@ AFS는 프레임 기준 A=S, I/Q는 생성 당시 기준 A를 사용합니다.
 
 AFS와 I/Q는 Type 63 / Version 6의 같은 SB 구성을 사용합니다.
 SB4에는 가상 송신 시각·기준 시각·원본 Doppler·C/N0·유효성·전리층 정보를 넣습니다.
-I/Q도 실제 RF 프레임 복호 후 위 계산을 수행하며 RF 추적 관측값은 trackingEpochs 진단 자료로 분리합니다.
+새 I/Q 파형의 시작 의사거리·Doppler는 SB4와 같은 기준값에 맞추며 이후 기존 궤도·이동 변화를 유지합니다. 수신부는 CRC 통과 프레임의 항법정보와 실제 RF 관측값으로 계산 가능한 첫 RF Epoch를 선택합니다.
+RF 기준 PVT와 `P′=P_RF+c×(R−S)`·`t′=t_RF+(R−S)`를 적용한 PVT를 비교합니다. 두 계산의 Doppler·C/N0·항법정보는 동일합니다. RF 관측 부족·계산 실패 시 SB4 관측값으로 대체하지 않습니다.
 I/Q 파일 생성 후 대기와 수신 후 복호시간은 지연에 합산하지 않습니다.
 송신 시험 시작 시 파일 존재·크기·형식을 확인하고 생성 시 SHA-256을 재사용합니다. 송신 파일의 전체 해시는 다시 계산하지 않습니다.
 수신부는 복호 전 전체 SHA-256을 한 번 검증하며 진행률·읽은 용량·경과 시간·처리속도를 로그로 표시합니다. 복호 후에는 파일 크기·수정시각·파일 식별값만 확인하며 변경이 감지되면 실패 처리합니다. 처리 중 공유파일을 변경하지 않는 운영 조건이며, 같은 크기·수정시각으로 내용을 변경한 경우까지 검출하는 방식은 아닙니다.
-I/Q 보고서의 `observations`는 `IQ_FRAME` 복원 관측·항법정보와 `trackingEpochs`의 RF 추적값을 제공합니다. `referenceObservations`는 I/Q에서 반환하지 않으며 Reference PVT·비교 결과는 유지합니다. 관측값 조회는 PVT Epoch 개수와 독립적입니다.
-송신 I/Q 보고서의 `observations`는 생성 당시 저장한 원본 1 Epoch입니다. `referencePvt`는 생성에 사용한 기준 PVT입니다. 새로 보관하는 원본 GNSS는 외부 어댑터에 추가하지 않으며 기존 Reference PVT 전송 규격은 유지합니다. 원본 미보관 과거 이력의 `observations`는 비어 있을 수 있습니다. 수신 `trackingEpochs`는 RF 시점별로 관측표에 통합 표시하며 프레임의 지연 반영 의사거리와 구분합니다.
+새 I/Q 보고서의 `observations.source`는 `IQ_RF`이며 선택한 RF 관측·변환 의사거리·복원 항법정보를 제공합니다. `selectedElapsedSeconds`는 선택된 파일 내 시점이며 `trackingEpochs`는 전체 RF 추적값입니다. 과거 `IQ_FRAME` 결과의 의미는 유지합니다. `referenceObservations`는 I/Q에서 반환하지 않으며 Reference PVT·비교 결과는 유지합니다. 관측값 조회는 PVT Epoch 개수와 독립적입니다.
+송신 I/Q 보고서의 `observations`는 생성 당시 저장한 원본 1 Epoch입니다. `referencePvt`는 생성에 사용한 기준 PVT입니다. 새로 보관하는 원본 GNSS는 외부 어댑터에 추가하지 않으며 기존 Reference PVT 전송 규격은 유지합니다. 원본 미보관 과거 이력의 `observations`는 비어 있을 수 있습니다. 새 수신 관측표는 선택 RF Epoch의 지연 미적용·적용 의사거리를 표시합니다. 전체 RF 추적값은 보고서 JSON에도 보관합니다.
+새 보고서의 `comparisonBasis`는 `RF_BASELINE`이며 `rfBaselinePvt`가 지연 미적용 RF 해입니다. `referencePvt`는 송신 원본, `receivedPvt`는 지연 반영 RF 해로 유지합니다. RF 기준 해는 `fileResult.rfBaselinePvt`에도 보관되어 서비스 간 결과 조회에 포함됩니다.
 화면의 `data-integrity`는 `fileResult.verdict`와 `comparison.verdict`를 구분해 함께 표시합니다. 파일 크기·SHA-256 불일치는 `fileResult.verdict=FAIL`로 기록하며, 복호 실패만으로 파일 불일치를 판정하지 않습니다. 지연 시험의 `MEASURED`는 PVT 차이 측정 완료이며 원본과 같은 값이라는 뜻은 아닙니다.
 생성 후 전체 해시 계산 중에는 I/Q 상태가 GENERATING이며 phase=VERIFYING과 verificationBytes·verificationTotalBytes·verificationElapsedMillis를 제공합니다.
 PC 시계 동기화가 전제이며 음수 지연은 비교 불가로 처리합니다.
@@ -76,5 +78,5 @@ GET /lnis/api/v1/node/peer/dtn/tests/{testId}/reference
 ## 이전 파일
 
 이전 시험 결과와 파일은 삭제하지 않습니다.
-새 시험은 현재 프레임 규격만 허용하며 이전 I/Q 파일은 REGENERATE로 표시합니다.
+새 I/Q 시험은 RF 기준값으로 생성한 파일만 허용하며 이전 파일은 REGENERATE로 표시합니다. 과거 결과와 이미 등록된 이전 방식의 수신 대기 시험은 보존합니다.
 기존 파일을 새 규격이라고 이름만 바꾸어 전송하면 안 됩니다.

@@ -4,7 +4,7 @@ import {initGnssControls} from './dtn-gnss.js?v=20261026-frame6';
 import {createDtnLog} from './dtn-log.js?v=20261026-frame6';
 import {initAdapterHealth} from './dtn-adapter-health.js?v=20261026-frame6';
 import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20261026-frame6';
-import {createObservationView, numeric, renderClockBias} from './dtn-observations.js?v=20261102-iq-history';
+import {createObservationView, numeric, renderClockBias} from './dtn-observations.js?v=20261103-rf-delay';
 
 const $ = id => document.getElementById(id);
 const payloadViewer = createPayloadViewer($('dtn-payload'), {receivedOnly: true});
@@ -38,17 +38,34 @@ let tests = [], epochs = [], selectedId = '', renderVersion = 0, polling = false
 let reportKey = '';
 let receivedIds = null;
 let historyPage = 0, selectionPinned = false, cancelling = false;
-let referenceEpochs = [], comparisonEpochs = [], delayComparison = false, delayEvidence = null;
+let referenceEpochs = [], comparisonEpochs = [], delayComparison = false, delayEvidence = null, rfComparison = false;
 function setComparison(report = {}) {
   renderReference(report);
   delayComparison = report.comparisonMode === 'DELAY';
-  $('receiver-pvt-title').textContent = delayComparison ? '수신 지연 반영 PVT · Reference 비교' : '수신 지구 PVT · 송신 기준 비교';
+  rfComparison = report.comparisonBasis === 'RF_BASELINE';
+  document.querySelectorAll('[data-reference-label]').forEach(element => {
+    element.textContent = rfComparison ? (element.dataset.rfLabel || 'RF 기준 · 지연 미적용') : element.dataset.referenceLabel;
+  });
+  document.querySelectorAll('[data-shifted-label]').forEach(element => {
+    element.textContent = delayComparison ? '지연 반영 PVT' : '수신 복원 (Restored)';
+  });
+  const original = report.referencePvt?.[0];
+  $('iq-original-reference').hidden = !rfComparison;
+  $('iq-original-reference-values').textContent = !original ? '송신 원본 Reference 없음' : [
+    'Week ' + original.week + ' / TOW ' + original.towSeconds + ' s',
+    'ECEF(m) ' + (original.ecefMeters || []).join(' / '),
+    '속도(m/s) ' + (original.velocityMetersPerSecond || []).join(' / '),
+    'Clock Bias(s) ' + (original.receiverClockBiasSeconds ?? '—')
+  ].join(' · ');
+  $('pvt-differences').title = rfComparison ? '동일 RF 관측의 지연 적용 전후 차이입니다.' : '송신 Reference와 재계산 결과의 차이입니다.';
+  $('pvt-clock-change').parentElement.title = rfComparison ? '지연 반영 Bias − RF 기준 Bias' : '수신 Bias − 송신 기준 Bias';
+  $('receiver-pvt-title').textContent = rfComparison ? 'I/Q RF PVT · 공통 지연 비교' : delayComparison ? '수신 지연 반영 PVT · Reference 비교' : '수신 지구 PVT · 송신 기준 비교';
   if ($('received-pvt-label')) $('received-pvt-label').textContent = delayComparison ? '수신 지연 반영 지구 PVT' : '수신 복원 지구 PVT';
   delayEvidence = report.delayEvidence ?? null;
   $('dtn-clock-analysis').hidden = !delayComparison;
   $('pvt-delay-details').hidden = !delayComparison;
   renderClockAnalysis(null);
-  referenceEpochs = Array.isArray(report.referencePvt) ? report.referencePvt : [];
+  referenceEpochs = (rfComparison ? report.rfBaselinePvt : report.referencePvt) || [];
   comparisonEpochs = report.comparison?.epochs || [];
   const verdict = report.comparison?.verdict;
   pill('pvt-match', verdict === 'MEASURED' ? (delayComparison ? '지연 반영 PVT 측정 완료' : 'I/Q PVT 오차 측정') : verdict === 'PARTIAL' ? '부분 비교 · 속도 비교 불가' : verdict === 'PASS' ? '전체 PVT 일치' : verdict === 'FAIL' ? '전체 PVT 불일치' : 'PVT 비교 불가',
@@ -776,17 +793,17 @@ function renderClockAnalysis(delta, reference, pvt) {
   $('pvt-delay-evidence').textContent = !delayComparison ? '' : [
     '시작 접수 (UTC): ' + (delayEvidence?.timing?.startedAt ?? '—'),
     '본문 수신 완료 (UTC): ' + (delayEvidence?.timing?.receivedAt ?? '—'),
-    '송신 기준 GNSS 시각: ' + epoch(delayEvidence?.originalTime),
+    (rfComparison ? 'RF 기준 GNSS 시각: ' : '송신 기준 GNSS 시각: ') + epoch(delayEvidence?.originalTime),
     '지연 반영 GNSS 시각: ' + epoch(delayEvidence?.shiftedTime),
     '시험 전달 지연: ' + raw(delayEvidence?.delaySeconds) + ' s',
-    '송신 기준 Clock Bias: ' + raw(reference?.positionValid ? reference.receiverClockBiasSeconds : null) + ' s',
+    (rfComparison ? 'RF 기준 Clock Bias: ' : '송신 기준 Clock Bias: ') + raw(reference?.positionValid ? reference.receiverClockBiasSeconds : null) + ' s',
     '수신 Clock Bias: ' + raw(pvt?.positionValid ? pvt.receiverClockBiasSeconds : null) + ' s',
     '시계오차 변화: ' + raw(available ? delta?.clockDifferenceSeconds : null) + ' s',
     '지연 반영 잔차: ' + raw(seconds) + ' s',
-    '잔차 = (수신 Bias − 송신 기준 Bias) − 시험 전달 지연',
+    rfComparison ? '잔차 = (지연 반영 Bias − RF 기준 Bias) − 시험 전달 지연' : '잔차 = (수신 Bias − 송신 기준 Bias) − 시험 전달 지연',
     '위치 변화 X / Y / Z (m): ' + vector(delta?.positionDeltaMeters),
     '속도 변화 X / Y / Z (m/s): ' + vector(delta?.velocityDeltaMetersPerSecond),
-    '사용 위성 (송신 / 수신): ' + raw(reference?.satellitesUsed) + ' / ' + raw(pvt?.satellitesUsed)
+    (rfComparison ? '사용 위성 (RF 기준 / 지연 반영): ' : '사용 위성 (송신 / 수신): ') + raw(reference?.satellitesUsed) + ' / ' + raw(pvt?.satellitesUsed)
   ].join('\n');
 }
 

@@ -122,6 +122,15 @@ if ($sourceResult.Jar -ne (Join-Path $repo 'build\libs\lnis.jar') -or
     throw 'Explicit source directory did not resolve deployment inputs'
 }
 Write-Host 'PASS: explicit source root works without script-path metadata'
+$generatorFixture = Join-Path $caseRoot 'afs_sim'
+[IO.File]::WriteAllBytes($generatorFixture, [byte[]]@(0x7F, 0x45, 0x4C, 0x46, 1, 2))
+Assert-IqGenerator $generatorFixture
+[IO.File]::WriteAllText($generatorFixture, 'not an ELF generator')
+$blocked = $false
+try { Assert-IqGenerator $generatorFixture } catch { $blocked = $true }
+if (!$blocked) { throw 'Invalid native generator accepted' }
+Write-Host 'PASS: optional I/Q generator ELF validation'
+
 
 # Native UTF-8 stdout must survive a redirected parent process, including Korean Compose paths.
 $expectedDirectory = '/mnt/c/lnis-compose-리시버'

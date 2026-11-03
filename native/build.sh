@@ -56,6 +56,9 @@ iq)
         "$lans/afs_sim.c" iq_earth.c "$lans/afs_nav.c" "$lans/afs_rand.c" \
         "$lans/ldpc/alloc.c" "$lans/ldpc/mod2sparse.c" \
         "$rtk/rtkcmn.c" "$rtk/rcvraw.c" "$rtk/ephemeris.c" "$lans/pocketsdr/pocketsdr.c" -lm -o /out/iq/afs_sim
+    gcc "${common[@]}" -static -fopenmp -Wl,--gc-sections test_iq_anchor.c \
+        "$rtk/rtkcmn.c" "$rtk/rcvraw.c" "$rtk/ephemeris.c" -lm -o /out/verification/test_iq_anchor
+    cp iq_earth.c /out/modified-sources/
     cp "$lans/008_Weil1500hex210prns.txt" "$lans/default_almanac.txt" "$lans/LICENSE.txt" /out/iq/
     cd /out/iq
     if ./afs_sim -t 0.1 -b 2 /work/missing-input.bin > missing-input.log 2>&1; then

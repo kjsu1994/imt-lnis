@@ -627,8 +627,9 @@ public class DtnService {
             transfer.setFile(file);
             applyTransferConfig(job, transfer);
             var source = iq.source(inputId, file);
-            if (source == null) {
-                throw new IllegalArgumentException("현재 프레임 규격으로 I/Q 파일을 다시 생성하세요.");
+            if (source == null || source.metadata() == null
+                    || !IqReceiver.RF_METHOD.equals(source.metadata().pvtMethod())) {
+                throw new IllegalArgumentException("RF 기준 시험용으로 I/Q 파일을 다시 생성하세요.");
             }
             if (source != null) {
                 job.setSelectedEpochJson(objectMapper.valueToTree(new DtnDelay.Epoch(
@@ -1475,9 +1476,14 @@ public class DtnService {
                                 IqReceiver.references(
                                         metadata, sent.getReferencePvt(), result.getPvt());
                         job.setReferenceJson(objectMapper.writeValueAsString(reference));
-                        job.setComparisonJson(
-                                objectMapper.writeValueAsString(
-                                        DtnComparison.delay(reference, result.getPvt(), result.getDelayEvidence())));
+                        boolean rf = IqReceiver.RF_METHOD.equals(metadata.pvtMethod());
+                        List<Pvt> baseline = rf ? objectMapper.convertValue(verified.path("rfBaselinePvt"),
+                                new TypeReference<List<Pvt>>() {}) : reference;
+                        var measured = new LinkedHashMap<>(DtnComparison.delay(
+                                baseline, result.getPvt(), result.getDelayEvidence()));
+                        if (rf) measured.put("comparisonBasis", "RF_BASELINE");
+                        measured.put("method", metadata.pvtMethod());
+                        job.setComparisonJson(objectMapper.writeValueAsString(measured));
                         job.setDelayEvidenceJson(objectMapper.writeValueAsString(result.getDelayEvidence()));
                     }
                     update(job, "INCONCLUSIVE".equals(result.getState()) ? "INCONCLUSIVE" : "COMPLETED", "상대 시험 완료 · I/Q 결과는 수신 화면에서 확인하세요.", "상대 결과 확인");
@@ -1512,7 +1518,8 @@ public class DtnService {
                     || transfer.getSchemaVersion() != 3
                     || !"LNIS-IQ-FILE-v3".equals(transfer.getFormat())
                     || !(transfer.getMetadata() instanceof IqMetadata)
-                    || !IqReceiver.FRAME_METHOD.equals(((IqMetadata) transfer.getMetadata()).pvtMethod())
+                    || !(IqReceiver.FRAME_METHOD.equals(((IqMetadata) transfer.getMetadata()).pvtMethod())
+                            || IqReceiver.RF_METHOD.equals(((IqMetadata) transfer.getMetadata()).pvtMethod()))
                     || transfer.getFrames() != null || transfer.getGrawBase64() != null) {
                 throw new IllegalArgumentException("현재 프레임 규격으로 I/Q 파일을 다시 생성하세요.");
             }
@@ -1567,12 +1574,33 @@ public class DtnService {
                     throw new IqService.FileMismatchException("I/Q 처리 중 파일 변경 · 크기·수정시각·파일 식별 확인 실패");
                 }
                 trace(job.getId(), "복호 후 파일 확인", true, "크기·수정시각·파일 식별 유지 확인 완료");
+                synchronized (this) {
+                    if (!"CALCULATING".equals(get(job.getId()).getState())) return;
+                }
                 reference =
                         IqReceiver.references(metadata, transfer.getReferencePvt(), decoded.pvt());
-                comparison =
-                        new java.util.LinkedHashMap<>(
-                                DtnComparison.delay(reference, decoded.pvt(), decoded.delayEvidence()));
+                boolean rf = IqReceiver.RF_METHOD.equals(metadata.pvtMethod());
+                if (rf && decoded.rfBaselinePvt().size() != 1) {
+                    throw new IllegalArgumentException("RF 기준 PVT 누락");
+                }
+                comparison = new java.util.LinkedHashMap<>(DtnComparison.delay(
+                        rf ? decoded.rfBaselinePvt() : reference, decoded.pvt(), decoded.delayEvidence()));
                 comparison.put("method", metadata.pvtMethod());
+                if (rf) {
+                    comparison.put("comparisonBasis", "RF_BASELINE");
+                    result.put("rfBaselinePvt", decoded.rfBaselinePvt());
+                    var row = objectMapper.valueToTree(comparison).path("epochs").path(0);
+                    trace(job.getId(), "RF PVT 비교", true,
+                            "지연 반영 − RF 기준 · 위치 차이 " + measurement(row, "positionDifferenceMeters", "m")
+                                    + " · 속도 차이 " + measurement(row, "velocityDifferenceMetersPerSecond", "m/s")
+                                    + " · Clock Bias 증가 " + measurement(row, "clockDifferenceSeconds", "s")
+                                    + " · 주입 지연 " + decoded.delayEvidence().delaySeconds() + " s"
+                                    + " · Clock Bias 잔차 " + measurement(row, "clockResidualSeconds", "s"));
+                    trace(job.getId(), "RF 계산 입력", true,
+                            "파일 경과 " + Objects.toString(decoded.observations().get("selectedElapsedSeconds"), "미확보")
+                                    + " s · 동일 RF 관측의 지연 미적용/적용 PVT 비교 · "
+                                    + decoded.observations().get("receivedValues"));
+                }
             }
             synchronized (this) {
                 if (!"CALCULATING".equals(get(job.getId()).getState())) {
@@ -1583,7 +1611,9 @@ public class DtnService {
                 if (decoded != null) {
                     job.setDelayEvidenceJson(objectMapper.writeValueAsString(decoded.delayEvidence()));
                     if (logs != null) {
-                        logs.delay(job.getId(), decoded.delayEvidence());
+                        boolean rf = !decoded.rfBaselinePvt().isEmpty();
+                        logs.delay(job.getId(), decoded.delayEvidence(), rf ? "RF 추적" : "원본");
+                        if (rf) logs.pvt(job.getId(), "TEST", decoded.rfBaselinePvt(), 0, "RF 기준 PVT");
                         logs.pvt(job.getId(), "TEST", decoded.pvt(), 0, "I/Q 공통 지연 PVT");
                     }
                     job.setReceiverJson(objectMapper.writeValueAsString(decoded.pvt()));

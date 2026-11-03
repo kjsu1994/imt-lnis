@@ -173,6 +173,9 @@ public class IqService {
             }
             text.append("P ").append(payload.prn()).append('\n');
             var blocks = server.afs.AfsPvtFrameCodec.encode(payload);
+            var anchor = server.afs.AfsPvtFrameCodec.decode(blocks.sb2(), blocks.sb3(), blocks.sb4());
+            text.append("O ").append(anchor.prn()).append(' ').append(anchor.range())
+                    .append(' ').append((double) anchor.doppler()).append('\n');
             text.append("F ").append(payload.prn());
             for (byte[] bits : List.of(blocks.sb2(), blocks.sb3(), blocks.sb4())) {
                 text.append(' ');
@@ -219,6 +222,9 @@ public class IqService {
         }
         if (!enabled()) {
             throw new IllegalStateException("I/Q 생성기를 설정하세요.");
+        }
+        if (!IqReceiver.RF_METHOD.equals(IqReceiver.source(earthInput, "").metadata().pvtMethod())) {
+            throw new IllegalArgumentException("SB4와 일치하는 I/Q 파형 기준 관측값이 필요합니다.");
         }
         if (active != null) {
             throw new IllegalStateException("I/Q 생성 작업 진행 중");
@@ -425,9 +431,9 @@ public class IqService {
                 var source = Files.isRegularFile(context)
                         ? json.readValue(context.toFile(), IqReceiver.Source.class) : null;
                 if (source == null || source.metadata() == null
-                        || !IqReceiver.FRAME_METHOD.equals(source.metadata().pvtMethod())) {
+                        || !IqReceiver.RF_METHOD.equals(source.metadata().pvtMethod())) {
                     result.put("state", "REGENERATE");
-                    result.put("message", "현재 프레임 규격으로 다시 생성하세요.");
+                    result.put("message", "RF 기준 시험용으로 I/Q 파일을 다시 생성하세요.");
                 } else {
                     result.put("preview", preview(file));
                 }

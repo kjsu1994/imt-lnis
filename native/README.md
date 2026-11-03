@@ -144,7 +144,7 @@ Java 입력 어댑터에서 LNAV preamble 위치까지 확인하여 CNAV가 계�
 
 `patches/05-afs-pvt-payload.patch` supplies the Java common encoder's SB2/SB3/SB4 input bits to the existing modulator. `iq_earth.c` accepts `LNIS-IQ-EARTH-2` with `F <PRN> <1176 bits> <846 bits> <846 bits>` records; the legacy input remains readable. Original CRC/FEC/interleaving/modulation implementations are retained.
 
-PocketSDR emits `$IQAFS,<sample time>,<PRN>,<block>,<packed hex>` only after LDPC/CRC success. SB2 exports 147 bytes; SB3/SB4 export 106 bytes with the last two padding bits zero. The Java receiver combines blocks from the same decoded frame, validates the LNIS extension, and supplies recovered navigation to RTKLIB. The tracked pseudorange/Doppler remain the RF solver's observations. The local type 63/version 2 payload is not an official message assignment. See README for bit offsets and the 6000-bit layout.
+PocketSDR emits `$IQAFS,<sample time>,<PRN>,<block>,<packed hex>` only after LDPC/CRC success. SB2 exports 147 bytes; SB3/SB4 export 106 bytes with the last two padding bits zero. The Java receiver combines blocks from the same decoded frame, validates the LNIS extension, and supplies recovered navigation to RTKLIB. New RF-delay trials use tracked pseudorange/Doppler for both baseline and delayed solutions; old frame-PVT trials retain their original behavior. The local type 63/version 2 payload is not an official message assignment. See README for bit offsets and the 6000-bit layout.
 
 실제 파일 재생 PVT 회귀 검사는 `LNIS_IQ_REPLAY_DIRECTORY`에 90초 검증 자료(`source.json`, `tracking-0-20.log`, `tracking-1-1.log`, `tracking-2-20.log`)가 있는 폴더를 지정하면 실행한다. `NativeFileReplayIntegrationTest`는 JSON 항법 보조 없이 마지막 Epoch까지 위치·속도가 유효한지 검사한다. 자료가 없으면 생략한다.
 
@@ -158,4 +158,10 @@ AFS v5는 SB2·SB3에 항법정보, SB4에 원본 의사거리 대신 가상 송
 무기한 DTN 수신 대기는 네이티브 계산의 무제한 지연 지원을 의미하지 않는다.
 큰 공통 지연에서는 반복 계산 수렴 또는 항법정보 유효기간 때문에 PVT가 무효일 수 있다.
 이 경우 원문·복원 결과를 보존하고 계산 불가 사유를 표시하며, 정답 Clock Bias를 주입하지 않는다.
-이번 서비스 안정화에서는 네이티브 원본·패치·C/C++ 연결 코드·알고리즘을 변경하지 않는다.
+원본 네이티브 소스는 보존하며 아래 RF 파형 보정은 빌드 복사본에 패치로 적용한다.
+
+## RF 기준 파형과 지연 비교
+
+`07-iq-observation-anchor.patch`는 빌드 복사본의 LNIS 연결부 `iq_earth.c`에만 적용한다. `O <PRN> <pseudorange m> <Doppler Hz>` 입력은 Java가 SB4 인코딩·복원 값으로 생성한다. 시작 거리와 원본 0.1초 변조 구간의 거리율을 보정하고 기존 궤도·이동 변화를 유지한다. 원본 C 파일과 `vendor/`는 변경하지 않으며 `/out/modified-sources/iq_earth.c`에서 적용 결과를 확인한다.
+
+`test_iq_anchor`는 시작 거리·Doppler 일치와 이후 거리 보정을 검사한다. 새 파일의 `pvtMethod`는 `AFS_IQ_RF_DELAY-v1`이다. Java 수신부는 CRC 통과 프레임의 항법정보와 `$IQOBS`를 사용하며, 같은 RF 관측의 지연 미적용·적용 PVT를 비교한다. 송신 원본 Reference는 별도 보존한다. 의사거리·Doppler와 항법정보가 일관되지 않은 합성 입력은 RF PVT 품질검사에서 무효가 될 수 있으며, SB4 관측값으로 대체하지 않는다. 이전 `AFS_IQ_FRAME_PVT-v3` 대기 시험은 기존 계산 경로를 유지한다.

@@ -37,6 +37,8 @@ class IqCommonDelayTest {
         try (var solver = new NativePvtCodec(nativePath)) {
             var reference = solver.calculate(records).getFirst();
             var metadata = IqReceiver.source(IqService.earthInput(records, reference), "A".repeat(64)).metadata();
+            metadata = new server.common.DtnModels.IqMetadata(metadata.signal(), IqReceiver.FRAME_METHOD,
+                    metadata.week(), metadata.towSeconds(), metadata.trajectory(), metadata.prns(), metadata.gpsLnav());
             var start = Instant.parse("2026-10-26T00:00:00.123456789Z");
             var result = receiver.calculate(tracking, metadata,
                     new DtnDelay.Timing(start, start.plusSeconds(20)));

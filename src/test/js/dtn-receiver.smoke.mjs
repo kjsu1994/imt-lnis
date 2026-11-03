@@ -8,7 +8,7 @@ import vm from 'node:vm';
 const html = readFileSync(new URL('../../main/resources/static/dtn-receiver.html', import.meta.url), 'utf8');
 const source = pageSource('dtn-receiver.js');
 const elements = new Map([...html.matchAll(/id="([^"]+)"/g)].map(([, id]) => [id, {
-  value: '', options: [], textContent: '', hidden: false, disabled: false, style: {},
+  value: '', options: [], textContent: '', hidden: false, disabled: false, style: {}, parentElement: {},
   addEventListener() {}, add(option) { this.options.push(option); },
   setAttribute(key, value) { this[key] = value; },
   replaceChildren(...options) { this.options = options; this.value = options[0]?.value ?? ''; },
@@ -31,7 +31,7 @@ const context = {
   numeric, renderClockBias, URL, AbortSignal,
   renderIqFile() {},
   createDtnLog: () => ({write(msg) { console.log('DTN LOG:', msg); },setContext() {},refresh() {}}),
-  document: {visibilityState:'visible', getElementById(id) { if (removedHealth.has(id) || optionalElements.has(id)) return null; assert.ok(elements.has(id), 'DOM missing: ' + id); return elements.get(id); }},
+  document: {visibilityState:'visible', querySelectorAll() { return []; }, getElementById(id) { if (removedHealth.has(id) || optionalElements.has(id)) return null; assert.ok(elements.has(id), 'DOM missing: ' + id); return elements.get(id); }},
   createPayloadViewer(container, options) { assert.equal(options.receivedOnly, true); return {setJob() {},setReceipts(values) {shownReceipts = values;}}; },
   createObservationView() { return {setData() {}, select() {}}; },
   URLSearchParams,

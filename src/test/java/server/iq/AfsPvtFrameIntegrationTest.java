@@ -186,7 +186,7 @@ class AfsPvtFrameIntegrationTest {
             Files.writeString(root.resolve("earth-input.txt"), input);
             Files.write(root.resolve("source.graw"), NativePvtIntegrationTest.validSample());
             var source = IqReceiver.source(input, "A".repeat(64));
-            assertEquals(IqReceiver.FRAME_METHOD, source.metadata().pvtMethod());
+            assertEquals(IqReceiver.RF_METHOD, source.metadata().pvtMethod());
             json.writeValue(root.resolve("source.json").toFile(), source);
         }
     }
@@ -213,15 +213,40 @@ class AfsPvtFrameIntegrationTest {
                 new server.pvt.DtnDelay.Timing(start, start.plusSeconds(20)));
         assertTrue(result.pvt().stream().anyMatch(Pvt::isPositionValid));
         assertTrue(result.pvt().stream().anyMatch(Pvt::isVelocityValid));
-        assertEquals("IQ_FRAME", result.observations().get("source"));
+        boolean rf = IqReceiver.RF_METHOD.equals(m.pvtMethod());
+        assertEquals(rf ? "IQ_RF" : "IQ_FRAME", result.observations().get("source"));
         assertEquals(1, result.pvt().size());
         assertFalse(((List<?>) result.observations().get("trackingEpochs")).isEmpty());
+        var trackingEpochs = (List<?>) result.observations().get("trackingEpochs");
+        assertEquals(89, ((Number) ((Map<?, ?>) trackingEpochs.getLast()).get("elapsedSeconds")).intValue());
         var reference = IqReceiver.references(m, List.of(source.reference()), result.pvt());
-        var comparison = server.pvt.DtnComparison.delay(reference, result.pvt(), result.delayEvidence());
+        var baseline = rf ? result.rfBaselinePvt() : reference;
+        var comparison = server.pvt.DtnComparison.delay(baseline, result.pvt(), result.delayEvidence());
         assertEquals(20, result.pvt().getFirst().getReceiverClockBiasSeconds()
-                - source.reference().getReceiverClockBiasSeconds(), 1e-8);
+                - baseline.getFirst().getReceiverClockBiasSeconds(), 1e-8);
+        if (rf) {
+            for (int axis = 0; axis < 3; axis++) {
+                assertEquals(baseline.getFirst().getEcefMeters()[axis], result.pvt().getFirst().getEcefMeters()[axis], .05);
+                assertEquals(baseline.getFirst().getVelocityMetersPerSecond()[axis], result.pvt().getFirst().getVelocityMetersPerSecond()[axis], .001);
+            }
+        }
         assertEquals("MEASURED", comparison.get("verdict"));
         json.writerWithDefaultPrettyPrinter()
                 .writeValue(root.resolve("pvt-comparison.json").toFile(), comparison);
+        if (rf) {
+            var report = new java.util.LinkedHashMap<String, Object>();
+            report.put("testType", "IQ_SAMPLE");
+            report.put("comparisonMode", "DELAY");
+            report.put("comparisonBasis", "RF_BASELINE");
+            report.put("referencePvt", reference);
+            report.put("rfBaselinePvt", baseline);
+            report.put("receivedPvt", result.pvt());
+            report.put("observations", result.observations());
+            report.put("delayEvidence", result.delayEvidence());
+            report.put("comparison", comparison);
+            report.put("fileResult", Map.of("verdict", "PASS", "sha256", source.sha256(),
+                    "sizeBytes", IqService.EXPECTED_BYTES, "rfBaselinePvt", baseline));
+            json.writerWithDefaultPrettyPrinter().writeValue(root.resolve("report.json").toFile(), report);
+        }
     }
 }

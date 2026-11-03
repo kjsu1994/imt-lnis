@@ -5,8 +5,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>LNIS DTN Receiver</title>
-  <link rel="stylesheet" href="/lnis/assets/common/app.css?v=20261102-light-header">
-  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20261102-iq-history-2">
+  <link rel="stylesheet" href="/lnis/assets/common/app.css?v=20261103-rf-delay">
+  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20261103-rf-delay">
 </head>
 <body data-page="dtn-receiver">
 <header style="position: relative;">
@@ -153,6 +153,10 @@
         <span id="pvt-validity" class="pill">결과 대기</span>
       </div>
     </div>
+    <details id="iq-original-reference" hidden>
+      <summary>송신 원본 Reference · 참고</summary>
+      <p id="iq-original-reference-values" class="pvt-difference-summary"></p>
+    </details>
     <div id="dtn-clock-analysis" class="pvt-delay-analysis" hidden>
       <div class="pvt-delay-metrics">
         <div title="시작 접수 → 본문 수신 완료"><span>시험 전달 지연</span><strong id="pvt-delay-value">—</strong></div>
@@ -240,7 +244,7 @@
 
                       <!-- 송신 기준 중심점 (0,0) -->
                       <circle cx="0" cy="0" r="7" class="enu-center-halo" />
-                      <circle cx="0" cy="0" r="3.5" class="enu-center-point" title="송신 기준 원점 (0, 0)" />
+                      <circle cx="0" cy="0" r="3.5" class="enu-center-point" title="비교 기준 원점 (0, 0)" />
 
                       <!-- 편차 벡터 선 및 수신 복원 타깃 점 -->
                       <line id="enu-vector-line" x1="0" y1="0" x2="0" y2="0" class="enu-vector-line" />
@@ -343,8 +347,8 @@
                 <thead>
                   <tr>
                     <th>항목</th>
-                    <th>송신 기준 (Reference)</th>
-                    <th>수신 복원 (Restored)</th>
+                    <th data-reference-label="송신 기준 (Reference)">송신 기준 (Reference)</th>
+                    <th data-shifted-label>수신 복원 (Restored)</th>
                     <th>편차 (Δ)</th>
                   </tr>
                 </thead>
@@ -374,7 +378,7 @@
             <div class="enu-components-wrap">
               <div class="section-sub-header">
                 <h4>🧭 국소 ENU 축별 성분 분해</h4>
-                <small class="sub-header-note">송신 기준점 접평면 기준 (East / North / Up)</small>
+                <small class="sub-header-note" data-reference-label="송신 기준점 접평면 기준 (East / North / Up)" data-rf-label="RF 기준점 접평면 기준 (East / North / Up)">송신 기준점 접평면 기준 (East / North / Up)</small>
               </div>
               <div class="enu-comp-grid">
                 <div class="enu-comp-card comp-east">
@@ -417,7 +421,7 @@
           <thead>
             <tr>
               <th>항목 (Parameter)</th>
-              <th>송신 기준 (Original)</th>
+              <th data-reference-label="송신 기준 (Original)">송신 기준 (Original)</th>
               <th>수신 지연 반영 (Shifted)</th>
               <th>편차 (Difference)</th>
               <th>판정 상태</th>
@@ -481,7 +485,7 @@
             <span class="evidence-box-icon">📐</span>
             <div class="evidence-box-title">
               <strong>DTN 전달 지연 및 시계오차 흡수 계산 근거 상세</strong>
-              <small class="evidence-box-formula">공식: 잔차 = (수신 Clock Bias − 송신 기준 Clock Bias) − 시험 전달 지연</small>
+              <small class="evidence-box-formula" data-reference-label="공식: 잔차 = (수신 Clock Bias − 송신 기준 Clock Bias) − 시험 전달 지연" data-rf-label="공식: 잔차 = (지연 반영 Clock Bias − RF 기준 Clock Bias) − 시험 전달 지연">공식: 잔차 = (수신 Clock Bias − 송신 기준 Clock Bias) − 시험 전달 지연</small>
             </div>
           </div>
           <pre id="pvt-delay-evidence" class="evidence-pre"></pre>

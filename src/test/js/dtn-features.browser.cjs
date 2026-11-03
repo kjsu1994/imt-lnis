@@ -388,6 +388,42 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
   await page.waitForFunction(label=>document.querySelector('#dtn-observations [data-integrity]')?.textContent===label,label);
   assert.equal(await observationPanel.locator('[data-integrity]').getAttribute('class'),'pill '+tone);
  }
+ // RF trials compare against the RF baseline while preserving the sender reference.
+ const baseline={week:2400,towSeconds:100000,positionValid:true,velocityValid:true,
+   ecefMeters:[-3049086,4046274,3861625],velocityMetersPerSecond:[1,2,3],satellitesUsed:5,receiverClockBiasSeconds:0};
+ const rfFixture={testType:'IQ_SAMPLE',comparisonMode:'DELAY',comparisonBasis:'RF_BASELINE',
+   fileResult:{verdict:'PASS'},referencePvt:[{...baseline,ecefMeters:[-3048000,4046000,3861000]}],
+   rfBaselinePvt:[baseline],receivedPvt:[{...baseline,towSeconds:100001,receiverClockBiasSeconds:1}],
+   delayEvidence:{timing:{startedAt:'2026-11-03T00:00:00Z',receivedAt:'2026-11-03T00:00:01Z'},delaySeconds:1,
+     originalTime:{week:2400,towSeconds:100000},shiftedTime:{week:2400,towSeconds:100001},satellites:[]},
+   comparison:{verdict:'MEASURED',epochs:[{week:2400,towSeconds:100001,positionDifferenceMeters:0,
+     velocityDifferenceMetersPerSecond:0,clockDifferenceSeconds:1,clockResidualSeconds:0}]},
+   observations:{...receivedReport.observations,source:'IQ_RF',selectedElapsedSeconds:21,
+     receivedValues:{observations:iqSignals.map(o=>({...o,pseudorangeMeters:21000000}))}}};
+ reportFixture=process.env.LNIS_RF_REPORT ? JSON.parse(readFileSync(process.env.LNIS_RF_REPORT,'utf8')) : rfFixture;
+ job={...job,testType:'IQ_SAMPLE',state:'COMPLETED',receivedEpochs:1};
+ await page.reload();await selectTrial();
+ await page.waitForFunction(()=>document.getElementById('receiver-pvt-title').textContent.includes('RF PVT'));
+ assert.match(await observationPanel.locator('[data-range-heading]').innerText(),/RF 추적/);
+ assert.ok(await observationPanel.locator('[data-range-heading]').isVisible());
+ assert.ok(await observationPanel.locator('td.converted-range').first().isVisible());
+ assert.equal(await observationPanel.locator('td.converted-range').first().evaluate(el=>getComputedStyle(el).color),'rgb(180, 35, 24)');
+ assert.equal(await page.locator('#reference-x').textContent(),reportFixture.rfBaselinePvt[0].ecefMeters[0].toFixed(3));
+ assert.equal(await page.locator('#iq-original-reference').isVisible(),true);
+ await page.locator('#iq-original-reference summary').click();
+ assert.ok((await page.locator('#iq-original-reference-values').innerText()).includes(String(reportFixture.referencePvt[0].ecefMeters[0])));
+ await page.locator('#iq-original-reference summary').click();
+ assert.match(await observationPanel.locator('[data-source]').innerText(),/RF 관측/);
+ assert.equal(await page.locator('[data-shifted-label]').innerText(),'지연 반영 PVT');
+ for(const width of [1920,1366,390]) {
+  await page.setViewportSize({width,height:900});
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'RF result fits '+width);
+  await observationPanel.screenshot({path:'build/iq-rf-observations-'+width+'.png'});
+ }
+ await page.setViewportSize({width:1366,height:900});
+ await page.locator('.receiver-pvt').screenshot({path:'build/iq-rf-pvt.png'});
+ await page.setViewportSize({width:1600,height:1000});
+ reportFixture=receivedReport;
  // I/Q must not leave hidden columns or filters on a subsequent AFS trial.
  job={...job,testType:'AFS_METADATA',receivedEpochs:1};
  reportFixture={comparisonMode:'DELAY',referenceStatus:'COMPLETE',referenceObservations:{epochs:[{observation:epoch}]},
@@ -450,8 +486,8 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
    assert.ok((await page.locator('#evidence-details').innerText()).trim().length > 15);
    if (mode === 'iq' && stage === 'decode') {
     const detail = await page.locator('#evidence-details').innerText();
-    assert.match(detail, /RF 추적 관측값.*진단/);
-    assert.match(detail, /프레임.*원본 Doppler/);
+    assert.match(detail, /RF 추적 의사거리/);
+    assert.match(detail, /같은 RF Epoch.*지연 미적용·적용 PVT/);
     assert.doesNotMatch(detail, /SB4 원본 관측값은.*절대 전달되지/);
    }
    if (stage === 'compare') {

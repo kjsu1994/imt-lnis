@@ -38,7 +38,7 @@ class IqServiceTest {
         var source = IqReceiver.source(input, "A".repeat(64));
         assertEquals(List.of(19, 23, 24, 28, 29), source.metadata().prns());
         assertEquals(15, source.metadata().gpsLnav().size());
-        assertFalse(input.lines().anyMatch(l -> l.matches("[NPF] 26(?: .*|$)")));
+        assertFalse(input.lines().anyMatch(l -> l.matches("[NPOF] 26(?: .*|$)")));
         assertTrue(messages.stream().anyMatch(m -> m.contains("제외 PRN [26]")));
     }
 
@@ -85,6 +85,8 @@ class IqServiceTest {
             Path report = Path.of("build/reports/iq-missing-navigation");
             Files.createDirectories(report);
             Files.writeString(report.resolve("earth-input.txt"), input);
+            new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules()
+                    .writeValue(report.resolve("source.json").toFile(), source);
         }
     }
 
@@ -99,7 +101,7 @@ class IqServiceTest {
                 IqService.EXPECTED_BYTES, "A".repeat(64), 90, 12000000, "IQ_INTERLEAVED_INT8", 2);
         json.writeValue(directory.resolve(id + ".json").toFile(), file);
         json.writeValue(directory.resolve(id + ".context.json").toFile(),
-                Map.of("metadata", Map.of("pvtMethod", IqReceiver.FRAME_METHOD)));
+                Map.of("metadata", Map.of("pvtMethod", IqReceiver.RF_METHOD)));
         try (var files = org.mockito.Mockito.mockStatic(Files.class, org.mockito.Mockito.CALLS_REAL_METHODS)) {
             files.when(() -> Files.size(bin)).thenReturn(IqService.EXPECTED_BYTES);
             assertEquals(file, service.completed(id), "dispatch must not recalculate the digest");
@@ -108,6 +110,10 @@ class IqServiceTest {
                     "receiver verification must still read all file bytes");
             files.when(() -> Files.size(bin)).thenReturn(4L);
             assertThrows(IllegalArgumentException.class, () -> service.completed(id));
+            json.writeValue(directory.resolve(id + ".context.json").toFile(),
+                    Map.of("metadata", Map.of("pvtMethod", IqReceiver.FRAME_METHOD)));
+            assertEquals("REGENERATE", service.status(id).get("state"));
+            assertTrue(Files.exists(bin), "old I/Q files must be preserved");
         }
         Files.delete(bin);
         assertThrows(IllegalStateException.class, () -> service.completed(id));

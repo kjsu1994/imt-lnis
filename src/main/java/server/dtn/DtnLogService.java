@@ -335,6 +335,10 @@ public class DtnLogService {
 
     /** 수신 노드에만 위성별 계산 근거를 남긴다. 송신 노드는 최종 요약만 기록한다. */
     public void delay(UUID id, DtnDelay.Evidence evidence) {
+        delay(id, evidence, "원본");
+    }
+
+    public void delay(UUID id, DtnDelay.Evidence evidence, String source) {
         if (evidence == null || hasStage(id, "지연 측정")) {
             return;
         }
@@ -366,7 +370,7 @@ public class DtnLogService {
                 "TEST",
                 "관측 시각",
                 true,
-                "원본 GNSS 시간축 유지 · GPS 원본 t₀ = "
+                source + " GNSS 시간축 유지 · GPS 기준 t₀ = "
                         + gpsTime(evidence.originalTime())
                         + " · 계산 t₁ = t₀ + Δt = "
                         + gpsTime(evidence.shiftedTime()));
@@ -432,7 +436,7 @@ public class DtnLogService {
                             + satellite.recalculatedMeters()
                             + " m · 계산은 절대시각 반올림 영향을 피하도록 Pᵢ+c×Δt 사용 · 변화 "
                             + evidence.addedMeters()
-                            + " m · 원본 Doppler "
+                            + " m · " + source + " Doppler "
                             + satellite.dopplerHz()
                             + " Hz / C/N0 "
                             + satellite.cn0()
@@ -445,7 +449,7 @@ public class DtnLogService {
                 "TEST",
                 "계산 조건",
                 true,
-                "Ephemeris·Doppler·C/N0 등 원본 유지 · 기존 RTKLIB GPS L1 C/A SPP 재사용 · 원본 JSON/RAW 변경 없음");
+                "Ephemeris 유지 · " + source + " Doppler·C/N0 유지 · 기존 RTKLIB GPS L1 C/A SPP 재사용");
         add(
                 id,
                 "TEST",

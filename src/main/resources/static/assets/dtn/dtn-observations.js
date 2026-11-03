@@ -1337,7 +1337,7 @@ export function createObservationView(container, onSelect = () => {}, role = '')
 
   function render(notify = true) {
     const tracking = renderTracking();
-    const iqView = data?.source === 'IQ_FRAME' || data?.source === 'IQ_TRACKING' || report?.testType === 'IQ_SAMPLE';
+    const iqView = data?.source === 'IQ_FRAME' || data?.source === 'IQ_RF' || data?.source === 'IQ_TRACKING' || report?.testType === 'IQ_SAMPLE';
     const frame = data?.source === 'IQ_FRAME';
     for (const name of ['range', 'phase', 'lock', 'deviation']) {
       container.querySelector('[data-' + name + '-heading]').hidden = frame;
@@ -1348,7 +1348,7 @@ export function createObservationView(container, onSelect = () => {}, role = '')
       const result = iqIntegrity(report?.fileResult, report?.comparison, report?.state);
       integrity.textContent = result.label;
       integrity.className = 'pill ' + result.tone;
-      integrity.title = '파일 일치는 크기·SHA-256 검증 결과입니다. PVT는 Reference와 위치·속도·시계오차를 비교하며, 지연에 따른 차이를 별도로 측정합니다.';
+      integrity.title = report?.comparisonBasis === 'RF_BASELINE' ? '크기·SHA-256으로 파일 일치를 확인하고, 동일 RF 관측의 지연 적용 전후 PVT 차이를 측정합니다.' : '파일 일치는 크기·SHA-256 검증 결과입니다. PVT는 Reference와 위치·속도·시계오차를 비교하며, 지연에 따른 차이를 별도로 측정합니다.';
     }
     if (data?.receivedValues) { renderWire(notify, tracking); return; }
     const item = data?.epochs?.[Number(select.value)];
@@ -1498,9 +1498,11 @@ export function createObservationView(container, onSelect = () => {}, role = '')
     const wire = data.receivedValues;
     const rawEpoch = wire.records?.find(record => record.observation)?.observation;
     const values = rawEpoch?.observations || wire.observations || [];
-    const week = rawEpoch?.week ?? values[0]?.week;
-    const tow = rawEpoch?.receiverTowSeconds ?? values[0]?.towSeconds;
-    const iq = data.source === 'IQ_FRAME';
+    const week = rawEpoch?.week ?? values[0]?.week ?? wire.week;
+    const tow = rawEpoch?.receiverTowSeconds ?? values[0]?.towSeconds ?? wire.towSeconds;
+    const rf = data.source === 'IQ_RF';
+    const iq = data.source === 'IQ_FRAME' || rf;
+    container.querySelector('[data-phase-heading]').title = rf ? 'RF 추적기의 상대 누적 위상입니다. PVT 계산에는 사용하지 않습니다.' : '';
     const reference = !iq && report?.referenceObservations?.epochs?.find(item =>
       item.observation.week === week && item.observation.receiverTowSeconds === tow)?.observation;
     const calculated = data.epochs?.[Number(select.value)]?.observation;
@@ -1517,19 +1519,19 @@ export function createObservationView(container, onSelect = () => {}, role = '')
       integrity.title = '송신 시 의도한 변환·제외를 적용한 뒤 전달 대상 데이터만 대조합니다. 원본 의사거리와 Reference는 별도 조회하며 수신 PVT 계산에 사용하지 않습니다.';
     }
     container.querySelector('[data-title]').textContent = '수신 원본 GNSS 관측값';
-    container.querySelector('[data-observation-title]').textContent = iq ? '프레임 복원 관측값 · 1 Epoch' : '관측값 · RAWX';
-    container.querySelector('[data-range-heading]').textContent = '원본 의사거리 (m)';
-    container.querySelector('[data-range-heading]').title = '계산 후 송신 서비스에서 별도로 조회한 원본입니다. 조회 전에는 표시하지 않습니다.';
+    container.querySelector('[data-observation-title]').textContent = rf ? 'RF 추적 관측값 · PVT 계산 입력' : iq ? '프레임 복원 관측값 · 1 Epoch' : '관측값 · RAWX';
+    container.querySelector('[data-range-heading]').textContent = rf ? 'RF 추적 의사거리 (m)' : '원본 의사거리 (m)';
+    container.querySelector('[data-range-heading]').title = rf ? '선택한 RF Epoch의 지연 미적용 의사거리입니다.' : '계산 후 송신 서비스에서 별도로 조회한 원본입니다. 조회 전에는 표시하지 않습니다.';
     container.querySelector('[data-range-after]').hidden = false;
     container.querySelector('[data-range-after]').textContent = iq ? '지연 반영 의사거리 (m)' : '변환 후 의사거리 (m)';
     container.querySelector('[data-range-after]').classList.add('converted-range');
     container.querySelector('[data-range-added]').hidden = true;
     container.querySelector('[data-transmit-heading]').textContent = '보정 송신 시각 (Unix s)';
     container.querySelector('[data-transmit-heading]').classList.add('converted-value');
-    container.querySelector('[data-transmit-heading]').title = '송신부가 원본 의사거리에서 역산하고 시험 시작 시각에 맞춰 보정한 가상 송신 시각입니다.';
+    container.querySelector('[data-transmit-heading]').title = rf ? '수신부가 RF 의사거리로 역산한 시험 시작 기준 가상 송신 시각입니다.' : '송신부가 원본 의사거리에서 역산하고 시험 시작 시각에 맞춰 보정한 가상 송신 시각입니다.';
     container.querySelector('[data-delay-summary]').hidden = true;
     container.querySelector('[data-frame-input]').hidden = true;
-    container.querySelector('[data-source]').textContent = data.source === 'IQ_FRAME' ? 'I/Q 프레임 복원 · 공통 지연 PVT' : rawEpoch ? '수신 RAW JSON' : 'AFS 프레임 복원';
+    container.querySelector('[data-source]').textContent = rf ? 'RF 관측 · 파일 경과 ' + numeric(data.selectedElapsedSeconds) + ' s · 공통 지연 PVT' : data.source === 'IQ_FRAME' ? 'I/Q 프레임 복원 · 공통 지연 PVT' : rawEpoch ? '수신 RAW JSON' : 'AFS 프레임 복원';
     container.querySelector('[data-nav]').textContent = '항법정보 ' + (data.navigationCount ?? 0) + '건';
     container.querySelector('[data-count]').textContent = '관측 신호 ' + values.length;
     container.querySelector('[data-status]').textContent = '';
@@ -1550,11 +1552,16 @@ export function createObservationView(container, onSelect = () => {}, role = '')
     selectSatellite(displayed);
     for (const {observation, rfOnly} of rows) {
       const originals = reference?.observations?.filter(o => matchSignal(o, observation)) || [];
-      const original = originals.length === 1 ? originals[0] : null;
+      const original = rf ? observation : originals.length === 1 ? originals[0] : null;
       const conversions = calculated?.observations?.filter(o => matchSignal(o, observation)) || [];
       const converted = conversions.length === 1 ? conversions[0] : null;
       const cells = observationCells(observation, tow);
       cells[3] = numeric(original?.pseudorangeMeters);
+      if (rf) {
+        cells[2] = 'AFS Data · L1';
+        cells[7] = '—';
+        cells[8] = '—';
+      }
       // Eligibility uses the calculated received observation, never Reference pseudorange.
       cells[10] = delayEvidence?.error ? '계산 불가' : conversions.length > 1 ? '확인 불가'
         : converted ? observationCells(converted, tow)[10] : '계산값 없음';
@@ -1577,7 +1584,7 @@ export function createObservationView(container, onSelect = () => {}, role = '')
       }
       cells.forEach((value, index) => {
         const cell = document.createElement('td');
-        cell.hidden = iq && [3, 5, 8, 9].includes(index);
+        cell.hidden = iq && !rf && [3, 5, 8, 9].includes(index);
         if (index === 4) cell.className = 'converted-range';
         if (index === cells.length - 1 && stamp) cell.className = 'converted-value';
         if (index === 7) {
@@ -1622,8 +1629,8 @@ export function createObservationView(container, onSelect = () => {}, role = '')
         showAllNavigation = true;
       }
       const selected = preserve ? Number(select.value) : 0;
-      const nextIq = next?.source === 'IQ_FRAME' || next?.source === 'IQ_TRACKING';
-      const previousIq = data?.source === 'IQ_FRAME' || data?.source === 'IQ_TRACKING';
+      const nextIq = next?.source === 'IQ_FRAME' || next?.source === 'IQ_RF' || next?.source === 'IQ_TRACKING';
+      const previousIq = data?.source === 'IQ_FRAME' || data?.source === 'IQ_RF' || data?.source === 'IQ_TRACKING';
       if (nextIq !== previousIq) {
         showPvtActiveOnly = !nextIq;
         if (navFilterCheckbox) navFilterCheckbox.checked = showPvtActiveOnly;

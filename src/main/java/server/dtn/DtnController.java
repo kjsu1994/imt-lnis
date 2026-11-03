@@ -460,6 +460,12 @@ public class DtnController {
                 job.getComparisonJson() == null
                         ? null
                         : objectMapper.readTree(job.getComparisonJson()));
+        if (report.get("comparison") instanceof JsonNode comparison
+                && "RF_BASELINE".equals(comparison.path("comparisonBasis").asText())) {
+            report.put("comparisonBasis", "RF_BASELINE");
+            report.put("rfBaselinePvt", report.get("fileResult") instanceof JsonNode file
+                    ? file.path("rfBaselinePvt") : null);
+        }
         // 과거 비교 결과에도 수치를 추가하되 저장된 결과와 로그는 수정하지 않는다.
         if ("DELAY".equals(job.getComparisonMode())
                 && evidence != null

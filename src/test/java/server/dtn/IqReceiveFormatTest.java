@@ -31,6 +31,7 @@ class IqReceiveFormatTest {
         "1,LNIS-IQ-FILE-v1,legacy,false",
         "2,LNIS-IQ-FILE-v2,frame,false",
         "3,LNIS-IQ-FILE-v3,frame,true",
+        "3,LNIS-IQ-FILE-v3,rf,true",
         "1,LNIS-IQ-FILE-v2,frame,false",
         "2,LNIS-IQ-FILE-v1,frame,false",
         "2,LNIS-IQ-FILE-v2,legacy,false"
@@ -69,7 +70,7 @@ class IqReceiveFormatTest {
         transfer.setMetadata(
                 new IqMetadata(
                         "AFSD",
-                        "frame".equals(method) ? IqReceiver.FRAME_METHOD : IqReceiver.METHOD,
+                        "rf".equals(method) ? IqReceiver.RF_METHOD : "frame".equals(method) ? IqReceiver.FRAME_METHOD : IqReceiver.METHOD,
                         2400,
                         100000,
                         "ECEF_CONSTANT_VELOCITY",
@@ -127,8 +128,9 @@ class IqReceiveFormatTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"unchanged", "size", "modified", "replaced", "removed", "cancelled"})
+    @ValueSource(strings = {"unchanged", "size", "modified", "replaced", "removed", "cancelled", "rf"})
     void verifiesHashOnceAndPublishesResultsOnlyForUnchangedActiveTrial(String change) throws Exception {
+        boolean rf = change.equals("rf");
         var json = new ObjectMapper().findAndRegisterModules();
         var repository = mock(DtnRepository.class);
         var service = new DtnService(repository, mock(AgentCommandService.class),
@@ -145,12 +147,12 @@ class IqReceiveFormatTest {
                     Files.readAttributes(bin, java.nio.file.attribute.BasicFileAttributes.class).fileKey() != null,
                     "File identity is not provided on this filesystem; covered by the Linux verification.");
         }
-        when(iq.verify(any(), any())).thenReturn(Map.of("verdict", "PASS"));
+        when(iq.verify(any(), any())).thenReturn(Map.of("verdict", "PASS", "sizeBytes", IqService.EXPECTED_BYTES, "sha256", "A".repeat(64)));
         var start = Instant.parse("2026-11-02T00:00:00Z");
         var timing = new server.pvt.DtnDelay.Timing(start, start.plusSeconds(2));
         var evidence = new server.pvt.DtnDelay.Evidence(timing, 2, 2 * server.pvt.DtnDelay.C,
-                new server.pvt.DtnDelay.Time(2400, 100000),
-                new server.pvt.DtnDelay.Time(2400, 100002), List.of(), null);
+                new server.pvt.DtnDelay.Time(2400, rf ? 100021 : 100000),
+                new server.pvt.DtnDelay.Time(2400, rf ? 100023 : 100002), List.of(), null);
         var reference = new Pvt();
         reference.setWeek(2400);
         reference.setTowSeconds(100000);
@@ -160,7 +162,9 @@ class IqReceiveFormatTest {
         reference.setVelocityMetersPerSecond(new double[] {4, 5, 6});
         reference.setReceiverClockBiasSeconds(0.0);
         var received = json.readValue(json.writeValueAsString(reference), Pvt.class);
-        received.setTowSeconds(100002);
+        received.setTowSeconds(rf ? 100023 : 100002);
+        var baseline = json.readValue(json.writeValueAsString(reference), Pvt.class);
+        baseline.setTowSeconds(rf ? 100021 : 100000);
         received.setReceiverClockBiasSeconds(2.0);
         var transfer = new Transfer();
         transfer.setSchemaVersion(3);
@@ -168,7 +172,7 @@ class IqReceiveFormatTest {
         transfer.setTestType("IQ_SAMPLE");
         transfer.setFile(new IqFile("/exchange/" + UUID.randomUUID() + ".bin",
                 IqService.EXPECTED_BYTES, "A".repeat(64), 90, 12000000, "IQ_INTERLEAVED_INT8", 2));
-        transfer.setMetadata(new IqMetadata("AFSD", IqReceiver.FRAME_METHOD, 2400, 100000,
+        transfer.setMetadata(new IqMetadata("AFSD", rf ? IqReceiver.RF_METHOD : IqReceiver.FRAME_METHOD, 2400, 100000,
                 "ECEF_CONSTANT_VELOCITY", List.of(19, 23, 24, 28), List.of()));
         transfer.setReferencePvt(List.of(reference));
         var job = new DtnJob();
@@ -196,19 +200,45 @@ class IqReceiveFormatTest {
                 case "removed" -> Files.delete(bin);
                 case "cancelled" -> job.setState("CANCELLED");
             }
-            return new IqReceiver.Result(List.of(received), Map.of("source", "IQ_FRAME"), evidence);
+            return new IqReceiver.Result(List.of(received), Map.of("source", rf ? "IQ_RF" : "IQ_FRAME"), evidence,
+                    rf ? List.of(baseline) : List.of());
         });
 
         ReflectionTestUtils.invokeMethod(service, "verifyIq", job);
 
         verify(iq, times(1)).verify(any(), any());
         verify(receiver, times(1)).decode(eq(bin), any(), eq(timing), any());
-        if (change.equals("unchanged")) {
+        if (change.equals("unchanged") || rf) {
             assertEquals("COMPLETED", job.getState());
             assertEquals("PASS", json.readTree(job.getFileResultJson()).path("verdict").asText());
             assertEquals("MEASURED", json.readTree(job.getComparisonJson()).path("verdict").asText());
             assertEquals(json.valueToTree(List.of(received)), json.readTree(job.getReceiverJson()));
             assertEquals(evidence, json.readValue(job.getDelayEvidenceJson(), server.pvt.DtnDelay.Evidence.class));
+            if (rf) {
+                assertEquals("RF_BASELINE", json.readTree(job.getComparisonJson()).path("comparisonBasis").asText());
+                assertEquals(json.valueToTree(List.of(reference)), json.readTree(job.getReferenceJson()));
+                assertEquals(json.valueToTree(List.of(baseline)), json.readTree(job.getFileResultJson()).path("rfBaselinePvt"));
+                var reportService = mock(DtnService.class);
+                when(reportService.get(job.getId())).thenReturn(job);
+                var report = new DtnController(reportService, json).report(job.getId()).getBody();
+                assertEquals("RF_BASELINE", report.get("comparisonBasis"));
+                assertEquals(json.valueToTree(List.of(baseline)), report.get("rfBaselinePvt"));
+                var sender = new DtnJob();
+                sender.setId(job.getId());
+                sender.setTestType("IQ_SAMPLE");
+                sender.setState("WAITING_DTN");
+                sender.setSentJson(json.writeValueAsString(transfer));
+                var remote = new DtnRemoteResult();
+                remote.setState("COMPLETED");
+                remote.setReceivedAt(timing.receivedAt());
+                remote.setPvt(List.of(received));
+                remote.setDelayEvidence(evidence);
+                remote.setFileResult(json.readTree(job.getFileResultJson()));
+                ReflectionTestUtils.invokeMethod(service, "applyReceiverResult", sender, remote);
+                assertEquals("COMPLETED", sender.getState());
+                assertEquals("RF_BASELINE", json.readTree(sender.getComparisonJson()).path("comparisonBasis").asText());
+                assertEquals(json.valueToTree(List.of(reference)), json.readTree(sender.getReferenceJson()));
+            }
         } else {
             assertEquals(change.equals("cancelled") ? "CANCELLED" : "FAILED", job.getState());
             assertNull(job.getReceiverJson());

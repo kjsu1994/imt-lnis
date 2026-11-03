@@ -5,6 +5,7 @@ param(
     [string]$Distribution = 'Ubuntu',
     [string]$BridgeDistribution,
     [string]$SourceDirectory,
+    [string]$IqGenerator,
     [switch]$ValidateOnly
 )
 
@@ -25,6 +26,16 @@ $SourceDirectory = [IO.Path]::GetFullPath($SourceDirectory)
 if ([string]::IsNullOrWhiteSpace($Jar)) { $Jar = Join-Path $SourceDirectory 'build\libs\lnis.jar' }
 if ([string]::IsNullOrWhiteSpace($BridgeDistribution)) { $BridgeDistribution = Join-Path $SourceDirectory 'build\windows-serial-bridge' }
 $sourceScripts = Join-Path $SourceDirectory 'deployment\node'
+
+function Assert-IqGenerator([string]$Path) {
+    $stream = [IO.File]::OpenRead($Path)
+    try {
+        $magic = [byte[]]::new(4)
+        if ($stream.Read($magic, 0, 4) -ne 4 -or [BitConverter]::ToString($magic) -ne '7F-45-4C-46') {
+            throw "Expected a Linux ELF I/Q generator: $Path"
+        }
+    } finally { $stream.Dispose() }
+}
 
 function Assert-Jar([string]$Path, [string]$ExpectedHash) {
     if ((Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash -ne $ExpectedHash) {
@@ -189,6 +200,12 @@ function Wait-Healthy($Target) {
 $source = (Resolve-Path -LiteralPath $Jar).Path
 $hash = (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash
 Assert-Jar $source $hash
+$generator = $null
+if ($IqGenerator) {
+    $generator = (Resolve-Path -LiteralPath $IqGenerator).Path
+    Assert-IqGenerator $generator
+    $generatorSources = (Resolve-Path -LiteralPath (Join-Path $SourceDirectory 'build\distributions\native-sources.zip')).Path
+}
 $timestamp = Get-Date -Format 'yyyyMMdd-HHmmss-fff'
 $targets = @()
 
@@ -200,6 +217,14 @@ foreach ($directory in $TargetDirectories) {
     $linux = '/mnt/' + $path.Substring(0, 1).ToLowerInvariant() + '/' + $path.Substring(3).Replace('\', '/')
     foreach ($file in @('docker-compose.yml', '.env', 'Dockerfile', 'lnis.jar', 'DB')) {
         if (-not (Test-Path -LiteralPath (Join-Path $path $file))) { throw "Missing deployment file: $path\$file" }
+    }
+    if ($generator) {
+        $installedGenerator = Join-Path $path 'iq\afs_sim'
+        if ($generator -eq $installedGenerator) { throw 'Build and deployed I/Q generators must be separate.' }
+        Assert-IqGenerator $installedGenerator
+        if (!(Test-Path -LiteralPath (Join-Path $path 'licenses\native-sources.zip') -PathType Leaf)) {
+            throw 'Missing installed native source archive.'
+        }
     }
     if ($source -eq (Join-Path $path 'lnis.jar')) { throw 'Build JAR and deployed JAR must be separate files.' }
     # Read the running project's complete file list; an explicit Windows/USB overlay must not disappear.
@@ -263,9 +288,14 @@ foreach ($target in $targets) {
     $stopped = $false
     $jarReplaced = $false
     $bridgeReplaced = $false
+    $generatorReplaced = $false
     New-Item -ItemType Directory -Path $target.Backup | Out-Null
     foreach ($file in @('lnis.jar', 'Dockerfile', '.env')) {
         Copy-Item -LiteralPath (Join-Path $target.Path $file) -Destination $target.Backup
+    }
+    if ($generator) {
+        Copy-Item -LiteralPath (Join-Path $target.Path 'iq\afs_sim') -Destination (Join-Path $target.Backup 'afs_sim')
+        Copy-Item -LiteralPath (Join-Path $target.Path 'licenses\native-sources.zip') -Destination $target.Backup
     }
     Get-ChildItem -LiteralPath $target.Path -Filter '*.yml' -File | Copy-Item -Destination $target.Backup
     if ($target.Bridge) {
@@ -281,6 +311,15 @@ foreach ($target in $targets) {
         Assert-Jar $stagedJar $hash
         Move-Item -LiteralPath $stagedJar -Destination $deployedJar -Force
         $jarReplaced = $true
+        if ($generator) {
+            $installedGenerator = Join-Path $target.Path 'iq\afs_sim'
+            $generatorReplaced = $true
+            Copy-Item -LiteralPath $generator -Destination $installedGenerator -Force
+            Copy-Item -LiteralPath $generatorSources -Destination (Join-Path $target.Path 'licenses\native-sources.zip') -Force
+            if ((Get-FileHash -LiteralPath $installedGenerator).Hash -ne (Get-FileHash -LiteralPath $generator).Hash) {
+                throw 'I/Q generator copy hash mismatch.'
+            }
+        }
         # Also supports receiver deployments whose Compose file has no build section.
         Invoke-Docker $target.Linux @('build', '--tag', $target.Image, '.') | Out-Host
         Assert-NodeIdle $target
@@ -311,6 +350,10 @@ foreach ($target in $targets) {
             Assert-Jar $stagedJar (Get-FileHash -LiteralPath $previousJar -Algorithm SHA256).Hash
             Move-Item -LiteralPath $stagedJar -Destination $deployedJar -Force
             Invoke-Docker $target.Linux @('tag', $target.PreviousImage, $target.Image) | Out-Host
+        }
+        if ($generatorReplaced) {
+            Copy-Item -LiteralPath (Join-Path $target.Backup 'afs_sim') -Destination (Join-Path $target.Path 'iq\afs_sim') -Force
+            Copy-Item -LiteralPath (Join-Path $target.Backup 'native-sources.zip') -Destination (Join-Path $target.Path 'licenses\native-sources.zip') -Force
         }
         if ($bridgeReplaced) {
             & (Join-Path $target.Path 'stop-serial-bridge.ps1')
