@@ -66,13 +66,25 @@ class DataManagementIntegrationTest {
         }
     }
 
+    @AfterAll
+    static void removeTestFiles() throws Exception {
+        Path root = directory.toAbsolutePath().normalize();
+        assertTrue(root.startsWith(Path.of(System.getProperty("java.io.tmpdir")).toAbsolutePath().normalize()));
+        assertTrue(root.getFileName().toString().startsWith("lnis-management-test-"));
+        try (var paths = Files.walk(root)) {
+            for (Path path : paths.sorted(Comparator.reverseOrder()).toList())
+                Files.deleteIfExists(path);
+        }
+    }
+
     @DynamicPropertySource
     static void paths(DynamicPropertyRegistry p) {
         p.add("lnis.storage.data-directory", () -> directory.toString());
         p.add("lnis.iq.directory", () -> directory.resolve("iq").toString());
     }
 
-    @Autowired DataManagementService management;
+    @MockitoSpyBean DataManagementService management;
+    @Autowired DataResetService reset;
     @Autowired DataManagementGuard guard;
     @Autowired DtnRepository jobs;
     @Autowired DtnService dtn;
@@ -112,6 +124,8 @@ class DataManagementIntegrationTest {
 
     @BeforeEach
     void clear() {
+        guard.resetting(false);
+        guard.revision(null);
         tx(
                 () -> {
                     for (String entity :
@@ -447,4 +461,228 @@ class DataManagementIntegrationTest {
         }
         assertEquals(0, management.list(Kind.RECEIPT, 0, "", "", null, null).total());
     }
+    DataResetService.View awaitReset() throws InterruptedException {
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(15);
+        while (System.nanoTime() < deadline) {
+            var status = reset.status();
+            if (status != null && !"RUNNING".equals(status.state())) return status;
+            Thread.sleep(20);
+        }
+        fail("초기화 처리가 제한 시간 안에 끝나지 않았습니다.");
+        return null;
+    }
+
+    @Test
+    void querySelectionIncludesEveryPageAndPreservesExcludedPins() {
+        tx(() -> {
+            for (int index = 0; index < 503; index++) {
+                DtnJob job = new DtnJob();
+                job.setId(UUID.randomUUID());
+                job.setTestType("GNSS_RAW");
+                job.setState("COMPLETED");
+                job.setCreatedAt(old);
+                job.setUpdatedAt(old);
+                em.persist(job);
+            }
+        });
+        var pinned = management.list(Kind.DTN, 0, "", "", null, null).items().getFirst().key();
+        management.pin(pinned, true);
+        var preview = management.previewQuery(new QuerySelection(Kind.DTN, "", "COMPLETED", null, null));
+        assertEquals(502, preview.items().size());
+        assertEquals(1, preview.excluded().size());
+        assertEquals(502L, preview.counts().get("DTN"));
+        var result = management.execute(preview.token(), "TEST_QUERY");
+        assertEquals(502, result.results().size());
+        assertTrue(result.results().stream().allMatch(row -> row.status().equals("DELETED")));
+        assertTrue(jobs.existsById(pinned.id()));
+        assertEquals(1, management.list(Kind.DTN, 0, "", "", null, null).total());
+    }
+
+    @Test
+    void trialResetRequiresExactConfirmationAndPreservesInputsFilesAndPolicies() throws Exception {
+        var input = inputs.create("preserved.graw", 3, InputKind.GRAW_UPLOAD);
+        inputs.append(input.inputId(), 0, new byte[] {1, 2, 3});
+        Path inputPath = directory.resolve("files/inputs/" + input.inputId() + ".part");
+        DtnJob job = job(input.inputId());
+        management.pin(key(job), true);
+        receipts.capture(("{\"testId\":\"" + job.getId() + "\"}").getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                "application/json", false);
+        logs.add(job.getId(), "TEST", "검증", false, "삭제 대상");
+        var policy = new Settings(new Policy(true,30), new Policy(false,30), new Policy(false,30));
+        management.savePolicy(management.previewPolicy(policy).preview().token());
+        jdbc.execute("create table if not exists test_session (session_id uuid primary key, request_json clob)");
+        jdbc.update("insert into test_session(session_id,request_json) values (?,?)", UUID.randomUUID(), "legacy");
+        var preview = reset.preview(DataResetService.Mode.TRIALS);
+        assertTrue(preview.counts().get("ARCHIVE") > 0);
+        assertTrue(preview.counts().get("PIN") > 0);
+        assertTrue(jobs.existsById(job.getId()));
+        assertThrows(IllegalArgumentException.class, () -> reset.start(preview.token(), "초기화"));
+        assertTrue(jobs.existsById(job.getId()));
+        reset.start(preview.token(), "시험 데이터 초기화");
+        var result = awaitReset();
+        assertEquals("COMPLETED", result.state(), result.message());
+        assertFalse(guard.resetting());
+        assertFalse(jobs.existsById(job.getId()));
+        assertEquals(policy, management.settings());
+        assertEquals(0, jdbc.queryForObject("select count(*) from test_session", Integer.class));
+        assertNotNull(inputs.get(input.inputId()));
+        assertTrue(Files.exists(inputPath));
+        assertTrue(guard.deleted("DTN", job.getId()));
+        assertThrows(RuntimeException.class, () -> receipts.capture(
+                ("{\"testId\":\"" + job.getId() + "\"}").getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                "application/json", false));
+        assertThrows(RuntimeException.class, () -> reset.start(preview.token(), "시험 데이터 초기화"));
+        guard.restoreRevision();
+        assertTrue(guard.revision().endsWith(":TRIALS"));
+        assertFalse(guard.revision().contains("\""));
+    }
+
+    @Test
+    void serviceResetClearsOwnedMaterialsAndPresetsButKeepsUnknownSharedFiles() throws Exception {
+        var input = inputs.create("reset.graw", 3, InputKind.GRAW_UPLOAD);
+        inputs.append(input.inputId(), 0, new byte[] {4, 5, 6});
+        DtnJob job = job(input.inputId());
+        management.pin(key(job), true);
+        Path root = directory.resolve("iq");
+        Files.createDirectories(root);
+        UUID owned = UUID.randomUUID(), external = UUID.randomUUID();
+        Path bin = root.resolve(owned + ".bin"), foreign = root.resolve(external + ".bin");
+        Files.write(bin, new byte[] {7, 8, 9});
+        Files.write(foreign, new byte[] {10, 11});
+        String owner = guard.storageOwner();
+        Files.writeString(root.resolve(owned + ".context.json"), "{\"owner\":\"" + owner + "\"}");
+        tx(() -> {
+            DtnPreset preset = new DtnPreset();
+            preset.setId(UUID.randomUUID());
+            preset.setName("초기화 대상");
+            preset.setSettingsJson("{}");
+            preset.setUpdatedAt(Instant.now());
+            em.persist(preset);
+            var connection = new server.node.NodePeerSetting();
+            connection.setId(1);
+            connection.setBaseUrl("http://192.0.2.1:8088");
+            em.merge(connection);
+        });
+        var preview = reset.preview(DataResetService.Mode.SERVICE);
+        assertEquals(1L, preview.counts().get("IQ"));
+        assertTrue(preview.retainedFiles() >= 1);
+        assertTrue(preview.fileBytes() >= 6);
+        assertTrue(Files.exists(bin));
+        reset.start(preview.token(), "서비스 초기화");
+        var result = awaitReset();
+        assertEquals("COMPLETED", result.state(), result.message());
+        assertFalse(Files.exists(bin));
+        assertFalse(Files.exists(directory.resolve("files/inputs/" + input.inputId() + ".part")));
+        assertTrue(Files.exists(foreign));
+        assertEquals(0L, em.createQuery("select count(e) from DtnPreset e", Long.class).getSingleResult());
+        assertEquals(0L, em.createQuery("select count(e) from InputBufferEntity e", Long.class).getSingleResult());
+        assertEquals(0L, em.createQuery("select count(e) from NodePeerSetting e", Long.class).getSingleResult());
+        assertFalse(management.settings().tests().enabled());
+        assertTrue(guard.revision().endsWith(":SERVICE"));
+        Files.delete(foreign);
+    }
+
+    @Test
+    void resetRejectsWaitingTrialsChangedPreviewsAndConcurrentMutations() throws Exception {
+        DtnJob job = job(null);
+        var initial = reset.preview(DataResetService.Mode.TRIALS);
+        DtnJob waiting = job(null);
+        waiting.setState("WAITING_DTN");
+        jobs.saveAndFlush(waiting);
+        assertThrows(RuntimeException.class, () -> reset.start(initial.token(), "시험 데이터 초기화"));
+        var blocked = reset.preview(DataResetService.Mode.TRIALS);
+        assertFalse(blocked.blocked().isEmpty());
+        assertThrows(RuntimeException.class, () -> reset.start(blocked.token(), "시험 데이터 초기화"));
+        assertTrue(jobs.existsById(job.getId()));
+        guard.resetting(true);
+        try {
+            mvc.perform(post("/lnis/api/v1/inputs").contentType("application/json").content("{}"))
+                    .andExpect(status().isConflict());
+            mvc.perform(get("/lnis/api/v1/data-management/reset/status")).andExpect(status().isOk());
+            assertThrows(RuntimeException.class, () -> management.execute(management.preview(List.of(key(job))).token(), "TEST"));
+        } finally {
+            guard.resetting(false);
+        }
+        waiting.setCancelPending(true);
+        waiting.setCancelWaitingOnly(true);
+        jobs.saveAndFlush(waiting);
+        var current = reset.preview(DataResetService.Mode.TRIALS);
+        assertEquals(1, reset.closeWaiting(current.token()).get("cancelled"));
+        var ended = jobs.findById(waiting.getId()).orElseThrow();
+        assertEquals("CANCELLED", ended.getState());
+        assertFalse(Boolean.TRUE.equals(ended.getCancelPending()));
+        assertTrue(jobs.existsById(job.getId()));
+    }
+
+    @Test
+    void failedFileResetIsResumableAndDoesNotEraseDatabaseEarly() throws Exception {
+        Path root = directory.resolve("iq");
+        Files.createDirectories(root);
+        UUID id = UUID.randomUUID();
+        Path file = root.resolve(id + ".bin").toAbsolutePath().normalize();
+        Files.write(file, new byte[] {1, 2, 3});
+        String owner = guard.storageOwner();
+        Files.writeString(root.resolve(id + ".context.json"), "{\"owner\":\"" + owner + "\"}");
+        DtnJob job = job(null);
+        var preview = reset.preview(DataResetService.Mode.SERVICE);
+        doThrow(new java.io.IOException("simulated locked file")).when(management).deletePath(file);
+        try {
+            reset.start(preview.token(), "서비스 초기화");
+            var failed = awaitReset();
+            assertEquals("FAILED", failed.state());
+            assertTrue(guard.resetting());
+            assertTrue(jobs.existsById(job.getId()));
+            assertTrue(Files.exists(file));
+            reset.restore();
+            assertEquals("FAILED", reset.status().state());
+        } finally {
+            doCallRealMethod().when(management).deletePath(file);
+        }
+        reset.retry(preview.token(), "서비스 초기화");
+        var completed = awaitReset();
+        assertEquals("COMPLETED", completed.state(), completed.message());
+        assertFalse(guard.resetting());
+        assertFalse(jobs.existsById(job.getId()));
+        assertFalse(Files.exists(file));
+    }
+
+    @Test
+    void resetHttpContractRequiresConfirmationAndReportsCommittedRevision() throws Exception {
+        DtnJob job = job(null);
+        var response = mvc.perform(post("/lnis/api/v1/data-management/reset/preview")
+                        .contentType("application/json").content("{\"mode\":\"TRIALS\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.state").value("PREVIEW"))
+                .andExpect(jsonPath("$.counts.DTN").value(1))
+                .andReturn().getResponse().getContentAsString();
+        String token = new com.fasterxml.jackson.databind.ObjectMapper().readTree(response).path("token").asText();
+        mvc.perform(post("/lnis/api/v1/data-management/reset/execute").contentType("application/json")
+                        .content("{\"token\":\"" + token + "\",\"confirmation\":\"틀린 문구\"}"))
+                .andExpect(status().isBadRequest());
+        assertTrue(jobs.existsById(job.getId()));
+        mvc.perform(post("/lnis/api/v1/data-management/reset/execute").contentType("application/json")
+                        .content("{\"token\":\"" + token + "\",\"confirmation\":\"시험 데이터 초기화\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.state").value("RUNNING"));
+        assertEquals("COMPLETED", awaitReset().state());
+        mvc.perform(get("/lnis/api/v1/data-management/reset/status"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.state").value("COMPLETED"))
+                .andExpect(header().string("X-LNIS-Data-Revision", token + ":TRIALS"));
+    }
+
+    @Test
+    void queryDeletionOfSharedTrialsKeepsFilesNotApprovedInThePreview() {
+        var input = inputs.create("shared-query.graw", 3, InputKind.GRAW_UPLOAD);
+        inputs.append(input.inputId(), 0, new byte[] {1, 2, 3});
+        DtnJob first = job(input.inputId()), second = job(input.inputId());
+        var preview = management.previewQuery(new QuerySelection(Kind.DTN, "", "", null, null));
+        assertTrue(preview.querySelection());
+        assertTrue(preview.items().stream().allMatch(row -> row.related().isEmpty()));
+        var result = management.execute(preview.token(), "TEST_QUERY_SHARED");
+        assertTrue(result.results().stream().allMatch(row -> row.status().equals("DELETED")));
+        assertFalse(jobs.existsById(first.getId()));
+        assertFalse(jobs.existsById(second.getId()));
+        assertNotNull(inputs.get(input.inputId()));
+        assertTrue(Files.exists(directory.resolve("files/inputs/" + input.inputId() + ".part")));
+    }
+
 }

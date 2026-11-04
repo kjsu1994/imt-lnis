@@ -46,6 +46,16 @@ public class ServiceClock {
                 anchor == null ? 0 : (tick - anchorTick) / 1e9, roundTrip, session, revision, changes);
     }
 
+    public synchronized void reset() {
+        requireAvailable();
+        anchor = null;
+        calibratedAt = null;
+        proposal = null;
+        source = "SYSTEM";
+        roundTrip = null;
+        revision++;
+    }
+
     public synchronized Proposal prepare(String source, double offset, Double roundTrip) {
         if (!java.util.Set.of("GNSS_USB", "PEER_GNSS", "NTP").contains(source)
                 || !Double.isFinite(offset) || Math.abs(offset) > 300

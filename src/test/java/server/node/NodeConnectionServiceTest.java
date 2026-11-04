@@ -175,4 +175,17 @@ class NodeConnectionServiceTest {
         request.setPort(port);
         return request;
     }
+    @Test
+    void resetRestoresEnvironmentAddressAndPreservesManagementToken() {
+        properties.applyPeerAddress(URI.create("http://192.0.2.1:8089"));
+        service.reset();
+        verify(settings).deleteAll();
+        verify(connection).applyAddress(URI.create("http://192.168.1.20:8088"));
+        assertEquals("test-private-token", properties.getManagementToken());
+        var noDefault = new NodeProperties(new MockEnvironment().withProperty("lnis.node.role","receiver"));
+        noDefault.applyPeerAddress(null);
+        assertFalse(noDefault.peerConfigured());
+        assertNull(noDefault.getPeerBaseUrl());
+    }
+
 }

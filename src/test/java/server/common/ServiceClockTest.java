@@ -69,4 +69,18 @@ class ServiceClockTest {
         wall.set(wall.get().plusSeconds(1));
         assertThrows(IllegalStateException.class, () -> clock.apply(next.ticket(), token));
     }
+    @org.junit.jupiter.api.Test
+    void serviceResetRestoresSystemTimeWithoutChangingThePcClock() {
+        var clock = new ServiceClock();
+        String token = java.util.UUID.randomUUID().toString();
+        clock.reserve(token);
+        var proposal = clock.prepare("GNSS_USB", 1.0, null);
+        clock.apply(proposal.ticket(), token);
+        clock.release(token);
+        org.junit.jupiter.api.Assertions.assertEquals("GNSS_USB", clock.stamp().source());
+        clock.reset();
+        org.junit.jupiter.api.Assertions.assertEquals("SYSTEM", clock.stamp().source());
+        org.junit.jupiter.api.Assertions.assertEquals(0.0, clock.stamp().offsetSeconds(), 1e-9);
+    }
+
 }

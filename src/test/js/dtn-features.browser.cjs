@@ -12,6 +12,8 @@ let browser, bulkRequests=0;
 let rows=[], id=0, job=null, starts=0, reportFixture={referencePvt:[],receivedPvt:[]};
 let managementRole = 'sender', policySaves = 0, managementDeletes = 0, proposedPolicies;
 let retentionSettings = {tests:{enabled:false,days:7},receipts:{enabled:false,days:7},files:{enabled:false,days:30}};
+let managedItems = [], managedTotal = 0, querySelections = 0, resetExecutions = 0, resetRetries = 0;
+let resetView = null, resetStatusView = null, resetStatusReads = 0, failReset = false;
 const managementItem = {key:{kind:'DTN',id:'management-test'},name:'GNSS_RAW',state:'COMPLETED'};
 const retentionPreview = () => ({token:'retention-token',role:managementRole,
   items:[{row:managementItem,related:[],logs:1,receipts:0,evidence:0,blocked:''}]});
@@ -23,6 +25,35 @@ const server=createServer((req,res)=>{
    const data=body?JSON.parse(body):{};
    if(path.startsWith('/lnis/api/v1/data-management/')){
     const endpoint = path.slice('/lnis/api/v1/data-management'.length);
+    if(endpoint === '/reset/status'){
+     if(resetStatusView?.state === 'RUNNING' && ++resetStatusReads > 1)
+      resetStatusView={...resetStatusView,state:'COMPLETED',completed:resetStatusView.total,message:'초기화 완료'};
+     return json(resetStatusView);
+    }
+    if(endpoint === '/reset/preview'){
+     resetView={token:'reset-token',mode:data.mode,role:managementRole,state:'PREVIEW',
+      expiresAt:new Date(Date.now()+600000).toISOString(),
+      counts:{DTN:2,RECEIPT:3,INPUT:data.mode==='SERVICE'?1:0,IQ:data.mode==='SERVICE'?1:0,PRESET:data.mode==='SERVICE'?5:0,PIN:1},
+      fileBytes:data.mode==='SERVICE'?2160000000:0,retainedFiles:data.mode==='SERVICE'?2:0,
+      blocked:[],waiting:{count:0,testIds:[]},completed:0,total:3,message:''};
+     return json(resetView);
+    }
+    if(endpoint === '/reset/execute' || endpoint === '/reset/retry'){
+     assert.equal(data.token,'reset-token');
+     assert.equal(data.confirmation,resetView.mode==='SERVICE'?'서비스 초기화':'시험 데이터 초기화');
+     if(endpoint.endsWith('/retry'))resetRetries++;else resetExecutions++;
+     resetStatusReads=0;
+     resetStatusView={...resetView,state:failReset?'FAILED':'RUNNING',
+      message:failReset?'파일 초기화 실패 · 다시 실행하세요.':'파일 정리 중'};
+     failReset=false;
+     return json(resetStatusView);
+    }
+    if(endpoint === '/selection/preview'){
+     querySelections++;
+     assert.equal(data.kind,'DTN');
+     return json({...retentionPreview(),fileBytes:1024,counts:{DTN:2,INPUT:1},
+      excluded:[{key:{kind:'DTN',id:'protected'},blocked:'보관 고정'}]});
+    }
     if(endpoint === '/summary')return json({role:managementRole,counts:{DTN:1,RECEIPT:0},databaseBytes:1024,inputBytes:0,iqBytes:0});
     if(endpoint === '/settings/preview'){proposedPolicies=data;return json({settings:data,preview:retentionPreview()});}
     if(endpoint === '/settings'){
@@ -31,7 +62,7 @@ const server=createServer((req,res)=>{
     }
     if(endpoint === '/cleanup/preview')return json(retentionPreview());
     if(endpoint === '/delete'){assert.equal(data.token,'retention-token');managementDeletes++;return json({results:[{key:managementItem.key,status:'DELETED'}]});}
-    if(endpoint === '/items')return json({items:[],total:0});
+    if(endpoint === '/items')return json({items:managedItems,total:managedTotal});
     if(endpoint === '/history')return json([]);
     return json({},404);
    }
@@ -810,6 +841,66 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
  assert.equal(new URL(await management.locator('#brand-home').getAttribute('href'),base).pathname,'/lnis/dtntest/receiver');
  await management.locator('#brand-home').click();
  await management.waitForURL(base+'/lnis/dtntest/receiver');
+ // Query-wide selection is preserved when paging and does not delete before confirmation.
+ managedItems=[{...managementItem,createdAt:'2026-11-01T00:00:00Z',bytes:0,pinned:false,blocked:''}];
+ managedTotal=503;
+ await management.getByRole('link',{name:'데이터 관리',exact:true}).click();
+ await management.waitForURL(base+'/lnis/data-manager');
+ await management.waitForFunction(()=>document.getElementById('count').textContent.includes('503'));
+ await management.locator('#select-results').click();
+ await management.waitForFunction(()=>document.getElementById('selection-count').textContent.includes('503'));
+ await management.locator('#next').click();
+ await management.waitForFunction(()=>document.getElementById('page').textContent.startsWith('2 /'));
+ assert.match(await management.locator('#selection-count').innerText(),/503/);
+ const deletionsBeforePreview=managementDeletes;
+ await management.locator('#delete-selected').click();
+ await management.waitForFunction(()=>document.getElementById('confirm').open);
+ assert.equal(querySelections,1);
+ assert.match(await management.locator('.preview-summary').innerText(),/삭제 파일 1.0 KB/);
+ assert.match(await management.locator('.preview-excluded summary').innerText(),/삭제 제외 1건/);
+ assert.equal(managementDeletes,deletionsBeforePreview);
+ await management.locator('#confirm-cancel').click();
+ await management.locator('#clear-selection').click();
+ await management.waitForFunction(()=>document.getElementById('selection-count').textContent==='');
+ await management.getByRole('button',{name:'초기화',exact:true}).click();
+ await management.locator('#reset-preview').click();
+ await management.waitForFunction(()=>!document.getElementById('reset-summary').hidden);
+ assert.match(await management.locator('#reset-summary').innerText(),/GNSS 입력.*유지/);
+ assert.equal(resetExecutions,0);
+ await management.locator('#reset-confirm-open').click();
+ await management.locator('#reset-phrase').fill('초기화');
+ await management.locator('#reset-acknowledge').check();
+ assert.equal(await management.locator('#reset-confirm-run').isDisabled(),true);
+ await management.locator('#reset-phrase').fill('시험 데이터 초기화');
+ assert.equal(await management.locator('#reset-confirm-run').isEnabled(),true);
+ await management.locator('#reset-confirm-cancel').click();
+ assert.equal(resetExecutions,0);
+ await management.locator('#reset-mode-service').check();
+ await management.locator('#reset-preview').click();
+ await management.waitForFunction(()=>document.getElementById('reset-summary').textContent.includes('프리셋'));
+ assert.match(await management.locator('#reset-summary').innerText(),/소유 미확인/);
+ for(const width of [1366,390]){
+  await management.setViewportSize({width,height:900});
+  assert.ok(await management.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'reset layout fits '+width);
+  await management.locator('#reset').screenshot({path:'build/management-reset-'+width+'.png'});
+ }
+ failReset=true;
+ await management.locator('#reset-confirm-open').click();
+ await management.locator('#reset-acknowledge').check();
+ await management.locator('#reset-phrase').fill('서비스 초기화');
+ await management.locator('#reset-confirm-run').click();
+ await management.waitForFunction(()=>document.getElementById('reset-state').textContent==='초기화 미완료');
+ assert.equal(resetExecutions,1);
+ assert.equal(await management.getByRole('button',{name:'시험 기록',exact:true}).isDisabled(),true);
+ assert.equal(await management.locator('#reset-retry').isVisible(),true);
+ await management.locator('#reset-retry').click();
+ await management.locator('#reset-acknowledge').check();
+ await management.locator('#reset-phrase').fill('서비스 초기화');
+ await management.locator('#reset-confirm-run').click();
+ await management.waitForFunction(()=>document.getElementById('reset-state').textContent==='초기화 완료');
+ assert.equal(resetRetries,1);
+ assert.equal(await management.locator('#reset-home').isVisible(),true);
+ assert.equal(await management.getByRole('button',{name:'시험 기록',exact:true}).isEnabled(),true);
  await management.close();
  assert.deepEqual(errors,[]);await browser.close();console.log('PASS: preset CRUD/apply/capacity/shared list, trial settings, viewport fullscreen, waiting batch cancellation, scoped intro, retention confirmation and same-tab navigation, responsive layout.');
 })().catch(e=>{console.error(e);process.exitCode=1;}).finally(async()=>{await browser?.close();server.close();});

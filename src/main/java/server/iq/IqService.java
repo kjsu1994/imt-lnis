@@ -22,6 +22,18 @@ public class IqService {
     private volatile Process process;
     private UUID active;
     @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private server.management.DataManagementGuard managementGuard;
+
+    private String storageOwner() {
+        return managementGuard == null || managementGuard.storageOwner() == null
+                ? "standalone" : managementGuard.storageOwner();
+    }
+
+    public synchronized void forgetJobs() {
+        if (active != null) throw new IllegalStateException("I/Q 작업 진행 중입니다.");
+        jobs.clear();
+    }
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
     private DtnLogService logs;
     private void trace(UUID id, String stage, boolean detail, String message) {
         if (logs != null) {
@@ -246,6 +258,8 @@ public class IqService {
                         + " · 항법 레코드 "
                         + earthInput.lines().filter(s -> s.startsWith("N ")).count()
                         + "건");
+        json.writeValue(root.resolve(id + ".context.json").toFile(),
+                Map.of("owner", storageOwner()));
         active = id;
         set(id, "GENERATING", "GNSS 기반 90초 AFS I/Q 생성 중 · PRN별 SB2·SB3·SB4 반복", null);
         Thread.ofVirtual().name("iq-generate").start(() -> generate(id, earthInput, grawBase64, reference));
@@ -360,7 +374,9 @@ public class IqService {
                                 12_000_000,
                                 "IQ_INTERLEAVED_INT8",
                                 2);
-                json.writeValue(root.resolve(id + ".context.json").toFile(), context);
+                var storedContext = (com.fasterxml.jackson.databind.node.ObjectNode) json.valueToTree(context);
+                storedContext.put("owner", storageOwner());
+                json.writeValue(root.resolve(id + ".context.json").toFile(), storedContext);
                 // The file manifest marks READY after its PVT context has been persisted.
                 json.writeValue(root.resolve(id + ".json").toFile(), file);
                 set(id, "READY", "파일 생성·크기·SHA-256 검증 완료", file);

@@ -21,6 +21,7 @@ public class NodeProperties {
     private final String peerAgentId;
     private final URI baseUrl;
     private volatile URI peerBaseUrl;
+    private final URI defaultPeerBaseUrl;
     private final String managementToken;
 
     public NodeProperties(Environment environment) {
@@ -41,6 +42,7 @@ public class NodeProperties {
                         environment.getProperty("lnis.node.base-url", "http://localhost:8088"));
         String peerAddress = environment.getProperty("lnis.node.peer-url", "").trim();
         peerBaseUrl = peerAddress.isEmpty() ? null : parseBaseUrl(peerAddress);
+        defaultPeerBaseUrl = peerBaseUrl;
         managementToken = environment.getProperty("lnis.node.management-token", "");
         if (agentId.isBlank() || peerAgentId.isBlank() || agentId.equals(peerAgentId)) {
             throw new IllegalArgumentException("노드 ID와 상대 노드 ID는 서로 다른 값이어야 합니다.");
@@ -56,6 +58,10 @@ public class NodeProperties {
 
     /** 검증 및 영속 저장을 완료한 설정 서비스만 호출한다. 역할과 인증 토큰은 변경하지 않는다. */
     void applyPeerAddress(URI address) {
+        if (address == null) {
+            peerBaseUrl = null;
+            return;
+        }
         URI validated = parseBaseUrl(address.toString());
         if (validated.equals(baseUrl)) {
             throw new IllegalArgumentException("자기 자신을 수신 노드로 지정할 수 없습니다.");

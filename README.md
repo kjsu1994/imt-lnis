@@ -261,6 +261,21 @@ docker compose ps
 
 ---
 
+### 데이터 관리
+
+송수신 화면의 데이터 관리 아이콘은 같은 창에서 `/lnis/data-manager`로 이동하며, imtplus 로고로 시험 화면에 돌아갑니다. 자료 건수·용량·저장소 여유 공간을 표시합니다. 용량 표시는 1 KB = 1,000 bytes 기준입니다.
+
+- **선택 삭제:** 현재 페이지 또는 검색 결과 전체를 선택하고 연관 자료·삭제 파일 용량·제외 사유를 확인합니다. 보관 고정·진행 중·공유 자료의 기존 보호 조건은 유지합니다.
+- **보관 설정:** 자동 삭제와 기간(1~3,650일)을 지정합니다. 시험은 최종 갱신 시점, 미연결 원문은 수신 시점, 미사용 파일은 생성 시점 기준입니다. 설정 저장과 즉시 정리는 별도 확인을 거칩니다.
+- **시험 데이터 초기화:** 시험·결과·원문·로그·이전 독립 AFS 보관 이력을 삭제합니다. GNSS 입력·I/Q·프리셋·연결 및 보관 설정은 유지합니다.
+- **서비스 초기화:** 위 자료와 서비스 소유 입력·I/Q 작업 파일·프리셋을 정리하고 사용자 설정을 배포 기본값으로 복원합니다. 자동 삭제는 꺼지고 시험용 시각 보정·GNSS 연결 설정도 초기화합니다. 실행 프로그램·Compose·환경변수·인증 정보·배포 백업·서비스 운영 로그는 유지합니다.
+
+초기화는 대상 확인 후 범위 이름을 입력해야 실행되며 보관 고정 자료도 포함됩니다. 진행 작업은 완료 후 실행합니다. 초기화 전 대기 종료는 현재 서비스에만 적용하며 상대 서비스·DTN 어댑터의 자료는 변경하지 않습니다. 처리 중 새 시험·수집·수신 요청을 제한하고, 파일 정리 실패 시 DB 이력을 먼저 지우지 않습니다. 중단된 작업은 남은 항목을 다시 실행할 수 있습니다.
+
+공유·소유 미확인 I/Q는 유지 개수를 표시하고 초기화에서 제외합니다. 새 생성 파일은 기존 `.context.json`에 설치별 소유 식별자를 기록합니다. 제외 파일은 일반 파일 조회에서 확인 후 개별 선택 삭제할 수 있습니다. 수행 정보와 삭제된 시험 ID는 지연 수신·재등록 방지를 위해 최소 관리 정보로 남깁니다. 서비스 초기화 완료 후 다른 브라우저도 다음 API 응답에서 저장된 화면 설정을 초기화합니다. 다른 PC는 해당 PC에서 별도로 관리합니다.
+
+---
+
 ## 7. Build, Native Compilation & Verification
 
 LNIS uses a reproducible, containerized multi-stage build (`native/Dockerfile`) to compile its C/C++ native libraries (`libLnisAfsCodec.so` for Linux x86-64, `LnisAfsCodec.dll` for Windows x86-64, and `afs_sim` / `pocket_trk` executables) from unmodified upstream vendor snapshots (`native/vendor/`) and auditable patch sets (`native/patches/`).

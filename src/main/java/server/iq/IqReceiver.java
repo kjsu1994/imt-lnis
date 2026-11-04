@@ -26,6 +26,7 @@ public class IqReceiver {
     public static final String FRAME_METHOD = "AFS_IQ_FRAME_PVT-v3";
     public static final String RF_METHOD = "AFS_IQ_RF_DELAY-v1";
 
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)
     public record Source(String sha256, IqMetadata metadata, Pvt reference, String grawBase64) {
         public Source(String sha256, IqMetadata metadata, Pvt reference) {
             this(sha256, metadata, reference, null);

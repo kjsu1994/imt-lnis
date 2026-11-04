@@ -352,6 +352,14 @@ public final class GnssConnection implements AutoCloseable {
         }
     }
 
+    public void resetSettings() {
+        disconnect();
+        synchronized (this) {
+            settings = null;
+            resetInput();
+        }
+    }
+
     @Override
     public void close() {
         synchronized (this) {

@@ -16,12 +16,39 @@ import java.util.*;
 @RequiredArgsConstructor
 public class DataManagementController {
     private final DataManagementService service;
+    private final DataResetService reset;
 
     public record Selection(List<Key> items) {}
 
     public record Confirmation(UUID token) {}
 
     public record PinRequest(Key item, boolean pinned) {}
+
+    public record ResetRequest(DataResetService.Mode mode) {}
+    public record ResetConfirmation(UUID token, String confirmation) {}
+
+    @GetMapping("/reset/status")
+    public Object resetStatus() { return reset.status(); }
+
+    @PostMapping("/reset/preview")
+    public Object resetPreview(@RequestBody ResetRequest request) {
+        return reset.preview(request.mode());
+    }
+
+    @PostMapping("/reset/execute")
+    public Object resetExecute(@RequestBody ResetConfirmation request) {
+        return reset.start(request.token(), request.confirmation());
+    }
+
+    @PostMapping("/reset/waiting/close")
+    public Object closeResetWaiting(@RequestBody Confirmation request) {
+        return reset.closeWaiting(request.token());
+    }
+
+    @PostMapping("/reset/retry")
+    public Object resetRetry(@RequestBody ResetConfirmation request) {
+        return reset.retry(request.token(), request.confirmation());
+    }
 
     @GetMapping("/summary")
     public Object summary() {
@@ -47,6 +74,11 @@ public class DataManagementController {
     @PostMapping("/preview")
     public Object preview(@RequestBody Selection request) {
         return service.preview(request.items());
+    }
+
+    @PostMapping("/selection/preview")
+    public Object previewQuery(@RequestBody QuerySelection request) {
+        return service.previewQuery(request);
     }
 
     @PostMapping("/delete")

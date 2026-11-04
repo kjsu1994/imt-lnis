@@ -1,4 +1,4 @@
-import {requestJson} from '../common/http.js?v=20261001-review';
+import {requestJson} from '../common/http.js?v=20261103-management-reset';
 
 const types = {GNSS_RAW: 'RAW', AFS_METADATA: 'AFS', IQ_SAMPLE: 'I/Q'};
 const fullTypes = {GNSS_RAW: 'GNSS RAW', AFS_METADATA: 'AFS Frame', IQ_SAMPLE: 'I/Q Sample'};

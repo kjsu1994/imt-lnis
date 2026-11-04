@@ -2,7 +2,7 @@
 <html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>LNIS 데이터 관리</title><link rel="icon" href="/lnis/assets/common/logo_v3.png?v=995392000e36">
 <link rel="stylesheet" href="/lnis/assets/common/app.css?v=20261103-system-logo-v2">
-<link rel="stylesheet" href="/lnis/assets/management/data-management.css?v=20261103-retention-ui"></head>
+<link rel="stylesheet" href="/lnis/assets/management/data-management.css?v=20261103-management-reset"></head>
 <body>
 <header>
   <div class="management-heading">
@@ -15,13 +15,13 @@
   <a class="back" id="back" href="/">시험 화면으로</a>
 </header>
 <main><p id="message" role="status" aria-live="polite"></p>
-<section class="card"><h2>저장 현황</h2><div id="summary" class="metrics"></div><small>이 PC의 데이터만 관리합니다. 자료를 삭제해도 DB 파일의 실제 크기는 바로 줄어들지 않을 수 있습니다.</small></section>
-<nav class="management-tabs" aria-label="데이터 관리 메뉴"><button data-tab="records" class="primary">시험 기록</button><button data-tab="files">수신 원문·파일</button><button data-tab="settings">보관 설정</button></nav>
+<section id="storage-overview" class="card"><h2>저장 현황</h2><div id="summary" class="metrics"></div><small>이 PC의 데이터만 관리합니다. 자료를 삭제해도 DB 파일의 실제 크기는 바로 줄어들지 않을 수 있습니다.</small></section>
+<nav class="management-tabs" aria-label="데이터 관리 메뉴"><button data-tab="records" class="primary">시험 기록</button><button data-tab="files">수신 원문·파일</button><button data-tab="settings">보관 설정</button><button data-tab="reset">초기화</button></nav>
 <section id="records" class="card">
 <form id="search-form" class="filters"><label>자료 종류<select id="kind"><option value="DTN">DTN 시험</option></select></label>
 <label>시작일<input type="date" id="from"></label><label>종료일<input type="date" id="to"></label>
 <label>상태<select id="state"><option value="">전체</option></select></label><label>시험·자료 ID<input id="search" maxlength="100" placeholder="ID 일부로 검색"></label><button type="submit">조회</button></form>
-<div class="actions"><button id="select-page">이 페이지 선택</button><button id="delete-selected" class="danger">선택 삭제</button><span id="count"></span></div>
+<div class="actions"><button id="select-page">이 페이지 선택</button><button id="select-results">검색 결과 전체 선택</button><button id="clear-selection">선택 해제</button><button id="delete-selected" class="danger">선택 삭제</button><span id="count"></span><span id="selection-count" role="status" aria-live="polite"></span></div>
 <div class="table-scroll"><table><thead><tr><th>선택</th><th>시험·자료</th><th>상태</th><th>생성 시각</th><th>용량</th><th>관리</th></tr></thead><tbody id="rows"></tbody></table></div>
 <div class="actions"><button id="previous">이전</button><span id="page"></span><button id="next">다음</button></div>
 </section>
@@ -46,6 +46,36 @@
   </details>
   <h2 class="cleanup-history-heading">최근 정리 내역</h2><div id="history"></div>
 </section>
+<section id="reset" class="card" hidden>
+  <div class="card-title"><h2>초기화</h2><span class="scope-label">현재 PC에만 적용</span></div>
+  <div id="reset-options" class="reset-options">
+    <label class="reset-option"><input id="reset-mode-trials" type="radio" name="reset-mode" value="TRIALS" checked><span><strong>시험 데이터 초기화</strong><small>시험·결과·원문·로그 삭제<br>입력 파일과 설정 유지</small></span></label>
+    <label class="reset-option"><input id="reset-mode-service" type="radio" name="reset-mode" value="SERVICE"><span><strong>서비스 초기화</strong><small>시험·관리 파일·프리셋 삭제<br>사용자 설정 기본값 복원</small></span></label>
+  </div>
+  <p class="reset-preserved">실행 프로그램·배포 설정·인증 정보는 유지합니다. 상대 서비스와 어댑터 자료는 변경하지 않습니다.</p>
+  <div class="reset-preview-toolbar"><button id="reset-preview" class="primary">초기화 대상 확인</button></div>
+  <div id="reset-summary" class="reset-summary" hidden></div>
+  <div id="reset-blocked" class="reset-blocked" role="status" hidden></div>
+  <div class="reset-actions">
+    <button id="reset-stop-waiting" hidden>수신 대기 시험 종료</button>
+    <button id="reset-confirm-open" class="danger" hidden>초기화 진행</button>
+    <button id="reset-retry" hidden>남은 항목 다시 실행</button>
+  </div>
+  <div id="reset-progress-panel" class="reset-progress-panel" hidden>
+    <div class="reset-progress-heading"><strong id="reset-state"></strong><span id="reset-progress-count"></span></div>
+    <progress id="reset-progress" max="100" value="0" aria-label="초기화 진행률"></progress>
+    <p id="reset-message" role="status" aria-live="polite"></p>
+    <a id="reset-home" class="return-link" href="/" hidden>시험 화면으로</a>
+  </div>
+</section>
 <section id="detail" class="card" hidden><div class="card-title"><h2>선택한 자료</h2><button id="close-detail">닫기</button></div><div id="detail-links" class="actions"></div><pre id="detail-content"></pre></section>
 <dialog id="confirm"><h2 id="confirm-title">삭제 대상 확인</h2><p id="confirm-note"></p><div id="preview-items"></div><p id="confirm-warning">진행 중·보관 고정·공유 자료는 서버에서 다시 확인합니다. 삭제한 자료는 이 화면에서 복원할 수 없습니다.</p><div class="actions"><button id="confirm-cancel">취소</button><button id="confirm-apply" class="danger">확인</button></div></dialog>
-</main><script type="module" src="/lnis/assets/management/data-management.js?v=20261103-retention-ui"></script></body></html>
+<dialog id="reset-confirm">
+  <h2 id="reset-confirm-title">초기화 확인</h2>
+  <p id="reset-confirm-summary"></p>
+  <p class="reset-final-note">보관 고정 자료도 포함됩니다. 삭제한 자료는 이 화면에서 복원할 수 없습니다.</p>
+  <label class="reset-acknowledge"><input id="reset-acknowledge" type="checkbox">초기화 대상과 유지 항목을 확인했습니다.</label>
+  <label class="reset-confirm-phrase"><span id="reset-phrase-label"></span><input id="reset-phrase" autocomplete="off" spellcheck="false"></label>
+  <div class="actions"><button id="reset-confirm-cancel">취소</button><button id="reset-confirm-run" class="danger" disabled>초기화 실행</button></div>
+</dialog>
+</main><script type="module" src="/lnis/assets/management/data-management.js?v=20261103-management-reset"></script></body></html>

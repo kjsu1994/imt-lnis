@@ -77,6 +77,31 @@ GET /lnis/api/v1/node/peer/dtn/tests/{testId}/reference
 
 ## 이전 파일
 
-이전 시험 결과와 파일은 삭제하지 않습니다.
+규격 변경이나 서비스 업데이트만으로 이전 시험 결과와 파일을 자동 삭제하지 않습니다. 관리 화면의 명시적 삭제·초기화는 별도 동작입니다.
 새 I/Q 시험은 RF 기준값으로 생성한 파일만 허용하며 이전 파일은 REGENERATE로 표시합니다. 과거 결과와 이미 등록된 이전 방식의 수신 대기 시험은 보존합니다.
 기존 파일을 새 규격이라고 이름만 바꾸어 전송하면 안 됩니다.
+
+
+## 데이터 관리
+
+기준 경로: `/lnis/api/v1/data-management`. 현재 서비스에만 적용하며 어댑터 전송 규격은 변경하지 않습니다.
+
+| 메서드·경로 | 요청·응답 |
+|---|---|
+| `GET /summary` | `counts`, `receiptBytes`, `inputBytes`, `iqBytes`, `databaseBytes`, `freeBytes`, `role` |
+| `POST /selection/preview` | `{kind, search, state, from, to}`. 페이지 제한 없이 조회 조건에 해당하는 삭제 가능 자료 확인 |
+| `POST /preview` | 기존 `{items:[{kind,id}]}`, 1~500건 개별 선택 |
+| `POST /delete` | 기존 `{token}`. 보호 조건 재검사 후 실행 |
+| `POST /reset/preview` | `{mode:"TRIALS"}` 또는 `{mode:"SERVICE"}` |
+| `POST /reset/waiting/close` | `{token}`. 확인 목록의 현재 서비스 수신 대기만 종료. 상대 서비스 호출 없음 |
+| `POST /reset/execute` | `{token, confirmation}`. 문구는 각각 `시험 데이터 초기화`, `서비스 초기화` |
+| `GET /reset/status` | 최근 초기화 상태. 이력이 없으면 빈 응답 |
+| `POST /reset/retry` | `{token, confirmation}`. 실패·중단된 작업의 남은 항목 재실행 |
+
+삭제 미리보기는 기존 `items` 외에 `fileBytes`(삭제 파일 예상 용량), `counts`(연관 자료 포함), `excluded`(전체 선택의 제외 항목·사유)를 반환합니다. 확인은 10분간 유효하며 설정 저장 확인은 삭제를 실행하지 않습니다. 자동 정리는 기존 회당 최대 500건을 유지합니다. 전체 선택 확인에는 querySelection=true를 표시하며, 같은 일괄 처리에서 공유가 해제된 파일이라도 미리 확인한 연관 자료에 없으면 유지합니다.
+
+초기화 응답은 `token`, `mode`, `role`, `state`, `counts`, `fileBytes`, `retainedFiles`, `blocked`, `waiting`, `completed`, `total`, `message`, `updatedAt`, `expiresAt`을 포함합니다. 상태는 `PREVIEW|RUNNING|FAILED|COMPLETED`입니다. 진행 수는 파일·폴더 정리와 최종 DB 처리 단계 기준입니다. 재기동으로 중단된 작업은 `FAILED`로 표시하고 재실행을 요구합니다. 만료·대상 변경·진행 작업·초기화 처리 중 충돌은 HTTP 409, 잘못된 확인 문구는 HTTP 400입니다.
+
+`TRIALS`는 시험·결과·원문·로그 및 이전 독립 AFS 보관 이력을 정리하고 입력·I/Q·프리셋·연결·보관 설정은 유지합니다. `SERVICE`는 소유 확인된 입력·I/Q 작업 파일과 프리셋도 정리하며 사용자 설정을 배포 기본값으로 복원합니다. 보관 고정 자료도 포함됩니다. 실행 파일·환경변수·Compose·인증 정보·배포 백업·운영 로그는 유지하며 공유·소유 미확인 I/Q는 `retainedFiles`로 표시하고 제외합니다.
+
+초기화 중 새 시험·수집·수신을 거절하며 상태 조회와 재실행은 허용합니다. 삭제된 시험 ID는 재등록·지연 수신 방지를 위해 유지합니다. 완료 후 `X-LNIS-Data-Revision: <UUID>:TRIALS|SERVICE` 응답 헤더로 브라우저 갱신을 알립니다. `SERVICE`는 해당 출처의 `lnis.*` 화면 설정만 지웁니다. 변경 식별자·저장소 소유 식별자·최근 수행 정보는 초기화 후에도 보관합니다.

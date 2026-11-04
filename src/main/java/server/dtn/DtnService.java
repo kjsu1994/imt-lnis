@@ -844,7 +844,8 @@ public class DtnService {
                             try {
                                 boolean rejected, waitingOnly;
                                 synchronized (this) {
-                                    DtnJob current = get(job.getId());
+                                    DtnJob current = dtnRepository.findById(job.getId()).orElse(null);
+                                    if (current == null) return;
                                     waitingOnly = Boolean.TRUE.equals(current.getCancelWaitingOnly());
                                     rejected = "FAILED".equals(current.getState())
                                             && "REJECTED".equals(current.getSendStatus());
@@ -857,7 +858,8 @@ public class DtnService {
                                     throw new IllegalStateException("상대 종료 확인 응답 누락");
                                 }
                                 synchronized (this) {
-                                    DtnJob current = get(job.getId());
+                                    DtnJob current = dtnRepository.findById(job.getId()).orElse(null);
+                                    if (current == null) return;
                                     // 정리 도중 사용자가 중지했다면 다음 순환에서 일반 중지를 보낸다.
                                     if (rejected && !"FAILED".equals(current.getState())) return;
                                     if (waitingOnly != Boolean.TRUE.equals(current.getCancelWaitingOnly())) return;
@@ -883,7 +885,8 @@ public class DtnService {
                                 }
                             } catch (RuntimeException error) {
                                 // 기존 사용자의 개별 중지는 기존 주기로 재시도한다.
-                                DtnJob current = get(job.getId());
+                                DtnJob current = dtnRepository.findById(job.getId()).orElse(null);
+                                if (current == null) return;
                                 if (!"FAILED".equals(current.getState())
                                         && !Boolean.TRUE.equals(current.getCancelWaitingOnly())) return;
                                 // 미지원 endpoint도 일반 중지로 대체하지 않는다.
@@ -1256,6 +1259,7 @@ public class DtnService {
     /* 시험 제한 시간과 Receiver 연결 상태를 확인한다. */
     @Scheduled(fixedDelay = 3000)
     public synchronized void tick() {
+        if (managementGuard != null && managementGuard.resetting()) return;
         for (DtnJob job : dtnRepository.findByCancelPendingTrue()) {
             requestCancellation(job);
         }
@@ -1827,7 +1831,8 @@ public class DtnService {
     }
 
     @Scheduled(fixedDelay = 3000)
-    public void retryReferences() {
+    public synchronized void retryReferences() {
+        if (managementGuard != null && managementGuard.resetting()) return;
         if (nodeLink == null || sendingNode()) return;
         for (DtnRepository.ReferenceTask job : dtnRepository.findTasksByReferenceStatus("WAITING")) {
             if (referenceRequests.size() >= 4) break;

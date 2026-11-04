@@ -119,7 +119,16 @@ public class DataManagementService {
     public record PlanItem(
             Row row, List<Key> related, long logs, long receipts, long evidence, String blocked) {}
 
-    public record Preview(UUID token, String role, Instant expiresAt, List<PlanItem> items) {}
+    public record Preview(
+            UUID token, String role, Instant expiresAt, List<PlanItem> items,
+            long fileBytes, Map<String, Long> counts, List<Row> excluded, boolean querySelection) {
+        public Preview(UUID token, String role, Instant expiresAt, List<PlanItem> items) {
+            this(token, role, expiresAt, items, 0, Map.of(), List.of(), false);
+        }
+    }
+
+    public record QuerySelection(Kind kind, String search, String state, Instant from, Instant to) {}
+
 
     public record Result(Key key, String status, String message) {}
 
@@ -127,11 +136,11 @@ public class DataManagementService {
 
     public record PolicyPreview(Preview preview, Settings settings) {}
 
-    private <T> T transaction(Supplier<T> action) {
+    <T> T transaction(Supplier<T> action) {
         return new TransactionTemplate(transactions).execute(status -> action.get());
     }
 
-    private void put(String id, String kind, Object value) {
+    void put(String id, String kind, Object value) {
         try {
             ManagementEntry entry = em.find(ManagementEntry.class, id);
             if (entry == null) {
@@ -145,7 +154,7 @@ public class DataManagementService {
         }
     }
 
-    private <T> T stored(String id, Class<T> type) {
+    <T> T stored(String id, Class<T> type) {
         var entry = em.find(ManagementEntry.class, id);
         if (entry == null) {
             return null;
@@ -373,7 +382,7 @@ public class DataManagementService {
         return false;
     }
 
-    private List<Row> iqRows() {
+    List<Row> iqRows() {
         Path root = Path.of(iqDirectory).toAbsolutePath().normalize();
         var ids = new LinkedHashSet<UUID>();
         var rows = new ArrayList<Row>();
@@ -445,7 +454,7 @@ public class DataManagementService {
         return rows;
     }
 
-    private List<Path> iqPaths(UUID id) {
+    List<Path> iqPaths(UUID id) {
         Path root = Path.of(iqDirectory).toAbsolutePath().normalize();
         return List.of(
                 root.resolve(id + ".bin"),
@@ -455,7 +464,7 @@ public class DataManagementService {
                 root.resolve("work-" + id));
     }
 
-    private long size(Path path) throws java.io.IOException {
+    long size(Path path) throws java.io.IOException {
         if (Files.isSymbolicLink(path)) {
             return 0;
         }
@@ -486,7 +495,10 @@ public class DataManagementService {
             counts.put(kind.name(), list(kind, 0, "", "", null, null).total());
         }
         result.put("counts", counts);
+        result.put("receiptBytes", em.createQuery(
+                "select coalesce(sum(e.sizeBytes),0) from DtnReceipt e", Long.class).getSingleResult());
         try {
+            result.put("freeBytes", Files.getFileStore(storage.getDataDirectory()).getUsableSpace());
             result.put("inputBytes", size(storage.getDataDirectory().resolve("files/inputs")));
             result.put("iqBytes", size(Path.of(iqDirectory)));
             Long dbBytes = null;
@@ -602,17 +614,59 @@ public class DataManagementService {
                 || keys.stream().anyMatch(Objects::isNull)) {
             throw new IllegalArgumentException("1~500건을 선택하세요.");
         }
-        var result =
-                new Preview(
-                        UUID.randomUUID(),
-                        role,
-                        Instant.now().plus(Duration.ofMinutes(10)),
-                        keys.stream().distinct().map(this::plan).toList());
-        transaction(
-                () -> {
-                    put("PREVIEW:" + result.token(), "PREVIEW", result);
-                    return null;
-                });
+        return savePreview(keys.stream().distinct().map(this::plan).toList(), List.of(), false);
+    }
+
+    public Preview previewQuery(QuerySelection query) {
+        if (query == null || query.kind() == null)
+            throw new IllegalArgumentException("조회 조건이 필요합니다.");
+        var plans = new ArrayList<PlanItem>();
+        var excluded = new ArrayList<Row>();
+        for (int page = 0; ; page++) {
+            Page rows = list(query.kind(), page, query.search(), query.state(), query.from(), query.to());
+            for (Row row : rows.items()) {
+                PlanItem item = plan(row.key());
+                if (item.blocked().isEmpty()) plans.add(item);
+                else excluded.add(row);
+            }
+            if ((long) (page + 1) * 50 >= rows.total()) break;
+        }
+        return savePreview(plans, excluded, true);
+    }
+
+    private Preview savePreview(List<PlanItem> items, List<Row> excluded, boolean querySelection) {
+        var resources = new LinkedHashSet<Key>();
+        var counts = new LinkedHashMap<String, Long>();
+        for (PlanItem item : items) {
+            if (!item.blocked().isEmpty()) continue;
+            resources.add(item.row().key());
+            resources.addAll(item.related());
+            if (item.row().key().kind() == Kind.DTN) {
+                for (UUID id : em.createQuery("select e.id from DtnReceipt e where e.testId=:id", UUID.class)
+                        .setParameter("id", item.row().key().id()).getResultList())
+                    resources.add(new Key(Kind.RECEIPT, id));
+            }
+        }
+        long bytes = 0;
+        for (Key key : resources) {
+            counts.merge(key.kind().name(), 1L, Long::sum);
+            try {
+                if (key.kind() == Kind.INPUT) {
+                    Path root = storage.getDataDirectory().resolve("files/inputs");
+                    bytes += size(root.resolve(key.id() + ".graw")) + size(root.resolve(key.id() + ".part"));
+                } else if (key.kind() == Kind.IQ) {
+                    for (Path path : iqPaths(key.id())) bytes += size(path);
+                }
+            } catch (java.io.IOException error) {
+                throw new IllegalStateException("삭제 대상 파일 용량 확인 실패", error);
+            }
+        }
+        var result = new Preview(UUID.randomUUID(), role, Instant.now().plusSeconds(600),
+                items, bytes, counts, excluded, querySelection);
+        transaction(() -> {
+            put("PREVIEW:" + result.token(), "PREVIEW", result);
+            return null;
+        });
         return result;
     }
 
@@ -623,6 +677,7 @@ public class DataManagementService {
         var lock = guard.gate.writeLock();
         lock.lock();
         try {
+            guard.requireOperational();
             get(key);
             transaction(
                     () -> {
@@ -661,6 +716,13 @@ public class DataManagementService {
     }
 
     private <T> T exclusive(Supplier<T> action) {
+        return maintenance(() -> {
+            guard.requireOperational();
+            return action.get();
+        });
+    }
+
+    <T> T maintenance(Supplier<T> action) {
         var lock = guard.gate.writeLock();
         lock.lock();
         try {
@@ -716,14 +778,16 @@ public class DataManagementService {
                                         if (!current.blocked().isEmpty()) {
                                             throw new IllegalStateException(current.blocked());
                                         }
-                                        if (!new HashSet<>(item.related())
-                                                        .containsAll(current.related())
+                                        if ((!preview.querySelection()
+                                                        && !new HashSet<>(item.related()).containsAll(current.related()))
                                                 || current.receipts() > item.receipts()) {
                                             throw new IllegalStateException(
                                                     "연관 자료가 변경됐습니다. 다시 미리보기 하세요.");
                                         }
                                         for (Key related : current.related()) {
-                                            remove(related);
+                                            // 같은 일괄 처리로 공유가 해제돼도 미리 확인하지 않은 파일은 유지한다.
+                                            if (!preview.querySelection() || item.related().contains(related))
+                                                remove(related);
                                         }
                                         remove(key);
                                         return null;
@@ -742,16 +806,15 @@ public class DataManagementService {
                                     key.id(),
                                     error.getClass().getSimpleName());
                         }
-                        transaction(
-                                () -> {
-                                    put(
-                                            "OP:" + operationId,
-                                            "OP",
-                                            new Operation(
-                                                    operationId, operationAt, source, results));
-                                    return null;
-                                });
                         index++;
+                        // 미확정 항목은 삭제 식별자로 재검사하므로 전체 결과를 매 건 다시 저장하지 않는다.
+                        if (index % 50 == 0) {
+                            transaction(() -> {
+                                put("OP:" + operationId, "OP",
+                                        new Operation(operationId, operationAt, source, results));
+                                return null;
+                            });
+                        }
                     }
                     var operation = new Operation(operationId, operationAt, source, results);
                     transaction(
@@ -808,7 +871,7 @@ public class DataManagementService {
                 .executeUpdate();
     }
 
-    private void deletePath(Path path) throws java.io.IOException {
+    void deletePath(Path path) throws java.io.IOException {
         Path root = Path.of(iqDirectory).toAbsolutePath().normalize();
         path = path.toAbsolutePath().normalize();
         if (!path.startsWith(root) || path.equals(root) || Files.isSymbolicLink(root)) {
@@ -906,6 +969,7 @@ public class DataManagementService {
         var lock = guard.gate.writeLock();
         lock.lock();
         try {
+            guard.requireOperational();
             return transaction(
                     () -> {
                         var proposed = stored("POLICY:" + token, PolicyPreview.class);
@@ -936,6 +1000,7 @@ public class DataManagementService {
             fixedDelayString = "${lnis.storage.cleanup-delay:PT10M}",
             initialDelayString = "${lnis.storage.cleanup-delay:PT10M}")
     public void cleanup() {
+        if (guard.resetting()) return;
         try {
             var keys = candidates(settings());
             if (!keys.isEmpty()) {
@@ -944,7 +1009,7 @@ public class DataManagementService {
             transaction(
                     () -> {
                         em.createQuery(
-                                        "delete from ManagementEntry e where e.kind in ('PREVIEW','POLICY') and e.createdAt<:cutoff")
+                                        "delete from ManagementEntry e where e.kind in ('PREVIEW','POLICY','RESET_PREVIEW') and e.createdAt<:cutoff")
                                 .setParameter("cutoff", Instant.now().minus(Duration.ofHours(1)))
                                 .executeUpdate();
                         return null;
@@ -961,6 +1026,7 @@ public class DataManagementService {
         var lock = guard.gate.readLock();
         lock.lock();
         try {
+            guard.requireOperational();
             get(key);
             Path root =
                     key.kind() == Kind.IQ

@@ -100,6 +100,11 @@ public class NodeConnectionService {
         }
     }
 
+    public void reset() {
+        settings.deleteAll();
+        connection.applyAddress(properties.getDefaultPeerBaseUrl());
+    }
+
     private boolean busy() {
         return dtn.managementBusy() || jobs.peerAddressBusy();
     }

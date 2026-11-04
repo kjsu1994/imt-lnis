@@ -185,3 +185,46 @@ dialog::backdrop {
 .history-entry > p { margin: 0; }
 .history-entry details { flex-basis: 100%; }
 .history-entry button { padding: 4px 8px; font-size: 12px; }
+
+/* 관리 작업은 수치와 대상에 집중하고, 실행 확인만 강조한다. */
+.metrics .metric small { display: block; margin-top: 3px; font-size: 11px; }
+#selection-count { margin-left: auto; font-size: 12px; color: var(--teal); }
+.management-tabs button { padding: 7px 14px; font-size: 13px; }
+#records > .actions button { font-size: 12px; padding: 6px 10px; }
+.preview-summary { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; background: #f5f8f8; }
+.preview-excluded { font-size: 12px; color: var(--muted); padding: 8px 0; }
+.preview-excluded summary { cursor: pointer; }
+.scope-label { font-size: 12px; color: var(--muted); }
+.reset-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; max-width: 820px; }
+.reset-option { display: flex; align-items: flex-start; gap: 12px; padding: 16px; margin: 0; border: 1px solid var(--line); border-radius: 10px; background: #fafcfc; cursor: pointer; }
+.reset-option:has(input:checked) { border-color: var(--teal); background: #f1f8f6; }
+.reset-option input, .reset-acknowledge input { width: 16px; flex: 0 0 16px; margin: 3px 0 0; accent-color: var(--teal); }
+.reset-option strong { display: block; font-size: 14px; color: var(--ink); }
+.reset-option small { display: block; margin-top: 7px; font-size: 12px; line-height: 1.7; font-weight: 400; }
+.reset-preserved { margin: 12px 0; font-size: 12px; color: var(--muted); }
+.reset-preview-toolbar { margin: 12px 0; }
+.reset-preview-toolbar button, .reset-actions button { font-size: 12px; padding: 7px 12px; }
+.reset-summary { display: flex; flex-wrap: wrap; gap: 8px 18px; border: 1px solid var(--line); border-radius: 9px; background: #f7faf9; padding: 12px; font-size: 13px; margin-top: 16px; }
+.reset-summary small { flex-basis: 100%; font-size: 12px; }
+.reset-blocked { margin-top: 10px; padding: 10px 12px; border-left: 3px solid #bd8b30; background: #fffaf0; color: #775014; font-size: 12px; }
+.reset-blocked p { margin: 3px 0; }
+.reset-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.reset-progress-panel { max-width: 820px; padding-top: 18px; }
+.reset-progress-heading { display: flex; align-items: center; justify-content: space-between; font-size: 13px; margin-bottom: 6px; }
+.reset-progress-panel p { font-size: 12px; color: var(--muted); margin: 6px 0; overflow-wrap: anywhere; }
+#reset-confirm { width: min(540px, calc(100% - 24px)); }
+#reset-confirm-summary, .reset-final-note { font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+.reset-final-note { color: #9c3838; }
+.reset-acknowledge { display: flex; align-items: flex-start; gap: 8px; margin-block: 16px; font-weight: 400; }
+.reset-confirm-phrase { margin: 12px 0; }
+.reset-confirm-phrase input { max-width: 320px; }
+.return-link { display: inline-block; font-size: 13px; margin-top: 10px; color: var(--teal); }
+@media (max-width: 600px) {
+  .reset-options { grid-template-columns: minmax(0, 1fr); }
+  .reset-option { padding: 12px; }
+  #selection-count { margin-left: 0; flex-basis: 100%; }
+  .card-title { flex-wrap: wrap; gap: 4px; }
+}
+
+.reset-progress-panel[data-state="FAILED"] #reset-state { color: var(--red); }
+.reset-progress-panel[data-state="COMPLETED"] #reset-state { color: var(--teal); }

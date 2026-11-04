@@ -63,6 +63,11 @@ public class LocalNodeLifecycle
         return runtime;
     }
 
+    public void resetGnssSettings() {
+        AgentRuntime runtime = agentRuntime;
+        if (runtime != null) runtime.gnss().resetSettings();
+    }
+
     public boolean busy() {
         AgentRuntime runtime = agentRuntime;
         return runtime != null && runtime.state() == AgentState.BUSY;

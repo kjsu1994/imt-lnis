@@ -36,3 +36,34 @@ globalThis.fetch = async () => ({ok:true, status:200, json:async()=>{
 }});
 await assert.rejects(requestJson('/body', {signal:interruptedBody.signal}, {allowEmpty:true}), /body deadline exceeded/);
 console.log('PASS: a read deadline is not mistaken for an allowed empty JSON response');
+
+const stored = new Map([['lnis.hdtnConfig.v1','old'],['unrelated.setting','keep']]);
+globalThis.localStorage = {
+    get length() { return stored.size; },
+    key(index) { return [...stored.keys()][index]; },
+    getItem(key) { return stored.get(key) ?? null; },
+    setItem(key,value) { stored.set(key,value); },
+    removeItem(key) { stored.delete(key); }
+};
+let reloads = 0;
+globalThis.location = {pathname:'/lnis/dtntest/sender',reload(){reloads++;}};
+globalThis.fetch = async () => new Response('{}',{headers:{'X-LNIS-Data-Revision':'one:TRIALS'}});
+await requestJson('/revision');
+assert.equal(stored.get('lnis.hdtnConfig.v1'),'old','trial reset preserves user settings');
+assert.equal(reloads,1);
+await requestJson('/revision');
+assert.equal(reloads,1,'the same reset must not cause a reload loop');
+globalThis.fetch = async () => new Response('{}',{headers:{'X-LNIS-Data-Revision':'two:SERVICE'}});
+await requestJson('/revision');
+assert.equal(stored.has('lnis.hdtnConfig.v1'),false);
+assert.equal(stored.get('unrelated.setting'),'keep');
+assert.equal(reloads,2);
+stored.set('lnis.adapter-url.dtn-sender','old');
+globalThis.location.pathname='/lnis/data-manager';
+globalThis.fetch = async () => new Response('{}',{headers:{'X-LNIS-Data-Revision':'three:SERVICE'}});
+await requestJson('/revision');
+assert.equal(stored.has('lnis.adapter-url.dtn-sender'),false);
+assert.equal(reloads,2,'management keeps the completion screen visible');
+delete globalThis.localStorage;
+delete globalThis.location;
+console.log('PASS: reset revisions preserve trial settings, clear only service keys and never loop reloads');
