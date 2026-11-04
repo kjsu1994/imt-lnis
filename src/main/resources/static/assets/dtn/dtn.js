@@ -1,10 +1,10 @@
-import {initPresetControls, renderTrialSettings, trialTypeLabel, trialOption, colorTrialSelection, initWaitingCancellation, initTrialSettingsDialog} from './dtn-settings.js?v=20261103-management-reset';
+import {parseNodeAddress, initPresetControls, renderTrialSettings, trialTypeLabel, trialOption, colorTrialSelection, initWaitingCancellation, initTrialSettingsDialog} from './dtn-settings.js?v=20261104-peer-address-validation-2';
 import {requestJson} from '../common/http.js?v=20261103-management-reset';
 import {initGnssControls} from './dtn-gnss.js?v=20261104-serial-controls';
 import {createDtnLog} from './dtn-log.js?v=20261103-management-reset';
 import {initAdapterHealth, validAdapterUrl} from './dtn-adapter-health.js?v=20261026-frame6';
 import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20261026-frame6';
-import {createObservationView, numeric, renderClockBias, receiverInformation} from './dtn-observations.js?v=20261103-pvt-filter-default';
+import {createObservationView, numeric, renderClockBias, receiverInformation} from './dtn-observations.js?v=20261104-receiver-epoch-ui-v2';
 
 const $ = id => document.getElementById(id);
 const payload = createPayloadViewer($('dtn-payload'), {sentOnly: true});
@@ -435,10 +435,24 @@ $('dtn-settings-open').onclick = () => showSettings(!($('dtn-settings-view').cla
 $('dtn-settings-close').onclick = () => showSettings(false);
 if ($('dtn-drawer-backdrop')) $('dtn-drawer-backdrop').onclick = () => showSettings(false);
 if ($('dtn-config-hud')) $('dtn-config-hud').onclick = () => showSettings(true);
+if ($('dtn-sender-status')) {
+  $('dtn-sender-status').onclick = () => {
+    showSettings(true);
+    $('dtn-settings-title')?.focus();
+  };
+}
+if ($('dtn-receiver-status')) {
+  $('dtn-receiver-status').onclick = () => {
+    showSettings(true);
+    $('dtn-receiver-ip')?.focus();
+    $('dtn-receiver-ip')?.scrollIntoView?.({behavior: 'smooth', block: 'center'});
+  };
+}
 if ($('dtn-adapter-strip-status')) {
   $('dtn-adapter-strip-status').onclick = () => {
     showSettings(true);
     $('dtn-send-url')?.focus();
+    $('dtn-send-url')?.scrollIntoView?.({behavior: 'smooth', block: 'center'});
   };
 }
 if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
@@ -615,7 +629,7 @@ function getSendReadiness() {
       id: 'peer',
       label: '상대 수신 서비스 연결 정상',
       ready: isPeerReady,
-      hint: '수신 서비스 IP 및 포트(기본 8091) 연결을 확인하세요.'
+      hint: '상대 수신 서비스 주소(예: http://IP:8089) 연결을 확인하세요.'
     },
     {
       id: 'agent',
@@ -731,7 +745,7 @@ function updateControls() {
   if ($('dtn-replay')) $('dtn-replay').disabled = locked();
   $('dtn-refresh').disabled = locked() || tx?.state !== 'READY';
   for (const button of document.querySelectorAll('.test-type-button,.transport-mode-button,.input-mode')) button.disabled = locked();
-  for (const id of ['dtn-connection-test', 'dtn-connection-save', 'dtn-receiver-ip', 'dtn-receiver-port']) $(id).disabled = busy || (!pendingCapture && locked()) || peerConfig?.busy || !peerConfig?.editable;
+  for (const id of ['dtn-connection-test', 'dtn-connection-save', 'dtn-receiver-ip']) $(id).disabled = busy || (!pendingCapture && locked()) || peerConfig?.busy || !peerConfig?.editable;
   $('dtn-message').textContent = selectedType !== 'IQ_SAMPLE'
     ? active() ? (locked() ? '송신 준비·어댑터 요청 중입니다.' : '이전 시험 수신 대기 · 다음 시험을 전송할 수 있습니다.') : !inputId ? 'GNSS 입력을 준비하세요.' : !urlValid() ? '어댑터 전송 URL을 입력하세요.' : !adapterOnline ? '송신 어댑터 데몬 연결을 확인하세요.' : ''
     : active() ? (locked() ? '송신 준비·어댑터 요청 중입니다.' : '이전 시험 수신 대기 · 다음 시험을 전송할 수 있습니다.') : generatingIq() ? '90초 I/Q 생성 중입니다.'
@@ -974,15 +988,29 @@ for (const button of document.querySelectorAll('.transport-mode-button')) button
   $('dtn-transport-mode-state').textContent = senderMode + ' → ' + receiverMode + ' · 전송 요청에 포함';
   updateInputSummary(); updateDtnControls(); updateHdtnControls(); updateAdapterTabBadges();
 };
+let peerAddressDirty = false;
+function formatPeerAddress(conn) {
+  if (!conn) return '';
+  if (conn.baseUrl) return conn.baseUrl;
+  if (!conn.ip) return '';
+  return (conn.scheme || 'http') + '://' + conn.ip + ':' + (conn.port || 8091);
+}
+function parsePeerAddress(raw) {
+  const parsed = parseNodeAddress(raw, peerConfig?.port || 8091, peerConfig?.scheme || 'http');
+  return {...parsed, baseUrl: parsed.scheme + '://' + parsed.ip + ':' + parsed.port};
+}
 async function connectPeer(save) {
-  if (!$('dtn-receiver-ip').reportValidity() || !$('dtn-receiver-port').reportValidity()) return;
+  if (!$('dtn-receiver-ip').reportValidity()) return;
   busy = true; updateControls(); destination('확인 중');
   try {
-    const body = {ip: $('dtn-receiver-ip').value.trim(), port: Number($('dtn-receiver-port').value), scheme: peerConfig?.scheme || 'http'};
+    const parsed = parsePeerAddress($('dtn-receiver-ip').value);
+    const body = {ip: parsed.ip, port: parsed.port, scheme: parsed.scheme};
     const result = await request('/node/connection' + (save ? '' : '/test'), {method: save ? 'PUT' : 'POST',
       headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
     if (save) {
-      peerConfig = result;
+      peerConfig = {...result, ip: result.ip || parsed.ip, port: result.port || parsed.port, scheme: result.scheme || parsed.scheme};
+      peerAddressDirty = false;
+      $('dtn-receiver-ip').value = formatPeerAddress(peerConfig);
       destination(result.peerOnline ? '연결됨' : '저장됨 · 연결 확인 중', result.peerOnline ? 'online' : 'unknown');
     } else {
       destination(result.connected ? '응답 확인' : '연결 실패', result.connected ? 'online' : 'offline');
@@ -994,7 +1022,7 @@ async function connectPeer(save) {
 }
 $('dtn-connection-test').onclick = () => connectPeer(false);
 $('dtn-connection-save').onclick = () => connectPeer(true);
-for (const id of ['dtn-receiver-ip', 'dtn-receiver-port']) $(id).oninput = () => { destination('주소 변경 · 미확인'); $('dtn-connection-message').textContent = ''; };
+$('dtn-receiver-ip').oninput = () => { peerAddressDirty = true; destination('주소 변경 · 미확인'); $('dtn-connection-message').textContent = ''; };
 $('dtn-send-url').oninput = updateControls;
 $('dtn-sdrHeapSizeBytes').oninput = updateInputSummary;
 $('hdtn-maxSumOfBundleBytesInPipeline').oninput = updateInputSummary;
@@ -1162,8 +1190,10 @@ async function poll() {
       peerConfig = connection;
       gnss.setPeerTime(connection.peerGnssTimeState);
       updateClockSkewWarning(connection);
-      if ($('dtn-receiver-ip').value === connection.ip && Number($('dtn-receiver-port').value) === connection.port)
+      if (!peerAddressDirty) {
+        $('dtn-receiver-ip').value = formatPeerAddress(connection);
         destination(connection.peerOnline ? '연결됨' : '연결 끊김', connection.peerOnline ? 'online' : 'offline');
+      }
     } else {
       updateClockSkewWarning(null);
     }
@@ -1238,7 +1268,7 @@ async function initialize() {
       $('dtn-transport-mode-state').textContent = senderMode + ' → ' + receiverMode + ' · 전송 요청에 포함';
     try {
       peerConfig = await request('/node/connection');
-      $('dtn-receiver-ip').value = peerConfig.ip || ''; $('dtn-receiver-port').value = peerConfig.port;
+      if (!peerAddressDirty) $('dtn-receiver-ip').value = formatPeerAddress(peerConfig);
     } catch { $('dtn-connection-message').textContent = '상대 서비스 주소 설정을 사용할 수 없습니다.'; }
     await poll(); socket();
     log('DTN 송신 화면 준비 완료');

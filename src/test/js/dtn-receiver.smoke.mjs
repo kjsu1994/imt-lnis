@@ -93,6 +93,23 @@ assert.equal(peerAddress, 'http://192.168.1.45:8090');
 console.log('PASS: receiver peer address edit, polling preservation, probe and server save');
 for (const id of ['receive-url', 'copy-receive-url', 'receive-auth', 'receive-help']) assert.equal(elements.has(id), false);
 assert.equal(requests.filter(url => url.endsWith('/dtn/config')).length, 1, 'adapter config is loaded once, not polled for removed authentication UI');
+for (const address of ['http://192.168.1.45:80', 'https://192.168.1.45:443']) {
+  elements.get('sender-address').value = address;
+  elements.get('sender-address').oninput();
+  await elements.get('sender-address-save').onclick();
+  assert.equal(peerAddress, address, 'save must retain the explicitly entered HTTP/HTTPS port');
+}
+const savesBeforeInvalidAddress = peerSaves;
+for (const address of ['192.168.001.072:8090', '127.1:8090', '192.168.1.45:0', '192.168.1.45:65536']) {
+  elements.get('sender-address').value = address;
+  elements.get('sender-address').oninput();
+  await elements.get('sender-address-save').onclick();
+}
+assert.equal(peerSaves, savesBeforeInvalidAddress, 'invalid addresses must not reach the save API');
+elements.get('sender-address').value = '192.168.1.45:8090';
+await elements.get('sender-address-save').onclick();
+console.log('PASS: receiver saves standard ports exactly and rejects ambiguous IPv4 before API mutation');
+
 assert.equal(requests.some(url => url.endsWith('/node')), false, 'removed endpoint display does not request a public URL');
 assert.equal(elements.get('receive-state').textContent, '수신 대기');
 assert.match(elements.get('dtn-receiver-status').textContent, /처리 중/);
@@ -103,20 +120,24 @@ assert.equal(elements.get('step-process').querySelector('.step-text').textConten
 assert.equal(elements.get('receive-state').textContent,'수신 계산 완료');
 context.renderSummary({testType:'IQ_SAMPLE',state:'COMPLETED',receivedEpochs:69});
 assert.equal(elements.get('dtn-observations').hidden,false);
+assert.equal(elements.get('dtn-cancel').hidden,true);
 context.setComparison({comparison:{verdict:'MEASURED'}});
 assert.match(elements.get('pvt-match').textContent,/오차 측정/);
 for (const testType of ['GNSS_RAW', 'AFS_METADATA', 'IQ_SAMPLE']) {
   for (const senderMode of ['DTN', 'HDTN']) for (const receiverMode of ['DTN', 'HDTN']) {
     context.renderSummary({testType, senderMode, receiverMode, state: 'COMPLETED'});
     assert.equal(elements.get('dtn-observations').hidden, testType === 'IQ_SAMPLE');
+    assert.equal(elements.get('dtn-cancel').hidden, true);
     assert.equal(elements.get('receiver-type').textContent, {GNSS_RAW:'GNSS RAW',AFS_METADATA:'AFS Frame',IQ_SAMPLE:'I/Q Sample'}[testType]);
     assert.equal(elements.get('receiver-mode').textContent, senderMode + ' → ' + receiverMode);
   }
 }
 context.renderSummary({state:'WAITING_DTN'});
+assert.equal(elements.get('dtn-cancel').hidden, false);
 assert.equal(elements.get('receiver-type').textContent, '유형 미확인');
 assert.equal(elements.get('receive-state').textContent, '외부 번들 수신 대기');
 context.renderSummary(null);
+assert.equal(elements.get('dtn-cancel').hidden, true);
 assert.equal(elements.get('dtn-observations').hidden, false);
 assert.equal(elements.get('receiver-mode').textContent, '경로 정보 없음');
 assert.equal(elements.get('receiver-type').textContent, '시험 선택 대기');
@@ -133,6 +154,7 @@ report = {receivedPvt: [
 await context.poll(true);
 assert.equal(elements.get('receive-state').textContent, '수신 계산 완료');
 assert.equal(elements.get('pvt-x').textContent, '1.000');
+assert.match(elements.get('pvt-epoch').textContent, /Week 2400 \/ TOW 10\.000 s/);
 assert.equal(elements.get('pvt-count').textContent, '2개 관측');
 assert.equal(elements.get('step-process').className, 'done');
 assert.equal(elements.get('reference-x').textContent, '-');
@@ -188,10 +210,10 @@ await cleared.poll();
 assert.equal(elements.get('dtn-tests').value, '', 'polling must preserve cleared selection');
 console.log('PASS: receiver default entry preserves empty selection through polling');
 
-// New registrations keep the current selection; actual receipts select automatically.
+// New registrations and actual receipts select automatically unless pinned.
 nextTests = [waiting, done];
 await cleared.poll();
-assert.equal(elements.get('dtn-tests').value, '');
+assert.equal(elements.get('dtn-tests').value, 'waiting');
 const receivedWaiting = {...waiting, dtnReceived: true, state: 'CALCULATING', receivedAt: '2026-09-16T01:00:00Z'};
 nextTests = [receivedWaiting, done];
 await cleared.poll();
@@ -346,3 +368,12 @@ nextTests=[{...nextTests[0],fileResult:{verdict:'FAIL'}}];
 await context.poll();
 assert.equal(reportLoads(),countAfterLoad+1,'a changed file verdict invalidates the report');
 console.log('PASS: I/Q received observations load independently of PVT epochs with cached reports');
+
+elements.get('sender-address').value = 'https://192.168.1.72:443';
+elements.get('sender-address').oninput();
+multi.fetch = ordinaryReceiverFetch;
+multi.poll = async () => {};
+await multi.initialize();
+assert.equal(elements.get('sender-address').value, 'https://192.168.1.72:443',
+  'initial connection load must preserve an address already edited by the user');
+console.log('PASS: initial settings loading preserves the edited peer address');

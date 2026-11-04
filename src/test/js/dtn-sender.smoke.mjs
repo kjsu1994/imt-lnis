@@ -1,4 +1,5 @@
 import {pageSource} from './browser-source.mjs';
+import {parseNodeAddress} from '../../main/resources/static/assets/dtn/dtn-settings.js';
 import {numeric, renderClockBias, receiverInformation} from '../../main/resources/static/assets/dtn/dtn-observations.js';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -141,6 +142,37 @@ assert.equal(html.includes('합성 데이터 · 실측 아님'), false);
 assert.equal(elements.has('dtn-replay'), true);
 assert.equal(elements.has('reverse-state'), false);
 assert.equal(elements.has('destination-state'), true);
+assert.equal(elements.has('dtn-receiver-port'), false, 'peer address uses a single unified URL input');
+assert.equal(elements.get('dtn-receiver-ip').value, 'http://127.0.0.1:18091');
+assert.deepEqual({...context.parsePeerAddress('http://192.168.1.72:8089')}, {ip: '192.168.1.72', port: 8089, scheme: 'http', baseUrl: 'http://192.168.1.72:8089'});
+assert.deepEqual({...context.parsePeerAddress('192.168.1.72:8089')}, {ip: '192.168.1.72', port: 8089, scheme: 'http', baseUrl: 'http://192.168.1.72:8089'});
+for (const [address, port, scheme] of [
+  ['http://192.168.1.72:80', 80, 'http'],
+  ['https://192.168.1.72:443', 443, 'https'],
+  ['192.168.1.72:1', 1, 'http'],
+  ['http://192.168.1.72:65535/', 65535, 'http'],
+  ['  HTTP://192.168.1.72:80/  ', 80, 'http'],
+  ['192.168.1.72', 8089, 'http']
+]) {
+  assert.deepEqual(parseNodeAddress(address, 8089),
+    {ip: '192.168.1.72', port, scheme}, address);
+}
+for (const address of [
+  '', '192.168.001.072:8089', '127.1:8089', '3232235848:8089',
+  '0xc0a80148:8089', '192.168.1.256:8089', 'localhost:8089', '[::1]:8089',
+  'http://user:password@192.168.1.72:8089', 'ftp://192.168.1.72:8089',
+  'http://192.168.1.72:8089/path', '192.168.1.72:8089?x=1',
+  '192.168.1.72:8089#part', '192.168.1.72:', '192.168.1.72:0',
+  '192.168.1.72:65536', '192.168.1.72:1.5', '192.168.1.72:+80'
+]) {
+  assert.throws(() => parseNodeAddress(address, 8089), Error, address);
+}
+assert.deepEqual(parseNodeAddress('192.168.1.72', 443, 'https'),
+  {ip: '192.168.1.72', port: 443, scheme: 'https'}, 'omitted scheme and port retain current settings');
+assert.equal(context.parsePeerAddress('http://192.168.1.72:80').port, 80);
+assert.equal(context.parsePeerAddress('https://192.168.1.72:443').port, 443);
+assert.throws(() => context.parsePeerAddress('192.168.001.072:8089'));
+console.log('PASS: exact IPv4, explicit HTTP/HTTPS default ports, current defaults and invalid node address rejection');
 assert.equal(elements.get('dtn-development').hidden, true);
 assert.equal(elements.get('dtn-start').disabled, true);
 assert.equal(elements.get('dtn-send').disabled, true);
@@ -696,3 +728,10 @@ finishHistory({referencePvt:[],observations});
 await pendingHistory;
 assert.equal(loaded,otherOriginal,'late IQ report cannot replace the next selected trial');
 console.log('PASS: IQ sender history originals and Reference PVT, legacy absence, cache and stale-response isolation');
+
+elements.get('dtn-receiver-ip').value = 'https://192.168.1.72:443';
+elements.get('dtn-receiver-ip').oninput();
+await cleared.initialize();
+assert.equal(elements.get('dtn-receiver-ip').value, 'https://192.168.1.72:443',
+  'initial connection load must preserve an address already edited by the user');
+console.log('PASS: initial settings loading preserves the edited peer address');

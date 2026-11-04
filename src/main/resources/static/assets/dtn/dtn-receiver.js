@@ -1,10 +1,10 @@
-import {renderTrialSettings, trialTypeLabel, trialOption, colorTrialSelection, initWaitingCancellation, initTrialSettingsDialog} from './dtn-settings.js?v=20261103-management-reset';
+import {parseNodeAddress, renderTrialSettings, trialTypeLabel, trialOption, colorTrialSelection, initWaitingCancellation, initTrialSettingsDialog} from './dtn-settings.js?v=20261104-peer-address-validation-2';
 import {requestJson} from '../common/http.js?v=20261103-management-reset';
 import {initGnssControls} from './dtn-gnss.js?v=20261104-serial-controls';
 import {createDtnLog} from './dtn-log.js?v=20261103-management-reset';
 import {initAdapterHealth} from './dtn-adapter-health.js?v=20261026-frame6';
 import {createPayloadViewer} from './dtn-payload.js?v=20261026-frame6';
-import {createObservationView, numeric, renderClockBias} from './dtn-observations.js?v=20261103-pvt-filter-default';
+import {createObservationView, numeric, renderClockBias} from './dtn-observations.js?v=20261104-receiver-epoch-ui-v2';
 
 const $ = id => document.getElementById(id);
 const payloadViewer = createPayloadViewer($('dtn-payload'), {receivedOnly: true});
@@ -36,7 +36,7 @@ $('reference-retry').onclick = async () => {
 };
 let tests = [], epochs = [], selectedId = '', renderVersion = 0, polling = false;
 let reportKey = '';
-let receivedIds = null;
+let receivedIds = null, knownIds = null;
 let historyPage = 0, selectionPinned = false, cancelling = false;
 let referenceEpochs = [], comparisonEpochs = [], delayComparison = false, delayEvidence = null, rfComparison = false;
 function setComparison(report = {}) {
@@ -105,24 +105,7 @@ $('sender-address').oninput = () => {
   $('sender-address-feedback').textContent = '';
 };
 function parseSenderAddress(raw) {
-  let value = raw.trim();
-  if (!value) throw new Error('상대 송신 서비스 IP 또는 http(s)://IP:포트 형식으로 입력하세요.');
-  if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(value)) {
-    value = lastPeerScheme + '://' + value;
-  }
-  let url;
-  try {
-    url = new URL(value);
-  } catch {
-    throw new Error('http(s)://IPv4:포트 또는 IPv4:포트 형식으로 입력하세요.');
-  }
-  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password
-      || url.search || url.hash || url.pathname !== '/') {
-    throw new Error('http(s)://IPv4:포트 형식으로 입력하세요.');
-  }
-  const scheme = url.protocol.slice(0, -1);
-  const port = Number(url.port || lastPeerPort || (url.protocol === 'https:' ? 443 : 8090));
-  return {ip: url.hostname, port, scheme};
+  return parseNodeAddress(raw, lastPeerPort, lastPeerScheme);
 }
 async function saveSenderAddress(save) {
   if (peerSaving) return;
@@ -821,6 +804,9 @@ function formatCoordDiff(diff) {
 function renderEpoch() {
   observations.select(Number($('pvt-epoch').value));
   const pvt = epochs[Number($('pvt-epoch').value)];
+  $('pvt-epoch').textContent = pvt
+    ? 'Week ' + pvt.week + ' / TOW ' + number(pvt.towSeconds) + ' s'
+    : '계산 결과 없음';
   const delta = pvt && comparisonEpochs.find(e => e.week === pvt.week && Math.abs(e.towSeconds - pvt.towSeconds) < 0.001);
   const deltaR = delta?.positionDifferenceMeters;
   const deltaV = delta?.velocityDifferenceMetersPerSecond;
@@ -963,11 +949,13 @@ function renderEpoch() {
 function setEpochs(values, preserve = false) {
   const selected = preserve ? $('pvt-epoch').value : '0';
   epochs = Array.isArray(values) ? values : [];
-  $('pvt-epoch').replaceChildren(...(epochs.length
-    ? epochs.map((pvt, index) => new Option((index + 1) + ' · Week ' + pvt.week + ' / TOW ' + number(pvt.towSeconds) + ' s', String(index)))
-    : [new Option('계산 결과 없음', '')]));
+  const nextIndex = epochs.length && Number(selected) < epochs.length ? Number(selected) : 0;
+  const pvt = epochs[nextIndex];
+  $('pvt-epoch').textContent = pvt
+    ? 'Week ' + pvt.week + ' / TOW ' + number(pvt.towSeconds) + ' s'
+    : '계산 결과 없음';
+  $('pvt-epoch').value = epochs.length ? String(nextIndex) : '';
   $('pvt-epoch').disabled = !epochs.length;
-  if (epochs.length) $('pvt-epoch').value = Number(selected) < epochs.length ? selected : '0';
   $('pvt-count').textContent = epochs.length + '개 관측';
   renderEpoch();
 }
@@ -1064,7 +1052,9 @@ function updateReceiverFlow(job) {
 let trialDialogHandler = null;
 function renderSummary(job) {
   waitingCancellation.update();
-  $('dtn-cancel').disabled = cancelling || !['PREPARING', 'WAITING_DTN', 'WAITING_RECEIVER', 'CALCULATING'].includes(job?.state);
+  const canCancel = ['PREPARING', 'WAITING_DTN', 'WAITING_RECEIVER', 'CALCULATING'].includes(job?.state);
+  $('dtn-cancel').hidden = !canCancel && !cancelling;
+  $('dtn-cancel').disabled = cancelling || !canCancel;
   $('dtn-cancel').textContent = job?.state === 'CALCULATING' ? '계산 중지' : job?.state === 'WAITING_DTN' ? '대기 종료' : '시험 중지';
   if ($('trial-settings')) renderTrialSettings($('trial-settings'), job);
   trialDialogHandler?.updateDialog(job);
@@ -1161,9 +1151,13 @@ async function poll(force = false) {
       const selectedJob = await get('/dtn/tests/' + encodeURIComponent(selectedId)).catch(() => null);
       if (selectedJob) nextTests.push(selectedJob);
     }
+    const newlyRegistered = nextTests.filter(job =>
+      knownIds !== null && !knownIds.has(job.testId))
+      .sort((a, b) => (Date.parse(b.createdAt) || 0) - (Date.parse(a.createdAt) || 0))[0];
     const newlyReceived = nextTests.filter(job => job.dtnReceived &&
       (receivedIds !== null && !receivedIds.has(job.testId)))
       .sort((a, b) => (Date.parse(b.receivedAt) || 0) - (Date.parse(a.receivedAt) || 0))[0];
+    knownIds = new Set(nextTests.map(job => job.testId));
     receivedIds = new Set(nextTests.filter(job => job.dtnReceived).map(job => job.testId));
     tests = nextTests;
     const connection = await get('/node/connection').catch(() => ({}));
@@ -1184,7 +1178,8 @@ async function poll(force = false) {
     const selected = $('dtn-tests').value;
     $('dtn-tests').replaceChildren(new Option(tests.length ? '시험 선택' : '등록된 시험 없음', ''), ...(tests.length ? tests.map(job =>
       trialOption(job, time(job.createdAt))) : []));
-    if (newlyReceived && !selectionPinned && historyPage === 0) $('dtn-tests').value = newlyReceived.testId;
+    const autoTarget = newlyReceived || newlyRegistered;
+    if (autoTarget && !selectionPinned && historyPage === 0) $('dtn-tests').value = autoTarget.testId;
     else if (tests.some(job => job.testId === selected)) $('dtn-tests').value = selected;
     colorTrialSelection($('dtn-tests'), tests.find(job => job.testId === $('dtn-tests').value));
     await renderTest(force);
@@ -1216,11 +1211,25 @@ function updateAdapterStripPill(text, tone, className) {
 async function initialize() {
   initCubeInteraction();
   trialDialogHandler = initTrialSettingsDialog(() => tests.find(item => item.testId === $('dtn-tests').value));
+  if ($('dtn-receiver-status')) {
+    if ($('dtn-receiver-status').style) $('dtn-receiver-status').style.cursor = 'pointer';
+    $('dtn-receiver-status').onclick = () => {
+      $('gnss-port')?.focus();
+      $('gnss-port')?.scrollIntoView?.({behavior: 'smooth', block: 'center'});
+    };
+  }
+  if ($('dtn-sender-status')) {
+    if ($('dtn-sender-status').style) $('dtn-sender-status').style.cursor = 'pointer';
+    $('dtn-sender-status').onclick = () => {
+      $('sender-address')?.focus();
+      $('sender-address')?.scrollIntoView?.({behavior: 'smooth', block: 'center'});
+    };
+  }
   if ($('dtn-adapter-strip-status')) {
     if ($('dtn-adapter-strip-status').style) $('dtn-adapter-strip-status').style.cursor = 'pointer';
     $('dtn-adapter-strip-status').onclick = () => {
       $('dtn-send-url')?.focus();
-      $('dtn-send-url')?.scrollIntoView({behavior: 'smooth', block: 'center'});
+      $('dtn-send-url')?.scrollIntoView?.({behavior: 'smooth', block: 'center'});
     };
   }
   await gnss.poll();
@@ -1238,7 +1247,7 @@ async function initialize() {
   }
   try {
     const connection = await get('/node/connection');
-    $('sender-address').value = connection.baseUrl || '';
+    if (!peerAddressDirty) $('sender-address').value = connection.baseUrl || '';
   } catch { /* Optional in central mode. */ }
   await poll();
   const repeat = async () => { await poll(); setTimeout(repeat, 2000); };

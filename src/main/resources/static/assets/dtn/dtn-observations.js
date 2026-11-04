@@ -928,9 +928,12 @@ export function observationCounts(data, index = 0, results = [], evidence = null
 
 export function createObservationView(container, onSelect = () => {}, role = '') {
   if (!container) return {setData() {}, select() {}, setPvt() {}};
+  const isSingleEpochView = role === '수신 원본' || role === '송신 비교원본';
   container.innerHTML = `
     <div class="gnss-data-header"><h2 data-title>GNSS 수집 데이터</h2>
-      <label>GNSS 기준시간 <select data-epoch aria-label="관측 시점"></select></label>
+      ${isSingleEpochView
+        ? `<div class="gnss-epoch-display"><span class="gnss-epoch-label">GNSS 기준시간</span><span class="gnss-epoch-value" data-epoch role="status" aria-label="관측 시점">GNSS 시간 없음</span></div>`
+        : `<label>GNSS 기준시간 <select data-epoch aria-label="관측 시점"></select></label>`}
       <span data-integrity class="pill" role="status" hidden></span>
 
       <details class="pvt-input-status" data-pvt-status>
@@ -980,10 +983,10 @@ export function createObservationView(container, onSelect = () => {}, role = '')
     <div class="navigation-heading"><h3 data-navigation-title>항법정보 · SFRBX</h3>
       <div data-association hidden><button type="button" data-navigation-all>전체 보기</button>
         <span data-navigation-summary></span></div>
-      <label class="navigation-filter-label" title="현재 선택된 Epoch의 위성 위치 및 시계(PVT) 계산에 실제 사용된 최신 항법정보 1세트만 필터링하여 표시합니다.">
+      ${isSingleEpochView ? '' : `<label class="navigation-filter-label" title="현재 선택된 Epoch의 위성 위치 및 시계(PVT) 계산에 실제 사용된 최신 항법정보 1세트만 필터링하여 표시합니다.">
         <input type="checkbox" data-navigation-pvt-active checked>
-        <span>선택 epoch</span>
-      </label></div>
+        <span>PVT 대상</span>
+      </label>`}</div>
     <div class="epoch-table-viewport" tabindex="0" aria-label="GNSS 항법정보 표">
       <table class="epoch-observation-table" data-navigation-table><caption data-navigation-caption>항법정보 · SFRBX · 수집된 전체 메시지</caption><thead><tr data-navigation-head>
         <th title="원본 레코드의 수집 순번이며 총 건수가 아닙니다. 0~95는 96건입니다.">수집 순번</th><th>수집 시각 <small>UTC</small></th><th>GNSS</th><th>위성</th>
@@ -993,7 +996,6 @@ export function createObservationView(container, onSelect = () => {}, role = '')
       <div class="epoch-table-viewport"><table class="epoch-observation-table navigation-linked">
         <thead><tr><th>방송 위성</th><th>내용</th><th>관측 기준</th><th>원문</th></tr></thead>
         <tbody data-common-body></tbody></table></div></details>
-    <details data-record-details><summary>저장된 전체 필드 보기 · JSON</summary><pre data-records class="log"></pre></details>
     `;
   const hideTransmitEstimate = role === '송신 원본' || role === '송신 비교원본';
   container.querySelector('[data-transmit-heading]').hidden = hideTransmitEstimate;
@@ -1043,17 +1045,17 @@ export function createObservationView(container, onSelect = () => {}, role = '')
   const association = container.querySelector('[data-association]');
   association.hidden = !linkedNavigation;
   const navFilterLabel = container.querySelector('.navigation-filter-label');
-  if (navFilterLabel) navFilterLabel.hidden = !linkedNavigation;
+  if (navFilterLabel) navFilterLabel.hidden = !linkedNavigation || isSingleEpochView;
   const allNavigation = container.querySelector('[data-navigation-all]');
   allNavigation.onclick = () => {
     showAllNavigation = true;
     render(false);
   };
-  const navFilterCheckbox = container.querySelector('[data-navigation-pvt-active]');
+  const navFilterCheckbox = isSingleEpochView ? null : container.querySelector('[data-navigation-pvt-active]');
   if (navFilterCheckbox && navFilterCheckbox.checked === undefined) {
     navFilterCheckbox.checked = true;
   }
-  let showPvtActiveOnly = navFilterCheckbox ? !!navFilterCheckbox.checked : true;
+  let showPvtActiveOnly = isSingleEpochView ? false : (navFilterCheckbox ? !!navFilterCheckbox.checked : true);
   if (navFilterCheckbox) {
     const handleNavFilter = () => {
       showPvtActiveOnly = !!navFilterCheckbox.checked;
@@ -1354,6 +1356,11 @@ export function createObservationView(container, onSelect = () => {}, role = '')
     if (data?.receivedValues) { renderWire(notify, tracking); return; }
     const item = data?.epochs?.[Number(select.value)];
     const epoch = item?.observation;
+    if (isSingleEpochView) {
+      select.textContent = epoch
+        ? 'Week ' + epoch.week + ' / TOW ' + numeric(epoch.receiverTowSeconds) + ' s'
+        : 'GNSS 시간 없음';
+    }
     const comparison = !data?.receivedValues && !!delayEvidence && role === '수신 원본' && data?.source !== 'IQ_TRACKING';
     const epochMatches = !!epoch && !!delayEvidence?.shiftedTime && !delayEvidence?.error && epoch.week === delayEvidence?.originalTime?.week
       && epoch?.receiverTowSeconds === delayEvidence?.originalTime?.towSeconds;
@@ -1538,8 +1545,15 @@ export function createObservationView(container, onSelect = () => {}, role = '')
     container.querySelector('[data-status]').textContent = '';
     container.querySelector('[data-navigation-title]').textContent = '수신 항법정보 · SFRBX';
     container.querySelector('[data-navigation-caption]').textContent = rawEpoch ? '전달된 항법 메시지' : 'SB2 통합 항법 슬롯에서 복원한 항법 메시지 (SB3 0101 패딩)';
-    select.replaceChildren(new Option('Week ' + (week ?? '—') + ' / TOW ' + numeric(tow) + ' s', '0'));
-    select.disabled = true;
+    const wireEpochText = 'Week ' + (week ?? '—') + ' / TOW ' + numeric(tow) + ' s';
+    if (isSingleEpochView) {
+      select.textContent = wireEpochText;
+      select.value = '0';
+      select.disabled = true;
+    } else {
+      select.replaceChildren(new Option(wireEpochText, '0'));
+      select.disabled = true;
+    }
     body.replaceChildren();
     const rows = ordered(values);
     for (const signal of tracking) {
@@ -1633,7 +1647,7 @@ export function createObservationView(container, onSelect = () => {}, role = '')
       const nextIq = next?.source === 'IQ_FRAME' || next?.source === 'IQ_RF' || next?.source === 'IQ_TRACKING';
       const previousIq = data?.source === 'IQ_FRAME' || data?.source === 'IQ_RF' || data?.source === 'IQ_TRACKING';
       if (nextIq !== previousIq) {
-        showPvtActiveOnly = !nextIq;
+        showPvtActiveOnly = isSingleEpochView ? false : !nextIq;
         if (navFilterCheckbox) navFilterCheckbox.checked = showPvtActiveOnly;
         if (filterCheckbox) filterCheckbox.checked = true;
       }
@@ -1660,20 +1674,21 @@ export function createObservationView(container, onSelect = () => {}, role = '')
         row.className = 'epoch-empty-row'; cell.colSpan = 9; cell.textContent = '표시할 항법정보가 없습니다.';
         row.append(cell); navigationBody.append(row);
       }
-      const details = container.querySelector('[data-record-details]');
-      const renderRecords = () => {
-        container.querySelector('[data-records]').textContent = details.open
-          ? JSON.stringify(data?.source === 'IQ_FRAME'
-              ? {receivedValues: data.receivedValues, navigation: data.navigation, trackingEpochs: data.trackingEpochs}
-              : data?.receivedValues || data?.records || [], null, 2) : '';
-      };
-      details.ontoggle = renderRecords;
-      renderRecords();
-      select.replaceChildren(...(data?.epochs?.length
-        ? data.epochs.map((item, i) => new Option('Week ' + item.observation.week + ' / TOW ' + numeric(item.observation.receiverTowSeconds) + ' s', String(i)))
-        : [new Option('GNSS 시간 없음', '')]));
-      select.disabled = !data?.epochs?.length;
-      if (data?.epochs?.length) select.value = String(Math.min(selected || 0, data.epochs.length - 1));
+      const nextIndex = data?.epochs?.length ? Math.min(selected || 0, data.epochs.length - 1) : 0;
+      if (isSingleEpochView) {
+        const epochObs = data?.epochs?.[nextIndex]?.observation;
+        select.textContent = epochObs
+          ? 'Week ' + epochObs.week + ' / TOW ' + numeric(epochObs.receiverTowSeconds) + ' s'
+          : 'GNSS 시간 없음';
+        select.value = String(nextIndex);
+        select.disabled = true;
+      } else {
+        select.replaceChildren(...(data?.epochs?.length
+          ? data.epochs.map((item, i) => new Option('Week ' + item.observation.week + ' / TOW ' + numeric(item.observation.receiverTowSeconds) + ' s', String(i)))
+          : [new Option('GNSS 시간 없음', '')]));
+        select.disabled = !data?.epochs?.length;
+        if (data?.epochs?.length) select.value = String(nextIndex);
+      }
       render();
     },
     render() { render(false); },

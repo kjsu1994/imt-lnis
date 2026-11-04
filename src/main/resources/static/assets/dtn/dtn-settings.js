@@ -3,6 +3,22 @@ import {requestJson} from '../common/http.js?v=20261103-management-reset';
 const types = {GNSS_RAW: 'RAW', AFS_METADATA: 'AFS', IQ_SAMPLE: 'I/Q'};
 const fullTypes = {GNSS_RAW: 'GNSS RAW', AFS_METADATA: 'AFS Frame', IQ_SAMPLE: 'I/Q Sample'};
 
+// URL 변환은 기본 포트를 지우고 일부 IPv4 표기를 바꾸므로 입력 원문을 검사한다.
+export function parseNodeAddress(raw, defaultPort, defaultScheme = 'http') {
+  const value = (raw || '').trim();
+  if (!value) throw new Error('상대 서비스 주소(http://IPv4:포트)를 입력하세요.');
+  const match = /^(?:(https?):\/\/)?((?:0|[1-9][0-9]{0,2})(?:\.(?:0|[1-9][0-9]{0,2})){3})(?::([0-9]+))?\/?$/i.exec(value);
+  if (!match || match[2].split('.').some(part => Number(part) > 255)) {
+    throw new Error('http(s)://IPv4:포트 또는 IPv4:포트 형식으로 입력하세요.');
+  }
+  const scheme = (match[1] || defaultScheme).toLowerCase();
+  const port = Number(match[3] === undefined ? defaultPort : match[3]);
+  if (!['http', 'https'].includes(scheme) || !Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error('포트는 1~65535의 정수로 입력하세요.');
+  }
+  return {ip: match[2], port, scheme};
+}
+
 export function trialTypeLabel(type, compact = false) {
   return (compact ? types : fullTypes)[type] || (compact ? '미확인' : '유형 미확인');
 }

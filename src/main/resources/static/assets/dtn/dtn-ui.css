@@ -615,7 +615,10 @@ body[data-page="dtn-sender"] #dtn-upload-panel .upload-progress-field progress {
 body[data-page^="dtn-"] .observation-summary { display: flex; flex-wrap: wrap; gap: 12px 24px; color: #516178; padding: 12px 0; font-size: 13px; }
 body[data-page^="dtn-"] .gnss-data-header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; }
 body[data-page^="dtn-"] .gnss-data-header h2 { margin: 0; }
-body[data-page^="dtn-"] .gnss-data-header label { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0; min-width: 0; }
+body[data-page^="dtn-"] .gnss-data-header label,
+body[data-page^="dtn-"] .gnss-data-header .gnss-epoch-display { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0; min-width: 0; font-size: 13px; color: #34465a; }
+body[data-page^="dtn-"] .gnss-data-header .gnss-epoch-label { font-weight: 600; color: #516178; }
+body[data-page^="dtn-"] .gnss-data-header .gnss-epoch-value { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 6px; background: #f1f5f9; border: 1px solid #d7e2ec; color: #1e293b; font-weight: 600; font-variant-numeric: tabular-nums; user-select: text; }
 body[data-page^="dtn-"] .gnss-data-header select { width: auto; max-width: 100%; margin: 0; }
 body[data-page^="dtn-"] .gnss-data-header .observation-summary { margin-left: auto; padding: 0; gap: 4px 12px; font-size: 12px; justify-content: flex-end; }
 body[data-page^="dtn-"] .gnss-data-header .observation-summary span { white-space: nowrap; }
@@ -685,8 +688,10 @@ body[data-page^="dtn-"] .dtn-log-tools select { width: auto; margin: 0; padding:
 body[data-page^="dtn-"] .dtn-log-tools select { max-width: 160px; min-width: 0; }
 body[data-page^="dtn-"] .dtn-log-tools a { border: 1px solid var(--line); border-radius: 8px; text-decoration: none; }
 body[data-page^="dtn-"] #dtn-log-detail[aria-pressed="true"] { background: #dff2ec; color: #116b55; }
-body[data-page^="dtn-"] .adapter-url-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; align-items: end; gap: 10px; }
-body[data-page^="dtn-"] .adapter-connection-state { display: flex; align-items: center; gap: 8px; min-height: 41px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; white-space: nowrap; }
+body[data-page^="dtn-"] .adapter-url-controls { display: grid; grid-template-columns: minmax(0, 1fr) 215px auto auto; align-items: end; gap: 10px; }
+body[data-page^="dtn-"] .adapter-connection-state { display: flex; align-items: center; gap: 8px; min-height: 41px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; background: #fbfcfc; white-space: nowrap; box-sizing: border-box; }
+body[data-page^="dtn-"] .adapter-connection-state small { color: var(--muted); }
+body[data-page^="dtn-"] .adapter-connection-state strong { margin-left: auto; font-size: 13px; }
 body[data-page^="dtn-"] .adapter-url-controls label { margin: 0; }
 body[data-page^="dtn-"] #dtn-adapter-save { order: 1; }
 body[data-page^="dtn-"] .adapter-url-controls label { display: block; min-width: 0; }
@@ -694,6 +699,7 @@ body[data-page^="dtn-"] .adapter-url-controls label span { display: block; margi
 body[data-page^="dtn-"] .adapter-url-controls input { width: 100%; min-width: 0; margin: 0; }
 body[data-page^="dtn-"] .adapter-url-controls button { flex-shrink: 0; white-space: nowrap; }
 body[data-page^="dtn-"] .adapter-url-help { display: block; margin-top: 7px; color: var(--muted); }
+body[data-page^="dtn-"] .adapter-url-help:empty { display: none; }
 body[data-page^="dtn-"] .adapter-health-results { margin-top: 6px; padding: 0; }
 body[data-page^="dtn-"] .adapter-health-item { display: flex; align-items: flex-start; flex-direction: column; gap: 6px; min-width: 0; }
 body[data-page^="dtn-"] .adapter-health-item small { max-width: 100%; overflow-wrap: anywhere; word-break: break-word; color: var(--muted); }
@@ -1377,15 +1383,22 @@ body[data-page="dtn-sender"] .sender-summary-row #service-clock-sync { padding: 
   flex-wrap: wrap;
   font-size: 12px;
 }
-.receiver-epoch-controls label {
+.receiver-epoch-controls label,
+.receiver-epoch-controls .gnss-epoch-label {
   font-weight: 600;
   color: #475569;
 }
-.receiver-epoch-controls select {
-  width: auto;
-  min-width: 220px;
-  max-width: 320px;
-  margin: 0;
+.receiver-epoch-controls .gnss-epoch-value {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 6px;
+  background: #f1f5f9;
+  border: 1px solid #d7e2ec;
+  color: #1e293b;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  user-select: text;
 }
 .pvt-gauge-pill {
   display: inline-flex;
@@ -2488,11 +2501,15 @@ button.satellite-select.constellation-badge[aria-pressed="true"] {
 .constellation-chip.chip-glo { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
 .constellation-chip.chip-other { background: #f3f4f6; color: #4b5563; border-color: #e5e7eb; }
 
+#dtn-sender-status,
+#dtn-receiver-status,
 #dtn-adapter-strip-status {
   cursor: pointer;
   user-select: none;
   transition: transform 0.15s ease, filter 0.15s ease, box-shadow 0.15s ease;
 }
+#dtn-sender-status:hover,
+#dtn-receiver-status:hover,
 #dtn-adapter-strip-status:hover {
   filter: brightness(0.95);
   transform: translateY(-1px);

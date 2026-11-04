@@ -5,7 +5,7 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>LNIS DTN Sender</title>
   <link rel="stylesheet" href="/lnis/assets/common/app.css?v=20261103-system-logo-v2">
-  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20261104-serial-controls">
+  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20261104-sender-url-unified">
 </head>
 <body data-page="dtn-sender">
 <header style="position: relative;">
@@ -34,8 +34,8 @@
 </header>
 <main>
   <section class="status-strip">
-    <span id="dtn-sender-status" class="pill">송신 처리기 확인 중</span>
-    <span id="dtn-receiver-status" class="pill">수신 처리기 확인 중</span>
+    <span id="dtn-sender-status" class="pill" title="클릭하여 송신 설정 열기">송신 처리기 확인 중</span>
+    <span id="dtn-receiver-status" class="pill" title="클릭하여 상대 수신 서비스 설정으로 이동">수신 처리기 확인 중</span>
     <span id="dtn-adapter-strip-status" class="pill warning" title="클릭하여 어댑터 설정 열기">어댑터 확인 중</span>
     <span id="dtn-test-status" class="pill">시험 대기</span>
     <span id="dtn-clock-skew-warning" class="pill warning" hidden title="노드 간 시각이 어긋나 있습니다. 시간 맞추기 버튼으로 보정하세요.">⚠️ 시계 오차 <strong id="clock-skew-val">0.0s</strong> · 동기화 필요</span>
@@ -196,18 +196,20 @@
       </section>
     </div>
     <select id="dtn-sender" hidden></select><select id="dtn-receiver" hidden></select>
-    <div class="destination-row">
-      <label>상대 수신 서비스 IP<input id="dtn-receiver-ip" type="text" placeholder="192.168.219.100" autocomplete="off" required></label>
-      <label class="port-field">포트<input id="dtn-receiver-port" type="number" min="1" max="65535" value="8091" required></label>
-      <div class="destination-status"><span id="destination-dot" class="connection-dot unknown"></span>
-        <div><small>송신 → 수신 서비스</small><strong id="destination-state">미확인</strong></div></div>
-      <div class="connection-actions"><button id="dtn-connection-test" type="button">연결 확인</button><button id="dtn-connection-save" type="button">저장·적용</button></div>
+    <div class="adapter-url-row peer-url-row">
+      <div class="adapter-url-controls">
+        <label><span>상대 수신 서비스 주소</span>
+          <input id="dtn-receiver-ip" type="text" placeholder="http://수신-PC-IP:포트 (예: http://192.168.1.72:8089)" autocomplete="off" required></label>
+        <div class="adapter-connection-state"><span id="destination-dot" class="connection-dot unknown" aria-hidden="true"></span><small>송신 → 수신 서비스</small><strong id="destination-state" role="status" aria-live="polite">미확인</strong></div>
+        <button id="dtn-connection-test" type="button">연결 확인</button>
+        <button id="dtn-connection-save" type="button" title="송신 서버에 주소 저장·적용">저장·적용</button>
+      </div>
+      <small id="dtn-connection-message" class="adapter-url-help" role="status"></small>
     </div>
-    <small id="dtn-connection-message" role="status"></small>
     <div class="adapter-url-row">
       <div class="adapter-url-controls">
         <label><span>DTN 어댑터 서버 주소</span>
-          <input id="dtn-send-url" type="url" placeholder="http://어댑터-IP:포트" autocomplete="off"></label>
+          <input id="dtn-send-url" type="url" placeholder="http://어댑터-IP:포트 (예: http://192.168.1.154:8080)" autocomplete="off"></label>
         <div class="adapter-connection-state"><span id="dtn-adapter-dot" class="connection-dot unknown" aria-hidden="true"></span><small>송신 → 송신 adapter</small><strong id="dtn-adapter-status" role="status" aria-live="polite">미확인</strong></div>
         <button id="dtn-adapter-save" type="button" title="이 브라우저에 주소 저장·적용">저장·적용</button>
         <button id="dtn-adapter-health" type="button" aria-controls="dtn-adapter-health-results">연결 확인</button>
@@ -348,5 +350,5 @@
   <span class="software-version" title="소프트웨어 버전" aria-label="소프트웨어 버전 @lnisVersion@">v@lnisVersion@</span>
 </footer>
 
-<script type="module" src="/lnis/assets/dtn/dtn.js?v=20261104-serial-controls"></script>
+<script type="module" src="/lnis/assets/dtn/dtn.js?v=20261104-peer-address-validation-2"></script>
 </body></html>

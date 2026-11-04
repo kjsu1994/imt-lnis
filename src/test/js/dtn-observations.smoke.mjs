@@ -201,6 +201,8 @@ assert.equal(nodes.get('[data-navigation]').children.length,1);
 console.log('PASS: epoch selection fallback and navigation without observations');
 
 const senderView = createObservationView(container, () => {}, '송신 원본');
+assert.ok(container.innerHTML.includes('<select data-epoch aria-label="관측 시점"></select>'));
+assert.ok(!container.innerHTML.includes('data-record-details'));
 senderView.setData(original);
 assert.equal(nodes.get('[data-association]').hidden,false);
 assert.equal(nodes.get('[data-transmit-heading]').hidden,true);
@@ -211,7 +213,10 @@ assert.equal(JSON.stringify(original),originalJson);
 console.log('PASS: sender association retains original values and hidden transmit estimate');
 
 const referenceView = createObservationView(container, () => {}, '송신 비교원본');
+assert.ok(!container.innerHTML.includes('<select data-epoch'));
+assert.ok(!container.innerHTML.includes('data-record-details'));
 referenceView.setData(original);
+assert.match(nodes.get('[data-epoch]').textContent, /Week 2400 \/ TOW 100021\.000 s/);
 assert.equal(nodes.get('[data-association]').hidden,false);
 assert.equal(nodes.get('[data-transmit-heading]').hidden,true);
 assert.equal(nodes.get('[data-observations]').children[0].children.length,11);
@@ -546,7 +551,7 @@ let iqRow=nodes.get('[data-observations]').children[0];
 assert.equal(nodes.get('[data-integrity]').textContent,'파일 일치 · PVT 측정 완료');
 assert.equal(nodes.get('[data-range-heading]').hidden,true);
 assert.equal(nodes.get('[data-phase-heading]').hidden,true);
-assert.equal(nodes.get('[data-navigation-pvt-active]').checked,false);
+assert.ok(!container.innerHTML.includes('data-navigation-pvt-active'));
 assert.equal(nodes.get('[data-pvt-filter]').checked,true);
 assert.equal(nodes.get('[data-navigation]').children.length,1);
 assert.equal(iqRow.children[3].textContent,'—','I/Q never reads Reference pseudorange');
@@ -579,7 +584,6 @@ assert.equal(nodes.get('[data-integrity]').textContent,'파일 일치 · PVT 비
 iqReceiverView.setData({...wireView,receivedValues:{observations:[{...wireObservation,week:2400,towSeconds:100021}]}},false,null,{referenceStatus:'COMPLETE',referenceObservations:original});
 assert.equal(nodes.get('[data-range-heading]').hidden,false);
 assert.equal(nodes.get('[data-phase-heading]').hidden,false);
-assert.equal(nodes.get('[data-navigation-pvt-active]').checked,true);
 assert.equal(nodes.get('[data-iq-tracking]').hidden,true);
 assert.equal(nodes.get('[data-rf-range]').hidden,true);
 assert.equal(nodes.get('[data-observations]').children[0].children[3].textContent,numeric(raw.pseudorangeMeters));

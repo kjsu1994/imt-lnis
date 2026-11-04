@@ -251,7 +251,10 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
  assert.match(await observationPanel.locator('[data-observations]').innerText(),/21000000\.000/);
  assert.match(await observationPanel.locator('[data-observations]').innerText(),/320792458\.000/);
  assert.equal(await observationPanel.locator('td.converted-range').evaluate(el=>getComputedStyle(el).color),'rgb(180, 35, 24)');
- assert.equal(await observationPanel.locator('[data-epoch]').inputValue(),'0');
+ assert.equal(await observationPanel.locator('select[data-epoch]').count(),0);
+ assert.equal(await page.locator('select#pvt-epoch').count(),0);
+ assert.equal(await observationPanel.locator('[data-record-details]').count(),0);
+ assert.equal(await observationPanel.locator('[data-navigation-pvt-active]').count(),0);
  assert.match(await observationPanel.locator('[data-epoch]').innerText(),/100000\.000/);
  assert.equal(await observationPanel.locator('[data-observations] tr').count(),1);
  await page.screenshot({path:'build/receiver-observation-review.png',fullPage:true});
@@ -281,7 +284,6 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
  await page.reload();await selectTrial();
  assert.equal(await observationPanel.locator('[data-pvt-filter]').isChecked(),true);
  await observationPanel.locator('[data-pvt-filter]').uncheck();
- await observationPanel.locator('[data-navigation-pvt-active]').uncheck();
  await page.waitForFunction(()=>document.querySelector('#dtn-observations [data-navigation-title]')?.textContent.includes('전체 항법정보 · 6건'));
  assert.equal(await observationPanel.locator('[data-navigation] tr').count(),6);
  assert.equal(await observationPanel.locator('[data-navigation-all]').isVisible(),false);
@@ -416,7 +418,7 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
  assert.equal(await observationPanel.isVisible(),true);
  assert.equal(await page.locator('#receiver-iq').count(),0);
  assert.equal(await observationPanel.locator('[data-observations] tr').count(),2);
- assert.equal(await observationPanel.locator('[data-navigation-pvt-active]').isChecked(),false);
+ assert.equal(await observationPanel.locator('[data-navigation-pvt-active]').count(),0);
  assert.equal(await observationPanel.locator('[data-navigation] tr').count(),6);
  assert.equal(await observationPanel.locator('[data-navigation] pre').first().isVisible(),true);
  assert.equal(await observationPanel.locator('[data-range-heading]').isVisible(),false);
@@ -493,7 +495,7 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
  await page.waitForFunction(()=>document.querySelector('#dtn-observations [data-integrity]')?.textContent==='데이터 일치');
  assert.equal(await observationPanel.locator('[data-range-heading]').isVisible(),true);
  assert.equal(await observationPanel.locator('[data-phase-heading]').isVisible(),true);
- assert.equal(await observationPanel.locator('[data-navigation-pvt-active]').isChecked(),true);
+ assert.equal(await observationPanel.locator('[data-navigation-pvt-active]').count(),0);
 
  await page.goto(base + '/dtn-intro');
  assert.equal(await page.locator('.pc-boundary').count(), 2);

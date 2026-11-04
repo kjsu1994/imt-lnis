@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>LNIS DTN Receiver</title>
   <link rel="stylesheet" href="/lnis/assets/common/app.css?v=20261103-system-logo-v2">
-  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20261104-serial-controls">
+  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20261104-receiver-epoch-ui">
 </head>
 <body data-page="dtn-receiver">
 <header style="position: relative;">
@@ -36,9 +36,9 @@
 </header>
 <main>
   <section class="status-strip" aria-label="연결 상태">
-    <span id="dtn-receiver-status" class="pill">수신 처리기 확인 중</span>
-    <span id="dtn-sender-status" class="pill">송신 처리기 확인 중</span>
-    <span id="dtn-adapter-strip-status" class="pill warning" title="수신 어댑터 연결 상태">어댑터 확인 중</span>
+    <span id="dtn-receiver-status" class="pill" title="클릭하여 수신 설정으로 이동">수신 처리기 확인 중</span>
+    <span id="dtn-sender-status" class="pill" title="클릭하여 상대 송신 서비스 설정으로 이동">송신 처리기 확인 중</span>
+    <span id="dtn-adapter-strip-status" class="pill warning" title="클릭하여 수신 어댑터 설정으로 이동">어댑터 확인 중</span>
     <span id="dtn-clock-skew-warning" class="pill warning" hidden title="노드 간 시각이 어긋나 있습니다. 시간 맞추기 버튼으로 보정하세요.">⚠️ 시계 오차 <strong id="clock-skew-val">0.0s</strong> · 동기화 필요</span>
     <div class="service-clock-pill" title="시험 기준시각 및 보정 상태">
       <span class="clock-label">기준시각</span>
@@ -105,7 +105,7 @@
         <button id="dtn-tests-next" type="button" disabled aria-label="다음 시험 목록">다음</button>
         <button id="dtn-cancel-waiting" type="button" title="목록 페이지와 관계없이 수신 대기 시험 전체를 종료합니다. 전송·계산 중인 시험과 기록은 유지됩니다.">대기 전체 종료</button>
         <button id="dtn-refresh" type="button">새로고침</button>
-        <button id="dtn-cancel" type="button" disabled>대기 종료</button>
+        <button id="dtn-cancel" type="button" disabled hidden>대기 종료</button>
       </div>
 
       <div class="receiver-flow-container">
@@ -146,8 +146,8 @@
         <span id="pvt-match" class="pill">PVT 비교 대기</span>
       </div>
       <div class="receiver-epoch-controls">
-        <label for="pvt-epoch">관측 시각</label>
-        <select id="pvt-epoch" disabled><option value="">계산 결과 없음</option></select>
+        <span class="gnss-epoch-label">관측 시각</span>
+        <span id="pvt-epoch" class="gnss-epoch-value" role="status" aria-label="PVT 관측 시각">계산 결과 없음</span>
         <span id="pvt-count">0개 관측</span>
         <span id="pvt-validity" class="pill">결과 대기</span>
       </div>
@@ -515,6 +515,6 @@
   <span class="software-version" title="소프트웨어 버전" aria-label="소프트웨어 버전 @lnisVersion@">v@lnisVersion@</span>
 </footer>
 
-<script type="module" src="/lnis/assets/dtn/dtn-receiver.js?v=20261104-serial-controls"></script>
+<script type="module" src="/lnis/assets/dtn/dtn-receiver.js?v=20261104-peer-address-validation-2"></script>
 </body>
 </html>
