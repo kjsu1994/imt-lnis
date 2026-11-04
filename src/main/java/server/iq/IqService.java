@@ -376,6 +376,7 @@ public class IqService {
                                 2);
                 var storedContext = (com.fasterxml.jackson.databind.node.ObjectNode) json.valueToTree(context);
                 storedContext.put("owner", storageOwner());
+                storedContext.put("frameFormat", server.afs.AfsPvtFrameCodec.FORMAT);
                 json.writeValue(root.resolve(id + ".context.json").toFile(), storedContext);
                 // The file manifest marks READY after its PVT context has been persisted.
                 json.writeValue(root.resolve(id + ".json").toFile(), file);
@@ -444,12 +445,13 @@ public class IqService {
         if (job.get("file") instanceof IqFile file && "READY".equals(job.get("state"))) {
             try {
                 Path context = root.resolve(id + ".context.json");
-                var source = Files.isRegularFile(context)
-                        ? json.readValue(context.toFile(), IqReceiver.Source.class) : null;
+                var stored = Files.isRegularFile(context) ? json.readTree(context.toFile()) : null;
+                var source = stored == null ? null : json.treeToValue(stored, IqReceiver.Source.class);
                 if (source == null || source.metadata() == null
-                        || !IqReceiver.RF_METHOD.equals(source.metadata().pvtMethod())) {
+                        || !IqReceiver.RF_METHOD.equals(source.metadata().pvtMethod())
+                        || !server.afs.AfsPvtFrameCodec.FORMAT.equals(stored.path("frameFormat").asText())) {
                     result.put("state", "REGENERATE");
-                    result.put("message", "RF 기준 시험용으로 I/Q 파일을 다시 생성하세요.");
+                    result.put("message", "현재 배포 규격으로 I/Q 파일을 다시 생성하세요.");
                 } else {
                     result.put("preview", preview(file));
                 }
@@ -499,7 +501,8 @@ public class IqService {
     public IqFile completed(UUID id) throws IOException {
         var job = status(id);
         if (!"READY".equals(job.get("state"))) {
-            throw new IllegalStateException("완료된 I/Q 파일만 전송할 수 있습니다.");
+            throw new IllegalStateException("REGENERATE".equals(job.get("state"))
+                    ? String.valueOf(job.get("message")) : "완료된 I/Q 파일만 전송할 수 있습니다.");
         }
         IqFile file = (IqFile) job.get("file");
         // Reuse the generation digest; the receiver still verifies the complete file.

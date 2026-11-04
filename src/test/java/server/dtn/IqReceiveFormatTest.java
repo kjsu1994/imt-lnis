@@ -30,10 +30,11 @@ class IqReceiveFormatTest {
     @CsvSource({
         "1,LNIS-IQ-FILE-v1,legacy,false",
         "2,LNIS-IQ-FILE-v2,frame,false",
-        "3,LNIS-IQ-FILE-v3,frame,true",
-        "3,LNIS-IQ-FILE-v3,rf,true",
+        "1,LNIS-IQ-FILE-v1,frame,true",
+        "1,LNIS-IQ-FILE-v1,rf,true",
         "1,LNIS-IQ-FILE-v2,frame,false",
         "2,LNIS-IQ-FILE-v1,frame,false",
+        "3,LNIS-IQ-FILE-v1,rf,false",
         "2,LNIS-IQ-FILE-v2,legacy,false"
     })
     void acceptsMatchingVersionsBeforeVerifyingFile(
@@ -167,8 +168,8 @@ class IqReceiveFormatTest {
         baseline.setTowSeconds(rf ? 100021 : 100000);
         received.setReceiverClockBiasSeconds(2.0);
         var transfer = new Transfer();
-        transfer.setSchemaVersion(3);
-        transfer.setFormat("LNIS-IQ-FILE-v3");
+        transfer.setSchemaVersion(1);
+        transfer.setFormat("LNIS-IQ-FILE-v1");
         transfer.setTestType("IQ_SAMPLE");
         transfer.setFile(new IqFile("/exchange/" + UUID.randomUUID() + ".bin",
                 IqService.EXPECTED_BYTES, "A".repeat(64), 90, 12000000, "IQ_INTERLEAVED_INT8", 2));

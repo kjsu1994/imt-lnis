@@ -10,8 +10,5 @@ logs/
 agent-data/
 .env
 
-# Windows Agent 배포본의 Java 21 본체는 로컬/배포 산출물이며 설치 스크립트로 재생성한다.
-dist/windows-agent/runtime/jdk-21/
-
 .serial-bridge.env
 serial-bridge/

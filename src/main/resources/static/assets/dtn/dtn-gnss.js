@@ -31,13 +31,6 @@ export function initGnssControls({port, baud, refresh, changed = () => {}, log =
       + '\n최근 메시지 수신: ' + (state.updatedAt ? new Date(state.updatedAt).toLocaleTimeString('ko-KR') : '—')
       + '\n수신기 시간 정확도 추정: ' + (state.accuracyNanos == null ? '—' : state.accuracyNanos + ' ns (PC 정확도 아님)')
       + '\n' + (state.message || '') + '\nWindows 시간은 변경하지 않습니다. 시험 시각 보정은 시간 맞추기에서 적용합니다.';
-    if ($('gnss-dtr')) {
-      $('gnss-dtr').disabled = $('gnss-rts').disabled = attached() || working;
-      if (attached()) {
-        $('gnss-dtr').checked = !!state.dtrEnabled;
-        $('gnss-rts').checked = !!state.rtsEnabled;
-      }
-    }
     changed(state);
   }
   async function listPorts() {
@@ -150,7 +143,7 @@ export function initGnssControls({port, baud, refresh, changed = () => {}, log =
       state = await request(disconnect ? '/disconnect?stopCapture=' + !!state.capturing : '/connect', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
         body: disconnect ? undefined : JSON.stringify({portName: $(port).value, baudRate: Number($(baud).value),
-          protocolId: 'UBX', dtrEnabled: $('gnss-dtr')?.checked || false, rtsEnabled: $('gnss-rts')?.checked || false})});
+          protocolId: 'UBX', dtrEnabled: false, rtsEnabled: false})});
     } catch (error) {
       log(error.message, 'ERROR');
       $('gnss-time-detail').textContent = error.message;

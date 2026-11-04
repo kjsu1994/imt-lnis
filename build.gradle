@@ -119,6 +119,14 @@ tasks.register('syntheticGraw', JavaExec) {
 }
 
 tasks.register('nativeBuild', Exec) {
+    doFirst {
+        if (System.getProperty('os.name').toLowerCase().contains('windows')) {
+            commandLine 'powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass',
+                    '-File', file('scripts/package-windows.ps1').absolutePath,
+                    '-SourceDirectory', projectDir.absolutePath, '-NativeOnly'
+        }
+    }
+
     dependsOn tasks.named('nativeSourceTest')
     group = 'build'
     description = '내부 원본과 패치로 Linux SO/IQ 및 Windows DLL을 Docker에서 빌드한다.'
@@ -179,7 +187,7 @@ tasks.register('linuxNodeDistZip', Zip) {
     archiveFileName = 'lnis-node-linux.zip'
     destinationDirectory = layout.buildDirectory.dir('distributions')
     from('deployment/node') {
-        exclude 'docker-compose.dev.yml', 'dev-relay.mjs', 'docker-compose.example.yml'
+        exclude 'docker-compose.dev.yml', 'dev-relay.mjs', 'docker-compose.example.yml', '*.cmd', '*.ps1'
     }
     from('build/iq') {
         into 'iq'
@@ -214,7 +222,7 @@ gradle.taskGraph.whenReady { graph ->
         def builtCandidate = System.getProperty('os.name').toLowerCase().contains('windows')
                 ? 'build/native-pvt' : 'build/native-linux'
         def requestedCandidate = providers.gradleProperty('nativeCandidate').getOrElse(builtCandidate)
-        if (graph.hasTask(tasks.named('linuxNodeDistZip').get())
+        if ((graph.hasTask(tasks.named('linuxNodeDistZip').get()) || graph.hasTask(tasks.named('windowsNodeDistZip').get()))
                 && file(requestedCandidate).canonicalFile != file(builtCandidate).canonicalFile) {
             throw new GradleException('Distribution checks must use the newly built native candidate.')
         }
@@ -248,10 +256,6 @@ tasks.register('windowsSerialBridgeDist', Sync) {
         it.name.startsWith('jSerialComm-') || it.name.startsWith('jackson-core-') ||
         it.name.startsWith('jackson-databind-') || it.name.startsWith('jackson-annotations-')
     }) { into 'lib' }
-}
-tasks.named('linuxNodeDistZip') {
-    dependsOn tasks.named('windowsSerialBridgeDist')
-    from(layout.buildDirectory.dir('windows-serial-bridge')) { into 'serial-bridge' }
 }
 // Service guide is the source; publishing only changes links for the static site.
 def introAssets = ['logo_v3.png', 'imt_logo.png', 'system_logo.png']
@@ -307,6 +311,15 @@ tasks.register('deploymentTest', Exec) {
 }
 
 tasks.named('check') { dependsOn tasks.named('deploymentTest') }
+tasks.register('offlineNodeTest', Exec) {
+    group = 'verification'
+    description = '오프라인 설치 설정·포트 전달·WSL 프로세스 소유권을 격리하여 검사한다.'
+    onlyIf { System.getProperty('os.name').toLowerCase().contains('windows') }
+    commandLine 'powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass',
+            '-File', 'src/test/powershell/offline-node.smoke.ps1'
+}
+tasks.named('check') { dependsOn tasks.named('offlineNodeTest') }
+
 
 // Customer manual remains separate from the public intro site.
 tasks.register('userManualPdf', Exec) {
@@ -347,4 +360,29 @@ tasks.named('processResources') {
 
 tasks.named('browserTest') {
     dependsOn tasks.named('processResources')
+}
+
+// Windows delivery uses prebuilt images and offline runtime assets; Linux developer packaging remains separate.
+tasks.register('prepareWindowsNode', Exec) {
+    group = 'distribution'
+    description = 'Windows 11 오프라인 설치 자료와 서비스 이미지를 준비한다.'
+    dependsOn tasks.named('bootJar'), tasks.named('check'), tasks.named('nativeLinuxSourcesZip'),
+            tasks.named('nativeBuild'), tasks.named('windowsSerialBridgeDist')
+    doFirst {
+        commandLine 'powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass',
+                '-File', file('scripts/package-windows.ps1').absolutePath,
+                '-SourceDirectory', projectDir.absolutePath,
+                '-JavaHome', javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }.get().metadata.installationPath.asFile.absolutePath
+    }
+}
+tasks.register('windowsNodeDistZip', Zip) {
+    group = 'distribution'
+    description = '송신·수신 PC에 공통으로 설치할 Windows 오프라인 납품 묶음이다.'
+    dependsOn tasks.named('prepareWindowsNode')
+    archiveFileName = 'lnis-node-windows.zip'
+    destinationDirectory = layout.buildDirectory.dir('distributions')
+    from('build/windows-node') { into 'lnis-node-windows' }
+    zip64 = true
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
 }

@@ -938,8 +938,8 @@
                 ].join('\n\n')
               : [
                   iq
-                    ? 'IQ_SAMPLE · LNIS-IQ-FILE-v3 · schemaVersion 3. JSON에는 파일 경로·크기·SHA-256·신호 정보·Reference가 들어가고, BIN 파일은 공유 폴더로 전달합니다.'
-                    : 'AFS_METADATA · LNIS-AFS-GNSS-v6 · schemaVersion 6. 선택한 Epoch의 GPS L1 관측 위성마다 한 프레임을 만들고 satellites 아래에 묶습니다.',
+                    ? 'IQ_SAMPLE · LNIS-IQ-FILE-v1 · schemaVersion 1. JSON에는 파일 경로·크기·SHA-256·신호 정보·Reference가 들어가고, BIN 파일은 공유 폴더로 전달합니다.'
+                    : 'AFS_METADATA · LNIS-AFS-GNSS-v1 · schemaVersion 1. 선택한 Epoch의 GPS L1 관측 위성마다 한 프레임을 만들고 satellites 아래에 묶습니다.',
                   iq
                     ? 'pvtMethod는 AFS_IQ_RF_DELAY-v1입니다. RF 추적 관측과 복호 항법정보로 지연 미적용·적용 PVT를 계산합니다.'
                     : '원본 RAW와 Reference는 수신 계산 뒤 서비스 간 REST로 조회합니다. 어댑터 전달 JSON에는 testId·엔진·요청 설정과 변환한 관측 JSON 또는 AFS 프레임을 넣습니다.'
@@ -1101,10 +1101,10 @@
       const iq = state.data === 'iq';
       const raw = state.data === 'raw';
       const example = {
-        schemaVersion: iq ? 3 : raw ? 2 : 6,
+        schemaVersion: 1,
         testId: '00000000-0000-4000-8000-000000000001',
         testType: iq ? 'IQ_SAMPLE' : raw ? 'GNSS_RAW' : 'AFS_METADATA',
-        format: iq ? 'LNIS-IQ-FILE-v3' : raw ? 'LNIS-GRAW-DELAY-v2' : 'LNIS-AFS-GNSS-v6',
+        format: iq ? 'LNIS-IQ-FILE-v1' : raw ? 'LNIS-GRAW-DELAY-v1' : 'LNIS-AFS-GNSS-v1',
         senderMode: state.tx,
         receiverMode: state.rx
       };

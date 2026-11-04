@@ -46,7 +46,7 @@ public final class DtnModels {
 
         private IqFile file;
 
-        /** AFS v4: original evidence, independent of frame PVT input. Older AFS/IQ formats retain their contracts. */
+        /** Original evidence is independent of the frame PVT input. */
         private Metadata metadata;
 
         private String sourceSha256;
@@ -165,10 +165,10 @@ public final class DtnModels {
             List<IqNavigation> gpsLnav)
             implements Metadata {}
 
-    /** v2/v3 navigation words are SB2 residuals; v4 preserves full original navigation words. */
+    /** Navigation supplement retained for metadata-based decoding. */
     public record AfsMetadata(List<AfsRecord> records) implements Metadata {}
 
-    /** v3: shared epoch/envelope data only; measurements and navigation live with their satellite. */
+    /** Shared epoch/envelope data; measurements and navigation are grouped by satellite. */
     public record AfsGroupedMetadata(List<AfsIndexedRecord> commonRecords) implements Metadata {}
 
     public record AfsSatellite(

@@ -588,7 +588,7 @@ body[data-page^="dtn-"] .card { min-width: 0; }
 body[data-page^="dtn-"] .card h2 { margin-bottom: 12px; }
 body[data-page^="dtn-"] .compact-input-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
 body[data-page^="dtn-"] .compact-input-row label { flex: 1; min-width: 180px; }
-/* Serial connection: primary controls first, optional control lines below. */
+/* Serial connection controls and status. */
 .serial-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; }
 .serial-controls label { min-width: 0; margin: 0; }
 .serial-controls .serial-port { flex: 1 1 200px; }
@@ -599,18 +599,9 @@ body[data-page^="dtn-"] .compact-input-row label { flex: 1; min-width: 180px; }
 .serial-status .gnss-details { margin: 0; }
 .serial-status .gnss-details[open] { flex-basis: 100%; }
 .serial-status .gnss-details pre { margin: 6px 0; }
-.serial-advanced { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; font-size: 12px; }
-.serial-advanced summary { cursor: pointer; color: #516178; }
-.serial-signals { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
-.serial-signals label { display: flex; align-items: start; gap: 8px; margin: 0; min-width: 0; }
-.serial-signals input[type="checkbox"] { flex: none; width: 16px; height: 16px; margin: 2px 0 0; }
-.serial-signals strong { margin-right: 4px; }
-.serial-signals small { display: block; color: #64748b; margin-top: 3px; line-height: 1.5; }
-.serial-advanced p { margin: 8px 0 0; color: #64748b; line-height: 1.5; }
 @media (max-width: 480px) {
   .serial-controls .serial-port { flex-basis: 100%; }
   .serial-controls .serial-baud { flex: 1; }
-  .serial-signals { grid-template-columns: 1fr; }
 }
 body[data-page^="dtn-"] .compact-input-row progress { width: 150px; margin-bottom: 12px; }
 body[data-page="dtn-sender"] #dtn-upload-panel { display: grid; grid-template-columns: minmax(240px, 1fr) auto minmax(220px, 1fr); align-items: end; }

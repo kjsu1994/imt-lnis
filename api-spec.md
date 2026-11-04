@@ -27,13 +27,13 @@
 
 | testType | schemaVersion | format | 내용 |
 |---|---:|---|---|
-| GNSS_RAW | 2 | LNIS-GRAW-DELAY-v2 | 원본 의사거리를 가상 송신 시각으로 바꾼 1 Epoch |
-| AFS_METADATA | 6 | LNIS-AFS-GNSS-v6 | GPS PRN별 750-byte AFS 프레임 |
-| IQ_SAMPLE | 3 | LNIS-IQ-FILE-v3 | I/Q 파일 경로·크기·SHA-256, 신호 정보와 비교 Reference |
+| GNSS_RAW | 1 | LNIS-GRAW-DELAY-v1 | 원본 의사거리를 가상 송신 시각으로 바꾼 1 Epoch |
+| AFS_METADATA | 1 | LNIS-AFS-GNSS-v1 | GPS PRN별 750-byte AFS 프레임 |
+| IQ_SAMPLE | 1 | LNIS-IQ-FILE-v1 | I/Q 파일 경로·크기·SHA-256, 신호 정보와 비교 Reference |
 
 AFS_METADATA는 기존 API 식별자를 유지합니다. 화면에서는 AFS Frame으로 표시합니다.
 RAW·AFS 시험은 원본 GNSS 및 Reference를 어댑터로 보내지 않습니다.
-새 I/Q의 pvtMethod는 `AFS_IQ_RF_DELAY-v1`입니다. 기존 `AFS_IQ_FRAME_PVT-v3` 수신 대기 시험은 기존 방식으로 처리합니다. 전달된 Reference는 별도 참고자료이며 복호나 RF PVT 입력으로 사용하지 않습니다.
+새 I/Q의 pvtMethod는 `AFS_IQ_RF_DELAY-v1`입니다. 전달된 Reference는 별도 참고자료이며 복호나 RF PVT 입력으로 사용하지 않습니다.
 GPS L1 C/A만 PVT에 사용합니다. pvtConstellation은 생략하거나 GPS를 지정합니다. 다른 값은 거절합니다.
 
 ## 공통 지연 계산

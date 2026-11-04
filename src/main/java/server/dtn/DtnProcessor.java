@@ -85,7 +85,7 @@ public final class DtnProcessor {
                         + count
                         + " frames · 각 6000 bits/750 bytes"
                         + " · SB2 801/1176 bits · SB3 0101 패딩 · SB4 670/846 bits · 원본 메타데이터 별도 보존");
-        progress.accept("JSON 준비", "AFS v4 · PVT 계산 입력은 프레임, 원본 RAW는 metadata로 보존");
+        progress.accept("JSON 준비", "AFS 프레임 복원 · PVT 입력은 프레임, 비교용 원본은 metadata로 보존");
         result.setTransfer(transfer);
         return result;
     }

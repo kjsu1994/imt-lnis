@@ -74,7 +74,7 @@ class AfsPvtFrameIntegrationTest {
             var prepared = processor.prepare(id, NativePvtIntegrationTest.validSample());
             Transfer transfer =
                     json.readValue(json.writeValueAsBytes(prepared.getTransfer()), Transfer.class);
-            assertEquals(6, transfer.getSchemaVersion());
+            assertEquals(1, transfer.getSchemaVersion());
             assertEquals(AfsPvtFrameCodec.FORMAT, transfer.getFormat());
             assertEquals(
                     96,

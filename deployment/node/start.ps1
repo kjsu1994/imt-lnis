@@ -1,35 +1,54 @@
 ﻿[CmdletBinding()]
 param([switch]$NoBrowser)
 $ErrorActionPreference = 'Stop'
-$composeRoot = $PSScriptRoot
-if ($composeRoot -notmatch '^[A-Za-z]:\\') { throw 'Windows 로컬 드라이브에서 실행하세요.' }
-if (!(Test-Path -LiteralPath (Join-Path $composeRoot '.env'))) { throw '.env에 역할과 노드 주소를 설정하세요.' }
-$linuxRoot = '/mnt/' + $composeRoot.Substring(0, 1).ToLowerInvariant() + $composeRoot.Substring(2).Replace('\', '/')
-$portSetting = Get-Content -LiteralPath (Join-Path $composeRoot '.env') | Where-Object { $_ -match '^LNIS_SERVER_PORT=\d+$' } | Select-Object -Last 1
-$nodePort = if ($portSetting) { [int]($portSetting.Split('=')[1]) } else { 8088 }
-# Web/PVT remain in Docker. Both roles can optionally connect a local GNSS receiver.
-$composeArgs = @('-f', 'docker-compose.yml')
-if (Test-Path (Join-Path $composeRoot 'docker-compose.override.yml')) { $composeArgs += @('-f','docker-compose.override.yml') }
+. (Join-Path $PSScriptRoot 'node-runtime.ps1')
+$context = Get-NodeContext $PSScriptRoot
+$lock = Enter-NodeLock $context
+$created = $false
 try {
-    & (Join-Path $composeRoot 'start-serial-bridge.ps1')
-    $composeArgs += @('-f','docker-compose.windows-serial.yml')
-} catch {
-    if ($_.Exception.Message -match '\[GNSS_(BUSY|CONFIG)\]') { throw }
-    Write-Warning "GNSS bridge unavailable; starting file/REST service with system time. $($_.Exception.Message)"
-}
-& wsl.exe --cd $linuxRoot -- docker compose @composeArgs up -d --build
-if ($LASTEXITCODE -ne 0) { throw '독립 노드 시작에 실패했습니다.' }
-$deadline = (Get-Date).AddMinutes(3)
-do {
-    Start-Sleep -Seconds 3
-    try {
-        $status = Invoke-RestMethod "http://localhost:$nodePort/lnis/api/v1/node" -TimeoutSec 3
-        if ($status.online) {
-            Write-Host ('독립 노드 실행 완료: ' + $status.role + ' / ' + $status.agentId)
-            if (!$NoBrowser) { Start-Process "http://localhost:$nodePort" }
-            return
+    $created = Start-NodeKeepAlive $context
+    $deadline = (Get-Date).AddSeconds(60)
+    do {
+        try { Invoke-NodeWsl $context @('docker','info','--format','{{.OSType}}') | Out-Null; break }
+        catch {
+            if ((Get-Date) -ge $deadline) { throw 'Docker가 준비되지 않았습니다. 설치를 다시 확인하세요.' }
+            Invoke-NodeWsl $context @('sudo','-n','systemctl','start','docker') | Out-Null
+            Start-Sleep -Seconds 2
         }
-    } catch { }
-} while ((Get-Date) -lt $deadline)
-& wsl.exe --cd $linuxRoot -- docker compose logs --tail 60 node
-throw '로컬 실행기가 준비되지 않았습니다. SO 및 노드 로그를 확인하세요.'
+    } while ($true)
+    $gnssReady = $true
+    try {
+        & (Join-Path $context.App 'start-serial-bridge.ps1') -Distribution $context.Distribution -DataDirectory $context.Data
+    } catch {
+        if ($_.Exception.Message -match '\[GNSS_(BUSY|CONFIG)\]') { throw }
+        $gnssReady = $false
+        Write-Warning "GNSS 연결 기능 사용 불가: $($_.Exception.Message)"
+    }
+    if ($context.Installed) {
+        $release = Get-Content -Raw -LiteralPath (Join-Path $context.App 'release.json') -Encoding UTF8 | ConvertFrom-Json
+        $imageId = (Invoke-NodeWsl $context @('docker','image','inspect','--format','{{.Id}}',$release.image)) -join ''
+        if ($imageId.Trim() -ne $release.imageId) { throw '설치된 서비스 이미지가 배포본과 다릅니다. INSTALL.cmd를 다시 실행하세요.' }
+    }
+    $compose = Get-NodeCompose $context
+    Assert-NodePortMapping $context
+    # Compose reuses unchanged containers and applies edited env values without a rebuild.
+    Invoke-NodeWsl $context (@('docker') + $compose + @('up','-d','--no-build','--pull','never')) | Out-Host
+    $url = Wait-NodeReady $context
+    Write-Host ("서비스 실행 완료: " + $context.Settings.LNIS_NODE_ROLE + " / $url")
+    if (!$gnssReady) { Write-Warning '파일 기반 시험은 사용할 수 있습니다. GNSS 장비 수집은 중계 상태를 확인하세요.' }
+    if ($context.Installed) {
+        try {
+            $public = Invoke-RestMethod ($context.Settings.LNIS_NODE_BASE_URL + '/lnis/api/v1/node') -TimeoutSec 3
+            if (!$public.online -or $public.role -ine $context.Settings.LNIS_NODE_ROLE) { throw '잘못된 응답' }
+        } catch { Write-Warning "PC 주소·포트 접속 실패: $($context.Settings.LNIS_NODE_BASE_URL). INSTALL.cmd의 네트워크 설정을 확인하세요." }
+    }
+    if (!$NoBrowser) { Start-Process $url }
+} catch {
+    if ($created) {
+        try {
+            $running = Invoke-NodeWsl $context (@('docker') + (Get-NodeCompose $context) + @('ps','--status','running','-q'))
+            if (!$running) { Stop-NodeKeepAlive $context }
+        } catch { Write-Warning 'WSL 유지 프로세스를 보존했습니다. STOP.cmd로 정리할 수 있습니다.' }
+    }
+    throw
+} finally { $lock.ReleaseMutex(); $lock.Dispose() }

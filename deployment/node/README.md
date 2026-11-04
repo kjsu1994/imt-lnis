@@ -1,45 +1,57 @@
-# Linux 독립 노드 실행
+# 송신·수신 PC 설치와 실행
 
-송신·수신 **각각의 Linux x86-64 PC**에 동일한 묶음을 풉니다. Windows 중앙 서버용 묶음과 별개이며 DB를 공유하지 않습니다.
+## Windows 11 오프라인 납품
 
-1. `.env.example`을 `.env`로 복사합니다.
-2. 현재 역할(`sender`/`receiver`), 현재/상대 PC 주소, 양쪽 공통 관리 토큰을 입력합니다. 수신 PC에는 별도의 DTN 수신 토큰도 입력합니다.
-3. `docker compose up -d --build`를 실행합니다. 이후 시작은 `docker compose up -d`입니다.
-4. 각 PC의 `http://PC주소:8088`로 접속합니다. Sender/Receiver 버튼은 해당 PC의 화면으로 이동합니다.
+지원 환경은 Windows 11 x64, WSL2의 Linux Docker Engine입니다. Docker Desktop, 별도 Java 설치, 원본 오픈소스 폴더는 필요하지 않습니다.
 
-Java와 네이티브 실행기는 같은 컨테이너/JVM에서 동작합니다. BAT 또는 별도 Agent 실행은 필요 없습니다. 초기 DB 권한 준비 컨테이너는 작업 후 종료됩니다.
+설치 담당자는 Windows 가상화 기능을 준비하고 실제 사용할 Windows 계정으로 INSTALL.cmd를 실행합니다. Windows 기능 활성화와 방화벽 설정 때만 관리자 승인을 요청합니다. 재부팅 안내가 나오면 재부팅 후 같은 파일을 다시 실행합니다. Windows 구성요소의 원본이 없는 PC는 해당 Windows 설치 미디어가 필요합니다.
 
-상대 PC 주소를 아직 정하지 않았다면 `LNIS_NODE_PEER_URL`을 비워 로컬 실행기와 화면만 먼저 시작할 수 있습니다. 송수신 시험 전에는 실제 상대 주소와 양쪽 공통 관리 토큰을 설정해야 합니다.
+1. lnis-node-windows.zip을 Windows 로컬 폴더에 풉니다.
+2. INSTALL.cmd에서 설치 경로와 PC 역할을 정합니다. 기본 경로는 C:\ProgramData\imtplus\DTN입니다.
+3. 현재·상대 서비스 주소, 현재 PC가 연결할 어댑터 주소와 인증값을 입력합니다. 관리 토큰은 양쪽이 동일해야 합니다.
+4. 기본 서비스 포트는 두 PC 모두 8088입니다. 서로 다른 PC이므로 같은 번호를 사용할 수 있습니다.
+5. I/Q 시험은 각 PC의 data\exchange를 해당 PC의 어댑터와 공유합니다. 서비스가 I/Q 파일을 상대 PC로 직접 복사하지는 않습니다.
+6. 설치 후 상대 PC와 어댑터에서 이 PC 주소로 접근할 수 있는지 확인합니다.
 
-Windows의 WSL Docker에서 실행할 때는 `START.cmd`/`STOP.cmd`를 편의상 사용할 수 있습니다. 이 도우미는 Docker 서비스와 같은 PC의 Windows COM 중계를 함께 시작합니다. 장치를 WSL에 넘기지 않고 Windows COM 포트를 사용합니다. 중계가 없는 Linux 환경에서는 직접 USB 매핑 또는 파일 업로드를 사용합니다.
+설정 파일을 미리 준비한 경우 INSTALL.cmd -Configuration "C:\준비\sender.env"처럼 전달할 수 있습니다. 모든 항목의 의미와 입력 예시는 app/.env.example에 한글로 적혀 있고 생성된 data/.env에도 남습니다. 토큰은 URL이나 전달 로그에 넣지 않습니다.
 
-중앙 서버·별도 Windows Agent 배포는 제거되었습니다. 독립 노드 배포는 `linuxNodeDistZip` 산출물을 사용하며 기존 `.env`, `DB`, `exchange`는 유지하세요. 실행 명령은 기존과 같은 `docker compose up -d --build`입니다.
+### 일반 사용자
 
-## 실제 GNSS 수집
+- 바탕화면 DTN START: WSL 유지 프로세스 → Docker → Windows COM 중계 → 서비스 준비 확인 → 브라우저 열기.
+- 바탕화면 DTN STOP: 서비스 → COM 중계 → 자신이 만든 WSL 유지 프로세스 종료.
+- 브라우저나 CMD 창을 닫아도 서비스는 계속 동작합니다. PC 재부팅 후 START를 다시 실행합니다.
+- WSL 터미널이나 숨김 PowerShell 명령을 따로 실행하지 않습니다. 반복 실행은 기존 프로세스를 재사용합니다.
+- START는 인터넷 다운로드·이미지 빌드를 하지 않습니다. 이미지를 찾지 못하면 INSTALL을 다시 실행합니다.
 
-송신 PC에 EVK-F9T를 연결하고 `.env` 끝의 `COMPOSE_FILE`, `LNIS_SERIAL_DEVICE`, `LNIS_SERIAL_GID`를 활성화합니다. 장치는 `/dev/serial/by-id/...`의 실제 경로를 지정하고 그룹 번호는 호스트의 장치 소유 그룹 번호를 사용합니다. 컨테이너 화면에서는 `/dev/ttyUSB0`을 선택합니다. 장치를 다시 꽂거나 경로가 변경되면 컨테이너를 재생성하세요.
+GNSS 장비가 없거나 COM 중계가 준비되지 않아도 파일 기반 시험은 사용할 수 있습니다. 웹 화면의 COM 포트 조회에서 장비와 통신 속도(기본 38400)를 선택합니다. u-center 등 같은 COM 포트를 쓰는 프로그램은 먼저 연결을 해제합니다. 수집 완료·브라우저 종료 후에도 연결은 유지되며 화면의 연결 해제로 반환합니다. 서비스 재기동 후에는 포트를 다시 연결합니다.
 
-USB 매핑 없이도 GRAW 파일 업로드 시험은 가능합니다. 기본 구성은 Linux용이며 Windows Docker/WSL의 USB 연결을 자동 구성하지 않습니다.
+### 파일과 포트
 
-## 기존 DB 업그레이드
+- app: 버전이 고정된 Compose, START/STOP, COM 중계, 전용 Java, 배포 파일 목록.
+- data: .env, DB, exchange, COM 설정·로그, WSL 유지 프로세스 기록.
+- runtime: 전용 LNIS-Runtime WSL 배포판. 기본 Ubuntu나 다른 WSL 배포판을 변경하지 않습니다.
+- backups: 갱신 전 서비스·설정과 정지 상태의 DB. 설치 갱신에 실패하면 이전 버전으로 복원합니다.
 
-서비스 기동 시 DTN 시험 시작·수신 시각 컬럼을 확인하여 `TIMESTAMP(9) WITH TIME ZONE`으로 자동 보정합니다. 기존 H2의 6자리 정밀도로 인한 반올림과 AFS 프레임 시각 불일치를 방지합니다. 이미 9자리인 DB는 변경하지 않으며, 보정 실패 시 서비스 기동도 실패합니다.
+서비스 포트는 .env의 LNIS_SERVER_PORT 하나를 사용합니다. 설치 프로그램이 Windows LAN 주소의 같은 포트를 Windows loopback으로 전달합니다. WSL의 바뀌는 내부 IP를 규칙에 고정하지 않습니다. 주소·포트를 변경하면 INSTALL로 네트워크 설정도 갱신합니다. 다른 프로그램의 포트 전달 규칙은 덮어쓰지 않습니다. WSL NAT와 Windows localhost 전달이 정상인 환경이 기준이며, 운영체제의 전체 WSL 설정을 자동 변경하지 않습니다.
 
-기존 시험·입력·설정은 유지합니다. 과거에 반올림된 시각은 복원할 수 없으므로 해당 사유로 실패한 시험은 업그레이드 후 새로 실행하세요. 업그레이드 전에는 노드를 정지한 상태에서 DB 파일을 백업하세요.
+송수신 REST는 TCP 서비스 포트 하나를 사용합니다. 수신 어댑터는 수신 PC의 /lnis/api/v1/dtn/receive로 JSON과 수신 인증값을 전달합니다. 내부 시험 시각 보정은 OS 시각을 변경하지 않습니다. 외부 인터넷이 없는 경우 공통 내부 NTP 서버가 있으면 LNIS_NTP_SERVER에 입력하고, 없으면 비워 둡니다.
 
-## 통신 및 저장
+### 갱신과 장애 확인
 
-- 노드 관리 REST 및 DTN 수신 API: 양쪽 TCP 8088(또는 `LNIS_SERVER_PORT`). 독립 AFS 검증시험 전송은 제거했습니다. 토큰은 URL에 넣지 않습니다. 신뢰하는 시험 LAN에서만 사용하고 외부망에서는 TLS/방화벽을 구성하세요.
-- DTN: 송신 화면의 URL로 외부 어댑터에 POST합니다. 외부 수신 어댑터는 **수신 PC**의 `/lnis/api/v1/dtn/receive`에 같은 JSON과 `Authorization: Bearer 수신토큰`을 전달합니다.
-- 송신 DB: 입력, 송신 JSON, 기준 PVT, 수신 PVT 및 비교 결과.
-- 수신 DB: 사전 등록된 ID/해시, 최초 수신 JSON 원문, 복호화/PVT 결과. 기준 PVT나 송신 입력 파일은 복사하지 않습니다.
-- 각 PC의 `DB` 폴더가 `/app/data`에 연결됩니다. 실행 중인 H2 파일을 복사하지 말고 `docker compose down` 후 백업하세요. 다른 노드의 DB를 덮어쓰거나 동일 DB를 두 프로세스에서 열면 안 됩니다.
+새 배포본의 INSTALL.cmd를 기존 설치 경로에 실행합니다. 시험 준비·송신·계산·수집 중에는 갱신하지 않습니다. 종료 후 DB를 백업하며, 기존 입력·I/Q·설정을 보존합니다. 실패하면 이전 앱·설정·DB를 복원합니다. installer/install.log에서 관리자 작업의 오류를 확인할 수 있습니다. 실행 중인 H2 파일을 복사하거나 다른 PC DB로 덮어쓰지 않습니다.
 
-관리 연결 실패 시 시험 데이터를 자동 재전송하지 않습니다. 재시작 후 기존 시험의 상태를 확인하세요. 외부 DTN/HDTN 전달 대기는 시간 제한 없이 유지하며, testId가 일치하는 늦은 수신을 해당 시험에 반영합니다. 종료할 시험만 개별 중지합니다. 준비·계산 실행 단계의 제한 시간은 수신 대기와 구분합니다.
+외부 어댑터 전달 대기는 시간 제한 없이 유지되며 testId가 같은 늦은 수신을 해당 시험에 반영합니다. 서비스 정상 실행과 상대 PC·어댑터 연결 상태는 별개입니다.
 
-`licenses/native-sources.zip`에는 원본·변경 패치·Linux SO/IQ 및 Windows DLL 빌드 자료와 라이선스가 포함됩니다. 실행에는 외부 오픈소스 폴더가 필요하지 않습니다. 재빌드는 저장소의 `nativeBuild` 작업 또는 소스 ZIP의 `README.md`를 참고하세요.
+## 개발·배포 담당자
 
+gradlew.bat windowsNodeDistZip은 검증 후 Windows 설치 묶음을 생성합니다. 첫 생성은 공식 WSL MSI와 Ubuntu/Docker 자료를 받기 위해 인터넷이 필요합니다. 준비 자료는 build/offline-assets에 해시와 함께 캐시되고, 납품한 묶음의 설치·실행에는 인터넷이 필요하지 않습니다. 릴리스 목록에는 MSI·Docker·Compose·서비스 이미지 버전과 파일 SHA-256이 기록됩니다.
 
-기존 설치 갱신은 저장소의 `scripts/deploy-nodes.ps1`을 사용합니다. `check bootJar windowsSerialBridgeDist`로 함께 빌드한 뒤 `-ValidateOnly`로 먼저 확인할 수 있습니다. 실행 중인 Compose 프로젝트와 추가 설정 파일을 유지하며, COM 중계는 서버 JAR와 같은 빌드인지 확인합니다. GNSS 수집·시험 준비·송신·계산 중이면 배포를 중단합니다. 연결만 유지한 GNSS는 서비스 정상 종료로 해제한 뒤 중계를 갱신하며, 재기동 후 필요한 포트를 다시 연결합니다. 실패 시 이전 JAR·이미지·중계를 복원하고, `.env`·토큰·DB는 보존합니다.
+기존 개발 설치의 갱신은 scripts/deploy-nodes.ps1을 사용합니다. check bootJar windowsSerialBridgeDist를 함께 빌드하고 -ValidateOnly로 먼저 확인할 수 있습니다. 이 경로는 기존 Compose 추가 설정과 .env·DB를 유지합니다.
 
-현재 Windows COM 수집은 [Windows 중계 방식](WINDOWS-SERIAL-BRIDGE.md)을 기본으로 사용합니다. Windows 송신 노드에서 start.ps1을 실행하면 Java 중계와 Docker 웹서버가 함께 시작됩니다. 기본 통신속도는 38400입니다.
+## Linux 직접 실행
+
+Linux x86-64 PC에서는 linuxNodeDistZip 묶음을 사용합니다. .env.example을 .env로 복사해 역할·주소·인증값을 설정한 후 최초 docker compose up -d --build, 이후 docker compose up -d로 실행합니다. Windows용 START/INSTALL은 사용하지 않습니다.
+
+실제 USB를 직접 연결하려면 장치의 devices와 group_add를 Compose에 명시합니다. 장치 경로는 /dev/serial/by-id의 실제 값, 그룹 번호는 해당 장치의 소유 그룹을 사용합니다. 컨테이너·호스트 권한과 재연결을 확인해야 하며 privileged 또는 전체 쓰기 권한을 부여하지 않습니다. Windows COM 중계를 쓰는 장치를 동시에 WSL에 직접 연결하지 않습니다.
+
+라이선스와 native-sources.zip은 배포에 포함됩니다. 외부 오픈소스 폴더는 실행에 필요하지 않으며, 네이티브 재빌드 자료는 별도로 보존합니다.

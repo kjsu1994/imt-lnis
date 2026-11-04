@@ -144,7 +144,7 @@ class HdtnConfigTransferTest {
             prepareIq.countDown();
             if (!"IQ_SAMPLE".equals(type)) {
                 Transfer transfer = new Transfer();
-                transfer.setSchemaVersion(6);
+                transfer.setSchemaVersion(1);
                 transfer.setFormat(server.afs.AfsPvtFrameCodec.FORMAT);
                 transfer.setTestId(job.getId());
                 transfer.setTestType(type);

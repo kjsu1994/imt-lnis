@@ -9,7 +9,7 @@ import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import java.util.*;
 
-/** v4 keeps original metadata for evidence, while PVT input comes only from decoded frames. */
+/** PVT 입력은 복호한 프레임에서 복원하고 원본 메타데이터는 증거 자료로 보존한다. */
 public final class AfsPvtTransferCodec {
     public record Restored(List<byte[]> source, List<byte[]> calculation, int frameCount) {}
 
@@ -51,12 +51,12 @@ public final class AfsPvtTransferCodec {
                                 .map(AfsMetadataCodec::record)
                                 .toList()));
         AfsMetadataCodec.group(transfer);
-        transfer.setSchemaVersion(6);
+        transfer.setSchemaVersion(1);
         transfer.setFormat(AfsPvtFrameCodec.FORMAT);
     }
 
     public static Restored restore(Transfer transfer, NativeAfsCodec codec) {
-        if (transfer.getSchemaVersion() != 6
+        if (transfer.getSchemaVersion() != 1
                 || !AfsPvtFrameCodec.FORMAT.equals(transfer.getFormat())
                 || !DtnModels.PROFILE.equals(transfer.getProfile())
                 || !"AFS_METADATA".equals(transfer.getTestType())

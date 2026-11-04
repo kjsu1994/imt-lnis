@@ -148,6 +148,7 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
  job={testId:'test1',state:'COMPLETED',testType:'AFS_METADATA',senderMode:'HDTN',receiverMode:'HDTN',hdtnConfig:config,createdAt:'2026-09-23T00:00:00Z',updatedAt:'2026-09-23T00:00:00Z',dtnReceived:true};
  for(const route of ['/sender','/receiver']){
   await page.goto(base+route);
+  assert.equal(await page.locator('#gnss-dtr, #gnss-rts, .serial-advanced').count(),0);
   assert.equal(await page.locator('#dtn-observations [data-pvt-filter]').isChecked(),true);
   await page.waitForFunction(()=>[...document.getElementById('dtn-tests').options].some(o=>o.value==='test1'));
   await page.locator('#dtn-tests').selectOption('test1');

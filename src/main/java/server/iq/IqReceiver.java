@@ -23,7 +23,7 @@ import java.util.function.Consumer;
 @Slf4j
 public class IqReceiver {
     public static final String METHOD = "AFS_IQ_GPS_LNAV_ASSISTED-v1";
-    public static final String FRAME_METHOD = "AFS_IQ_FRAME_PVT-v3";
+    public static final String FRAME_METHOD = "AFS_IQ_FRAME_PVT-v1";
     public static final String RF_METHOD = "AFS_IQ_RF_DELAY-v1";
 
     @com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)

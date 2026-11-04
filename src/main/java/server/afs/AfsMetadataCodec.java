@@ -17,8 +17,8 @@ import java.util.*;
  * 원래 GRAW를 정확히 복원하므로 기존 지구 PVT 계산기와 관측값 화면을 그대로 사용한다.
  */
 public final class AfsMetadataCodec {
-    public static final String FORMAT = "LNIS-AFS-GNSS-v2";
-    public static final String GROUPED_FORMAT = "LNIS-AFS-GNSS-v3";
+    public static final String FORMAT = "LNIS-AFS-METADATA";
+    public static final String GROUPED_FORMAT = "LNIS-AFS-GROUPED";
     // {LNAV subframe index, parity-stripped LNAV bit offset, SB2 bit offset, length}
     // GPS eccentricity is 2^-33, original AFS is 2^-32: its last bit stays in metadata.
     private static final int[][] FIELDS = {
@@ -117,7 +117,7 @@ public final class AfsMetadataCodec {
             }
             records.set(n, withNavigation(record, words));
         }
-        transfer.setSchemaVersion(2);
+        transfer.setSchemaVersion(1);
         transfer.setFormat(FORMAT);
         transfer.setMetadata(new AfsMetadata(records));
         transfer.setFrames(frames);
@@ -127,7 +127,7 @@ public final class AfsMetadataCodec {
         if (GROUPED_FORMAT.equals(transfer.getFormat())) {
             transfer = ungroup(transfer);
         }
-        if (transfer.getSchemaVersion() != 2
+        if (transfer.getSchemaVersion() != 1
                 || !DtnModels.PROFILE.equals(transfer.getProfile())
                 || !"AFS_METADATA".equals(transfer.getTestType())
                 || transfer.getGrawBase64() != null
@@ -261,7 +261,7 @@ public final class AfsMetadataCodec {
         return output;
     }
 
-    /** JSON만 PRN별로 재배치한다. 원본 AFS 비트·PVT 계산 및 v2 복원 검증은 그대로 재사용한다. */
+    /** JSON만 PRN별로 재배치한다. 원본 AFS 비트·PVT 계산 및 메타데이터 복원 검증은 그대로 재사용한다. */
     static void group(Transfer transfer) {
         List<AfsRecord> records = ((AfsMetadata) transfer.getMetadata()).records();
         Map<String, AfsSatellite> satellites = new LinkedHashMap<>();
@@ -296,14 +296,14 @@ public final class AfsMetadataCodec {
         transfer.setSatellites(new ArrayList<>(satellites.values()));
         transfer.setMetadata(new AfsGroupedMetadata(common));
         transfer.setFrames(null);
-        transfer.setSchemaVersion(3);
+        transfer.setSchemaVersion(1);
         transfer.setFormat(GROUPED_FORMAT);
     }
 
     /** Restore original record/measurement ordering, not PRN order, before the existing hash/PVT path. */
     static Transfer ungroup(Transfer transfer) {
         boolean embedded = server.afs.AfsPvtFrameCodec.FORMAT.equals(transfer.getFormat());
-        if (transfer.getSchemaVersion() != (embedded ? 6 : 3)
+        if (transfer.getSchemaVersion() != 1
                 || transfer.getFrames() != null
                 || !(transfer.getMetadata() instanceof AfsGroupedMetadata metadata)
                 || metadata.commonRecords() == null
@@ -407,7 +407,7 @@ public final class AfsMetadataCodec {
         frames.sort(Comparator.comparingInt(Frame::getIndex));
         Transfer flat = new Transfer();
         flat.setTestId(transfer.getTestId());
-        flat.setSchemaVersion(2);
+        flat.setSchemaVersion(1);
         flat.setFormat(FORMAT);
         flat.setTestType(transfer.getTestType());
         flat.setProfile(transfer.getProfile());

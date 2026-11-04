@@ -10,8 +10,8 @@ import java.util.*;
  * FEC is deliberately outside this class. Both DTN and the I/Q modulator use these bits.
  */
 public final class AfsPvtFrameCodec {
-    public static final String FORMAT = "LNIS-AFS-GNSS-v6";
-    public static final int TYPE = 63, VERSION = 6;
+    public static final String FORMAT = "LNIS-AFS-GNSS-v1";
+    public static final int TYPE = 63, VERSION = 1;
     public static final int SB2_PRIMARY_USED = 284, SB2_USED = 801, SB3_USED = 0, SB4_USED = 670;
     private static final UUID INTERNAL_ID = new UUID(0, 0);
     // LNAV subframe, bit offset (parity stripped), AFS SB2 offset, bit count.

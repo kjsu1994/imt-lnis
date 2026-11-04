@@ -101,7 +101,8 @@ class IqServiceTest {
                 IqService.EXPECTED_BYTES, "A".repeat(64), 90, 12000000, "IQ_INTERLEAVED_INT8", 2);
         json.writeValue(directory.resolve(id + ".json").toFile(), file);
         json.writeValue(directory.resolve(id + ".context.json").toFile(),
-                Map.of("metadata", Map.of("pvtMethod", IqReceiver.RF_METHOD)));
+                Map.of("frameFormat", server.afs.AfsPvtFrameCodec.FORMAT,
+                        "metadata", Map.of("pvtMethod", IqReceiver.RF_METHOD)));
         try (var files = org.mockito.Mockito.mockStatic(Files.class, org.mockito.Mockito.CALLS_REAL_METHODS)) {
             files.when(() -> Files.size(bin)).thenReturn(IqService.EXPECTED_BYTES);
             assertEquals(file, service.completed(id), "dispatch must not recalculate the digest");
@@ -110,6 +111,9 @@ class IqServiceTest {
                     "receiver verification must still read all file bytes");
             files.when(() -> Files.size(bin)).thenReturn(4L);
             assertThrows(IllegalArgumentException.class, () -> service.completed(id));
+            json.writeValue(directory.resolve(id + ".context.json").toFile(),
+                    Map.of("metadata", Map.of("pvtMethod", IqReceiver.RF_METHOD)));
+            assertEquals("REGENERATE", service.status(id).get("state"), "unmarked development files stay on disk but cannot be dispatched");
             json.writeValue(directory.resolve(id + ".context.json").toFile(),
                     Map.of("metadata", Map.of("pvtMethod", IqReceiver.FRAME_METHOD)));
             assertEquals("REGENERATE", service.status(id).get("state"));

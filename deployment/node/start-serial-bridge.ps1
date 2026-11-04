@@ -1,5 +1,5 @@
-[CmdletBinding()]
-param([string]$JavaHome, [switch]$DockerDesktop)
+﻿[CmdletBinding()]
+param([string]$JavaHome, [switch]$DockerDesktop, [string]$Distribution = 'Ubuntu', [string]$DataDirectory)
 $ErrorActionPreference = 'Stop'
 function Get-BridgeSettings {
     param([string]$EnvironmentFile, [string]$ConfigFile)
@@ -36,6 +36,9 @@ function Get-BridgeSettings {
 
 $root = $PSScriptRoot
 $dist = Join-Path $root 'serial-bridge'
+$stateRoot = if ($DataDirectory) { Join-Path $DataDirectory 'serial-bridge' } else { $dist }
+$envRoot = if ($DataDirectory) { $DataDirectory } else { $root }
+New-Item -ItemType Directory -Path $stateRoot -Force | Out-Null
 if (!(Test-Path (Join-Path $dist 'classes\server\gnss\WindowsSerialBridge.class'))) { throw 'Build and install windowsSerialBridgeDist first.' }
 # Compare the complete installed byte bridge with the already running JVM.
 $hashLines = @(Get-ChildItem -LiteralPath (Join-Path $dist 'classes'), (Join-Path $dist 'lib') -File -Recurse |
@@ -46,8 +49,8 @@ $sha = [Security.Cryptography.SHA256]::Create()
 try { $version = ([BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($hashLines -join "`n")))).Replace('-', '').ToLowerInvariant() }
 finally { $sha.Dispose() }
 
-$config = Join-Path $dist 'bridge.properties'
-$settings = Get-BridgeSettings (Join-Path $root '.env') $config
+$config = Join-Path $stateRoot 'bridge.properties'
+$settings = Get-BridgeSettings (Join-Path $envRoot '.env') $config
 $bridgePort = $settings.Port
 $bindAddress = $settings.Bind
 if (!$bindAddress) {
@@ -55,7 +58,7 @@ if (!$bindAddress) {
     if (!$DockerDesktop) {
         Push-Location $env:SystemRoot
         try {
-            $route = (& wsl.exe --cd / -- sh -c 'ip -4 route show default') -join ' '
+            $route = (& wsl.exe -d $Distribution --cd / -- sh -c 'ip -4 route show default') -join ' '
             if ($route -match 'default via ([0-9.]+)') { $bindAddress = $Matches[1] }
         } finally { Pop-Location }
     }
@@ -84,22 +87,23 @@ try {
     $health = Invoke-RestMethod -Uri "http://${bindAddress}:${bridgePort}/health" -Method Post -Headers $headers -ContentType application/json -Body '{}' -TimeoutSec 2
 } catch {}
 if ($health -and $health.status -eq 'UP' -and $health.version -eq $version) {
-    [IO.File]::WriteAllText((Join-Path $root '.serial-bridge.env'), $bridgeEnvironment, $utf8)
+    [IO.File]::WriteAllText((Join-Path $envRoot '.serial-bridge.env'), $bridgeEnvironment, $utf8)
     Write-Host "Windows COM bridge already running with the installed version (${bindAddress}:${bridgePort})."
     return
 }
 if ($health -and $health.busy) {
     throw '[GNSS_BUSY] Disconnect GNSS before updating the Windows COM bridge.'
 }
-$pidFile = Join-Path $dist 'bridge.pid'
+$pidFile = Join-Path $stateRoot 'bridge.pid'
 if ($health -and !(Test-Path -LiteralPath $pidFile)) {
     throw 'An untracked bridge is running. Verify its process before updating it.'
 }
 # This helper verifies process ownership and refuses to stop an active session.
-& (Join-Path $root 'stop-serial-bridge.ps1')
-[IO.File]::WriteAllText((Join-Path $root '.serial-bridge.env'), $bridgeEnvironment, $utf8)
-[IO.File]::WriteAllText((Join-Path $dist 'bridge-version.txt'), $version + "`n", $utf8)
+& (Join-Path $root 'stop-serial-bridge.ps1') -DataDirectory $DataDirectory
+[IO.File]::WriteAllText((Join-Path $envRoot '.serial-bridge.env'), $bridgeEnvironment, $utf8)
+[IO.File]::WriteAllText((Join-Path $stateRoot 'bridge-version.txt'), $version + "`n", $utf8)
 [IO.File]::WriteAllText($config,"bind=$bindAddress`nport=$bridgePort`ntoken=$token`n",$utf8)
+if (!$JavaHome -and (Test-Path -LiteralPath (Join-Path $root 'runtime\bin\java.exe'))) { $JavaHome = Join-Path $root 'runtime' }
 if (!$JavaHome) {
     $installed = Get-ChildItem (Join-Path $env:USERPROFILE '.jdks') -Directory -ErrorAction SilentlyContinue | Where-Object Name -Match '21' | Select-Object -First 1
     if ($installed) { $JavaHome=$installed.FullName }
@@ -107,7 +111,7 @@ if (!$JavaHome) {
 $java = if ($JavaHome) { Join-Path $JavaHome 'bin\java.exe' } else { (Get-Command java.exe -ErrorAction Stop).Source }
 $javaRelease = Get-Content -Raw (Join-Path (Split-Path (Split-Path $java)) 'release')
 if ($javaRelease -notmatch 'JAVA_VERSION="(2[1-9]|[3-9][0-9])\.') { throw 'Java 21 or newer is required. Use -JavaHome.' }
-$process = Start-Process -FilePath $java -ArgumentList @(('-Dlnis.bridge.version=' + $version), '-cp',('"'+$dist+'\classes;'+$dist+'\lib\*"'),'server.gnss.WindowsSerialBridge',('"'+$config+'"')) -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $dist 'bridge.log') -RedirectStandardError (Join-Path $dist 'bridge-error.log')
+$process = Start-Process -FilePath $java -ArgumentList @(('-Dlnis.bridge.version=' + $version), '-cp',('"'+$dist+'\classes;'+$dist+'\lib\*"'),'server.gnss.WindowsSerialBridge',('"'+$config+'"')) -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $stateRoot 'bridge.log') -RedirectStandardError (Join-Path $stateRoot 'bridge-error.log')
 [IO.File]::WriteAllText($pidFile,[string]$process.Id,$utf8)
 for ($attempt=0;$attempt -lt 20;$attempt++) {
     Start-Sleep -Milliseconds 500

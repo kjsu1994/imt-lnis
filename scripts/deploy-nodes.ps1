@@ -258,7 +258,7 @@ foreach ($directory in $TargetDirectories) {
 }
 foreach ($target in $targets) { Assert-NodeIdle $target }
 $bridgeSource = $null
-$bridgeScripts = @('start-serial-bridge.ps1', 'stop-serial-bridge.ps1', 'start.ps1', 'stop.ps1')
+$bridgeScripts = @('start-serial-bridge.ps1', 'stop-serial-bridge.ps1', 'start.ps1', 'stop.ps1', 'node-runtime.ps1', 'START.cmd', 'STOP.cmd', '.env.example', 'README.md')
 if ($targets | Where-Object Bridge) {
     foreach ($script in $bridgeScripts) {
         if (!(Test-Path -LiteralPath (Join-Path $sourceScripts $script) -PathType Leaf)) {
@@ -299,7 +299,12 @@ foreach ($target in $targets) {
     }
     Get-ChildItem -LiteralPath $target.Path -Filter '*.yml' -File | Copy-Item -Destination $target.Backup
     if ($target.Bridge) {
-        Copy-Item -LiteralPath (Join-Path $target.Path 'serial-bridge') -Destination $target.Backup -Recurse
+        $bridgeBackup = Join-Path $target.Backup 'serial-bridge'
+        New-Item -ItemType Directory -Path $bridgeBackup -Force | Out-Null
+        foreach ($part in @('classes','lib','bridge.properties','bridge-version.txt')) {
+            $live = Join-Path $target.Path ('serial-bridge\' + $part)
+            if (Test-Path -LiteralPath $live) { Copy-Item -LiteralPath $live -Destination $bridgeBackup -Recurse }
+        }
         foreach ($script in $bridgeScripts) {
             $installed = Join-Path $target.Path $script
             if (Test-Path -LiteralPath $installed) { Copy-Item -LiteralPath $installed -Destination $target.Backup }

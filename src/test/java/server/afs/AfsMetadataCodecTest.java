@@ -106,7 +106,7 @@ class AfsMetadataCodecTest {
             AfsMetadataCodec.group(transfer);
             transfer = copy(transfer);
             assertNull(transfer.getFrames());
-            assertEquals(3, transfer.getSchemaVersion());
+            assertEquals(1, transfer.getSchemaVersion());
             restored = AfsMetadataCodec.restore(transfer, codec);
             for (int i = 0; i < records.size(); i++) {
                 assertArrayEquals(records.get(i), restored.get(i), "grouped record " + i);

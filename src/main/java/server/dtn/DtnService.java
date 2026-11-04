@@ -619,8 +619,8 @@ public class DtnService {
             Transfer transfer = new Transfer();
             transfer.setTestId(job.getId());
             transfer.setTestType(job.getTestType());
-            transfer.setFormat("LNIS-IQ-FILE-v3");
-            transfer.setSchemaVersion(3);
+            transfer.setFormat("LNIS-IQ-FILE-v1");
+            transfer.setSchemaVersion(1);
             transfer.setProfile("LANS-AFS-IQ-v1");
             transfer.setSenderMode(senderMode);
             transfer.setReceiverMode(receiverMode);
@@ -637,8 +637,8 @@ public class DtnService {
                 transfer.setMetadata(source.metadata());
                 transfer.setReferencePvt(List.of(source.reference()));
                 if (IqReceiver.FRAME_METHOD.equals(source.metadata().pvtMethod())) {
-                    transfer.setSchemaVersion(3);
-                    transfer.setFormat("LNIS-IQ-FILE-v3");
+                    transfer.setSchemaVersion(1);
+                    transfer.setFormat("LNIS-IQ-FILE-v1");
                 }
                 job.setReferenceJson(objectMapper.writeValueAsString(transfer.getReferencePvt()));
                 if (source.grawBase64() != null) {
@@ -1005,7 +1005,7 @@ public class DtnService {
         String type = received.path("testType").asText("AFS_METADATA");
         String format = received.path("format").asText();
         if ("AFS_METADATA".equals(type) && !server.afs.AfsPvtFrameCodec.FORMAT.equals(format)
-                || "IQ_SAMPLE".equals(type) && !"LNIS-IQ-FILE-v3".equals(format)) {
+                || "IQ_SAMPLE".equals(type) && !"LNIS-IQ-FILE-v1".equals(format)) {
             throw new IllegalArgumentException("이전 프레임 형식은 시험할 수 없습니다. 현재 규격으로 다시 생성하세요.");
         }
         DtnModels.requireGps(received.path("pvtConstellation").asText(null));
@@ -1519,8 +1519,8 @@ public class DtnService {
         try {
             Transfer transfer = objectMapper.readValue(job.getReceivedJson(), Transfer.class);
             if (!"IQ_SAMPLE".equals(transfer.getTestType())
-                    || transfer.getSchemaVersion() != 3
-                    || !"LNIS-IQ-FILE-v3".equals(transfer.getFormat())
+                    || transfer.getSchemaVersion() != 1
+                    || !"LNIS-IQ-FILE-v1".equals(transfer.getFormat())
                     || !(transfer.getMetadata() instanceof IqMetadata)
                     || !(IqReceiver.FRAME_METHOD.equals(((IqMetadata) transfer.getMetadata()).pvtMethod())
                             || IqReceiver.RF_METHOD.equals(((IqMetadata) transfer.getMetadata()).pvtMethod()))

@@ -1,7 +1,7 @@
 ﻿[CmdletBinding()]
-param()
+param([string]$DataDirectory)
 $ErrorActionPreference = 'Stop'
-$dist = Join-Path $PSScriptRoot 'serial-bridge'
+$dist = if ($DataDirectory) { Join-Path $DataDirectory 'serial-bridge' } else { Join-Path $PSScriptRoot 'serial-bridge' }
 $pidFile = Join-Path $dist 'bridge.pid'
 $config = Join-Path $dist 'bridge.properties'
 if (!(Test-Path -LiteralPath $pidFile)) { return }

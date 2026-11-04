@@ -114,7 +114,7 @@ public class NativePvtIntegrationTest {
             var wire =
                     mapper.readValue(
                             mapper.writeValueAsBytes(tx.getTransfer()), DtnModels.Transfer.class);
-            assertEquals(6, wire.getSchemaVersion());
+            assertEquals(1, wire.getSchemaVersion());
             assertEquals(AfsPvtFrameCodec.FORMAT, wire.getFormat());
             assertInstanceOf(DtnModels.AfsGroupedMetadata.class, wire.getMetadata());
             assertNull(wire.getFrames());

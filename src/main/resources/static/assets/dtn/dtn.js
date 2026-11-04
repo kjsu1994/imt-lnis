@@ -1,6 +1,6 @@
 import {initPresetControls, renderTrialSettings, trialTypeLabel, trialOption, colorTrialSelection, initWaitingCancellation, initTrialSettingsDialog} from './dtn-settings.js?v=20261103-management-reset';
 import {requestJson} from '../common/http.js?v=20261103-management-reset';
-import {initGnssControls} from './dtn-gnss.js?v=20261103-management-reset';
+import {initGnssControls} from './dtn-gnss.js?v=20261104-serial-controls';
 import {createDtnLog} from './dtn-log.js?v=20261103-management-reset';
 import {initAdapterHealth, validAdapterUrl} from './dtn-adapter-health.js?v=20261026-frame6';
 import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20261026-frame6';

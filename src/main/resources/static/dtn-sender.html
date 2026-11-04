@@ -5,7 +5,7 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>LNIS DTN Sender</title>
   <link rel="stylesheet" href="/lnis/assets/common/app.css?v=20261103-system-logo-v2">
-  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20261103-system-logo-v2">
+  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20261104-serial-controls">
 </head>
 <body data-page="dtn-sender">
 <header style="position: relative;">
@@ -247,14 +247,6 @@
         <details class="gnss-details"><summary>시간 상세</summary><pre id="gnss-time-detail"></pre></details>
       </div>
       <p id="dtn-port-status" role="status" hidden></p>
-      <details class="serial-advanced">
-        <summary>고급 설정 · DTR / RTS</summary>
-        <div class="serial-signals">
-          <label><input id="gnss-dtr" type="checkbox"><span><strong>DTR</strong> PC 준비 신호<small>Data Terminal Ready · PC가 통신할 준비가 됐음을 알립니다.</small></span></label>
-          <label><input id="gnss-rts" type="checkbox"><span><strong>RTS</strong> 송신 요청 신호<small>Request To Send · PC의 송신 요청을 알립니다.</small></span></label>
-        </div>
-        <p>장비에서 요구할 때만 켜세요. 일부 장비는 이 신호를 전원·리셋 등에 사용합니다. 변경하려면 연결을 해제하세요.</p>
-      </details>
     </div>
     <div id="dtn-upload-panel" class="compact-input-row">
       <label>GNSS 파일<input id="dtn-graw-file" type="file" accept=".ubx,.graw,application/octet-stream"></label>
@@ -356,5 +348,5 @@
   <span class="software-version" title="소프트웨어 버전" aria-label="소프트웨어 버전 @lnisVersion@">v@lnisVersion@</span>
 </footer>
 
-<script type="module" src="/lnis/assets/dtn/dtn.js?v=20261103-management-reset"></script>
+<script type="module" src="/lnis/assets/dtn/dtn.js?v=20261104-serial-controls"></script>
 </body></html>

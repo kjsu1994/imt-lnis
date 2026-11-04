@@ -14,7 +14,7 @@ import java.util.*;
 /** 원본·Reference 없이 송신 시각으로 계산하는 RAW/AFS 공통 전달 규격. */
 public final class DelayTransferCodec {
     public static final String AFS = AfsPvtFrameCodec.FORMAT;
-    public static final String RAW = "LNIS-GRAW-DELAY-v2";
+    public static final String RAW = "LNIS-GRAW-DELAY-v1";
     private static final ObjectMapper JSON = new ObjectMapper().findAndRegisterModules()
             .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
@@ -32,7 +32,7 @@ public final class DelayTransferCodec {
         Transfer transfer = new Transfer();
         transfer.setTestId(id);
         transfer.setTestType(raw ? "GNSS_RAW" : "AFS_METADATA");
-        transfer.setSchemaVersion(raw ? 2 : 6);
+        transfer.setSchemaVersion(1);
         transfer.setFormat(raw ? RAW : AFS);
         if (raw) {
             transfer.setRaw(rawValues(records, start));
@@ -104,11 +104,11 @@ public final class DelayTransferCodec {
             throw new IllegalArgumentException("지연 전송에 원본/Reference를 포함할 수 없습니다.");
         }
         try {
-            if (RAW.equals(transfer.getFormat()) && transfer.getSchemaVersion() == 2
+            if (RAW.equals(transfer.getFormat()) && transfer.getSchemaVersion() == 1
                     && "GNSS_RAW".equals(transfer.getTestType()) && transfer.getSatellites() == null) {
                 return restoreRaw(transfer.getRaw(), timing);
             }
-            if (!AFS.equals(transfer.getFormat()) || transfer.getSchemaVersion() != 6
+            if (!AFS.equals(transfer.getFormat()) || transfer.getSchemaVersion() != 1
                     || !"AFS_METADATA".equals(transfer.getTestType()) || transfer.getRaw() != null
                     || transfer.getSatellites() == null || transfer.getFrames() != null) {
                 throw new IllegalArgumentException("지연 전송 형식 오류");
