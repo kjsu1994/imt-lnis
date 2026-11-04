@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>LNIS DTN Receiver</title>
   <link rel="stylesheet" href="/lnis/assets/common/app.css?v=20261103-system-logo-v2">
-  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20261104-receiver-epoch-ui">
+  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20261104-receiver-layout">
 </head>
 <body data-page="dtn-receiver">
 <header style="position: relative;">
@@ -71,16 +71,16 @@
         </div>
         <small id="sender-address-feedback" role="status"></small>
       </div>
-    <div class="receiver-adapter">
-      <div class="receiver-connection-heading"><label for="dtn-send-url">수신 어댑터 서버 주소</label>
-        <span class="receiver-connection-status" title="수신 → 수신 adapter"><span id="dtn-adapter-dot" class="connection-dot unknown" aria-hidden="true"></span><strong id="dtn-adapter-status" role="status" aria-live="polite">미확인</strong></span></div>
-      <div class="adapter-url-controls">
-        <input id="dtn-send-url" type="url" placeholder="http://어댑터-IP:포트" autocomplete="off">
-        <button id="dtn-adapter-health" type="button">연결 확인</button>
-        <button id="dtn-adapter-save" type="button" title="이 브라우저에 주소 저장·적용">저장·적용</button>
-      </div>
+      <div class="receiver-adapter">
+        <div class="receiver-connection-heading"><label for="dtn-send-url">수신 어댑터 서버 주소</label>
+          <span class="receiver-connection-status" title="수신 → 수신 adapter"><span id="dtn-adapter-dot" class="connection-dot unknown" aria-hidden="true"></span><strong id="dtn-adapter-status" role="status" aria-live="polite">미확인</strong></span></div>
+        <div class="adapter-url-controls">
+          <input id="dtn-send-url" type="url" placeholder="http://어댑터-IP:포트" autocomplete="off">
+          <button id="dtn-adapter-health" type="button">연결 확인</button>
+          <button id="dtn-adapter-save" type="button" title="이 브라우저에 주소 저장·적용">저장·적용</button>
+        </div>
 
-    </div>
+      </div>
       <div class="receiver-gnss">
         <div class="receiver-connection-heading"><label for="gnss-port">GNSS 시간 입력</label>
           <span id="gnss-connection-state" class="pill">미연결</span></div>
@@ -93,6 +93,7 @@
           <label>통신 속도 (baud)<select id="gnss-baud"><option>9600</option><option selected>38400</option><option>57600</option><option>115200</option><option>230400</option><option>460800</option><option>921600</option></select></label>
           <pre id="gnss-time-detail"></pre>
         </details>
+      </div>
     </div>
 
     <div class="receiver-trial-toolbar">

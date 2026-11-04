@@ -360,7 +360,7 @@
                       </tbody>
                     </table>
                   </div>
-                  <p class="fine">시각은 초와 펨토초로 나누어 저장합니다. 이는 수치 표현 단위이며 GNSS·PC 시각의 정확도를 뜻하지 않습니다. AFS와 I/Q 프레임에는 원본 의사거리를 저장하지 않습니다.</p>
+                  <p class="fine">시각은 정수 초와 소수부로 저장합니다. 저장 정밀도와 실제 시각 정확도는 다릅니다. 원본 의사거리는 프레임에 넣지 않습니다.</p>
                 </div>
               </div>
 
@@ -396,7 +396,7 @@
                       </tbody>
                     </table>
                   </div>
-                  <p class="fine">SB2~SB4는 60행×98열로 인터리빙합니다. 미사용 영역의 0101… 패턴은 빈 영역을 채우는 값이며 메시지 구현을 뜻하지 않습니다. 현재 GPS LNAV 필드를 달 궤도력으로 직접 치환하는 기능은 없습니다.</p>
+                  <p class="fine">SB2~SB4는 60행×98열로 인터리빙합니다. 패딩은 SB2: 1010…, SB3·SB4: 0101…입니다. SB2 시작값은 공식 spare bit 규칙(0부터 시작)과 다릅니다.</p>
                   <p class="fine">기준: <a href="https://www.nasa.gov/wp-content/uploads/2025/02/lunanet-signal-in-space-recommended-standard-augmented-forward-signal-vol-a.pdf" target="_blank" rel="noopener">NASA LSIS Vol. A v1.0, §2.4~2.5</a>. 메시지 미정 항목과 TBC/TBW 조건은 원문을 따릅니다.</p>
                 </div>
               </div>
@@ -412,7 +412,7 @@
                       </thead>
                       <tbody>
 
-                        <tr><th scope="row">프레임 구성</th><td>AFS 전송과 같은 SB 구성기로 위성별 프레임을 생성합니다. 12초 길이의 프레임 내용을 신호 파일에서 반복합니다.</td></tr>
+                        <tr><th scope="row">프레임 구성</th><td>AFS 전송과 같은 SB 구성기로 위성별 프레임을 생성합니다. SB2~SB4의 내용을 반복하며, SB1의 TOI는 신호 진행에 따라 갱신합니다.</td></tr>
 
 
                         <tr><th scope="row">신호 합성</th><td>SB4와 같은 시작 의사거리·Doppler로 위성별 PRN 파형을 보정하고 합산합니다. 이후 궤도·이동 변화를 유지합니다. 합성 잡음은 원본 RAWX의 C/N0를 정량적으로 재현하지 않습니다.</td></tr>
@@ -503,7 +503,7 @@
                       </tbody>
                     </table>
                   </div>
-                  <p class="fine">수집 후 시작 전 대기는 제외합니다. PC 간 시계 차이와 수치 연산·보정 모델의 영향은 결과 해석 시 고려합니다. 펨토초 저장 단위는 실제 시각 정확도를 뜻하지 않습니다.</p>
+                  <p class="fine">수집 후 시작 전 대기는 제외합니다. 결과에는 PC 시계 차이와 계산·보정 오차가 포함될 수 있습니다.</p>
                 </div>
               </div>
 
@@ -597,7 +597,7 @@
                 <div class="deep-dive-card">
                   <h3>HDTN 요청 설정</h3>
                   <p>HDTN이 포함된 경로에는 hdtnConfig를 전달합니다. 아래 값은 LNIS 설정 화면의 초기 기본값이며, 실제 요청에는 저장한 설정이 적용됩니다.</p>
-                  <div class="table-scroll"><table class="deep-dive-table"><thead><tr><th scope="col">항목</th><th scope="col">LNIS 기본값</th><th scope="col">단위</th><th scope="col">용도</th></tr></thead><tbody><tr><th scope="row">maxNumberOfBundlesInPipeline</th><td>50</td><td>개</td><td>동시 번들 수 요청 상한</td></tr><tr><th scope="row">maxSumOfBundleBytesInPipeline</th><td>3,000,000,000</td><td>Bytes</td><td>동시 번들 용량 요청 상한</td></tr><tr><th scope="row">maxBundleSizeBytes</th><td>3,000,000,000</td><td>Bytes</td><td>단일 번들 크기 요청 상한</td></tr><tr><th scope="row">tcpclMaxSegmentSizeBytes</th><td>200,000</td><td>Bytes</td><td>TCPCL 세그먼트 크기</td></tr><tr><th scope="row">neighborDepletedStorageDelaySeconds</th><td>10</td><td>초</td><td>인접 노드 저장 공간 부족 시 대기</td></tr><tr><th scope="row">enforceBundlePriority</th><td>false</td><td>Boolean</td><td>번들 우선순위 적용 요청</td></tr><tr><th scope="row">storageDeletionPolicy</th><td>never</td><td>정책</td><td>자동 삭제 비활성화 요청</td></tr><tr><th scope="row">totalStorageCapacityBytes</th><td>8,589,934,592</td><td>Bytes</td><td>전체 저장 용량 요청</td></tr><tr><th scope="row">acsSendPeriodMilliseconds</th><td>1,000</td><td>ms</td><td>ACS 집계 전송 주기 요청</td></tr></tbody></table></div>
+                  <div class="table-scroll"><table class="deep-dive-table"><thead><tr><th scope="col">항목</th><th scope="col">LNIS 기본값</th><th scope="col">단위</th><th scope="col">용도</th></tr></thead><tbody><tr><th scope="row">maxNumberOfBundlesInPipeline</th><td>50</td><td>개</td><td>동시 번들 수 요청 상한</td></tr><tr><th scope="row">maxSumOfBundleBytesInPipeline</th><td>3,000,000,000</td><td>Bytes</td><td>동시 번들 용량 요청 상한</td></tr><tr><th scope="row">maxBundleSizeBytes</th><td>3,000,000,000</td><td>Bytes</td><td>단일 번들 크기 요청 상한</td></tr><tr><th scope="row">tcpclMaxSegmentSizeBytes</th><td>200,000</td><td>Bytes</td><td>TCPCL 세그먼트 크기</td></tr><tr><th scope="row">neighborDepletedStorageDelaySeconds</th><td>10</td><td>초</td><td>인접 노드 저장 공간 부족 시 대기</td></tr><tr><th scope="row">enforceBundlePriority</th><td>false</td><td>Boolean</td><td>번들 우선순위 적용 요청</td></tr><tr><th scope="row">storageDeletionPolicy</th><td>never</td><td>정책</td><td>만료 번들 자동 정리 비활성화 요청</td></tr><tr><th scope="row">totalStorageCapacityBytes</th><td>8,589,934,592</td><td>Bytes</td><td>전체 저장 용량 요청</td></tr><tr><th scope="row">acsSendPeriodMilliseconds</th><td>1,000</td><td>ms</td><td>ACS 집계 전송 주기 요청</td></tr></tbody></table></div>
                   <p class="fine">라우터 설정 변환과 적용은 외부 어댑터가 담당합니다. 번들 분할·우선순위·삭제 동작은 어댑터와 라우터의 적용 결과로 확인합니다. API의 선택 항목 maxLtpReceiveUdpPacketSizeBytes는 현재 설정 화면에서 입력하지 않습니다.</p>
                 </div>
 
@@ -861,8 +861,8 @@
                       </tr>
                       <tr>
                         <th scope="row">I/Q 파일 전송 지연 (Δt)</th>
-                        <td style="text-align: center;"><span class="ubx-tag">복호 프레임에 공통 지연 반영</span></td>
-                        <td>본문 접수 완료 시각으로 공통 지연을 구해 복호 프레임의 의사거리 재계산</td>
+                        <td style="text-align: center;"><span class="ubx-tag">RF 관측값에 공통 지연 반영</span></td>
+                        <td>본문 접수 완료 시각으로 공통 지연을 구해 RF 추적 의사거리 재계산</td>
                         <td>RF 관측과 복호 항법정보로 지연 미적용·적용 PVT 계산; 송신 Reference는 별도 보존</td>
                       </tr>
                     </tbody>
@@ -925,15 +925,15 @@
           return {
             title: raw ? '송신부 · 전송 데이터' : '송신부 · 전송 데이터',
             copy: raw
-              ? '선택한 1 Epoch의 의사거리를 초·펨토초로 저장한 보정 송신 시각(transmitAt)으로 변환하고, Reference를 분리하여 JSON으로 전송합니다. AFS 구성과 I/Q 생성은 건너뜁니다.'
+              ? '선택한 1 Epoch의 의사거리를 보정 송신 시각(transmitAt)으로 변환해 JSON으로 전송합니다. 원본 의사거리와 Reference는 제외합니다.'
               : iq
-                ? 'GNSS 데이터로부터 AFS 프레임을 합성하고, 이를 90초·12 MHz 대역의 2.16 GB I/Q 복소 신호 파일로 변환합니다.'
+                ? 'AFS 프레임으로 90초·12 Msps·2.16 GB I/Q 신호 파일을 생성합니다.'
                 : '선택한 1 Epoch의 보정 송신 시각과 PVT 계산에 필요한 AFS 6,000비트 프레임(SB2 통합 궤도·섭동·시계 + SB3 0101 패딩 + SB4 관측·가상시각)을 구성합니다.',
             summary: raw ? '1 Epoch와 시각 변환' : '전달 항목과 규격',
             detail: raw
               ? [
                   '【시험 대상】\n선택한 1 Epoch의 관측값과 해당 계산에 필요한 선행 항법정보를 사용합니다.',
-                  '【시각 변환】\n원본 의사거리 대신 T*ᵢ=S−Pᵢ/c를 transmitAt에 저장합니다. 초와 펨토초를 분리해 시각 연산의 정밀도 손실을 줄입니다. 저장 단위가 실제 측정 정확도를 의미하지는 않습니다. Doppler·C/N0·추적상태는 유지합니다.',
+                  '【시각 변환】\ntransmitAt = S−Pᵢ/c를 정수 초·소수부로 저장합니다. Doppler·C/N0·추적상태는 유지합니다.',
                   '【비교자료】\n어댑터로 보내는 관측 JSON에는 원본 의사거리와 Reference PVT를 넣지 않습니다. 수신부는 전달 데이터로 PVT를 계산한 뒤 원본 RAW와 Reference를 서비스 간 REST로 조회합니다.'
                 ].join('\n\n')
               : [
@@ -959,7 +959,7 @@
         case 'encode':
           return {
             title: '송신부 · I/Q 생성',
-            copy: '원본 의사거리·Doppler에 시작 기준을 맞춘 90초·12 MHz I/Q 신호를 생성합니다. 같은 AFS 프레임을 반복하고 2.16 GB BIN 파일로 저장합니다.',
+            copy: '원본 의사거리·Doppler에 시작 기준을 맞춘 90초·12 Msps I/Q 신호를 생성합니다. SB2~SB4 내용을 반복하고 SB1 TOI는 갱신하며, 2.16 GB BIN 파일로 저장합니다.',
             summary: '생성 조건과 파일 구성',
             detail: ''
           };
@@ -985,7 +985,7 @@
             summary: '라우팅과 대기 종료',
             detail: [
               '요청 경로는 ' + state.tx + ' → ' + state.rx + '입니다. LNIS는 여러 시험을 testId로 구분하며 실제 중계 경로는 어댑터·라우터 로그로 확인합니다.',
-              '외부 수신 대기는 시간 제한이 없습니다. 번들 수명과 라우터의 저장·삭제 정책은 LNIS의 수신 대기와 별개입니다.',
+              '외부 수신 대기는 시간 제한이 없습니다. 번들 수명과 라우터 저장·삭제 정책은 별개입니다. 장시간 지연으로 항법정보 선택 조건을 벗어나면 수신돼도 PVT 비교가 불가능할 수 있습니다.',
               '시험별 대기 종료와 대기 전체 종료를 지원합니다. 전체 종료는 수신·계산 중인 시험을 제외합니다. 대기 종료가 이미 전달한 번들의 회수를 보장하지는 않습니다. 종료 후 도착한 정상 데이터는 원문만 보관합니다.'
             ].join('\n\n')
           };
@@ -1001,7 +1001,7 @@
               'POST /lnis/api/v1/dtn/receive에서 인증 후 본문을 기록하고 시험·데이터를 검증합니다. 인증 실패 요청은 본문 기록 전에 거절합니다. 16 MiB 초과 본문은 앞 16 MiB만 저장하고 거절합니다. 기록은 보관 정책과 관리자 삭제 대상입니다.',
               '지연 Δt = R − S입니다. S는 시험 시작 접수, R은 수신 본문 완료 시각입니다. 시작 이후 준비·전송 대기는 포함하고 수집 후 시작 전 대기와 수신 후 계산·복호 시간은 제외합니다. PC 간 시계 차이는 측정 지연에 포함될 수 있습니다.',
               iq
-                ? 'JSON 접수와 BIN 검증은 별도입니다. 파일 크기·SHA-256을 확인(진행률·처리속도 실시간 표시)한 뒤 복호하고, 처리 후 해시를 다시 확인합니다.'
+                ? 'BIN의 크기·SHA-256을 한 번 검증한 뒤 복호합니다. 복호 후에는 크기·수정시각·파일 식별값만 확인합니다.'
                 : '전달된 시각·관측값·항법정보로 수신 PVT를 먼저 계산하고, 원본 RAW와 Reference는 이후 비교에 사용합니다.',
               '외부 수신과 계산 순서 대기는 시간 제한이 없습니다. 실제 준비·계산 작업에는 일반 10분, I/Q 20분의 제한이 적용됩니다.'
             ].join('\n\n')
@@ -1299,9 +1299,9 @@
           ["√A", "32 bits (70~101)", "2⁻¹⁹ m¹/²", "SF2", "GPS 장반경 제곱근"],
           ["i₀ / Ω₀ / ω / M₀", "각 32 bits (102~229)", "2⁻³¹ semi-circles", "SF2 / SF3", "GPS 궤도 요소"],
           ["t_oc / a_f0 / a_f1", "54 bits (230~283)", "16b / 22b / 16b", "SF1", "GPS 시계 기준 시각·편차·표류"],
-          ["보충 헤더·유효 플래그", "58 bits (284~341)", "Type 63 / Version 6", "-", "블록·Epoch·PRN 및 항법정보 존재 여부"],
+          ["보충 헤더·유효 플래그", "58 bits (284~341)", "Type 63 / Version 1", "-", "블록·Epoch·PRN 및 항법정보 존재 여부"],
           ["LNAV 보충 필드", "459 bits (342~800)", "GPS LNAV 비트", "SF1~3", "조화 보정항·변화율·시계·상태 등 전반부에 없는 원본 필드"],
-          ["미사용 영역", "375 bits (801~1175)", "0101…", "-", "LNIS가 사용하지 않는 정보 영역"],
+          ["미사용 영역", "375 bits (801~1175)", "1010…", "-", "현재 SB2 패딩. 공식 spare bit 규칙의 시작값 0과 다름"],
           ["CRC·LDPC", "CRC 24b → 2,400심볼", "AFS SF2", "-", "정보 1,176비트에 CRC를 붙이고 부호화·천공"]
         ],
         "extraHtml": renderTimeGuide()
@@ -1342,14 +1342,14 @@
         ],
         "note": "AFS와 I/Q가 같은 필드 구성을 사용합니다. 원본 의사거리는 넣지 않고 가상 송신 시각·기준시각과 원본 Doppler·C/N0·상태 등을 저장합니다. 공식 MSG-G1 등의 구현과 구분합니다.",
         "fields": [
-          ["Type 63 헤더", "57 bits (0~56)", "6b + 8b + 3b + 32b + 8b", "-", "Type·Version 6·Block 4·Epoch 순번·PRN"],
-          ["관측 순번 / Week / TOW", "88 bits (57~144)", "8b + 16b + 64b", "RAWX", "원본 관측의 순번·GPS 주·밀리초 TOW"],
-          ["가상 송신 시각 Tᵢ", "114 bits (145~258)", "초 64b + 펨토초 50b", "RAWX 변환", "Tᵢ=A−Pᵢ/c. 수신부에서 시험 시작 S에 맞춰 보정"],
+          ["Type 63 헤더", "57 bits (0~56)", "6b + 8b + 3b + 32b + 8b", "-", "Type·Version 1·Block 4·Epoch 순번·PRN"],
+          ["관측 순번 / Week / TOW", "88 bits (57~144)", "8b + 16b + 64b", "RAWX", "원본 관측의 순번·GPS 주·초 단위 TOW"],
+          ["가상 송신 시각 Tᵢ", "114 bits (145~258)", "정수 초 64b + 소수부 50b", "RAWX 변환", "Tᵢ=A−Pᵢ/c. AFS: 의사거리 재계산 / I/Q: 파형 시작 기준"],
           ["Doppler", "32 bits (259~290)", "float · Hz", "RAWX", "RAW·AFS 속도 입력. I/Q 파형의 시작 Doppler 기준이며 수신 속도는 RF 추적값 사용"],
           ["C/N0", "8 bits (291~298)", "dB-Hz", "RAWX", "원본 신호 품질. 현재 PVT의 직접 가중치로 사용하지 않음"],
           ["추적 상태", "8 bits (299~306)", "uint8", "RAWX", "원본 관측 유효성 플래그"],
           ["전리층 정보", "249 bits (307~555)", "플래그·PRN·계수", "SFRBX SF4", "GPS Klobuchar 모델 계수"],
-          ["프레임 기준시각 A", "114 bits (556~669)", "초 64b + 펨토초 50b", "-", "AFS는 A=S로 가상 송신 시각을 보정. I/Q는 생성 시 정한 파형 시작 기준"],
+          ["프레임 기준시각 A", "114 bits (556~669)", "정수 초 64b + 소수부 50b", "-", "AFS는 A=S로 가상 송신 시각을 보정. I/Q는 생성 시 정한 파형 시작 기준"],
           ["미사용 영역", "176 bits (670~845)", "0101…", "-", "LNIS가 사용하지 않는 정보 영역"],
           ["CRC·LDPC", "CRC 24b → 1,740심볼", "AFS SF3", "-", "정보 846비트에 CRC를 붙이고 부호화·천공"]
         ]

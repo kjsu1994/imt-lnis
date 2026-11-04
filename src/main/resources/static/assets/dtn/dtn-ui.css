@@ -1294,7 +1294,7 @@ body[data-page="dtn-receiver"] .destination-status > div { display: flex; align-
 .receiver-error { color: var(--red); }
 .receiver-connections { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 14px; align-items: start; }
 .receiver-connections select { min-width: 0; width: 100%; padding: 8px; font-size: 13px; }
-.receiver-connections .adapter-url-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; }
+body[data-page="dtn-receiver"] .receiver-connections .adapter-url-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; }
 .receiver-connections .adapter-url-controls input, .receiver-connections .adapter-url-controls select { min-width: 0; width: 100%; box-sizing: border-box; margin: 0; }
 .receiver-connections .adapter-url-controls button { white-space: nowrap; margin: 0; }
 .receiver-connections small:empty { display: none; }
@@ -1313,7 +1313,6 @@ body[data-page="dtn-receiver"] .destination-status > div { display: flex; align-
 .receiver-connections > div { min-width: 0; }
 .receiver-connection-heading { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px 8px; margin-bottom: 6px; min-height: 28px; }
 .receiver-connection-status { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; }
-body[data-page="dtn-receiver"] .receiver-adapter .adapter-url-controls { grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; }
 .receiver-connections input, .receiver-connections button { padding: 8px 10px; font-size: 13px; }
 .service-clock-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 7px 0; font-size: 12px; }
 .service-clock-row time { font-variant-numeric: tabular-nums; font-weight: 600; margin-left: 6px; }
@@ -1345,8 +1344,9 @@ body[data-page="dtn-sender"] .sender-summary-row #service-clock-sync { padding: 
   .receiver-connections { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 480px) {
-  body[data-page="dtn-receiver"] .receiver-adapter .adapter-url-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .receiver-adapter .adapter-url-controls > input { grid-column: 1 / -1; }
+  body[data-page="dtn-receiver"] .receiver-connections .adapter-url-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .receiver-connections .adapter-url-controls > input,
+  .receiver-connections .adapter-url-controls > select { grid-column: 1 / -1; }
 }
 .pvt-header-bar {
   display: flex;

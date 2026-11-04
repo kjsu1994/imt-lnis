@@ -84,8 +84,7 @@ async function run(work) {
 async function summary() {
   const data = await request('/summary');
   $('node').textContent =
-    (data.role === 'receiver' ? '수신 PC' : data.role === 'sender' ? '송신 PC' : '현재 서버') +
-    ' · 이 PC의 데이터만 관리합니다';
+    (data.role === 'receiver' ? '수신 PC' : data.role === 'sender' ? '송신 PC' : '현재 서버');
   $('back').href = '/lnis/dtntest/' + (data.role === 'receiver' ? 'receiver' : 'sender');
   $('brand-home').href = $('back').href;
   $('reset-home').href = $('back').href;

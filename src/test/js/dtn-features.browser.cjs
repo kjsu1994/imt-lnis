@@ -149,6 +149,36 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
  for(const route of ['/sender','/receiver']){
   await page.goto(base+route);
   assert.equal(await page.locator('#gnss-dtr, #gnss-rts, .serial-advanced').count(),0);
+  if(route==='/receiver'){
+   assert.equal(await page.locator('.receiver-overview > .receiver-trial-toolbar').count(),1);
+   assert.equal(await page.locator('.receiver-connections > div').count(),3);
+   for(const width of [1920,1366,1100,1000,820,390]){
+    await page.setViewportSize({width,height:1000});
+    const layout=await page.evaluate(()=>{
+     const bounds=selector=>document.querySelector(selector).getBoundingClientRect().toJSON();
+     return {
+      connections:bounds('.receiver-connections'),
+      toolbar:bounds('.receiver-trial-toolbar'),
+      controls:['#sender-address-test','#dtn-adapter-health','#gnss-refresh'].map(bounds),
+      groups:[...document.querySelectorAll('.receiver-connections > div')].map(e=>e.getBoundingClientRect().toJSON())
+     };
+    });
+    assert.ok(layout.toolbar.y>=layout.connections.bottom,'trial controls stay below connections at '+width);
+    assert.ok(Math.abs(layout.toolbar.width-layout.connections.width)<2,'trial controls span the card at '+width);
+    if(width>1200){
+     assert.ok(layout.controls.every(b=>b.width<100),'connection buttons keep their content width');
+     assert.ok(Math.abs(layout.controls[0].y-layout.controls[2].y)<6,'connection controls align');
+    }
+    for(let i=0;i<layout.groups.length;i++){
+     const a=layout.groups[i];
+     for(const b of layout.groups.slice(i+1)){
+      assert.ok(a.right<=b.x+1||b.right<=a.x+1||a.bottom<=b.y+1||b.bottom<=a.y+1,'connection groups do not overlap');
+     }
+    }
+   }
+   await page.setViewportSize({width:1600,height:1000});
+  }
+
   assert.equal(await page.locator('#dtn-observations [data-pvt-filter]').isChecked(),true);
   await page.waitForFunction(()=>[...document.getElementById('dtn-tests').options].some(o=>o.value==='test1'));
   await page.locator('#dtn-tests').selectOption('test1');
