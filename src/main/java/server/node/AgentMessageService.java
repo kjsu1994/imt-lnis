@@ -58,6 +58,10 @@ public class AgentMessageService {
                 });
     }
 
+    public void captureUbx(UUID id, byte[] ubx) {
+        withInput(id, () -> inputBufferService.captureUbx(id, ubx));
+    }
+
     public void ports(String agentId, AgentRole role, PortList ports) {
         eventService.publish(EventType.AGENT_STATUS, agentId, role, null, ports);
     }
@@ -75,6 +79,11 @@ public class AgentMessageService {
                                 Map.of("message", "Capture STATUS event type is missing"));
                         return;
                     }
+                    if (progress.type() == EventType.GNSS_STATUS || progress.type() == EventType.ERROR) {
+                        inputBufferService.captureProgress(id,
+                                progress.type() == EventType.ERROR ? "CaptureFailed" : progress.stage(),
+                                progress.message(), progress.counters());
+                    }
                     boolean written = false;
                     if (progress.type() == EventType.GNSS_STATUS
                             && "CaptureDecisionRequired".equals(progress.stage())) {
@@ -88,6 +97,10 @@ public class AgentMessageService {
                             logs.add(id, "INPUT", "ERROR", "COM 수집", false, progress.message());
                             written = true;
                         }
+                    }
+                    if (progress.type() == EventType.GNSS_STATUS
+                            && "CaptureComplete".equals(progress.stage())) {
+                        inputBufferService.complete(id);
                     }
                     if (progress.type() == EventType.GNSS_STATUS
                             && "SingleEpochComplete".equals(progress.stage())) {

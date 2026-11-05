@@ -17,7 +17,8 @@ public final class GnssConnection implements AutoCloseable {
     public record Status(String state, String portName, int baudRate, boolean capturing,
                          String timeState, Instant utc, Instant updatedAt, Long accuracyNanos,
                          String message, boolean dtrEnabled, boolean rtsEnabled) {}
-    private record Navigation(GrawCodec.NavigationUpdate message, Instant receivedAt, long tick) {}
+    private record Navigation(GrawCodec.NavigationUpdate message, UbloxParser.UbxFrame source,
+                              Instant receivedAt, long tick) {}
 
     private final Supplier<List<SerialCaptureService.DetectedPort>> detector;
     private final Function<SerialCaptureService.Settings, SerialConnection> opener;
@@ -277,7 +278,7 @@ public final class GnssConnection implements AutoCloseable {
         if (frame.messageClass() == 2 && frame.messageId() == 0x13) {
             try {
                 var nav = (GrawCodec.NavigationUpdate) UbloxParser.toCanonical(frame);
-                navigation.addLast(new Navigation(nav, receivedAt, tick));
+                navigation.addLast(new Navigation(nav, frame, receivedAt, tick));
                 trimNavigation(tick);
             } catch (IllegalArgumentException malformed) {
                 // 잘못된 항법 메시지가 시간 감시나 포트 연결을 종료시키지 않는다.
@@ -329,6 +330,10 @@ public final class GnssConnection implements AutoCloseable {
                     firstSequence++, nav.receivedAt(), nav.message())));
         }
         return records;
+    }
+
+    synchronized List<UbloxParser.UbxFrame> seedUbx() {
+        return lease == null ? List.of() : lease.seed.stream().map(Navigation::source).toList();
     }
 
     public void disconnect() {

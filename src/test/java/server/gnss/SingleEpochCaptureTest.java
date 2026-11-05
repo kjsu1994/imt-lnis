@@ -127,4 +127,49 @@ class SingleEpochCaptureTest {
                     }
                 });
     }
+    private static byte[] epoch(int week, double tow) throws Exception {
+        var sample = GrawCodec.splitLengthPrefixed(NativePvtIntegrationTest.validSample()).stream()
+                .map(GrawCodec::decode).filter(e -> e.message() instanceof GrawCodec.ObservationEpoch)
+                .findFirst().orElseThrow();
+        var original = (GrawCodec.ObservationEpoch) sample.message();
+        return GrawCodec.encode(new GrawCodec.Envelope(sample.testId(), java.util.UUID.randomUUID(),
+                (long) tow, java.time.Instant.EPOCH,
+                new GrawCodec.ObservationEpoch(tow, week, original.leapSeconds(), original.receiverStatus(),
+                        original.rawxVersion(), original.observations())));
+    }
+
+    @Test
+    void countsOnlyDistinctValidEpochsAndKeepsTheirArrivalOrder() throws Exception {
+        var capture = new SingleEpochCapture(3, records -> {
+            var last = (GrawCodec.ObservationEpoch) GrawCodec.decode(records.getLast()).message();
+            return last.receiverTowSeconds() != 101;
+        });
+        assertNull(capture.accept(epoch(2400, 100)));
+        assertNull(capture.accept(epoch(2400, 100)));
+        assertNull(capture.accept(epoch(2400, 101)));
+        assertEquals(1, capture.count());
+        assertNull(capture.accept(epoch(2400, 604799)));
+        var result = capture.accept(epoch(2401, 0));
+        assertEquals(3, capture.count());
+        assertEquals(3, result.size());
+        assertEquals(java.util.List.of(100.0, 604799.0, 0.0), result.stream()
+                .map(GrawCodec::decode).map(e -> ((GrawCodec.ObservationEpoch) e.message()).receiverTowSeconds()).toList());
+        assertNull(capture.accept(epoch(2401, 1)));
+    }
+
+    @Test
+    void explicitCountNeverTurnsPartialOrInvalidCaptureIntoSuccess() throws Exception {
+        var multiple = new SingleEpochCapture(10, records -> true);
+        multiple.accept(epoch(2400, 100));
+        assertNull(multiple.onTimeout());
+        assertEquals(1, multiple.count());
+        var one = new SingleEpochCapture(1, records -> false);
+        one.accept(epoch(2400, 100));
+        assertNull(one.onTimeout());
+        assertFalse(one.awaitingDecision());
+        assertEquals(50, new SingleEpochCapture(50, records -> true).targetCount());
+        assertThrows(IllegalArgumentException.class, () -> new SingleEpochCapture(0, records -> true));
+        assertThrows(IllegalArgumentException.class, () -> new SingleEpochCapture(51, records -> true));
+    }
+
 }

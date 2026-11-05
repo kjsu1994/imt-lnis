@@ -49,6 +49,14 @@ public class InputBufferRepository {
         return files.read(id, input.complete(), chunk.getFileOffset(), chunk.getByteLength());
     }
 
+    public java.nio.file.Path ubx(UUID id) {
+        return files.ubx(id);
+    }
+
+    public void saveUbx(UUID id, byte[] bytes) {
+        files.saveUbx(id, bytes);
+    }
+
     public void completeFile(UUID id) {
         files.complete(id);
     }

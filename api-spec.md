@@ -106,3 +106,20 @@ GET /lnis/api/v1/node/peer/dtn/tests/{testId}/reference
 `TRIALS`는 시험·결과·원문·로그 및 이전 독립 AFS 보관 이력을 정리하고 입력·I/Q·프리셋·연결·보관 설정은 유지합니다. `SERVICE`는 소유 확인된 입력·I/Q 작업 파일과 프리셋도 정리하며 사용자 설정을 배포 기본값으로 복원합니다. 보관 고정 자료도 포함됩니다. 실행 파일·환경변수·Compose·인증 정보·배포 백업·운영 로그는 유지하며 공유·소유 미확인 I/Q는 `retainedFiles`로 표시하고 제외합니다.
 
 초기화 중 새 시험·수집·수신을 거절하며 상태 조회와 재실행은 허용합니다. 삭제된 시험 ID는 재등록·지연 수신 방지를 위해 유지합니다. 완료 후 `X-LNIS-Data-Revision: <UUID>:TRIALS|SERVICE` 응답 헤더로 브라우저 갱신을 알립니다. `SERVICE`는 해당 출처의 `lnis.*` 화면 설정만 지웁니다. 변경 식별자·저장소 소유 식별자·최근 수행 정보는 초기화 후에도 보관합니다.
+
+
+## COM 수집과 UBX 다운로드
+
+아래 경로는 서비스 내부 API이며 외부 어댑터 전달 규격과 별개입니다.
+
+| 요청 | 동작 |
+|---|---|
+| POST /lnis/api/v1/captures | 기존 수집 요청에 epochCount(정수 1~50) 추가. 화면 기본값 10 |
+| GET /lnis/api/v1/inputs/{id} | 완료 상태, ubxAvailable, captureProgress 조회 |
+| GET /lnis/api/v1/captures/{id}/ubx | 완료된 수집의 UBX 다운로드. 파일이 없거나 미완료이면 404 |
+
+epochCount를 지정하면 위치·속도 PVT가 모두 유효한 고유 Week/TOW만 집계합니다. 최대 120초·GRAW/UBX 각 1 MiB이며 목표 미달은 완료 처리하지 않습니다. 생략한 기존 1 Epoch 호출은 기존 정책을 유지합니다.
+
+captureProgress는 stage·message·counters를 제공하며 counters의 validEpochs·targetEpochs로 진행률을 표시합니다. RAWX·항법정보 수신 계수도 함께 전달합니다. 수집 중에는 폴링과 기존 WebSocket으로 확인할 수 있습니다.
+
+UBX에는 선택된 RAWX와 선행·중간 SFRBX, 확보한 MON-VER를 보관합니다. 다운로드는 선택사항입니다. 완료된 입력은 기존 Epoch 선택·시험 기능에서 바로 사용합니다.

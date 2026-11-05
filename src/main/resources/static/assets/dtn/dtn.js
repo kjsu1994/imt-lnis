@@ -15,6 +15,8 @@ let pvt = [], inputPvt = [], epochIndex = 0, reportKey = '', lastAgentState = ''
 let polling = false, inputMode = 'upload';
 let delayChoices = [], preparedEpoch = null, inputView = false;
 let captureId = null, captureError = '';
+let captureTimer = null, captureStarted = 0, captureTarget = 10, captureCounters = {};
+let captureDownloadId = null, captureDownloadVersion = 0;
 let pendingCapture = null, acceptedCapture = false;
 let gnssState = {state: 'DISCONNECTED'};
 let iqJob = null;
@@ -727,6 +729,8 @@ function updateControls() {
   updateAdapterTabBadges();
   const tx = agents.find(a => a.agentId === $('dtn-sender').value);
   const rx = agents.find(a => a.agentId === $('dtn-receiver').value);
+  $('capture-epoch-target').disabled = locked();
+  $('capture-ubx-download').disabled = locked();
   $('dtn-start').disabled = locked() || gnssState.state !== 'CONNECTED' || gnssState.capturing || ! $('dtn-port').value || tx?.state !== 'READY';
   $('dtn-port').disabled = $('dtn-baud').disabled = locked() || ['CONNECTED', 'CONNECTING', 'RECONNECTING'].includes(gnssState.state);
   $('dtn-tests').disabled = busy || !!pendingCapture;
@@ -750,7 +754,8 @@ function updateControls() {
     ? active() ? (locked() ? '송신 준비·어댑터 요청 중입니다.' : '이전 시험 수신 대기 · 다음 시험을 전송할 수 있습니다.') : !inputId ? 'GNSS 입력을 준비하세요.' : !urlValid() ? '어댑터 전송 URL을 입력하세요.' : !adapterOnline ? '송신 어댑터 데몬 연결을 확인하세요.' : ''
     : active() ? (locked() ? '송신 준비·어댑터 요청 중입니다.' : '이전 시험 수신 대기 · 다음 시험을 전송할 수 있습니다.') : generatingIq() ? '90초 I/Q 생성 중입니다.'
       : iqJob?.state === 'READY' ? (!adapterOnline ? '송신 어댑터 데몬 연결을 확인하세요.' : '선택한 I/Q 파일을 전송합니다.') : 'GNSS 입력 적용 후 90초 I/Q를 생성하세요.';
-  if (pendingCapture) $('dtn-message').textContent = '확보한 데이터의 사용 여부를 선택하세요.';
+  if (captureTimer || captureId) $('dtn-message').textContent = 'GNSS 수집 중';
+  else if (pendingCapture) $('dtn-message').textContent = '확보한 데이터의 사용 여부를 선택하세요.';
   else if (acceptedCapture && noAfs) $('dtn-message').textContent = 'AFS 생성에 필요한 GPS LNAV 항법정보 부족 · GNSS RAW로 전송 가능';
   else if (acceptedCapture && selectedType === 'IQ_SAMPLE' && !inputPvt.some(v => v.positionValid && v.velocityValid)) $('dtn-message').textContent = 'I/Q 생성에는 유효한 위치·속도 PVT가 필요합니다.';
 }
@@ -789,7 +794,50 @@ $('iq-cancel').onclick = async () => {
   catch (error) { log(error.message, 'ERROR'); }
   updateControls();
 };
+function clearCaptureDownload() {
+  captureDownloadVersion++;
+  captureDownloadId = null;
+  $('capture-ubx-download').hidden = true;
+}
+async function loadCaptureDownload(id) {
+  clearCaptureDownload();
+  if (!id) return;
+  const version = captureDownloadVersion;
+  try {
+    const input = await request('/inputs/' + id);
+    if (version !== captureDownloadVersion || !input.ubxAvailable) return;
+    captureDownloadId = id;
+    $('capture-ubx-download').hidden = false;
+  } catch { /* 과거 입력이 삭제됐거나 UBX가 없으면 다운로드를 표시하지 않는다. */ }
+}
+$('capture-ubx-download').onclick = () => {
+  if (!captureDownloadId || locked()) return;
+  const link = document.createElement('a');
+  link.href = '/lnis/api/v1/captures/' + captureDownloadId + '/ubx';
+  link.download = 'gnss-' + captureDownloadId + '.ubx';
+  link.click();
+};
+function renderCaptureProgress(progress) {
+  if (progress?.counters) Object.assign(captureCounters, progress.counters);
+  const count = captureCounters.validEpochs || 0;
+  $('capture-epoch-count').textContent = '유효 Epoch ' + count + ' / ' + captureTarget;
+  $('capture-epoch-progress').max = captureTarget;
+  $('capture-epoch-progress').value = count;
+  $('capture-elapsed').textContent = Math.floor((Date.now() - captureStarted) / 1000) + '초';
+  if (progress?.message) $('capture-stage').textContent =
+    progress.stage === 'EpochCollected' ? '유효 관측 수집 중' : progress.message;
+  if (progress?.stage === 'CaptureFailed') $('dtn-capture-progress').classList.add('error');
+  $('dtn-capture-status').textContent = ['rawxEpochs', 'gpsL1Satellites', 'navigationMessages', 'bytes']
+    .filter(key => captureCounters[key] !== undefined)
+    .map(key => ({rawxEpochs:'수신 RAWX', gpsL1Satellites:'유효 GPS L1 위성',
+      navigationMessages:'항법 메시지', bytes:'수신 바이트'}[key]) + ' ' + captureCounters[key]).join(' · ');
+}
 function resetInputSelection() {
+  clearCaptureDownload();
+  $('dtn-capture-progress').hidden = true;
+  $('dtn-capture-progress').classList.remove('error');
+  $('dtn-capture-status').textContent = '';
+
   $('dtn-receiver-info').hidden = true;
   $('dtn-receiver-info').open = false;
   $('dtn-receiver-info-body').textContent = '';
@@ -846,13 +894,21 @@ $('dtn-upload').onclick = () => upload($('dtn-graw-file').files[0]).catch(e => l
 $('dtn-port').onchange = updateControls;
 $('dtn-start').onclick = async () => {
   if (locked() || gnssState.state !== 'CONNECTED' || !$('dtn-port').value) return;
-  busy = true; resetInputSelection(); inputId = null; acceptedCapture = false; clearIqSelection(); captureError = ''; $('dtn-capture-status').textContent = ''; resetResult(); view.setData(null); updateControls();
-  $('dtn-input-state').textContent = '항법정보·관측값 수집 중 · 최대 120초';
-  log('한 시점 수집 시작 · ' + $('dtn-port').value);
+  if (!$('capture-epoch-target').reportValidity()) return;
+  captureTarget = Number($('capture-epoch-target').value);
+  busy = true; resetInputSelection(); inputId = null; acceptedCapture = false; clearIqSelection();
+  captureError = ''; captureCounters = {}; captureStarted = Date.now();
+  $('dtn-capture-status').textContent = ''; resetResult(); view.setData(null); updateControls();
+  $('dtn-input-state').textContent = 'GNSS 수집 중';
+  $('dtn-message').textContent = 'GNSS 수집 중';
+  $('dtn-capture-progress').hidden = false;
+  renderCaptureProgress({message:'관측·항법정보 대기'});
+  captureTimer = setInterval(() => renderCaptureProgress(), 1000);
+  log('GNSS 수집 시작 · ' + $('dtn-port').value + ' · 유효 Epoch ' + captureTarget + '개');
   try {
     const input = await post('/captures', {senderAgentId: $('dtn-sender').value,
       portName: $('dtn-port').value, baudRate: Number($('dtn-baud').value), protocolId: 'UBX',
-      receiverModel: '', sessionName: 'DTN single epoch', singleEpoch: true,
+      receiverModel: '', sessionName: 'DTN GNSS capture', singleEpoch: true, epochCount: captureTarget,
       dtrEnabled: gnssState.dtrEnabled || false, rtsEnabled: gnssState.rtsEnabled || false});
     captureId = input.inputId;
     logView.setContext(captureId,'INPUT');
@@ -860,6 +916,10 @@ $('dtn-start').onclick = async () => {
     while (true) {
       if (captureError) throw new Error(captureError);
       const state = await request('/inputs/' + captureId);
+      renderCaptureProgress(state.captureProgress);
+      if (state.captureProgress?.stage === 'CaptureFailed') {
+        throw new Error(state.captureProgress.message);
+      }
       if (state.complete) {
         if (state.captureDecision === 'AWAITING_DECISION') {
           await showCaptureDecision(state);
@@ -872,15 +932,24 @@ $('dtn-start').onclick = async () => {
     }
     const observations = await request('/dtn/inputs/' + captureId + '/observations');
     pvt = await request('/dtn/inputs/' + captureId + '/pvt?constellation=' + encodeURIComponent(pvtConstellation));
-    if (observations.epochs?.length !== 1 || !pvt[0]?.positionValid || !pvt[0]?.velocityValid)
-      throw new Error('유효한 한 시점 PVT 입력이 아닙니다.');
+    if (observations.epochs?.length !== captureTarget || pvt.length !== captureTarget
+        || pvt.some(value => !value.positionValid || !value.velocityValid)) {
+      throw new Error('요청한 유효 Epoch 개수와 수집 결과가 다릅니다.');
+    }
     inputId = captureId; showInputObservations(observations); await loadDelayEpochs();
-    $('dtn-input-state').textContent = '한 시점 수집 완료 · 지구 PVT 계산 완료';
-    log('수집 완료 · 관측값 1시점 · 지구 PVT 계산 완료');
+    await loadCaptureDownload(captureId);
+    renderCaptureProgress({message:'수집 완료',counters:{validEpochs:captureTarget}});
+    $('dtn-input-state').textContent = '수집 완료 · 유효 Epoch ' + captureTarget + '개';
+    log('수집 완료 · 유효 Epoch ' + captureTarget + '개 · 관측 시각을 선택해 시험할 수 있습니다.');
   } catch (e) {
     inputId = null; pvt = []; view.setData(null); renderPvt();
-    $('dtn-input-state').textContent = '수집 실패'; log(e.message, 'ERROR');
-  } finally { captureId = null; busy = false; updateControls(); }
+    $('dtn-input-state').textContent = '수집 미완료';
+    renderCaptureProgress({stage:'CaptureFailed',message:e.message});
+    log(e.message, 'ERROR');
+  } finally {
+    clearInterval(captureTimer); captureTimer = null;
+    captureId = null; busy = false; updateControls();
+  }
 };
 
 async function showCaptureDecision(input) {
@@ -967,6 +1036,7 @@ function updateInputPanels() {
   $('dtn-iq-panel').classList.toggle('hidden', !iq && !generatingIq());
   $('dtn-iq-settings').classList.toggle('hidden', !iq && !generatingIq());
   $('dtn-start').hidden = inputMode !== 'capture';
+  $('capture-count-control').hidden = inputMode !== 'capture';
   $('dtn-capture-panel').classList.toggle('hidden', inputMode !== 'capture');
   $('dtn-upload-panel').classList.toggle('hidden', inputMode !== 'upload');
   for (const button of document.querySelectorAll('.input-mode')) button.classList.toggle('active', button.dataset.inputMode === inputMode);
@@ -1148,6 +1218,7 @@ $('dtn-tests').onchange = async () => {
     job = selected; colorTrialSelection($('dtn-tests'), job); reportKey = ''; renderSummary(); updateControls();
     pvt = []; inputView = false; view.setData(null); $('dtn-receiver-info').hidden = true; renderPvt();
     await loadTrialReport(selected, version, false);
+    if (version === jobVersion) await loadCaptureDownload(selected.inputId);
   } catch (error) { log(error.message, 'ERROR'); }
 };
 
@@ -1235,11 +1306,7 @@ function socket() {
       if (data.agentId === $('dtn-sender').value && data.payload?.ports) showPorts(data.payload.ports);
       if (data.agentId === $('dtn-sender').value && data.sessionId === captureId
           && data.type === 'GNSS_STATUS' && busy) {
-        const c = data.payload?.counters || {};
-        $('dtn-input-state').textContent = data.payload?.message || '1에폭 수집 중';
-        $('dtn-capture-status').textContent = ['bytes', 'rawxEpochs', 'observations', 'gpsL1Satellites', 'navigationMessages']
-          .filter(key => c[key] !== undefined).map(key => ({bytes: '수신 바이트', rawxEpochs: '수신 RAWX',
-            observations: '최근 관측 신호', gpsL1Satellites: '유효 GPS L1 위성', navigationMessages: '항법 메시지'}[key]) + ': ' + c[key]).join(' · ');
+        renderCaptureProgress(data.payload);
       }
     } catch { log('포트 응답을 읽을 수 없습니다.', 'WARN'); }
   };

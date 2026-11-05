@@ -26,6 +26,19 @@ public class CaptureController {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private server.dtn.DtnLogService logs;
 
+    @GetMapping("/{captureId}/ubx")
+    public ResponseEntity<org.springframework.core.io.Resource> ubx(@PathVariable UUID captureId)
+            throws java.io.IOException {
+        var file = inputBufferService.ubx(captureId);
+        return ResponseEntity.ok()
+                .contentType(org.springframework.http.MediaType.APPLICATION_OCTET_STREAM)
+                .contentLength(java.nio.file.Files.size(file))
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+                        org.springframework.http.ContentDisposition.attachment()
+                                .filename("gnss-" + captureId + ".ubx").build().toString())
+                .body(new org.springframework.core.io.FileSystemResource(file));
+    }
+
     @GetMapping("/pending")
     public java.util.List<InputBufferEntity> pending() {
         return inputBufferService.pendingCaptures();
@@ -57,7 +70,7 @@ public class CaptureController {
                             + request.portName()
                             + " · "
                             + request.baudRate()
-                            + " baud · 관측값·항법정보 대기");
+                            + " baud · 유효 Epoch " + (request.epochCount() == null ? 1 : request.epochCount()) + "개 · 관측값·항법정보 대기");
         }
         try {
             agentCommandService.command(

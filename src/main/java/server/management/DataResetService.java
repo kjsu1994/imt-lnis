@@ -201,7 +201,7 @@ public class DataResetService {
                     try (var paths = Files.list(inputRoot)) {
                         for (Path path : paths.sorted().toList()) {
                             String name = path.getFileName().toString();
-                            if (name.matches("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\.(graw|part)"))
+                            if (name.matches("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\.(graw|part|ubx|ubx\\.part)"))
                                 files.add(target(Kind.INPUT, path));
                         }
                     }

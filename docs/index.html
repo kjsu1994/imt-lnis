@@ -119,6 +119,30 @@
     .time-guide-box { margin-top: 12px; padding: 12px 14px; border: 1px solid #d2e3fc; border-radius: 8px; background: #f8fbff; }
     .time-guide-title { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; font-size: 12.5px; font-weight: 700; color: #1a4971; }
     .time-guide-title span { font-size: 11px; font-weight: 600; color: #1967d2; background: #e8f0fe; border: 1px solid #c2e7ff; padding: 2px 8px; border-radius: 999px; font-family: Consolas, "Malgun Gothic", monospace; }
+    .time-tier-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .time-tier-card { background: white; border: 1px solid #dce5ec; border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; position: relative; }
+    .time-tier-card.active-tier { border: 1.5px solid #245cbb; background: #ffffff; box-shadow: 0 2px 6px #245cbb14; }
+    .time-tier-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+    .time-tier-name { font-size: 12.5px; font-weight: 700; color: #102a43; }
+    .time-tier-loc { font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 4px; background: #edf2f7; color: #334e68; font-family: Consolas, monospace; }
+    .time-tier-card.active-tier .time-tier-loc { background: #e1edff; color: #1967d2; }
+    .time-tier-metaphor { font-size: 12px; font-weight: 700; color: #1967d2; margin-top: 1px; }
+    .time-tier-desc { font-size: 11px; color: #486581; line-height: 1.45; word-break: normal; overflow-wrap: break-word; }
+    .time-tier-cycle { margin-top: auto; padding-top: 5px; border-top: 1px dashed #e2e8f0; font-size: 10.5px; color: #137333; font-weight: 600; }
+    .toi-formula-bar { margin-top: 10px; background: white; border: 1px solid #dce5ec; border-radius: 8px; padding: 9px 12px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+    .toi-formula-bar.plain-bar { background: transparent; border: none; padding: 4px 2px 0; margin-top: 12px; }
+    .toi-formula-eq { font: 700 12px/1.4 Consolas, monospace; color: #0f172a; background: #f1f5f9; padding: 5px 10px; border-radius: 6px; border: 1px solid #cbd5e1; white-space: nowrap; }
+    .toi-formula-parts { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; justify-content: flex-end; }
+    .toi-part-pill { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: #334e68; background: #f8fafc; border: 1px solid #e2e8f0; padding: 3px 8px; border-radius: 6px; }
+    .toi-part-pill code { font-family: Consolas, monospace; font-weight: 700; color: #1967d2; background: #e8f0fe; padding: 1px 5px; border-radius: 4px; }
+    .time-why-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
+    .time-why-card { background: #ffffff; border: 1px dashed #b9d2ee; border-radius: 8px; padding: 8px 11px; display: flex; flex-direction: column; gap: 3px; }
+    .time-why-card strong { font-size: 11.5px; color: #1a4971; display: flex; align-items: center; gap: 5px; }
+    .time-why-card p { font-size: 11px; color: #486581; line-height: 1.45; margin: 0; word-break: normal; overflow-wrap: break-word; }
+    @media (max-width: 860px) {
+      .time-tier-grid, .time-why-grid { grid-template-columns: 1fr; }
+      .toi-formula-parts { justify-content: flex-start; }
+    }
     .deep-dive-card { margin-top: 14px; border: 1px solid #bcd0e6; border-radius: 8px; background: #f4f8fc; padding: 12px 14px; }
     .deep-dive-card h3 { margin: 0 0 6px; font-size: 13px; color: #1a4971; }
     .deep-dive-card p { font-size: 12px; line-height: 1.6; color: #334e68; margin: 4px 0; }
@@ -313,20 +337,20 @@
                     <tbody>
                       <tr>
                         <th scope="row">Subframe 1 (Word 1~10)<br>시계 및 보정</th>
-                        <td>• 시계 기준시(toc), af0, af1<br>• 2차 시계 가속도(af2), 지연차(TGD)</td>
-                        <td>• SB2 전반부 (핵심 시계 3개)<br>• SB2 후반부 (보충 시계·플래그)</td>
+                        <td>• 시계 기준시(toc), af0, af1<br>• 2차 시계 가속도(af2), 지연차(TGD), IODC, Health</td>
+                        <td>• SB2 전반부 (230~283, 핵심 시계 54b)<br>• SB2 후반부 (342~527, SF1 보충 186b)</td>
                         <td>위성 원자시계 0·1·2차 보정 및 하드웨어 회로 지연 보정</td>
                       </tr>
                       <tr>
                         <th scope="row">Subframe 2 (Word 1~10)<br>궤도 상반부</th>
                         <td>• 궤도 기준시(toe), √a, e, M0<br>• 평균운동(Δn), 조화섭동 Cuc, Cus, Crs</td>
-                        <td>• SB2 전반부 (핵심 궤도 4개)<br>• SB2 후반부 (보충 섭동 3종)</td>
+                        <td>• SB2 전반부 (22~101·198~229, 궤도 111b)<br>• SB2 후반부 (528~656, SF2 섭동 보충 129b)</td>
                         <td>기본 타원 기하 4요소 + 궤도 반경·위도 주기적 중력 섭동 보정</td>
                       </tr>
                       <tr>
                         <th scope="row">Subframe 3 (Word 1~10)<br>궤도 하반부</th>
                         <td>• 경사각(i0), 승교점(Ω0), 근지점(ω)<br>• 세차율(Ω_dot), IDOT, 조화섭동 Crc, Cic, Cis</td>
-                        <td>• SB2 전반부 (핵심 궤도 3개)<br>• SB2 후반부 (보충 섭동 3종)</td>
+                        <td>• SB2 전반부 (102~197, 궤도 96b)<br>• SB2 후반부 (657~800, SF3 섭동 보충 144b)</td>
                         <td>3차원 궤도면 배향 3요소 + 궤도 경사·반경 조화 섭동 보정</td>
                       </tr>
                     </tbody>
@@ -1216,22 +1240,120 @@
 
     function renderSpGuide() {
       return `
-        <div class="time-guide-box">
-          <div class="time-guide-title"><strong>SP와 수신 경로</strong><span>68심볼 × 2ms = 136ms</span></div>
-          <p>SP는 프레임 경계를 식별하는 고정 패턴이며 BCH·LDPC 부호화나 인터리빙을 적용하지 않습니다. 136ms는 패턴 길이이며 최초 획득 시간을 뜻하지 않습니다.</p>
-          <p>AFS 파일은 정해진 위치의 SP를 비교합니다. I/Q 수신기는 6,000심볼 간격의 연속 SP와 위상을 확인해 프레임 동기를 잡습니다.</p>
-          <p class="fine">공식 문서의 0.5ns(TBC) 조건은 송신 신호 성분 간 정렬 조건입니다. LNIS의 PC 시계 동기화나 수신 시각 측정 정확도를 나타내지 않습니다.</p>
-        </div>`;
+        <div class="time-guide-box" aria-label="SP 프레임 동기 부호 이해하기">
+          <div class="time-guide-title">
+            <strong>SP (동기 패턴) 한눈에 이해하기 · NASA LSIS-AFS Vol.A (§2.4.1.2 / LSIS-330~340)</strong>
+            <span>68 symbols = 136 ms (500 sps × 2 ms) · 0xCC63F74536F49E04A</span>
+          </div>
+          <div class="time-tier-grid">
+            <div class="time-tier-card active-tier">
+              <div class="time-tier-head">
+                <span class="time-tier-name">① 프레임 경계 검출</span>
+                <span class="time-tier-loc">LSIS-330 · Table 12</span>
+              </div>
+              <div class="time-tier-metaphor">🎯 6,000심볼의 시작점 찾기</div>
+              <div class="time-tier-desc">잡음 속에서 12초(6,000심볼) 프레임이 시작되는 경계(Frame Boundary)를 식별하는 68심볼 고정 프리앰블입니다.</div>
+              <div class="time-tier-cycle">비주기 자기상관(Aperiodic Autocorrelation) 최적화 시퀀스</div>
+            </div>
+            <div class="time-tier-card active-tier">
+              <div class="time-tier-head">
+                <span class="time-tier-name">② 무부호화 · 무인터리빙</span>
+                <span class="time-tier-loc">LSIS-340 · LSIS-FID0-470</span>
+              </div>
+              <div class="time-tier-metaphor">⚡ 왜 SP만 그대로 보낼까?</div>
+              <div class="time-tier-desc">인터리빙(60행×98열)된 SB2~SB4(5,880심볼)를 풀려면 먼저 프레임 첫머리를 알아야 하므로, SP(68)와 SB1(52)은 인터리빙 없이 맨 앞에 배치합니다.</div>
+              <div class="time-tier-cycle">패턴 길이 136 ms (68심볼 × 2 ms, 최초 획득 시간과 별도)</div>
+            </div>
+            <div class="time-tier-card active-tier">
+              <div class="time-tier-head">
+                <span class="time-tier-name">③ 시각 기준점 &amp; 위상 판별</span>
+                <span class="time-tier-loc">LSIS-160 · LSIS-720</span>
+              </div>
+              <div class="time-tier-metaphor">⏱️ 프레임 선두와 반송파 위상 판별</div>
+              <div class="time-tier-desc">공식 규격에서 프레임 선두는 <code>TOI</code> 시각 기준점이며, I/Q 수신기는 SP 상관 부호로 정위상/역위상(<code>180°</code> 반전)도 함께 판별합니다.</div>
+              <div class="time-tier-cycle">I/Q: 6,000심볼 간격 연속 2회 SP 일치 / AFS 파일: 앞 68비트 직접 대조</div>
+            </div>
+          </div>
+          <div class="time-why-grid">
+            <div class="time-why-card">
+              <strong>📐 왜 하필 이 68비트(0xCC63…E04A)인가?</strong>
+              <p>NASA LSIS Table 12에서 채택한 최소 비주기 자기상관 부호입니다. 1심볼이라도 어긋나면 상관값이 낮게 억제되고, 68심볼이 정확히 겹칠 때만 피크가 발생합니다.</p>
+            </div>
+            <div class="time-why-card">
+              <strong>🔗 확산 부호(Primary/Tertiary)와의 정렬</strong>
+              <p>공식 규격(LSIS-160, Figure 3 &amp; 11)은 송신 시 SP 첫 심볼과 I채널 Primary Code(2,046칩, 2ms)·Q채널 Tertiary Code(1,500칩, 12초) 시작점의 <code>0.5 ns(TBC)</code> 정렬을 규정합니다.</p>
+            </div>
+            <div class="time-why-card">
+              <strong>🛰️ LNIS 수신 경로별 SP 확인 방식</strong>
+              <p><strong>I/Q 경로</strong>(<code>sdr_nav.c</code>)는 심볼 버퍼에서 <code>6,000심볼(12초)</code> 간격 연속 2회 SP 일치(<code>sync_frame</code>)로 동기를 잡고, <strong>AFS 파일 경로</strong>(<code>lnis_afs_codec.c</code>)는 750B 프레임 앞 68비트를 <code>memcmp</code>로 대조합니다.</p>
+            </div>
+          </div>
+        </div>
+      `;
     }
 
-    function renderTimeGuide() {
+    function renderTimeGuide(activeBlock) {
+      const isSb1 = activeBlock === 1;
+      const isSb2 = activeBlock === 2;
       return `
-        <div class="time-guide-box">
-          <div class="time-guide-title"><strong>프레임 시간과 관측 시각</strong><span>GPS 시간 · PC 시각 · 공식 AFS 시간계 구분</span></div>
-          <p>LNIS는 GPS Week와 TOW에서 ITOW = floor(TOW/1200), TOI = floor((TOW mod 1200)/12)를 구해 파일 프레임을 식별합니다. ITOW×1200 + TOI×12는 12초 구간의 시작이며 관측 시각의 소수 초를 포함하지 않습니다.</p>
-          <p>공식 AFS의 TOI는 다음 프레임 선두 시각을 가리킵니다. I/Q 생성기의 다음 프레임 카운터와 파일 시험의 Epoch 구간 식별값을 구분해야 합니다. LNIS의 GPS 기반 필드는 공식 LRT 시간계와 동일한 정의가 아닙니다.</p>
-          <p class="fine">AFS는 SB4의 원본 관측 Week·TOW를 사용합니다. I/Q는 생성 시작 GNSS 시각에 파일 경과시간을 더한 RF 시각을 사용합니다. PC 시각은 공통 지연 계산용이며 SB1의 TOI를 의사거리 계산에 직접 사용하지 않습니다.</p>
-        </div>`;
+        <div class="time-guide-box" aria-label="위성 송신 시간 이해하기">
+          <div class="time-guide-title">
+            <strong>위성 송신 시간 한눈에 이해하기 (Week · ITOW · TOI 계층 구조)</strong>
+            <span>12초 구간 시작 초 = (ITOW × 1,200초) + (TOI × 12초)</span>
+          </div>
+          <div class="time-tier-grid">
+            <div class="time-tier-card ${isSb2 ? 'active-tier' : ''}">
+              <div class="time-tier-head">
+                <span class="time-tier-name">① Week (주 번호)</span>
+                <span class="time-tier-loc">SB2 · 13 bits (0~12)</span>
+              </div>
+              <div class="time-tier-metaphor">📅 큰 달력 (몇 번째 주인가?)</div>
+              <div class="time-tier-desc">GNSS 기준 시작일로부터 몇 주가 지났는지 나타내는 가장 큰 시간 단위입니다. (<code>p.week()</code>, 0~8191)</div>
+              <div class="time-tier-cycle">1주일(604,800초)마다 +1 증가</div>
+            </div>
+            <div class="time-tier-card ${isSb2 ? 'active-tier' : ''}">
+              <div class="time-tier-head">
+                <span class="time-tier-name">② ITOW (Interval TOW)</span>
+                <span class="time-tier-loc">SB2 · 9 bits (13~21)</span>
+              </div>
+              <div class="time-tier-metaphor">🕒 큰 시간대 (몇 번째 20분 구간인가?)</div>
+              <div class="time-tier-desc">그 주(1주일)를 20분(1,200초) 단위로 쪼갠 구간 번호입니다. (<code>(int)(TOW / 1200)</code>, 0~503)</div>
+              <div class="time-tier-cycle">20분(1,200초)마다 +1 증가</div>
+            </div>
+            <div class="time-tier-card ${isSb1 ? 'active-tier' : ''}">
+              <div class="time-tier-head">
+                <span class="time-tier-name">③ TOI (Time of Interval)</span>
+                <span class="time-tier-loc">SB1 · 7 bits (0~99)</span>
+              </div>
+              <div class="time-tier-metaphor">⏱️ 프레임 순번 (몇 번째 12초 프레임인가?)</div>
+              <div class="time-tier-desc">20분 구간을 다시 12초 단위로 나눈 프레임 순번(<code>0~99</code>)입니다. FID(2b)와 합쳐 9비트를 MSB 1b + BCH(51,8) 51b로 부호화합니다.</div>
+              <div class="time-tier-cycle">99가 되면 다음 20분 주기가 시작되며 0으로 돌아감</div>
+            </div>
+          </div>
+          <div class="toi-formula-bar">
+            <div class="toi-formula-eq">LNIS 파일 TOI 계산식 : (int)((TOW % 1200) / 12)</div>
+            <div class="toi-formula-parts">
+              <span class="toi-part-pill"><code>TOW</code> 주 시작(일요일 0시) 기준 경과 시간(초)</span>
+              <span class="toi-part-pill"><code>1200</code> 20분 주기(1,200초)</span>
+              <span class="toi-part-pill"><code>12</code> 1프레임 길이(12초)</span>
+            </div>
+          </div>
+          <div class="time-why-grid">
+            <div class="time-why-card">
+              <strong>🎯 왜 이 시각 정보가 필요한가?</strong>
+              <p>프레임이 어느 주(<code>Week</code>)·어느 20분 구간(<code>ITOW</code>)·어느 12초 슬롯(<code>TOI</code>)에 속하는지 식별합니다. 단, 12초 단위는 소수 초를 담지 못하므로 실제 의사거리·PVT 계산에는 <strong>SB4의 정밀 관측 시각·가상 송신 시각</strong>(I/Q는 RF 추적 시각)을 사용합니다.</p>
+            </div>
+            <div class="time-why-card">
+              <strong>🧩 왜 SB1과 SB2로 나누어 담았는가?</strong>
+              <p>20분 동안 변하지 않는 <code>Week(13b)·ITOW(9b)</code>는 항법 서브블록인 <strong>SB2(비트 0~21)</strong>에 두고, 12초마다 바뀌는 <code>TOI(7b)</code>만 인터리빙을 거치지 않는 <strong>초소형 SB1(52심볼)</strong>에 실어 빠르게 프레임 순번을 식별합니다.</p>
+            </div>
+            <div class="time-why-card">
+              <strong>🛰️ 공식 AFS 규격 vs LNIS 경로별 동작</strong>
+              <p>공식 규격(LSIS-720)과 <strong>I/Q 생성기</strong>(<code>afs_sim.c</code>)의 SB1은 <em>다음 프레임 선두</em>(<code>toi + 1</code>)를 담고 매 12초마다 갱신하며, <strong>AFS 파일 시험</strong>(<code>DelayTransferCodec</code>)은 관측 Epoch의 12초 구간 번호 <code>(int)((TOW % 1200) / 12)</code>를 담습니다.</p>
+            </div>
+          </div>
+        </div>
+      `;
     }
 
     const subframeSpecs = {
@@ -1273,7 +1395,7 @@
           ["TOI", "7 bits", "0~99", "RAWX / SFRBX", "12초 구간 식별값. 공식 다음 프레임 시각과 파일의 Epoch 식별 방식은 아래 설명 참조"],
           ["부호화 결과", "52 symbols", "MSB 1 + BCH 51", "-", "공식 BCH 생성다항식 763₈. 파일 수신 경로는 예상 부호열 대조, I/Q 경로는 신호 복호"]
         ],
-        "extraHtml": renderTimeGuide()
+        "extraHtml": renderTimeGuide(1)
       }),
       2: () => ({
         "title": "SB2 · GPS 항법정보",
@@ -1291,20 +1413,22 @@
             "cls": "badge-std"
           }
         ],
-        "note": "전반부 284비트의 기존 배치를 유지하고 517비트의 LNIS 보충 영역을 추가합니다. GPS LNAV의 복원용 배치이며 NASA MSG-G4의 공식 비트 배치나 달 궤도력 구현을 뜻하지 않습니다.",
+        "note": "전반부 284비트의 케플러 기본 궤도·시계 배치를 유지하고, 517비트(헤더 58b + LNAV 잔여 459b)의 LNIS 보충 영역을 추가합니다. 패리티 제외 GPS LNAV SF1~3 원본 720비트 중 전반부에 배치된 261비트를 뺀 나머지 459비트(섭동 보정·변화율·보조 시계 등)를 순서대로 수록해 수신부에서 원본 LNAV 720비트를 무손실 복원합니다. NASA MSG-G4의 공식 비트 배치나 달 궤도력 구현을 뜻하지 않습니다.",
         "fields": [
-          ["Week / ITOW", "22 bits (0~21)", "13b + 9b", "RAWX / SFRBX", "GPS Week와 20분 구간 번호"],
-          ["t_oe", "16 bits (22~37)", "2⁴ s", "SF2", "GPS 궤도력 기준 시각"],
-          ["e", "32 bits (38~69)", "0 고정 1b + 31b, 2⁻³³", "SF2", "이심률. 나머지 원본 비트는 보충 영역에서 복원"],
-          ["√A", "32 bits (70~101)", "2⁻¹⁹ m¹/²", "SF2", "GPS 장반경 제곱근"],
-          ["i₀ / Ω₀ / ω / M₀", "각 32 bits (102~229)", "2⁻³¹ semi-circles", "SF2 / SF3", "GPS 궤도 요소"],
-          ["t_oc / a_f0 / a_f1", "54 bits (230~283)", "16b / 22b / 16b", "SF1", "GPS 시계 기준 시각·편차·표류"],
-          ["보충 헤더·유효 플래그", "58 bits (284~341)", "Type 63 / Version 1", "-", "블록·Epoch·PRN 및 항법정보 존재 여부"],
-          ["LNAV 보충 필드", "459 bits (342~800)", "GPS LNAV 비트", "SF1~3", "조화 보정항·변화율·시계·상태 등 전반부에 없는 원본 필드"],
-          ["미사용 영역", "375 bits (801~1175)", "1010…", "-", "현재 SB2 패딩. 공식 spare bit 규칙의 시작값 0과 다름"],
-          ["CRC·LDPC", "CRC 24b → 2,400심볼", "AFS SF2", "-", "정보 1,176비트에 CRC를 붙이고 부호화·천공"]
+          ["Week / ITOW", "22 bits (0~21)", "13b + 9b", "RAWX / SFRBX", "GPS Week(13b)와 20분(1,200초) 구간 번호 ITOW(9b)"],
+          ["t_oe", "16 bits (22~37)", "2⁴ s", "SF2", "GPS 궤도력 기준 시각 (SF2 비트 216~231)"],
+          ["e", "32 bits (38~69)", "0 고정 1b + 31b, 2⁻³³", "SF2", "이심률 상위 31비트 (SF2 비트 136~166). 최하위 1비트(SF2 비트 167)는 보충 영역 비트 632에서 복원"],
+          ["√A", "32 bits (70~101)", "2⁻¹⁹ m¹/²", "SF2", "GPS 장반경 제곱근 (SF2 비트 184~215)"],
+          ["i₀ / Ω₀ / ω / M₀", "각 32 bits (102~229)", "2⁻³¹ semi-circles", "SF2 / SF3", "케플러 기본 궤도 요소 4종 (i₀: 102~133, Ω₀: 134~165, ω: 166~197, M₀: 198~229)"],
+          ["t_oc / a_f0 / a_f1", "54 bits (230~283)", "16b / 22b / 16b", "SF1", "위성 시계 기준 시각(230~245)·편차(246~267, 2⁻³¹ s)·1차 표류율(268~283, 2⁻⁴³ s/s)"],
+          ["보충 헤더·유효 플래그", "58 bits (284~341)", "Type 63 / Version 1", "-", "Type 63(6b)·Ver 1(8b)·Block 2(3b)·Epoch(32b)·PRN(8b)·항법 존재 플래그(1b)"],
+          ["SF1 보충 (시계·상태)", "186 bits (342~527)", "8b / 8b / 10b / 6b", "SF1", "군지연 T_GD(8b, 502~509, 2⁻³¹ s)·2차 시계 표류 a_f2(8b, 518~525, 2⁻⁵⁵ s/s²)·IODC(10b)·SV Health(6b, 406~411)·URA 및 TLM/HOW"],
+          ["SF2 섭동 보충 (궤도 ①)", "129 bits (528~656)", "16b × 4 + 1b + 8b", "SF2", "조화 섭동 C_rs(16b, 584~599, 2⁻⁵ m)·C_uc(16b, 616~631, 2⁻²⁹ rad)·C_us(16b, 633~648, 2⁻²⁹ rad), 평균운동 보정 Δn(16b, 600~615, 2⁻⁴³ semi-circles/s), e 최하위 1b(632), IODE(8b, 576~583)"],
+          ["SF3 섭동 보충 (궤도 ②)", "144 bits (657~800)", "16b × 3 + 24b + 14b", "SF3", "조화 섭동 C_ic(16b, 705~720, 2⁻²⁹ rad)·C_is(16b, 721~736, 2⁻²⁹ rad)·C_rc(16b, 737~752, 2⁻⁵ m), 승교점 세차율 Ω̇(24b, 753~776, 2⁻⁴³ semi-circles/s), 경사각 변화율 IDOT(14b, 785~798, 2⁻⁴³ semi-circles/s), IODE(8b, 777~784)"],
+          ["미사용 영역", "375 bits (801~1175)", "1010…", "-", "현재 SB2 패딩 (i % 2)"],
+          ["CRC·LDPC", "CRC 24b → 2,400심볼", "AFS SF2", "-", "정보 1,176비트에 CRC-24를 붙이고 LDPC 부호화·천공"]
         ],
-        "extraHtml": renderTimeGuide()
+        "extraHtml": renderTimeGuide(2)
       }),
       3: () => ({
         "title": "SB3 · 미사용 정보 영역",

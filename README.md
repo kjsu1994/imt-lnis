@@ -245,7 +245,7 @@ docker compose ps
    - Open the Settings Drawer (`⚙️`), verify the counterpart LNIS peer address, adapter URL, trial payload type (`GNSS RAW`, `AFS Frame`, or `I/Q Sample`), and routing engine (`DTN → HDTN`, `DTN → DTN`, `HDTN → DTN`, or `HDTN → HDTN`).
    - Engine parameters (e.g., ION SDR Heap Size, HDTN Pipeline Bundle Capacity, Custody/Deletion Policy) are persisted in browser storage and transmitted in the adapter JSON body.
 2. **GNSS Data Ingestion**:
-   - **Live Capture**: Connect a u-blox ZED-F9T receiver via COM port (`38400` baud default) and click **1-Epoch Capture** (up to 120s timeout to collect `RXM-RAWX` + `RXM-SFRBX` subframes).
+   - **Live Capture**: Connect the receiver via COM (`38400` baud default), enter the valid Epoch count (default 10; 1–50), and click **GNSS 수집**. Only distinct Epochs with valid position and velocity count. Capture stops at the target, within 120 s and 1 MiB per GRAW/UBX file. Select one captured Epoch for the existing trial. **UBX 다운로드** optionally saves the selected original messages; downloading is not required to start a trial.
    - **File Upload**: Upload a `.ubx` file (up to 64 MiB / 1,000 epochs) or `.graw` file (up to 1 MiB) and select the target observation epoch.
    - Inspect the computed **Reference PVT** (ECEF position, velocity, receiver clock bias, and per-satellite LNAV SF1–3 readiness).
    - Saved I/Q files retain their stored modification order after restart. The list shows up to 50 entries with the active generation first; older files remain on disk.

@@ -653,7 +653,8 @@ public class DataManagementService {
             try {
                 if (key.kind() == Kind.INPUT) {
                     Path root = storage.getDataDirectory().resolve("files/inputs");
-                    bytes += size(root.resolve(key.id() + ".graw")) + size(root.resolve(key.id() + ".part"));
+                    bytes += size(root.resolve(key.id() + ".graw")) + size(root.resolve(key.id() + ".part"))
+                            + size(root.resolve(key.id() + ".ubx")) + size(root.resolve(key.id() + ".ubx.part"));
                 } else if (key.kind() == Kind.IQ) {
                     for (Path path : iqPaths(key.id())) bytes += size(path);
                 }

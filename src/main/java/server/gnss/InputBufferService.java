@@ -19,6 +19,8 @@ import java.util.UUID;
  */
 public class InputBufferService {
     public static final int CHUNK_SIZE = 1024 * 1024;
+    private final java.util.Map<UUID, java.util.Map<String, Object>> captureProgress =
+            new java.util.concurrent.ConcurrentHashMap<>();
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private server.management.DataManagementGuard managementGuard;
@@ -155,8 +157,10 @@ public class InputBufferService {
             complete.capturedPvtJson =
                     current.capturedPvtJson() != null ? current.capturedPvtJson() : capturedPvtJson;
             complete.captureDecision = current.captureDecision();
+            complete.receiverInfoJson = current.receiverInfoJson();
             inputBufferRepository.save(complete);
             inputBufferRepository.completeFile(id);
+            captureProgress.remove(id);
             if (recording) {
                 logs.add(
                         id,
@@ -186,9 +190,62 @@ public class InputBufferService {
     }
 
     public InputBufferEntity get(UUID id) {
-        return inputBufferRepository
-                .find(id)
+        var input = inputBufferRepository.find(id)
                 .orElseThrow(() -> new IllegalArgumentException("Input not found: " + id));
+        var ubx = inputBufferRepository.ubx(id);
+        input.ubxAvailable = input.complete() && input.kind() == InputKind.GNSS_CAPTURE
+                && ubx != null && java.nio.file.Files.isRegularFile(ubx);
+        input.captureProgress = captureProgress.getOrDefault(id, java.util.Map.of());
+        return input;
+    }
+
+    public void captureProgress(UUID id, String stage, String message, java.util.Map<String, Object> counters) {
+        var input = inputBufferRepository.find(id).orElse(null);
+        if (input == null || input.kind() != InputKind.GNSS_CAPTURE || input.complete()) return;
+        captureProgress.compute(id, (key, previous) -> {
+            var merged = new java.util.LinkedHashMap<String, Object>();
+            if (previous != null && previous.get("counters") instanceof java.util.Map<?, ?> old) {
+                old.forEach((k, v) -> merged.put(k.toString(), v));
+            }
+            if (counters != null) merged.putAll(counters);
+            return java.util.Map.of("stage", stage, "message", message, "counters", merged);
+        });
+    }
+
+    /** GRAW와 UBX가 같은 선택 관측·항법정보인지 검증한 뒤 원문을 확정한다. */
+    @Transactional
+    public synchronized void captureUbx(UUID id, byte[] ubx) {
+        var input = get(id);
+        if (input.kind() != InputKind.GNSS_CAPTURE || input.complete()
+                || ubx.length == 0 || ubx.length > server.common.DtnModels.MAX_INPUT_BYTES) {
+            throw new IllegalArgumentException("UBX를 저장할 수 없는 수집 입력입니다.");
+        }
+        var original = GrawCodec.splitLengthPrefixed(readChunks(input, server.common.DtnModels.MAX_INPUT_BYTES))
+                .stream().map(GrawCodec::decode).map(GrawCodec.Envelope::message)
+                .filter(m -> !(m instanceof GrawCodec.ReceiverMetadata)).toList();
+        var restored = GrawCodec.splitLengthPrefixed(UbxGrawImport.convertAll(ubx, Instant.EPOCH, "COM"))
+                .stream().map(GrawCodec::decode).map(GrawCodec.Envelope::message)
+                .filter(m -> !(m instanceof GrawCodec.ReceiverMetadata)).toList();
+        if (!original.equals(restored)) {
+            throw new IllegalArgumentException("UBX와 수집 입력의 관측·항법정보가 다릅니다.");
+        }
+        inputBufferRepository.saveUbx(id, ubx);
+        try {
+            input.receiverInfoJson = new com.fasterxml.jackson.databind.ObjectMapper()
+                    .writeValueAsString(UbxGrawImport.receiverInfo(ubx));
+            inputBufferRepository.save(input);
+        } catch (java.io.IOException error) {
+            throw new IllegalStateException("수집 수신기 정보 저장 실패", error);
+        }
+    }
+
+    public java.nio.file.Path ubx(UUID id) {
+        var input = get(id);
+        if (input.kind() != InputKind.GNSS_CAPTURE || !input.ubxAvailable()) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.NOT_FOUND, "완료된 수집 UBX 파일이 없습니다.");
+        }
+        return inputBufferRepository.ubx(id);
     }
 
     public java.util.List<InputBufferEntity> pendingCaptures() {
@@ -286,6 +343,7 @@ public class InputBufferService {
         InputBufferEntity input = get(id);
         // 기준 버전과 동일하게 사용자의 명시적 삭제는 허용한다. 자동 보존 정리만 세션 참조를 보호한다.
         inputBufferRepository.delete(id);
+        captureProgress.remove(id);
     }
 
     /** 보존 정리 작업에서 참조 검사를 통과한 입력을 제거한다. */
@@ -294,6 +352,7 @@ public class InputBufferService {
         if (!"AWAITING_DECISION".equals(input.captureDecision())
                 && !dtnRepository.existsByInputId(input.inputId())) {
             inputBufferRepository.delete(input.inputId());
+            captureProgress.remove(input.inputId());
         }
     }
 }

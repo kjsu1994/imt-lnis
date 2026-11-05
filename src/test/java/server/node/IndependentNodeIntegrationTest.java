@@ -720,7 +720,9 @@ class IndependentNodeIntegrationTest {
                         .POST(HttpRequest.BodyPublishers.ofByteArray(bodies.get(index))).build();
                 assertEquals(202, http.send(request, HttpResponse.BodyHandlers.ofString()).statusCode());
             }
-            await(() -> ids.stream().allMatch(id -> "COMPLETED".equals(tx.get(id).getState())), 65);
+            // 수신 계산 종료와 비교자료 조회 완료는 별도 단계다.
+            await(() -> ids.stream().allMatch(id -> "COMPLETED".equals(tx.get(id).getState())
+                    && rx.get(id).getComparisonJson() != null), 65);
             for (int i = 0; i < ids.size(); i++) {
                 assertEquals("COMPLETED", rx.get(ids.get(i)).getState());
                 assertArrayEquals(bodies.get(i), rx.payload(ids.get(i), "received").getBody());

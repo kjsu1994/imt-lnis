@@ -66,7 +66,8 @@ class AgentMessageServiceTest {
                                         "SingleEpochComplete",
                                         "",
                                         Map.of("pvt", java.util.List.of(pvt)))));
-        verifyNoInteractions(inputs);
+        verify(inputs, never()).complete(any());
+        verify(inputs, never()).complete(any(), anyString());
     }
 
     @Test
@@ -79,4 +80,14 @@ class AgentMessageServiceTest {
         service.input(id, bytes);
         verify(inputs).append(id, 2, bytes);
     }
+    @Test
+    void multipleEpochCompletionUsesTheExistingFileInputPvtPath() {
+        UUID id = UUID.randomUUID();
+        service.status("sender", AgentRole.SENDER, id,
+                new Progress(EventType.GNSS_STATUS, 100, "CaptureComplete", "완료",
+                        Map.of("validEpochs", 10, "targetEpochs", 10)));
+        verify(inputs).complete(id);
+        verify(inputs, never()).complete(any(), anyString());
+    }
+
 }

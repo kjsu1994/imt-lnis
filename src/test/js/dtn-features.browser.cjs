@@ -808,6 +808,97 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
  }
  await typed.screenshot({path:'build/trial-type-receiver.png',fullPage:true});
  await typed.close();
+ // COM capture: progress works without WebSocket, download is optional, and trials remain manual.
+ const capturedPage=await context.newPage();
+ capturedPage.on('pageerror',e=>errors.push(e.message));
+ let captureRequests=[], captureFinished=false, captureFailed=false, downloads=0, targetEpochs=10;
+ const capturePvt=()=>Array.from({length:targetEpochs},(_,i)=>({week:2438,towSeconds:1000+i,
+   positionValid:true,velocityValid:true,ecefMeters:[1,2,3],velocityMetersPerSecond:[4,5,6],
+   receiverClockBiasSeconds:0,satellitesUsed:6,message:'PVT 계산 완료'}));
+ const captureObservations=()=>({navigation:[],navigationCount:0,records:[],
+   epochs:capturePvt().map((p,i)=>({recordIndex:i,observation:{week:p.week,receiverTowSeconds:p.towSeconds,
+     leapSeconds:18,receiverStatus:1,rawxVersion:1,observations:[{pseudorangeMeters:21000000+i,
+       carrierPhaseCycles:42,dopplerHz:-100,constellationId:0,satelliteId:3,signalId:0,frequencyId:0,
+       lockTimeMillis:64500,carrierToNoiseDbHz:40,pseudorangeStdDev:1,carrierPhaseStdDev:1,
+       dopplerStdDev:1,trackingStatus:3}]}}))});
+ await capturedPage.route('**/lnis/api/v1/node/gnss',r=>r.fulfill({json:{
+   state:'CONNECTED',portName:'COM4',baudRate:38400,timeState:'VALID',capturing:false}}));
+ await capturedPage.route('**/lnis/api/v1/node/gnss/ports',r=>r.fulfill({json:[{name:'COM4',description:'GNSS'}]}));
+ await capturedPage.route('**/lnis/api/v1/captures',async r=>{
+   const body=r.request().postDataJSON();captureRequests.push(body);
+   targetEpochs=body.epochCount;captureFinished=false;
+   await r.fulfill({json:{inputId:'captured-input',complete:false}});
+ });
+ await capturedPage.route('**/lnis/api/v1/inputs/captured-input',r=>r.fulfill({json:{
+   inputId:'captured-input',kind:'GNSS_CAPTURE',complete:captureFinished,ubxAvailable:captureFinished,
+   captureProgress:{stage:captureFailed?'CaptureFailed':'EpochCollected',
+     message:captureFailed?'수집 연결 끊김':'유효 Epoch '+Math.min(3,targetEpochs)+' / '+targetEpochs,
+     counters:{validEpochs:Math.min(3,targetEpochs),targetEpochs,rawxEpochs:12,navigationMessages:20}}}}));
+ await capturedPage.route('**/lnis/api/v1/dtn/inputs/captured-input/**',r=>{
+   const part=new URL(r.request().url()).pathname.split('/').pop();
+   const data=part==='observations'?captureObservations():part==='pvt'?capturePvt():
+     capturePvt().map((p,i)=>({epoch:{recordIndex:i,week:p.week,towSeconds:p.towSeconds},reference:p,afsReady:true}));
+   return r.fulfill({json:data});
+ });
+ await capturedPage.route('**/lnis/api/v1/captures/captured-input/ubx',r=>r.fulfill({
+   contentType:'application/octet-stream',headers:{'Content-Disposition':'attachment; filename="capture.ubx"'},
+   body:Buffer.from([0xb5,0x62,2,0x15])}));
+ capturedPage.on('download',()=>downloads++);
+ await capturedPage.setViewportSize({width:1366,height:900});
+ await capturedPage.goto(base+'/sender');
+ await capturedPage.locator('#dtn-settings-open').click();
+ await capturedPage.locator('.input-mode[data-input-mode="capture"]').click();
+ await capturedPage.locator('#dtn-settings-close').click();
+ assert.equal(await capturedPage.locator('#capture-epoch-target').inputValue(),'10');
+ await capturedPage.waitForFunction(()=>!document.getElementById('dtn-start').disabled);
+ for(const bad of ['0','1.5','51']){
+   await capturedPage.locator('#capture-epoch-target').fill(bad);
+   await capturedPage.locator('#dtn-start').click();
+   assert.equal(captureRequests.length,0);
+ }
+ await capturedPage.locator('#capture-epoch-target').fill('10');
+ await capturedPage.locator('#dtn-start').click();
+ await capturedPage.waitForFunction(()=>document.getElementById('capture-epoch-count').textContent==='유효 Epoch 3 / 10');
+ await capturedPage.waitForFunction(()=>document.getElementById('capture-elapsed').textContent!=='0초');
+ assert.equal(captureRequests[0].epochCount,10);
+ assert.equal(await capturedPage.locator('#dtn-message').innerText(),'GNSS 수집 중');
+ assert.equal(await capturedPage.locator('#capture-epoch-target').isDisabled(),true);
+ assert.match(await capturedPage.locator('#dtn-capture-status').innerText(),/수신 RAWX 12/);
+ assert.equal(await capturedPage.locator('#capture-ubx-download').isVisible(),false);
+ for(const width of [1366,390]){
+   await capturedPage.setViewportSize({width,height:900});
+   assert.ok(await capturedPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'capture progress fits '+width);
+   await capturedPage.locator('.sender-actions').screenshot({path:'build/capture-progress-'+width+'.png'});
+ }
+ captureFinished=true;
+ await capturedPage.waitForFunction(()=>document.getElementById('dtn-input-state').textContent==='수집 완료 · 유효 Epoch 10개');
+ assert.equal(await capturedPage.locator('#capture-ubx-download').isVisible(),true);
+ assert.equal(downloads,0,'capture must not force a download');
+ const downloadPromise=capturedPage.waitForEvent('download');
+ await capturedPage.locator('#capture-ubx-download').click();
+ await downloadPromise;assert.equal(downloads,1);
+ assert.equal(captureObservations().epochs.length,10);
+ const epochSelect=capturedPage.locator('#dtn-observations select[data-epoch]');
+ assert.equal(await epochSelect.locator('option').count(),10);
+ await epochSelect.selectOption('2');
+ assert.match(await capturedPage.locator('#dtn-gnss-time').innerText(),/1002/);
+ await capturedPage.setViewportSize({width:1366,height:900});
+ for(const count of [1,3,50]){
+   await capturedPage.locator('#capture-epoch-target').fill(String(count));
+   await capturedPage.locator('#dtn-start').click();
+   await capturedPage.waitForFunction(n=>document.getElementById('capture-epoch-count').textContent==='유효 Epoch '+Math.min(3,n)+' / '+n,count);
+   captureFinished=true;
+   await capturedPage.waitForFunction(n=>document.getElementById('dtn-input-state').textContent==='수집 완료 · 유효 Epoch '+n+'개',count);
+ }
+ captureFailed=true;
+ await capturedPage.locator('#dtn-start').click();
+ await capturedPage.waitForFunction(()=>document.getElementById('dtn-input-state').textContent==='수집 미완료');
+ assert.match(await capturedPage.locator('#capture-stage').innerText(),/수집 연결 끊김/);
+ assert.equal(await capturedPage.locator('#capture-ubx-download').isVisible(),false);
+ const stoppedClock=await capturedPage.locator('#capture-elapsed').innerText();
+ await capturedPage.waitForTimeout(1100);
+ assert.equal(await capturedPage.locator('#capture-elapsed').innerText(),stoppedClock);
+ await capturedPage.close();
  // Retention settings use mocked APIs; no production settings or records are changed.
  const management = await context.newPage();
  management.on('pageerror', error => errors.push(error.message));

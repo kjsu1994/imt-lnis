@@ -97,7 +97,7 @@ const context = {
   location: {protocol: 'http:', host: '127.0.0.1:18090'}, WebSocket: class {},
   window: {scrollY: 250, scrollTo({top}) { this.scrollY = top; }, addEventListener() {}},
   requestAnimationFrame: fn => fn(),
-  URL, AbortSignal, setInterval(callback, delay) { intervals.push({callback, delay}); }, setTimeout() {},
+  URL, AbortSignal, setInterval(callback, delay) { intervals.push({callback, delay}); }, clearInterval() {}, setTimeout() {},
   fetch: async (url, options) => {
     if (url.includes('/adapter-health?')) {
       healthCalls++; healthUrl = url;
@@ -121,7 +121,7 @@ const context = {
       body = {inputId: 'input1'};
     }
     else if (url.endsWith('/complete')) body = {recordCount: 2};
-    else if (url.endsWith('/captures')) { assert.equal(JSON.parse(options.body).singleEpoch, true); body = {inputId: 'capture1'}; }
+    else if (url.endsWith('/captures')) { assert.equal(JSON.parse(options.body).singleEpoch, true); assert.equal(JSON.parse(options.body).epochCount, 1); body = {inputId: 'capture1'}; }
     else if (url.endsWith('/inputs/capture1')) body = {complete: true};
     else if (url.includes('/pvt')) body = [{positionValid: true, velocityValid: true, ecefMeters: [1, 2, 3], velocityMetersPerSecond: [0, 0, 0]}];
     else if (url.endsWith('/observations')) body = observations;
@@ -239,6 +239,7 @@ assert.equal(elements.get('dtn-start').disabled, true, 'selecting a port does no
 gnssStatus = {state: 'CONNECTED', timeState: 'ACQUIRING', portName: '/dev/ttyACM0', baudRate: 38400};
 await vm.runInContext('gnss.poll()', context);
 assert.equal(elements.get('dtn-start').disabled, false);
+elements.get('capture-epoch-target').value = '1';
 const capturing = elements.get('dtn-start').onclick();
 assert.equal(elements.get('dtn-settings-lock').hidden, false);
 assert.equal(elements.get('dtn-port').disabled, true);
@@ -554,7 +555,7 @@ context.showPorts([{name:'COM4', description:'FT232R USB UART'}]);
 assert.equal(elements.get('dtn-port').value, '', 'unplugged port is no longer selected');
 context.showPorts([]);
 assert.match(elements.get('dtn-port-status').textContent, /0개 포트/);
-assert.match(html, />1 Epoch 수집<\/button>/);
+assert.match(html, />GNSS 수집<\/button>/);
 console.log('PASS: live serial-port refresh, selection preservation and unplug removal');
 
 for (const [state, verdict, label, tone] of [

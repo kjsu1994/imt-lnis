@@ -131,24 +131,18 @@ public final class AgentRuntime implements AutoCloseable {
         }
         var settings = json.convertValue(args, SerialCaptureService.Settings.class);
         var capturedPvt = new AtomicReference<List<server.common.DtnModels.Pvt>>();
-        var selection =
-                settings.singleEpoch()
-                        ? new server.gnss.SingleEpochCapture(
-                                records -> {
-                                    try (var pvt =
-                                            new server.pvt.NativePvtCodec(
-                                                    config.nativeDirectory())) {
-                                        var results = pvt.calculate(records);
-                                        var result = results.getFirst();
-                                        capturedPvt.set(results);
-                                        if (!result.isPositionValid()
-                                                || !result.isVelocityValid()) {
-                                            return false;
-                                        }
-                                        return true;
-                                    }
-                                })
-                        : null;
+        java.util.function.Predicate<List<byte[]>> solvable = records -> {
+            try (var pvt = new server.pvt.NativePvtCodec(config.nativeDirectory())) {
+                var results = pvt.calculate(records);
+                var result = results.getLast();
+                capturedPvt.set(results);
+                return result.isPositionValid() && result.isVelocityValid();
+            }
+        };
+        int targetCount = settings.epochCount() == null ? 1 : settings.epochCount();
+        var selection = !settings.singleEpoch() ? null : settings.epochCount() == null
+                ? new server.gnss.SingleEpochCapture(solvable)
+                : new server.gnss.SingleEpochCapture(targetCount, solvable);
         AgentState previous = state.get();
         if ((previous != AgentState.READY && previous != AgentState.ERROR)
                 || !state.compareAndSet(previous, AgentState.BUSY)) {
@@ -170,16 +164,22 @@ public final class AgentRuntime implements AutoCloseable {
                     },
                     selection,
                     () -> {
+                        if (selection != null && !selection.awaitingDecision() && selection.ubx().length > 0) {
+                            messages.captureUbx(sessionId, selection.ubx());
+                        }
                         state.set(AgentState.READY);
                         status(
                                 sessionId,
                                 EventType.GNSS_STATUS,
                                 100,
-                                selection.awaitingDecision() ? "CaptureDecisionRequired" : "SingleEpochComplete",
+                                selection.awaitingDecision() ? "CaptureDecisionRequired"
+                                        : targetCount == 1 ? "SingleEpochComplete" : "CaptureComplete",
                                 selection.awaitingDecision()
                                         ? "120초 종료 · 관측 데이터 확보 · PVT 조건 미충족 · 사용 여부 선택 대기"
-                                        : "한 시점 수집·지구 PVT 검증 완료",
-                                Map.of("pvt", capturedPvt.get()));
+                                        : "수집 완료 · 유효 Epoch " + selection.count() + "개",
+                                targetCount == 1
+                                        ? Map.of("pvt", capturedPvt.get())
+                                        : Map.of("validEpochs", selection.count(), "targetEpochs", targetCount));
                     },
                     progress -> status(sessionId, EventType.GNSS_STATUS, 0,
                             progress.stage(), progress.message(), progress.counters()),

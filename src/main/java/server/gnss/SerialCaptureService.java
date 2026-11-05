@@ -53,6 +53,15 @@ public final class SerialCaptureService implements AutoCloseable {
         boolean rtsEnabled;
 
         boolean singleEpoch;
+
+        Integer epochCount;
+
+        public Settings(String portName, int baudRate, String protocolId, String sessionName,
+                String receiverModel, String firmwareVersion, boolean dtrEnabled,
+                boolean rtsEnabled, boolean singleEpoch) {
+            this(portName, baudRate, protocolId, sessionName, receiverModel, firmwareVersion,
+                    dtrEnabled, rtsEnabled, singleEpoch, null);
+        }
     }
 
     /** 메모리 상한을 위해 수집 데이터를 약 1 MiB 단위로 서버에 전달하는 청크다. */
@@ -86,6 +95,7 @@ public final class SerialCaptureService implements AutoCloseable {
     private volatile Thread worker;
     private UbloxCaptureConfiguration configuration;
     private String detectedModel = "", detectedFirmware = "";
+    private UbloxParser.UbxFrame receiverFrame;
     private Consumer<byte[]> rawObserver = bytes -> {};
     private final GnssConnection connection;
 
@@ -133,7 +143,7 @@ public final class SerialCaptureService implements AutoCloseable {
             Consumer<CaptureProgress> progress, Consumer<byte[]> rawObserver) {
         if (settings.singleEpoch
                 && (selection == null || !"ubx".equalsIgnoreCase(settings.protocolId))) {
-            throw new IllegalArgumentException("한 시점 수집은 UBX만 지원합니다.");
+            throw new IllegalArgumentException("자동 Epoch 수집은 UBX만 지원합니다.");
         }
         if (!running.compareAndSet(false, true)) {
             throw new IllegalStateException("Capture is already running");
@@ -148,9 +158,11 @@ public final class SerialCaptureService implements AutoCloseable {
                 progress.accept(new CaptureProgress("Configuring", "현재 포트의 RAWX/SFRBX 출력 설정 확인 중", Map.of()));
                 detectedModel = "";
                 detectedFirmware = "";
+                receiverFrame = null;
                 for (var reply : exchange(UbloxParser.command(0x0a, 0x04, new byte[0]))) {
                     if (reply.messageClass() != 0x0a || reply.messageId() != 0x04
                             || reply.payload().length < 40) continue;
+                    receiverFrame = reply;
                     byte[] payload = reply.payload();
                     detectedFirmware = ascii(payload, 0, 30);
                     for (int offset = 40; offset + 30 <= payload.length; offset += 30) {
@@ -212,6 +224,7 @@ public final class SerialCaptureService implements AutoCloseable {
                                                 settings.baudRate,
                                                 settings.sessionName)));
                 if (selection != null) {
+                    selection.archive(receiverFrame);
                     selection.accept(metadata);
                 } else {
                     writeRecord(canonicalChunk, metadata);
@@ -219,8 +232,10 @@ public final class SerialCaptureService implements AutoCloseable {
                 records++;
             }
             if (connection != null && selection != null) {
-                for (byte[] record : connection.seed(testId, sequence)) {
-                    selection.accept(record);
+                var seeds = connection.seed(testId, sequence);
+                var sources = connection.seedUbx();
+                for (int i = 0; i < seeds.size(); i++) {
+                    selection.accept(seeds.get(i), sources.get(i));
                     sequence++;
                     records++;
                 }
@@ -239,7 +254,8 @@ public final class SerialCaptureService implements AutoCloseable {
                         break;
                     }
                     throw new IllegalStateException(
-                            "120초 안에 유효한 1에폭을 얻지 못했습니다: " + diagnostics.snapshot(System.nanoTime()).message());
+                            "120초 수집 종료 · 유효 Epoch " + selection.count() + " / "
+                                    + selection.targetCount() + " · " + diagnostics.snapshot(System.nanoTime()).message());
                 }
                 int count = port.readBytes(buffer, buffer.length);
                 if (count < 0) {
@@ -273,7 +289,14 @@ public final class SerialCaptureService implements AutoCloseable {
                                                     Instant.now(),
                                                     message));
                             if (selection != null) {
-                                var chosen = selection.accept(record);
+                                int before = selection.count();
+                                var chosen = selection.accept(record, frame);
+                                if (selection.count() != before) {
+                                    progress.accept(new CaptureProgress("EpochCollected",
+                                            "유효 Epoch " + selection.count() + " / " + selection.targetCount(),
+                                            Map.of("validEpochs", selection.count(),
+                                                    "targetEpochs", selection.targetCount())));
+                                }
                                 if (chosen != null) {
                                     for (byte[] item : chosen) {
                                         writeRecord(canonicalChunk, item);
@@ -304,7 +327,8 @@ public final class SerialCaptureService implements AutoCloseable {
                 }
             }
             if (selection != null && !selected) {
-                throw new IllegalStateException("한 시점 수집이 중단되었습니다.");
+                throw new IllegalStateException("GNSS 수집이 중단되었습니다. 유효 Epoch "
+                        + selection.count() + " / " + selection.targetCount());
             }
             if (rawChunk.size() > 0 || canonicalChunk.size() > 0) {
                 chunks.accept(

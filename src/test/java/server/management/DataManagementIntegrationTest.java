@@ -685,4 +685,43 @@ class DataManagementIntegrationTest {
         assertTrue(Files.exists(directory.resolve("files/inputs/" + input.inputId() + ".part")));
     }
 
+    @Test
+    void capturedUbxDownloadsOnlyAfterCompletionAndIsRemovedWithItsInput() throws Exception {
+        byte[] ubx = Files.readAllBytes(Path.of("test2.ubx"));
+        byte[] graw = UbxGrawImport.convertAll(ubx, Instant.EPOCH, "capture.ubx");
+        var input = inputs.create("capture.graw", graw.length, InputKind.GNSS_CAPTURE);
+        UUID id = input.inputId();
+        try {
+            inputs.append(id, 0, graw);
+            inputs.captureProgress(id, "EpochCollected", "유효 Epoch 4 / 10",
+                    Map.of("validEpochs", 4, "targetEpochs", 10));
+            inputs.captureProgress(id, "WaitingNavigation", "항법정보 수신 중", Map.of("rawxEpochs", 7));
+            var counters = (Map<?, ?>) inputs.get(id).captureProgress().get("counters");
+            assertEquals(4, counters.get("validEpochs"));
+            assertEquals(7, counters.get("rawxEpochs"));
+            mvc.perform(get("/lnis/api/v1/captures/" + id + "/ubx")).andExpect(status().isNotFound());
+            assertThrows(IllegalArgumentException.class, () -> inputs.captureUbx(id,
+                    new byte[] {1, 2, 3}));
+            assertFalse(Files.exists(files.ubx(id)));
+            inputs.captureUbx(id, ubx);
+            assertFalse(inputs.get(id).ubxAvailable());
+            inputs.complete(id);
+            assertTrue(inputs.get(id).ubxAvailable());
+            assertTrue(inputs.get(id).captureProgress().isEmpty());
+            assertTrue(inputs.get(id).receiverInfoJson().contains("ZED-F9T"));
+            mvc.perform(get("/lnis/api/v1/inputs/" + id))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.ubxAvailable").value(true));
+            mvc.perform(get("/lnis/api/v1/captures/" + id + "/ubx"))
+                    .andExpect(status().isOk()).andExpect(content().bytes(ubx))
+                    .andExpect(header().string("Content-Disposition",
+                            org.hamcrest.Matchers.containsString("gnss-" + id + ".ubx")));
+            var preview = management.preview(List.of(new Key(Kind.INPUT, id)));
+            assertEquals(graw.length + ubx.length, preview.fileBytes());
+            assertEquals("DELETED", management.execute(preview.token(), "TEST").results().getFirst().status());
+            assertFalse(Files.exists(files.ubx(id)));
+        } finally {
+            if (Files.exists(directory.resolve("files/inputs/" + id + ".graw"))) inputs.remove(id);
+        }
+    }
+
 }

@@ -68,6 +68,10 @@ public class InputBufferEntity {
     /** 화면용 MON-VER 정보. GRAW·어댑터 전송 원문에는 추가하지 않는다. */
     @Lob @com.fasterxml.jackson.annotation.JsonIgnore String receiverInfoJson;
 
+    /** 서버 저장 UBX의 다운로드 가능 여부와 수집 중 진행 정보다. DB에는 저장하지 않는다. */
+    @Transient boolean ubxAvailable;
+    @Transient java.util.Map<String, Object> captureProgress = java.util.Map.of();
+
     public InputBufferEntity(
             UUID inputId,
             InputKind kind,
@@ -94,6 +98,8 @@ public class InputBufferEntity {
                 completedAt,
                 null,
                 null,
-                null);
+                null,
+                false,
+                java.util.Map.of());
     }
 }

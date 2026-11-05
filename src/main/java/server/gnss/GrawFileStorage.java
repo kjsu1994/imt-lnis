@@ -100,8 +100,31 @@ public class GrawFileStorage {
         try {
             Files.deleteIfExists(partial(id));
             Files.deleteIfExists(completed(id));
+            Files.deleteIfExists(ubx(id));
+            Files.deleteIfExists(directory.resolve(id + ".ubx.part"));
         } catch (IOException error) {
             throw new IllegalStateException("GRAW 파일 삭제에 실패했습니다.", error);
+        }
+    }
+
+    public Path ubx(UUID id) {
+        return directory.resolve(id + ".ubx");
+    }
+
+    public synchronized void saveUbx(UUID id, byte[] bytes) {
+        Path partial = directory.resolve(id + ".ubx.part");
+        try {
+            Files.write(partial, bytes, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+            try {
+                Files.move(partial, ubx(id), StandardCopyOption.ATOMIC_MOVE);
+            } catch (AtomicMoveNotSupportedException ignored) {
+                Files.move(partial, ubx(id));
+            }
+        } catch (IOException error) {
+            throw new IllegalStateException("UBX 수집 파일 저장 실패", error);
+        } finally {
+            try { Files.deleteIfExists(partial); }
+            catch (IOException error) { throw new IllegalStateException("UBX 임시 파일 정리 실패", error); }
         }
     }
 

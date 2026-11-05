@@ -136,4 +136,28 @@ class GnssConnectionTest {
             assertEquals("DISCONNECTED", restarted.status().state());
         }
     }
+    @Test
+    void captureSeedRetainsTheOriginalNavigationPayloadForUbxReplay() throws Exception {
+        try (var connection = new GnssConnection(
+                () -> List.of(new SerialCaptureService.DetectedPort("COM4", "GNSS")), ignored -> new Port())) {
+            connection.connect(settings());
+            await(() -> connection.status().state().equals("CONNECTED"));
+            byte[] payload = new byte[12];
+            payload[1] = 3; payload[4] = 1; payload[6] = 2;
+            payload[8] = 42;
+            var source = new UbloxParser.UbxFrame(2, 0x13, payload);
+            connection.observe(source, Instant.now(), System.nanoTime());
+            var lease = connection.acquire(settings());
+            try {
+                var records = connection.seed(java.util.UUID.randomUUID(), 0);
+                var frames = connection.seedUbx();
+                assertEquals(1, frames.size());
+                assertArrayEquals(payload, frames.getFirst().payload());
+                assertEquals(GrawCodec.decode(records.getFirst()).message(), UbloxParser.toCanonical(frames.getFirst()));
+            } finally {
+                lease.closePort();
+            }
+        }
+    }
+
 }

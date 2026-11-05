@@ -54,6 +54,11 @@ public class CaptureRequest {
     /** 직렬 포트를 열 때 RTS(Request To Send) 제어선을 활성화할지 여부다. */
     boolean rtsEnabled;
 
-    /** DTN only: automatically select one epoch with valid terrestrial position and velocity. */
+    /** DTN 입력을 유효 Epoch 기준으로 자동 수집한다. 필드명은 기존 호출과 호환한다. */
     boolean singleEpoch;
+
+    /** 유효한 위치·속도 PVT를 확보할 Epoch 개수다. 기존 호출은 1개를 유지한다. */
+    @Min(1)
+    @Max(50)
+    Integer epochCount;
 }

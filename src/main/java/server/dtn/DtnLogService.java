@@ -37,7 +37,7 @@ public class DtnLogService {
 
     public boolean capture(UUID id, String stage, String message) {
         long now = System.nanoTime();
-        if (!Objects.equals(captureStages.put(id, stage), stage)
+        if ("EpochCollected".equals(stage) || !Objects.equals(captureStages.put(id, stage), stage)
                 || now - captureTimes.getOrDefault(id, 0L) > 10_000_000_000L) {
             captureTimes.put(id, now);
             add(id, "INPUT", "COM 수집", "Capturing".equals(stage), message);
