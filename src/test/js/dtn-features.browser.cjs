@@ -159,11 +159,15 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
      return {
       connections:bounds('.receiver-connections'),
       toolbar:bounds('.receiver-trial-toolbar'),
+      selection:bounds('.receiver-selection'),
+      flow:bounds('.receiver-flow-container'),
       controls:['#sender-address-test','#dtn-adapter-health','#gnss-refresh'].map(bounds),
       groups:[...document.querySelectorAll('.receiver-connections > div')].map(e=>e.getBoundingClientRect().toJSON())
      };
     });
     assert.ok(layout.toolbar.y>=layout.connections.bottom,'trial controls stay below connections at '+width);
+    assert.ok(Math.abs(layout.flow.x-layout.toolbar.x)<2,'receiver steps start at the left edge at '+width);
+    assert.ok(layout.flow.y>=layout.selection.bottom,'receiver steps follow the trial selection at '+width);
     assert.ok(Math.abs(layout.toolbar.width-layout.connections.width)<2,'trial controls span the card at '+width);
     if(width>1200){
      assert.ok(layout.controls.every(b=>b.width<100),'connection buttons keep their content width');

@@ -1143,19 +1143,14 @@ body[data-page="dtn-receiver"] .destination-status > div { display: flex; align-
   align-items: center;
 }
 .receiver-flow-container {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: 8px 12px;
-  flex-shrink: 0;
-  margin-left: auto;
-}
-@media (max-width: 1350px) {
-  .receiver-flow-container { margin-left: auto; }
+  width: 100%;
 }
 @media (max-width: 820px) {
   .receiver-selection { flex-wrap: wrap; }
-  .receiver-flow-container { margin-left: 0; flex-wrap: wrap; }
 }
 .receiver-flow {
   display: inline-flex;
