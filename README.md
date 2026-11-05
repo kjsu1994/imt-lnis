@@ -241,6 +241,10 @@ docker compose ps
 
 ## 6. Operational Workflow & Trial Execution
 
+RAW·AFS는 같은 입력·Epoch·유형으로 **전송시험 시작**을 반복하면 수신 HUD에 위치 편차를 누적합니다. 경로·어댑터 설정은 바꿀 수 있으며, 점을 클릭하면 해당 시험의 PVT·관측값·JSON·로그를 조회합니다. HUD 확대·축척 조절을 지원하고 새로고침·재기동 후 저장 이력으로 복원합니다. 적용 전 이력과 I/Q는 기존 단일 시험 표시를 유지합니다.
+
+
+
 1. **Adapter & Route Configuration**:
    - Open the Settings Drawer (`⚙️`), verify the counterpart LNIS peer address, adapter URL, trial payload type (`GNSS RAW`, `AFS Frame`, or `I/Q Sample`), and routing engine (`DTN → HDTN`, `DTN → DTN`, `HDTN → DTN`, or `HDTN → HDTN`).
    - Engine parameters (e.g., ION SDR Heap Size, HDTN Pipeline Bundle Capacity, Custody/Deletion Policy) are persisted in browser storage and transmitted in the adapter JSON body.

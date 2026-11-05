@@ -181,4 +181,119 @@ class DtnSummaryIntegrationTest {
         assertEquals(0, jobs.fillTrialMetadata(job.getId(), job.getExpectedPayloadSha256(), "IQ_SAMPLE", "DTN", "HDTN"));
         assertFalse(jobs.existsById(job.getId()));
     }
+    private static String historyPvt(double x) {
+        return "[{\"positionValid\":true,\"velocityValid\":false,\"ecefMeters\":["
+                + x + ",0,0]}]";
+    }
+
+    @Test
+    void historyKeyFollowsInputEpochTypeAndReferenceButNotRouteTimeOrSettings() throws Exception {
+        var service = service();
+        var input = UUID.randomUUID();
+        var reference = new server.common.DtnModels.Pvt();
+        reference.setPositionValid(true);
+        reference.setEcefMeters(new double[]{6378137, 0, 0});
+        var a = job(1);
+        a.setInputId(input);
+        a.setTestType("GNSS_RAW");
+        a.setComparisonMode("DELAY");
+        a.setSelectedEpochJson("{\"recordIndex\":4,\"week\":2400,\"towSeconds\":100000}");
+        service.assignPvtHistory(a, List.of(reference));
+        String key = a.getPvtHistoryKey();
+        assertNotNull(key);
+        assertEquals(64, key.length());
+
+        a.setId(UUID.randomUUID());
+        a.setTestStartedAt(Instant.now());
+        a.setSenderMode("HDTN");
+        a.setHdtnConfigJson("{\"maxNumberOfBundlesInPipeline\":500}");
+        service.assignPvtHistory(a, List.of(reference));
+        assertEquals(key, a.getPvtHistoryKey());
+        for (String epoch : List.of(
+                "{\"recordIndex\":5,\"week\":2400,\"towSeconds\":100000}",
+                "{\"recordIndex\":4,\"week\":2401,\"towSeconds\":100000}",
+                "{\"recordIndex\":4,\"week\":2400,\"towSeconds\":100001}")) {
+            a.setSelectedEpochJson(epoch);
+            service.assignPvtHistory(a, List.of(reference));
+            assertNotEquals(key, a.getPvtHistoryKey());
+        }
+        a.setSelectedEpochJson("{\"recordIndex\":4,\"week\":2400,\"towSeconds\":100000}");
+        service.assignPvtHistory(a, List.of(reference));
+        assertEquals(key, a.getPvtHistoryKey(), "다른 Epoch를 선택했다가 돌아오면 같은 묶음이다.");
+        a.setInputId(UUID.randomUUID());
+        service.assignPvtHistory(a, List.of(reference));
+        assertNotEquals(key, a.getPvtHistoryKey());
+        a.setInputId(input);
+        a.setTestType("AFS_METADATA");
+        service.assignPvtHistory(a, List.of(reference));
+        assertNotEquals(key, a.getPvtHistoryKey());
+        a.setTestType("GNSS_RAW");
+        reference.setEcefMeters(new double[]{6378138,0,0});
+        service.assignPvtHistory(a, List.of(reference));
+        assertNotEquals(key, a.getPvtHistoryKey());
+        var iq = job(2);
+        iq.setTestType("IQ_SAMPLE");
+        service.assignPvtHistory(iq,List.of(reference));
+        assertNull(iq.getPvtHistoryKey());
+    }
+
+    @Test
+    void historyReadsAllRoundsWithoutRawPayloadsAndKeepsInvalidResultsOutOfTheTarget() throws Exception {
+        String key = "A".repeat(64);
+        var saved = new ArrayList<DtnJob>();
+        for (int i = 0; i < 68; i++) {
+            var row = job(i);
+            row.setPvtHistoryKey(key);
+            row.setTestType("GNSS_RAW");
+            row.setState("COMPLETED");
+            row.setReferenceStatus("COMPLETE");
+            row.setReferenceJson(historyPvt(6378137));
+            row.setReceiverJson(historyPvt(6378137 + i / 100.0));
+            row.setReceivedAt(row.getTestStartedAt().plusNanos(123456789));
+            row.setSenderMode(i % 2 == 0 ? "DTN" : "HDTN");
+            row.setReceiverMode("HDTN");
+            if (i == 1) row.setState("INCONCLUSIVE"); // 속도가 무효여도 위치 비교는 가능하다.
+            if (i == 2) { row.setState("WAITING_DTN"); row.setReceiverJson(null); }
+            if (i == 3) row.setReferenceStatus("WAITING");
+            if (i == 4) row.setState("FAILED");
+            if (i == 5) row.setState("CANCELLED");
+            if (i == 6) row.setReferenceJson(historyPvt(6378139));
+            if (i == 7) row.setReceiverJson("[{\"positionValid\":true,\"ecefMeters\":[null,0,0]}]");
+            saved.add(jobs.save(row));
+        }
+        var legacy = job(70);
+        legacy.setTestType("IQ_SAMPLE");
+        jobs.save(legacy);
+        jobs.flush();
+        em.clear();
+        var sql = new ArrayList<String>();
+        DtnService.PvtHistory history;
+        statements.set(sql);
+        try {
+            history = service().pvtHistory(saved.getFirst().getId());
+        } finally {
+            statements.remove();
+        }
+        assertEquals(68,history.total());
+        assertEquals(2,history.waiting());
+        assertEquals(4,history.unavailable());
+        assertEquals(62,history.trials().stream().filter(t -> t.ecefMeters() != null).count());
+        assertEquals("REFERENCE_MISMATCH",history.trials().get(6).availability());
+        assertEquals("AVAILABLE",history.trials().get(1).availability());
+        assertEquals(0.123456789,history.trials().getFirst().delaySeconds(),1e-12);
+        assertEquals(saved.stream().map(DtnJob::getId).toList(),history.trials().stream().map(DtnService.PvtHistoryItem::testId).toList());
+        assertEquals(2,sql.size(),"묶음 조회는 페이지별·시험별 추가 조회 없이 수행한다.");
+        for (var statement : sql) {
+            for (var excluded : List.of("sent_json","received_json","received_raw_json","observations_json",
+                    "reference_source_base64","delay_evidence_json","hdtn_config_json")) {
+                assertFalse(statement.toLowerCase(Locale.ROOT).contains(excluded),excluded);
+            }
+        }
+        jobs.deleteById(saved.getFirst().getId());
+        jobs.flush();
+        em.clear();
+        assertEquals(67,service().pvtHistory(saved.get(1).getId()).total());
+        assertNull(service().pvtHistory(legacy.getId()).historyKey());
+    }
+
 }

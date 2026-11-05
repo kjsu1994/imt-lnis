@@ -121,6 +121,102 @@ public class DtnService {
 
     private DtnNodeLink nodeLink;
 
+    /** 시작 시각·경로·설정은 제외하고 동일한 입력과 비교 기준만 묶는다. */
+    void assignPvtHistory(DtnJob job, List<Pvt> reference) throws java.io.IOException {
+        if (!List.of("GNSS_RAW", "AFS_METADATA").contains(Objects.toString(job.getTestType(), ""))
+                || !"DELAY".equals(job.getComparisonMode()) || job.getInputId() == null
+                || job.getSelectedEpochJson() == null || reference.size() != 1
+                || !reference.getFirst().isPositionValid()) return;
+        double[] position = reference.getFirst().getEcefMeters();
+        if (!finitePosition(position)) return;
+        byte[] identity = objectMapper.writeValueAsBytes(List.of(
+                job.getSenderAgentId(), job.getReceiverAgentId(), job.getInputId(),
+                objectMapper.readTree(job.getSelectedEpochJson()), job.getTestType(),
+                Objects.toString(job.getPvtConstellation(), "GPS"), position));
+        job.setPvtHistoryKey(server.common.Hashing.hex(
+                server.common.Hashing.sha256Digest().digest(identity)));
+    }
+
+    public record PvtHistoryItem(UUID testId, String state, String senderMode, String receiverMode,
+            Instant startedAt, Instant receivedAt, Double delaySeconds, String clockWarning,
+            String availability, double[] ecefMeters) {}
+
+    public record PvtHistory(String historyKey, String testType, JsonNode selectedEpoch,
+            double[] referenceEcefMeters, int total, int waiting, int unavailable,
+            List<PvtHistoryItem> trials) {}
+
+    public PvtHistory pvtHistory(UUID id) throws java.io.IOException {
+        var context = dtnRepository.findPvtHistoryContextById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "시험이 없습니다."));
+        String key = context.getPvtHistoryKey();
+        JsonNode epoch = context.getSelectedEpochJson() == null ? null
+                : objectMapper.readTree(context.getSelectedEpochJson());
+        if (key == null) {
+            return new PvtHistory(null, context.getTestType(), epoch, null, 0, 0, 0, List.of());
+        }
+        var rows = dtnRepository.findPvtHistory(key);
+        double[] origin = null;
+        for (var row : rows) {
+            if ("COMPLETE".equals(row.getReferenceStatus())) {
+                origin = historyPosition(row.getReferenceJson());
+                if (origin != null) break;
+            }
+        }
+        var trials = new ArrayList<PvtHistoryItem>();
+        int waiting = 0, unavailable = 0;
+        for (var row : rows) {
+            double[] reference = historyPosition(row.getReferenceJson());
+            double[] received = historyPosition(row.getReceiverJson());
+            String availability;
+            if (List.of("FAILED", "CANCELLED").contains(Objects.toString(row.getState(), ""))) {
+                availability = row.getState();
+            } else if (ACTIVE.contains(row.getState()) || "WAITING".equals(row.getReferenceStatus())) {
+                availability = "WAITING";
+                waiting++;
+            } else if (!"COMPLETE".equals(row.getReferenceStatus()) || received == null || reference == null) {
+                availability = "UNAVAILABLE";
+            } else if (!Arrays.equals(origin, reference)) {
+                availability = "REFERENCE_MISMATCH";
+            } else {
+                availability = "AVAILABLE";
+            }
+            if (!"AVAILABLE".equals(availability) && !"WAITING".equals(availability)) unavailable++;
+            Double delay = null;
+            if (row.getTestStartedAt() != null && row.getReceivedAt() != null) {
+                Duration duration = Duration.between(row.getTestStartedAt(), row.getReceivedAt());
+                delay = duration.getSeconds() + duration.getNano() / 1e9;
+            }
+            trials.add(new PvtHistoryItem(row.getId(), row.getState(), row.getSenderMode(),
+                    row.getReceiverMode(), row.getTestStartedAt(), row.getReceivedAt(), delay,
+                    row.getClockWarning(), availability, "AVAILABLE".equals(availability) ? received : null));
+        }
+        return new PvtHistory(key, context.getTestType(), epoch, origin, rows.size(),
+                waiting, unavailable, trials);
+    }
+
+    private double[] historyPosition(String json) {
+        if (json == null) return null;
+        try {
+            JsonNode values = objectMapper.readTree(json);
+            if (!values.isArray() || values.size() != 1 || !values.get(0).path("positionValid").asBoolean()) return null;
+            JsonNode position = values.get(0).path("ecefMeters");
+            if (!position.isArray() || position.size() != 3) return null;
+            double[] xyz = new double[3];
+            for (int i = 0; i < 3; i++) {
+                if (!position.get(i).isNumber()) return null;
+                xyz[i] = position.get(i).doubleValue();
+            }
+            return finitePosition(xyz) ? xyz : null;
+        } catch (java.io.IOException error) {
+            log.debug("누적 PVT 표시 제외 · 저장 위치 자료 해석 불가", error);
+            return null;
+        }
+    }
+
+    private static boolean finitePosition(double[] xyz) {
+        return xyz != null && xyz.length == 3 && Arrays.stream(xyz).allMatch(Double::isFinite);
+    }
+
     public record EpochChoice(DtnDelay.Epoch epoch, Pvt reference, boolean afsReady) {
         public EpochChoice(DtnDelay.Epoch epoch, Pvt reference) {
             this(epoch, reference, true);
@@ -1179,6 +1275,7 @@ public class DtnService {
                     throw new IllegalArgumentException("송신 Reference PVT 계산 불가");
                 }
                 job.setReferenceJson(objectMapper.writeValueAsString(result.getPvt()));
+                assignPvtHistory(job, result.getPvt());
                 if (!server.afs.DelayTransferCodec.supports(result.getTransfer())) {
                     result.getTransfer().setReferencePvt(result.getPvt());
                 }

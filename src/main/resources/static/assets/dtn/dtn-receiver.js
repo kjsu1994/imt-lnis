@@ -1,5 +1,6 @@
 import {parseNodeAddress, renderTrialSettings, trialTypeLabel, trialOption, colorTrialSelection, initWaitingCancellation, initTrialSettingsDialog} from './dtn-settings.js?v=20261104-peer-address-validation-2';
 import {requestJson} from '../common/http.js?v=20261103-management-reset';
+import {createPvtHistory} from './dtn-pvt-history.js?v=20261105-2';
 import {initGnssControls} from './dtn-gnss.js?v=20261104-serial-controls';
 import {createDtnLog} from './dtn-log.js?v=20261103-management-reset';
 import {initAdapterHealth} from './dtn-adapter-health.js?v=20261026-frame6';
@@ -76,8 +77,8 @@ const observations = createObservationView($('dtn-observations'), index => {
 }, '수신 원본');
 observations.setData(null);
 
-function get(path) {
-  return requestJson(path, {cache: 'no-store'}, {errorDetails: false});
+function get(path, options = {}) {
+  return requestJson(path, {cache: 'no-store', ...options}, {errorDetails: false});
 }
 
 function updateClockSkewWarning(connection) {
@@ -208,6 +209,28 @@ function ecefDeltaToEnu(dx, dy, dz, refLatDeg, refLonDeg) {
   const n = -sPhi * cLam * dx - sPhi * sLam * dy + cPhi * dz;
   const u =  cPhi * cLam * dx + cPhi * sLam * dy + sPhi * dz;
   return { e, n, u };
+}
+
+const pvtHistory = createPvtHistory({
+  root: $('pvt-geodetic-visualizer'), request: get, onSelect: selectHistoryTrial,
+  project(reference, received) {
+    const geo = ecefToGeodetic(...reference);
+    return geo ? ecefDeltaToEnu(received[0]-reference[0], received[1]-reference[1],
+      received[2]-reference[2], geo.lat, geo.lon) : null;
+  }
+});
+let historySelectionVersion = 0;
+async function selectHistoryTrial(id) {
+  const version = ++historySelectionVersion;
+  selectionPinned = true;
+  const job = tests.find(item => item.testId === id) || await get('/dtn/tests/' + encodeURIComponent(id));
+  if (version !== historySelectionVersion) return;
+  if (!tests.some(item => item.testId === id)) tests.push(job);
+  const select = $('dtn-tests');
+  if (![...select.options].some(option => option.value === id)) select.add(trialOption(job,time(job.createdAt)));
+  select.value = id;
+  colorTrialSelection(select,job);
+  await renderTest(true);
 }
 
 function formatGeoCoord(deg, isLat) {
@@ -560,9 +583,15 @@ function renderGeodeticVisualizer(reference, pvt) {
   const refEcef = reference?.positionValid ? reference.ecefMeters : null;
   const recEcef = pvt?.positionValid ? pvt.ecefMeters : null;
   if (!refEcef || !recEcef) {
-    container.hidden = true;
+    container.hidden = !pvtHistory.active();
+    if (pvtHistory.active()) {
+      pvtHistory.detail(false);
+      if (targetViewMode === '3d') setTargetViewMode('hud');
+      pvtHistory.draw();
+    }
     return;
   }
+  if (pvtHistory.active()) pvtHistory.detail(true);
   container.hidden = false;
 
   const refGeo = ecefToGeodetic(refEcef[0], refEcef[1], refEcef[2]);
@@ -756,6 +785,7 @@ function renderGeodeticVisualizer(reference, pvt) {
   if (targetViewMode === '3d') {
     render3DCube(lastEnuData);
   }
+  pvtHistory.draw();
 }
 
 function renderClockAnalysis(delta, reference, pvt) {
@@ -1096,6 +1126,7 @@ async function renderTest(force = false) {
   logView.setContext(selectedId);
   payloadViewer.setJob(job);
   renderSummary(job);
+  pvtHistory.setJob(job);
   if (changed || !job) {
     $('pvt-delay-details').open = false;
     reportKey = '';
@@ -1104,6 +1135,8 @@ async function renderTest(force = false) {
     observations.setData(null);
   }
   if (!job) return;
+  await pvtHistory.refresh(force || changed);
+  if (version !== renderVersion || selectedId !== job.testId) return;
   const event = job.testId + ':' + job.state + ':' + job.updatedAt + ':' + (job.fileResult?.verdict || '');
   if (!job.receivedEpochs && !(job.testType === 'IQ_SAMPLE' && job.dtnReceived)) return;
   if (!force && reportKey === event) return;
@@ -1255,13 +1288,14 @@ async function initialize() {
 }
 
 $('dtn-tests').onchange = () => {
+  historySelectionVersion++;
   colorTrialSelection($('dtn-tests'), tests.find(job => job.testId === $('dtn-tests').value));
   selectionPinned = true;
   renderTest();
 };
-$('dtn-test-filter').onchange = () => { historyPage = 0; selectionPinned = false; poll(true); };
+$('dtn-test-filter').onchange = () => { historySelectionVersion++; historyPage = 0; selectionPinned = false; poll(true); };
 for (const [id, step] of [['dtn-tests-prev', -1], ['dtn-tests-next', 1]]) $(id).onclick = () => {
-  historyPage = Math.max(0, historyPage + step); selectionPinned = false; poll(true);
+  historySelectionVersion++; historyPage = Math.max(0, historyPage + step); selectionPinned = false; poll(true);
 };
 $('dtn-cancel').onclick = async () => {
   if (!selectedId || $('dtn-cancel').disabled) return;

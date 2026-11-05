@@ -414,6 +414,11 @@ public class DtnController {
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
+    @GetMapping("/tests/{id}/pvt-history")
+    public DtnService.PvtHistory pvtHistory(@PathVariable UUID id) throws Exception {
+        return dtnService.pvtHistory(id);
+    }
+
     /* 송신·수신 PVT와 비교 결과 조회 */
     @GetMapping(value = "/tests/{id}/report", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Map<String, Object>> report(@PathVariable UUID id) throws Exception {
@@ -601,6 +606,7 @@ public class DtnController {
     private Map<String, Object> summary(DtnRepository.SummaryView job) throws Exception {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("testId", job.getId());
+        result.put("pvtHistoryKey", job.getPvtHistoryKey());
         result.put("testType", job.getTestType());
         result.put("senderMode", job.getSenderMode());
         result.put("receiverMode", job.getReceiverMode());

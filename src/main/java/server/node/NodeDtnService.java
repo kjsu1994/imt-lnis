@@ -124,6 +124,7 @@ public class NodeDtnService implements DtnNodeLink {
         registration.setSenderMode(job.getSenderMode() == null ? payload.path("senderMode").asText(null) : job.getSenderMode());
         registration.setReceiverMode(job.getReceiverMode() == null ? payload.path("receiverMode").asText(null) : job.getReceiverMode());
         registration.setTestId(job.getId());
+        registration.setPvtHistoryKey(job.getPvtHistoryKey());
         registration.setComparisonMode(job.getComparisonMode());
         registration.setPvtConstellation(job.getPvtConstellation() == null ? "GPS" : job.getPvtConstellation());
         registration.setTestStartedAt(job.getTestStartedAt());
@@ -307,6 +308,7 @@ public class NodeDtnService implements DtnNodeLink {
         }
         DtnJob job = new DtnJob();
         job.setId(registration.getTestId());
+        job.setPvtHistoryKey(registration.getPvtHistoryKey());
         job.setTestType(registration.getTestType());
         job.setSenderMode(registration.getSenderMode());
         job.setReceiverMode(registration.getReceiverMode());
@@ -354,6 +356,9 @@ public class NodeDtnService implements DtnNodeLink {
                 || !registration.getReceiverAgentId().equals(existing.getReceiverAgentId())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 등록된 시험 내용과 다릅니다.");
         }
+        if (!java.util.Objects.equals(existing.getPvtHistoryKey(), registration.getPvtHistoryKey())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 등록된 시험의 누적 묶음과 다릅니다.");
+        }
         if (conflicts(existing.getTestType(), registration.getTestType())
                 || conflicts(existing.getSenderMode(), registration.getSenderMode())
                 || conflicts(existing.getReceiverMode(), registration.getReceiverMode())) {
@@ -373,6 +378,13 @@ public class NodeDtnService implements DtnNodeLink {
     }
 
     private static void validateTrialMetadata(NodeDtnRegistration registration) {
+        if (registration.getPvtHistoryKey() != null
+                && (!registration.getPvtHistoryKey().matches("[0-9a-fA-F]{64}")
+                    || !java.util.List.of("GNSS_RAW", "AFS_METADATA").contains(
+                            java.util.Objects.toString(registration.getTestType(), ""))
+                    || !"DELAY".equals(registration.getComparisonMode()))) {
+            throw new IllegalArgumentException("누적 PVT 묶음의 시험 조건이 올바르지 않습니다.");
+        }
         if (registration.getTestType() != null
                 && !java.util.List.of("GNSS_RAW", "AFS_METADATA", "IQ_SAMPLE").contains(registration.getTestType())
                 || registration.getSenderMode() != null

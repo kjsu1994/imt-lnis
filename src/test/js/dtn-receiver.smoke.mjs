@@ -1,6 +1,16 @@
 import {pageSource} from './browser-source.mjs';
 import {numeric, renderClockBias} from '../../main/resources/static/assets/dtn/dtn-observations.js';
 import assert from 'node:assert/strict';
+import {historyDistance, historyRadius} from '../../main/resources/static/assets/dtn/dtn-pvt-history.js';
+assert.equal(historyDistance(0),'0.000 mm');
+assert.equal(historyDistance(1e-9),'1.00e-9 m');
+assert.equal(historyDistance(-1e-9),'-1.00e-9 m');
+assert.equal(historyDistance(1e-6),'0.001 mm');
+assert.equal(historyRadius(0),0.001);
+assert.equal(historyRadius(0.012),0.02);
+assert.equal(historyRadius(2),5);
+assert.equal(historyRadius(2300),5000);
+
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 
@@ -28,6 +38,7 @@ let healthState = 'ready';
 let peerAddress = 'http://192.168.1.72:8090', peerSaves = 0, peerProbes = 0;
 const healthIntervals = [];
 const context = {
+  createPvtHistory: () => ({setJob() {}, async refresh() {}, draw() {}, detail() {}, active: () => false}),
   numeric, renderClockBias, URL, AbortSignal,
   createDtnLog: () => ({write(msg) { console.log('DTN LOG:', msg); },setContext() {},refresh() {}}),
   document: {visibilityState:'visible', querySelectorAll() { return []; }, getElementById(id) { if (removedHealth.has(id) || optionalElements.has(id)) return null; assert.ok(elements.has(id), 'DOM missing: ' + id); return elements.get(id); }},

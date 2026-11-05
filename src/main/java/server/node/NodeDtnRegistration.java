@@ -22,6 +22,8 @@ public class NodeDtnRegistration {
     private String senderMode;
     @Pattern(regexp = "DTN|HDTN")
     private String receiverMode;
+    @Pattern(regexp = "[0-9a-fA-F]{64}")
+    private String pvtHistoryKey;
     private String comparisonMode;
     private String pvtConstellation = "GPS";
     private java.time.Instant testStartedAt;

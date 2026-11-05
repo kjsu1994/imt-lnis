@@ -683,16 +683,22 @@ class IndependentNodeIntegrationTest {
                 byte[] body = packets.poll(20, java.util.concurrent.TimeUnit.SECONDS);
                 assertNotNull(body);
                 bodies.add(body);
+                assertFalse(new String(body, java.nio.charset.StandardCharsets.UTF_8).contains("pvtHistoryKey"),
+                        "묶음 정보는 외부 어댑터 전송 데이터에 추가하지 않는다.");
                 await(() -> !tx.sendBusy(), 10);
                 assertEquals("WAITING_DTN", tx.get(id).getState());
                 assertEquals("ACCEPTED", tx.get(id).getSendStatus());
                 assertEquals("WAITING_DTN", rx.get(id).getState());
                 assertEquals(type, rx.get(id).getTestType());
+                assertNotNull(tx.get(id).getPvtHistoryKey());
+                assertEquals(tx.get(id).getPvtHistoryKey(),rx.get(id).getPvtHistoryKey());
                 assertEquals("HDTN", rx.get(id).getSenderMode());
                 assertEquals("HDTN", rx.get(id).getReceiverMode());
                 assertNull(rx.get(id).getReceivedJson(), "사전 등록만으로 유형을 표시하며 실제 수신으로 처리하지 않는다.");
             }
             assertEquals(3, new java.util.HashSet<>(ids).size());
+            assertEquals(tx.get(ids.get(0)).getPvtHistoryKey(),tx.get(ids.get(2)).getPvtHistoryKey());
+            assertNotEquals(tx.get(ids.get(0)).getPvtHistoryKey(),tx.get(ids.get(1)).getPvtHistoryKey());
             for (var context : java.util.List.of(sender, receiver)) {
                 var repository = context.getBean(server.dtn.DtnRepository.class);
                 for (UUID id : ids) {
@@ -712,6 +718,22 @@ class IndependentNodeIntegrationTest {
                     HttpResponse.BodyHandlers.ofString());
             assertEquals(200, registration.statusCode());
             assertEquals("GNSS_RAW", new ObjectMapper().readTree(registration.body()).path("testType").asText());
+            var registrationTree = new ObjectMapper().readTree(registration.body());
+            assertEquals(tx.get(ids.get(1)).getPvtHistoryKey(),registrationTree.path("pvtHistoryKey").asText());
+            URI receiverRegistration = URI.create("http://127.0.0.1:" + receiverPort
+                    + "/lnis/api/v1/node/peer/dtn/tests");
+            assertEquals(202,http.send(HttpRequest.newBuilder(receiverRegistration)
+                    .header("Authorization","Bearer test-node-management")
+                    .header("Content-Type","application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(registration.body())).build(),
+                    HttpResponse.BodyHandlers.ofString()).statusCode());
+            ((com.fasterxml.jackson.databind.node.ObjectNode)registrationTree).put("pvtHistoryKey","0".repeat(64));
+            assertEquals(409,http.send(HttpRequest.newBuilder(receiverRegistration)
+                    .header("Authorization","Bearer test-node-management")
+                    .header("Content-Type","application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(registrationTree.toString())).build(),
+                    HttpResponse.BodyHandlers.ofString()).statusCode());
+
             for (int index : new int[] {2, 0, 1, 2}) {
                 var request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + receiverPort
                                 + "/lnis/api/v1/dtn/receive"))
@@ -729,6 +751,20 @@ class IndependentNodeIntegrationTest {
                 assertNotNull(rx.get(ids.get(i)).getComparisonJson());
             }
             assertTrue(rx.get(ids.get(2)).getReceivedAt().isBefore(rx.get(ids.get(0)).getReceivedAt()));
+            var historyResponse = http.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"
+                    + receiverPort + "/lnis/api/v1/dtn/tests/" + ids.getFirst() + "/pvt-history")).GET().build(),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200,historyResponse.statusCode());
+            var history = new ObjectMapper().readTree(historyResponse.body());
+            assertEquals(2,history.path("total").asInt(),"중복 수신은 점을 추가하지 않는다.");
+            assertEquals(2,history.path("trials").size());
+            assertEquals("AVAILABLE",history.path("trials").get(0).path("availability").asText());
+            assertEquals(1,rx.pvtHistory(ids.get(1)).total());
+            receiver.close();
+            try (var restarted = node("receiver",receiverPort,senderPort)) {
+                assertEquals(2,restarted.getBean(DtnService.class).pvtHistory(ids.getFirst()).total());
+            }
+
         } finally {
             adapter.stop(0);
         }

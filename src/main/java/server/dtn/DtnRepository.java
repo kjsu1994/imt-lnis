@@ -47,6 +47,7 @@ public interface DtnRepository extends JpaRepository<DtnJob, UUID> {
 
     /** 목록 응답에 필요한 값만 읽으며 원문은 존재 여부만 조회한다. */
     interface SummaryView {
+        String getPvtHistoryKey();
         UUID getId();
         String getTestType();
         String getSenderMode();
@@ -88,6 +89,7 @@ public interface DtnRepository extends JpaRepository<DtnJob, UUID> {
     @org.springframework.data.jpa.repository.Query("""
             select
                 j.id as id,
+                j.pvtHistoryKey as pvtHistoryKey,
                 j.testType as testType,
                 j.senderMode as senderMode,
                 j.receiverMode as receiverMode,
@@ -152,6 +154,40 @@ public interface DtnRepository extends JpaRepository<DtnJob, UUID> {
             @org.springframework.data.repository.query.Param("type") String type,
             @org.springframework.data.repository.query.Param("senderMode") String senderMode,
             @org.springframework.data.repository.query.Param("receiverMode") String receiverMode);
+
+
+    interface PvtHistoryContext {
+        String getPvtHistoryKey();
+        String getTestType();
+        String getSelectedEpochJson();
+    }
+
+    java.util.Optional<PvtHistoryContext> findPvtHistoryContextById(UUID id);
+
+    /** 누적 표적 조회에서는 원문·관측값·설정·상세 계산 근거를 읽지 않는다. */
+    interface PvtHistoryView {
+        UUID getId();
+        String getState();
+        String getSenderMode();
+        String getReceiverMode();
+        java.time.Instant getTestStartedAt();
+        java.time.Instant getReceivedAt();
+        String getReferenceStatus();
+        String getReferenceJson();
+        String getReceiverJson();
+        String getClockWarning();
+    }
+
+    @org.springframework.data.jpa.repository.Query("""
+            select j.id as id, j.state as state, j.senderMode as senderMode,
+                j.receiverMode as receiverMode, j.testStartedAt as testStartedAt,
+                j.receivedAt as receivedAt, j.referenceStatus as referenceStatus,
+                j.referenceJson as referenceJson, j.receiverJson as receiverJson,
+                j.clockWarning as clockWarning
+            from DtnJob j where j.pvtHistoryKey = :key
+            order by j.testStartedAt asc, j.id asc
+            """)
+    List<PvtHistoryView> findPvtHistory(@org.springframework.data.repository.query.Param("key") String key);
 
     List<DtnJob> findByCancelPendingTrue();
 

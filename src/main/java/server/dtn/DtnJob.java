@@ -12,7 +12,8 @@ import java.util.UUID;
 @Table(name = "dtn_job", indexes = {
         @Index(name = "dtn_job_state_created", columnList = "state,createdAt"),
         @Index(name = "dtn_job_reference_retry", columnList = "referenceStatus,referenceNextAttemptAt"),
-        @Index(name = "dtn_job_cancel_pending", columnList = "cancelPending")
+        @Index(name = "dtn_job_cancel_pending", columnList = "cancelPending"),
+        @Index(name = "dtn_job_pvt_history", columnList = "pvtHistoryKey,testStartedAt,id")
 })
 @Data
 public class DtnJob implements DtnRepository.SummaryView {
@@ -33,6 +34,10 @@ public class DtnJob implements DtnRepository.SummaryView {
 
     /** 일괄 종료는 상대가 아직 미수신인 경우에만 닫는다. 재시도·재기동에도 유지한다. */
     private Boolean cancelWaitingOnly;
+
+    /** 같은 입력·Epoch·시험 유형·Reference 위치를 누적 표시하는 내부 식별값이다. */
+    @Column(length = 64)
+    private String pvtHistoryKey;
 
     private String testType;
     private String senderMode;

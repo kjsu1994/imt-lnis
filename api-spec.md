@@ -123,3 +123,20 @@ epochCount를 지정하면 위치·속도 PVT가 모두 유효한 고유 Week/TO
 captureProgress는 stage·message·counters를 제공하며 counters의 validEpochs·targetEpochs로 진행률을 표시합니다. RAWX·항법정보 수신 계수도 함께 전달합니다. 수집 중에는 폴링과 기존 WebSocket으로 확인할 수 있습니다.
 
 UBX에는 선택된 RAWX와 선행·중간 SFRBX, 확보한 MON-VER를 보관합니다. 다운로드는 선택사항입니다. 완료된 입력은 기존 Epoch 선택·시험 기능에서 바로 사용합니다.
+
+## RAW·AFS 누적 위치 편차
+
+내부 사전 등록과 시험 요약에 선택 필드 pvtHistoryKey(64자리 HEX)를 추가합니다. 같은 입력 ID·선택 Epoch(recordIndex/Week/TOW)·시험 유형·참여 노드·Reference 위치를 묶습니다. 경로·어댑터 설정·testId·시험 시작 시각은 제외합니다. 외부 어댑터 JSON과 AFS/I/Q 규격은 변경하지 않습니다.
+
+GET /lnis/api/v1/dtn/tests/{testId}/pvt-history는 선택 시험과 같은 묶음의 저장 이력을 시작 시각·testId 순으로 반환합니다. 일반 시험 목록의 50건 페이지 제한을 적용하지 않습니다.
+
+| 필드 | 의미 |
+|---|---|
+| historyKey / testType / selectedEpoch | 묶음과 관측 시점 |
+| referenceEcefMeters | 공통 Reference ECEF(m), 미확보 시 null |
+| total / waiting / unavailable | 등록·대기·점 표시 불가 건수 |
+| trials | 시험별 testId·state·senderMode·receiverMode·startedAt·receivedAt·delaySeconds·clockWarning·availability·ecefMeters |
+
+availability는 AVAILABLE / WAITING / FAILED / CANCELLED / UNAVAILABLE / REFERENCE_MISMATCH입니다. ecefMeters는 위치 비교가 가능한 시험에만 제공합니다. 속도 무효만으로 위치 점을 제외하지 않습니다. 실패·중지·기준 불일치·유효하지 않은 위치는 점으로 표시하지 않습니다. 원문·관측값·설정·상세 로그는 포함하지 않으며 선택한 시험의 기존 API에서 조회합니다.
+
+묶음이 없는 이전 시험과 I/Q는 historyKey=null, 빈 trials를 반환합니다. 과거 시험을 자동으로 묶지 않습니다. 기존 testId 등록의 묶음 값을 변경하면 HTTP 409이며, 신규 등록의 잘못된 형식·유형은 HTTP 400입니다. 같은 입력·Epoch·유형으로 돌아오면 기존 묶음을 복원합니다. 자료 삭제·보관 정리 후에는 남은 이력만 반환합니다.

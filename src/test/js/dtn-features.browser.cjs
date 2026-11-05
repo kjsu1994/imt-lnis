@@ -808,6 +808,168 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
  }
  await typed.screenshot({path:'build/trial-type-receiver.png',fullPage:true});
  await typed.close();
+ // Multi-round target uses real SVG/DOM with mocked persisted API records.
+ const historyPage=await context.newPage();
+ historyPage.on('pageerror',e=>errors.push(e.message));
+ const historyKey='A'.repeat(64), otherHistoryKey='B'.repeat(64);
+ const historyReference={week:2400,towSeconds:1000,positionValid:true,velocityValid:true,
+   ecefMeters:[6378137,0,0],velocityMetersPerSecond:[0,0,0],receiverClockBiasSeconds:0,satellitesUsed:6};
+ let historyTrials=Array.from({length:240},(_,i)=>{
+   const e=i<2?0.002:i===3?0:0.012*Math.cos(i*0.73);
+   const n=i<2?0.003:i===3?0:0.012*Math.sin(i*0.73);
+   return {testId:'history-'+String(i+1).padStart(3,'0'),state:'COMPLETED',senderMode:i%2?'HDTN':'DTN',
+     receiverMode:i%4<2?'DTN':'HDTN',startedAt:new Date(Date.UTC(2026,10,5,0,0,i)).toISOString(),
+     receivedAt:new Date(Date.UTC(2026,10,5,0,0,i+1)).toISOString(),delaySeconds:1,
+     availability:'AVAILABLE',ecefMeters:[6378137+(i===1?2:0.001),e,n]};
+ });
+ const historyJob=(id,key=historyKey)=>({testId:id,pvtHistoryKey:key,testType:'GNSS_RAW',
+   selectedEpoch:{recordIndex:4,week:2400,towSeconds:1000},state:'COMPLETED',
+   createdAt:'2026-11-05T00:00:00Z',updatedAt:'1',dtnReceived:true,receivedEpochs:1,referenceEpochs:1,
+   receivedPayloadAvailable:true,receivedOriginalAvailable:true,senderMode:'DTN',receiverMode:'HDTN'});
+ let historyList=[historyJob('history-001'),historyJob('other-group',otherHistoryKey),
+   {...historyJob('waiting-round'),state:'WAITING_DTN',receivedEpochs:0,dtnReceived:false},
+   {...historyJob('legacy-iq'),testType:'IQ_SAMPLE',pvtHistoryKey:null}];
+ let historyReads=0, waitingCompleted=false, historyFailure=false, holdHistory=false, historyRelease=null;
+ await historyPage.route('**/lnis/api/v1/dtn/tests**',async route=>{
+   const path=new URL(route.request().url()).pathname;
+   if(path.endsWith('/tests')) return route.fulfill({json:historyList});
+   if(path.endsWith('/pvt-history')){
+     historyReads++;
+     const other=path.includes('/other-group/');
+     if(historyFailure)return route.fulfill({status:500,json:{message:'history unavailable'}});
+     if(holdHistory&&!other)await new Promise(resolve=>historyRelease=resolve);
+     const trials=other?[{...historyTrials[2],testId:'other-group'}]:historyTrials;
+     return route.fulfill({json:{historyKey:other?otherHistoryKey:historyKey,testType:'GNSS_RAW',
+       selectedEpoch:{recordIndex:4,week:2400,towSeconds:1000},referenceEcefMeters:[6378137,0,0],
+       total:trials.length+(other||waitingCompleted?0:1),waiting:other||waitingCompleted?0:1,unavailable:0,trials}});
+   }
+   const match=path.match(/\/tests\/([^/]+)(?:\/(report|payload\/received))?$/);
+   if(!match)return route.continue();
+   const id=match[1], row=historyTrials.find(p=>p.testId===id)||historyTrials[2];
+   const j=historyList.find(p=>p.testId===id)||historyJob(id);
+   if(match[2]==='payload/received')return route.fulfill({json:{testId:id,format:'fixture'}});
+   if(match[2]==='report')return route.fulfill({json:{
+     ...j,referenceStatus:'COMPLETE',comparisonMode:'DELAY',referencePvt:[historyReference],
+     receivedPvt:[{...historyReference,towSeconds:1001,ecefMeters:row.ecefMeters,receiverClockBiasSeconds:1}],
+     delayEvidence:{delaySeconds:1,timing:{startedAt:row.startedAt,receivedAt:row.receivedAt}},
+     comparison:{verdict:'MEASURED',epochs:[{week:2400,towSeconds:1001,positionDifferenceMeters:0.01,
+       velocityDifferenceMetersPerSecond:0,clockDifferenceSeconds:1,clockResidualSeconds:0}]},
+     observations:{epochs:[],navigation:[],records:[]}
+   }});
+   return route.fulfill({json:j});
+ });
+ await historyPage.setViewportSize({width:1366,height:900});
+ await historyPage.goto(base+'/receiver');
+ await historyPage.waitForFunction(()=>document.querySelector('#dtn-tests option[value="history-001"]'));
+ await historyPage.locator('#dtn-tests').selectOption('history-001');
+ await historyPage.waitForFunction(()=>document.querySelectorAll('#pvt-history-points circle').length===240);
+ assert.match(await historyPage.locator('#pvt-history-context').innerText(),/표시 240 \/ 등록 241 · 대기 1/);
+ const position=await historyPage.locator('#pvt-history-points circle[data-test-id="history-001"]')
+   .evaluate(el=>({x:Number(el.getAttribute('cx')),y:Number(el.getAttribute('cy'))}));
+ assert.ok(position.x>0&&position.y<0,'east is right and north is up');
+ assert.equal(await historyPage.locator('#pvt-history-legend span').count(),4);
+ const scope=historyPage.locator('#pvt-geodetic-visualizer');
+ await scope.screenshot({path:'build/pvt-history-inline.png'});
+ await historyPage.locator('#pvt-history-expand').click();
+ assert.equal(await scope.getAttribute('role'),'dialog');
+ let bounds=await scope.boundingBox();
+ assert.ok(bounds.width>=1340&&bounds.height>=875,'enlarged HUD fills viewport');
+ await historyPage.locator('#pvt-history-points circle[data-test-id="history-001"]').click();
+ await historyPage.waitForFunction(()=>!document.getElementById('pvt-history-picker').hidden);
+ await historyPage.locator('#pvt-history-picker-list button[title="history-002"]').click();
+ await historyPage.waitForFunction(()=>document.getElementById('test-id').textContent==='history-002');
+ assert.equal(await historyPage.locator('#dtn-tests').inputValue(),'history-002');
+ await historyPage.waitForFunction(()=>document.getElementById('pvt-clock-change').textContent.includes('1.000'));
+ await historyPage.waitForFunction(()=>document.querySelector('#dtn-payload textarea').value.includes('history-002'));
+ assert.equal(await historyPage.locator('#pvt-history-points circle').count(),240);
+ assert.equal(await historyPage.locator('#pvt-history-points circle.selected').getAttribute('data-test-id'),'history-002');
+ await scope.screenshot({path:'build/pvt-history-expanded.png'});
+ await historyPage.keyboard.press('Escape');
+ assert.equal(await scope.getAttribute('role'),null);
+ assert.equal(await historyPage.locator('#dtn-tests').inputValue(),'history-002');
+ await historyPage.locator('#pvt-history-zoom-in').click();
+ assert.match(await historyPage.locator('#pvt-history-summary').innerText(),/수동/);
+ await historyPage.locator('#pvt-history-auto').click();
+ assert.equal(await historyPage.locator('#pvt-history-auto').getAttribute('aria-pressed'),'true');
+
+ await historyPage.locator('#pvt-history-points circle.selected').focus();
+ await historyPage.keyboard.press('ArrowRight');
+ await historyPage.keyboard.press('Enter');
+ assert.equal(await historyPage.locator('#pvt-history-picker').isVisible(),true);
+ await historyPage.keyboard.press('Escape');
+ assert.equal(await historyPage.locator('#pvt-history-picker').isVisible(),false);
+ await historyPage.locator('#dtn-tests').selectOption('waiting-round');
+ await historyPage.waitForFunction(()=>document.getElementById('test-id').textContent==='waiting-round');
+ assert.equal(await historyPage.locator('#pvt-history-points circle').count(),240,'waiting selection preserves previous points');
+ assert.equal(await historyPage.locator('.pvt-details-section').isVisible(),false,'waiting selection does not retain prior PVT details');
+ waitingCompleted=true;
+ historyTrials.push({...historyTrials[0],testId:'waiting-round',ecefMeters:[6378137,2,0]});
+ historyList=historyList.map(p=>p.testId==='waiting-round'?{...p,state:'COMPLETED',dtnReceived:true,receivedEpochs:1,updatedAt:'2'}:p);
+ await historyPage.locator('#dtn-refresh').click();
+ await historyPage.waitForFunction(()=>document.querySelectorAll('#pvt-history-points circle').length===241);
+ const initialRadius=await historyPage.locator('#pvt-history-summary').innerText();
+ assert.match(initialRadius,/2.000 m/);
+ await historyPage.locator('#dtn-tests').selectOption('history-001');
+ historyTrials.push({...historyTrials[2],testId:'arrived-later'});
+ historyList.push(historyJob('arrived-later'));
+ await historyPage.locator('#dtn-refresh').click();
+ await historyPage.waitForFunction(()=>document.querySelectorAll('#pvt-history-points circle').length===242);
+ assert.equal(await historyPage.locator('#dtn-tests').inputValue(),'history-001','new arrival must not replace a selected trial');
+ await historyPage.locator('#pvt-history-zoom-in').click();
+ await historyPage.locator('#pvt-history-zoom-in').click();
+ assert.match(await historyPage.locator('#pvt-history-summary').innerText(),/범위 밖 1개/);
+ await historyPage.locator('#pvt-history-auto').click();
+ await historyPage.locator('#dtn-tests').selectOption('other-group');
+ await historyPage.waitForFunction(()=>document.querySelectorAll('#pvt-history-points circle').length===1);
+ await historyPage.locator('#dtn-tests').selectOption('history-001');
+ await historyPage.waitForFunction(()=>document.querySelectorAll('#pvt-history-points circle').length===242);
+ for(const width of [1366,390]){
+   await historyPage.setViewportSize({width,height:900});
+   await historyPage.locator('#pvt-history-expand').click();
+   await historyPage.screenshot({path:'build/pvt-history-expanded-'+width+'.png'});
+   assert.ok(await scope.evaluate(el=>el.scrollWidth<=el.clientWidth+1),'HUD fits '+width);
+   await historyPage.keyboard.press('Tab');
+   assert.ok(await scope.evaluate(el=>el.contains(document.activeElement)),'keyboard focus stays within enlarged HUD');
+   const thumb=await historyPage.locator('#alt-gauge-thumb-val').boundingBox();
+   const panel=await scope.boundingBox();
+   assert.ok(thumb.x>=panel.x&&thumb.x+thumb.width<=panel.x+panel.width,'vertical value stays inside the enlarged HUD');
+   await historyPage.keyboard.press('Escape');
+   assert.ok(await scope.evaluate(el=>el.scrollWidth<=el.clientWidth+1),'inline HUD fits '+width);
+ }
+ await historyPage.setViewportSize({width:1366,height:900});
+ historyFailure=true;
+ await historyPage.locator('#dtn-refresh').click();
+ await historyPage.waitForFunction(()=>document.getElementById('pvt-history-status').textContent.includes('조회 실패'));
+ assert.equal(await historyPage.locator('#pvt-history-points circle').count(),242,'query failure preserves existing points');
+ historyFailure=false;
+ holdHistory=true;
+ const heldRequest=historyPage.waitForRequest(r=>r.url().includes('/pvt-history'));
+ await historyPage.locator('#dtn-refresh').click();
+ await heldRequest;
+ await historyPage.waitForTimeout(100);
+ await historyPage.locator('#dtn-tests').selectOption('other-group');
+ await historyPage.waitForFunction(()=>document.querySelectorAll('#pvt-history-points circle').length===1);
+ holdHistory=false;historyRelease();
+ await historyPage.waitForTimeout(100);
+ assert.equal(await historyPage.locator('#pvt-history-points circle').count(),1,'late previous-group data must be ignored');
+ await historyPage.locator('#dtn-tests').selectOption('history-001');
+ await historyPage.waitForFunction(()=>document.querySelectorAll('#pvt-history-points circle').length===242);
+ const removedRound=historyTrials.find(p=>p.testId==='history-240');
+ historyTrials=historyTrials.filter(p=>p.testId!=='history-240');
+ await historyPage.locator('#dtn-refresh').click();
+ await historyPage.waitForFunction(()=>document.querySelectorAll('#pvt-history-points circle').length===241);
+ historyTrials.push(removedRound);
+ await historyPage.locator('#dtn-tests').selectOption('legacy-iq');
+ await historyPage.waitForFunction(()=>document.getElementById('test-id').textContent==='legacy-iq');
+ assert.equal(await historyPage.locator('#pvt-history-header').isVisible(),false);
+ assert.equal(await historyPage.locator('#enu-target-point').isVisible(),true,'I/Q keeps its existing single-point renderer');
+ await historyPage.reload();
+ await historyPage.waitForFunction(()=>document.querySelector('#dtn-tests option[value="history-001"]'));
+ await historyPage.locator('#dtn-tests').selectOption('history-001');
+ await historyPage.waitForFunction(()=>document.querySelectorAll('#pvt-history-points circle').length===242);
+ assert.ok(historyReads>2);
+ await historyPage.close();
+
  // COM capture: progress works without WebSocket, download is optional, and trials remain manual.
  const capturedPage=await context.newPage();
  capturedPage.on('pageerror',e=>errors.push(e.message));
