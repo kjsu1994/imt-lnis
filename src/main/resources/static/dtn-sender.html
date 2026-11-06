@@ -249,6 +249,20 @@
         <details class="gnss-details"><summary>시간 상세</summary><pre id="gnss-time-detail"></pre></details>
       </div>
       <p id="dtn-port-status" role="status" hidden></p>
+      <div class="serial-status" aria-label="GNSS 수집">
+        <label id="capture-count-control" class="capture-count" hidden title="위치·속도 PVT가 유효한 Epoch 개수 · 최대 120초 / 1 MiB">
+          유효 Epoch <input id="capture-epoch-target" type="number" min="1" max="50" step="1" value="10" required aria-label="수집할 유효 Epoch 개수">
+        </label>
+        <button id="dtn-start" type="button" hidden disabled title="지정한 유효 Epoch를 확보하면 자동 종료 · 최대 120초 / 1 MiB">GNSS 수집</button>
+        <button id="capture-ubx-download" type="button" title="해당 수집 입력의 RAWX·항법정보 UBX 원문 저장" hidden>UBX 다운로드</button>
+      </div>
+      <div id="dtn-capture-progress" class="capture-progress" hidden role="status" aria-live="polite">
+        <strong id="capture-epoch-count">유효 Epoch 0 / 10</strong>
+        <progress id="capture-epoch-progress" max="10" value="0" aria-label="유효 Epoch 수집"></progress>
+        <span id="capture-elapsed">0초</span>
+        <span id="capture-stage">관측·항법정보 대기</span>
+      </div>
+      <p id="dtn-capture-status" role="status"></p>
     </div>
     <div id="dtn-upload-panel" class="compact-input-row">
       <label>GNSS 파일<input id="dtn-graw-file" type="file" accept=".ubx,.graw,application/octet-stream"></label>
@@ -264,13 +278,6 @@
   <div id="dtn-main-view">
   <section class="sender-actions" aria-label="시험 실행">
     <p id="dtn-message" role="status"></p>
-    <div id="dtn-capture-progress" class="capture-progress" hidden role="status" aria-live="polite">
-      <strong id="capture-epoch-count">유효 Epoch 0 / 10</strong>
-      <progress id="capture-epoch-progress" max="10" value="0" aria-label="유효 Epoch 수집"></progress>
-      <span id="capture-elapsed">0초</span>
-      <span id="capture-stage">관측·항법정보 대기</span>
-    </div>
-    <p id="dtn-capture-status" role="status"></p>
     <div id="capture-decision" class="capture-decision" hidden role="status">
       <strong>PVT 계산 조건을 충족하지 못했습니다.</strong>
       <span>확보한 데이터를 PVT 비교 없이 송수신 시험에 사용할까요?</span>
@@ -296,12 +303,7 @@
         <button id="dtn-cancel-waiting" type="button" hidden title="목록 페이지와 관계없이 수신 대기 시험 전체를 종료합니다. 전송·계산 중인 시험과 기록은 유지됩니다.">대기 전체 종료</button>
         <button id="dtn-cancel" type="button" disabled title="LNIS 시험 대기·계산과 상대 수신 시험을 중지합니다. 이미 어댑터에 전달된 번들의 회수는 보장하지 않습니다.">시험 중지</button>
       </div>
-      <div class="sender-trial-buttons" aria-label="수집 및 전송">
-        <label id="capture-count-control" class="capture-count" hidden title="위치·속도 PVT가 유효한 Epoch 개수 · 최대 120초 / 1 MiB">
-          유효 Epoch <input id="capture-epoch-target" type="number" min="1" max="50" step="1" value="10" required aria-label="수집할 유효 Epoch 개수">
-        </label>
-        <button id="dtn-start" type="button" hidden disabled title="지정한 유효 Epoch를 확보하면 자동 종료 · 최대 120초 / 1 MiB">GNSS 수집</button>
-        <button id="capture-ubx-download" type="button" title="해당 수집 입력의 RAWX·항법정보 UBX 원문 저장" hidden>UBX 다운로드</button>
+      <div class="sender-trial-buttons" aria-label="전송">
         <div class="send-action-wrapper" id="dtn-send-wrapper">
           <button id="dtn-send" type="button" class="primary" disabled>전송시험 시작</button>
           <div id="dtn-send-guide" class="send-guide-popover" role="tooltip" aria-hidden="true">

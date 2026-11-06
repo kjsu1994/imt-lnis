@@ -3753,6 +3753,12 @@ button.satellite-select.constellation-badge[aria-pressed="true"] {
 .pvt-history-controls [aria-pressed="true"] { background:#edf4ff; border-color:#91b4ec; color:#1d4ed8; }
 .history-active #enu-vector-line, .history-active #enu-target-pulse, .history-active #enu-target-point { display:none; }
 .history-active .enu-center-point, .history-active .enu-center-halo { pointer-events:none; }
+.history-active .pvt-history-plane { clip-path:url(#pvt-history-clip); }
+#pvt-history-rings, .history-active #pvt-history-grid { display:none; }
+.history-active #pvt-history-rings { display:block; }
+.history-active #enu-target-svg, .pvt-history-plot { touch-action:none; user-select:none; cursor:grab; }
+.history-active #enu-target-svg.is-panning, .history-active #enu-target-svg.is-panning *,
+.pvt-history-plot.is-panning, .pvt-history-plot.is-panning * { cursor:grabbing!important; }
 .pvt-history-point { stroke:#fff; stroke-width:1.4; cursor:pointer; }
 .pvt-history-point.selected { stroke:#172a42; stroke-width:2.5; }
 .pvt-history-point:focus { outline:none; stroke:#172a42; stroke-width:3.5; }
@@ -3768,38 +3774,35 @@ button.satellite-select.constellation-badge[aria-pressed="true"] {
 .pvt-history-picker button { padding:5px 8px; font-size:11px; }
 #pvt-history-picker-list { display:flex; flex-direction:column; gap:5px; }
 #pvt-history-picker-list button { text-align:left; white-space:normal; }
+/* 전체화면에서는 원형 HUD와 분리된 동일 축척 E/N 좌표판을 사용한다. */
+.history-active > .pvt-visualizer-card { position:relative; }
+.pvt-expanded-views { display:none; }
 .history-expanded { position:fixed; inset:8px; z-index:10010; margin:0!important; padding:0; background:#fff; border-radius:14px; box-shadow:0 0 0 12px #102a4355; overflow:auto; }
-.history-expanded > .pvt-visualizer-card { height:100%; min-height:0; display:flex; flex-direction:column; margin:0; box-sizing:border-box; }
-.history-expanded .pvt-visualizer-layout { flex:1; min-height:0; grid-template-columns:minmax(0,1fr) minmax(200px,260px); align-items:center; }
-.history-expanded .pvt-details-section > :not(.enu-radar-summary-strip) { display:none; }
-.history-expanded .enu-radar-summary-strip { grid-template-columns:1fr; }
-.history-expanded .enu-radar-section, .history-expanded .target-content-area, .history-expanded #target-view-hud, .history-expanded .hud-composite-wrap { height:100%; min-height:0; }
-.history-expanded .enu-radar-container { height:100%; width:auto; flex:1; min-width:0; }
-.history-expanded .enu-radar-container svg { width:100%; height:100%; max-height:calc(100dvh - 195px); }
-.history-expanded .hud-alt-gauge-wrap { height:min(420px,calc(100dvh - 250px)); }
+.history-expanded > .pvt-visualizer-card { height:100%; min-height:0; display:flex; flex-direction:column; margin:0; padding:16px; box-sizing:border-box; position:relative; }
+.history-expanded .pvt-visualizer-layout { display:none; }
+.history-expanded .pvt-history-header { margin-bottom:10px; }
+.history-expanded .pvt-history-footer { margin-top:8px; padding-top:8px; gap:3px 16px; }
+.history-expanded .pvt-expanded-views { display:flex; flex:1; min-height:240px; }
+.pvt-plot-panel { flex:1; display:flex; flex-direction:column; min-width:0; min-height:0; border:1px solid #dbe4ed; border-radius:8px; background:#f8fafc; overflow:hidden; }
+.pvt-plot-heading { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:6px; padding:9px 12px; font-size:12px; }
+.pvt-plot-heading small { color:var(--muted); font-size:11px; }
+.pvt-history-plot { display:block; flex:1; width:100%; min-height:0; overflow:hidden; }
+.pvt-history-plot text { fill:#526579; font:11px sans-serif; pointer-events:none; }
+.pvt-history-plot .plot-grid { stroke:#dbe4ed; stroke-width:1; }
+.pvt-history-plot .plot-zero { stroke:#91a7bc; stroke-width:1.3; }
+.pvt-history-plot .plot-reference { fill:#fff; stroke:#4d6278; stroke-width:1.5; pointer-events:none; }
 @media (max-width:700px) {
   .pvt-history-header { align-items:flex-start; gap:6px; }
   .pvt-history-header small { font-size:10px; }
   .pvt-history-controls { gap:3px; }
   .pvt-history-controls button { min-width:27px; padding:4px 6px; }
-  .history-expanded .pvt-visualizer-layout { grid-template-columns:1fr; gap:6px; }
-  .history-expanded .enu-radar-container svg { max-height:calc(100dvh - 290px); }
-  .history-expanded .pvt-details-section .enu-radar-summary-strip { grid-template-columns:repeat(2,minmax(0,1fr)); gap:5px; }
-  .history-expanded .radar-summary-item { padding:5px; }
-  .history-expanded .summary-val { font-size:14px; }
-  .history-expanded .hud-alt-gauge-wrap { height:min(250px,calc(100dvh - 330px)); }
+  .history-expanded > .pvt-visualizer-card { padding:10px; }
+  .history-expanded .pvt-expanded-views { min-height:260px; }
 }
-
 .pvt-history-origin { display:none; pointer-events:none; fill:#526c86; font:8px sans-serif; }
 .history-active .pvt-history-origin { display:block; }
 .history-active .alt-gauge-thumb { left:auto; right:12px; flex-direction:row-reverse; }
 .history-active .alt-thumb-arrow { transform:rotate(180deg); }
-.history-expanded .target-view-toggle-bar { display:none; }
-@media (max-width:700px) {
-  .history-expanded .pvt-visualizer-layout { grid-template-rows:minmax(0,1fr) auto; align-items:stretch; }
-  .history-expanded .pvt-details-section { align-self:end; }
-}
-
 @media (max-width:700px) {
   .history-active .enu-radar-section { flex-wrap:wrap; min-width:0; }
   .history-active .target-view-toggle-bar { width:100%; }
@@ -3810,5 +3813,4 @@ button.satellite-select.constellation-badge[aria-pressed="true"] {
   .history-active .hud-alt-gauge-wrap { height:260px; }
   .history-active .pvt-details-section { min-width:0; }
   .history-active .wgs84-comparison-wrap { max-width:100%; overflow-x:auto; }
-  .history-expanded .enu-radar-container, .history-expanded .hud-alt-gauge-wrap { height:100%; max-height:calc(100dvh - 340px); }
 }

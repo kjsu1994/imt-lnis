@@ -9,11 +9,11 @@ const html = readFileSync(new URL('../../main/resources/static/dtn-sender.html',
 const capturePanel = html.split('id="dtn-capture-panel"')[1].split('</div>')[0];
 const settingsMarkup = html.split('id="dtn-settings-view"')[1].split('id="dtn-main-view"')[0];
 const mainMarkup = html.split('id="dtn-main-view"')[1];
-for (const id of ['dtn-send-url', 'dtn-receiver-ip', 'dtn-port', 'dtn-baud', 'dtn-graw-file', 'dtn-upload', 'iq-saved', 'iq-delete', 'dtn-development']) {
+for (const id of ['dtn-send-url', 'dtn-receiver-ip', 'dtn-port', 'dtn-baud', 'dtn-graw-file', 'dtn-upload', 'iq-saved', 'iq-delete', 'dtn-development', 'dtn-start', 'capture-epoch-target', 'capture-ubx-download', 'dtn-capture-progress']) {
   assert.ok(settingsMarkup.includes('id="' + id + '"'), id + ' belongs in settings');
   assert.ok(!mainMarkup.includes('id="' + id + '"'));
 }
-for (const id of ['dtn-start', 'dtn-send', 'iq-generate', 'iq-cancel', 'iq-file', 'dtn-observations', 'dtn-payload', 'dtn-log']) {
+for (const id of ['dtn-send', 'iq-generate', 'iq-cancel', 'iq-file', 'dtn-observations', 'dtn-payload', 'dtn-log']) {
   assert.ok(mainMarkup.includes('id="' + id + '"'), id + ' stays on main view');
   assert.ok(!settingsMarkup.includes('id="' + id + '"'));
 }
@@ -569,7 +569,8 @@ for (const [state, verdict, label, tone] of [
   assert.equal(context.trialOption({testId: 'sample-id', state, verdict}, '오늘').className, 'trial-' + tone);
 }
 assert.match(html, /class="sender-trial-toolbar"/);
-assert.match(html, /class="sender-trial-buttons"[\s\S]*id="dtn-start"[\s\S]*id="dtn-send"/);
+assert.match(settingsMarkup, /id="capture-count-control"[\s\S]*id="dtn-start"[\s\S]*id="capture-ubx-download"/);
+assert.match(mainMarkup, /class="sender-trial-buttons"[\s\S]*id="dtn-send"/);
 vm.runInContext("busy=false; config.sendBusy=false; config.delaySupported=true; job=null; selectedType='GNSS_RAW'; agents[0].state='READY'; pendingCapture={inputId:'pending'}; inputId=null;", context);
 context.updateControls();
 assert.equal(elements.get('dtn-send').disabled, true);

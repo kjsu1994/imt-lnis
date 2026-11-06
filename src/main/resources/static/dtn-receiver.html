@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>LNIS DTN Receiver</title>
   <link rel="stylesheet" href="/lnis/assets/common/app.css?v=20261103-system-logo-v2">
-  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20261105-pvt-history-20261105-receiver-flow-left">
+  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20261106-reference-rings">
 </head>
 <body data-page="dtn-receiver">
 <header style="position: relative;">
@@ -179,6 +179,12 @@
             <button type="button" id="pvt-history-expand" title="HUD 크게 보기" aria-label="HUD 크게 보기" aria-pressed="false">⛶</button>
           </div>
         </div>
+        <div class="pvt-expanded-views" aria-label="위치 편차 전체 분포">
+          <section class="pvt-plot-panel">
+            <div class="pvt-plot-heading"><strong>전체 분포</strong><small title="마우스 위치를 중심으로 확대·축소합니다.">드래그 이동 · 휠 확대/축소</small></div>
+            <svg id="pvt-history-overview" class="pvt-history-plot" aria-label="Reference 대비 전체 수평 편차"></svg>
+          </section>
+        </div>
         <div class="pvt-visualizer-layout">
           <!-- 좌측 (1/3): 고시인성 국소 ENU 레이더 타깃 & 3D 큐브 -->
           <div class="enu-radar-section">
@@ -215,29 +221,38 @@
                           <stop offset="70%" stop-color="#f8fafc" stop-opacity="0.85" />
                           <stop offset="100%" stop-color="#e2e8f0" stop-opacity="0.9" />
                         </radialGradient>
+                        <clipPath id="pvt-history-clip">
+                          <circle cx="0" cy="0" r="145"/>
+                        </clipPath>
                       </defs>
 
                       <!-- 레이더 배경 바탕 원 -->
                       <circle cx="0" cy="0" r="145" fill="url(#radar-bg)" />
 
-                      <!-- 동심원 링 (140, 95, 50) -->
-                      <circle cx="0" cy="0" r="140" class="enu-ring ring-outer" />
-                      <circle cx="0" cy="0" r="95" class="enu-ring ring-mid" />
-                      <circle cx="0" cy="0" r="50" class="enu-ring ring-inner" />
+                      <g class="pvt-history-plane">
+                        <g id="pvt-history-grid">
+                          <title>Reference 기준 거리 눈금</title>
+                          <!-- 동심원 링 (140, 95, 50) -->
+                          <circle cx="0" cy="0" r="140" class="enu-ring ring-outer" />
+                          <circle cx="0" cy="0" r="95" class="enu-ring ring-mid" />
+                          <circle cx="0" cy="0" r="50" class="enu-ring ring-inner" />
 
-                      <!-- 45도 보조 점선 축 -->
-                      <line x1="-100" y1="-100" x2="100" y2="100" class="enu-diagonal" />
-                      <line x1="-100" y1="100" x2="100" y2="-100" class="enu-diagonal" />
+                          <!-- 45도 보조 점선 축 -->
+                          <line x1="-100" y1="-100" x2="100" y2="100" class="enu-diagonal" />
+                          <line x1="-100" y1="100" x2="100" y2="-100" class="enu-diagonal" />
 
-                      <!-- 십자 주 축선 -->
-                      <line x1="-165" y1="0" x2="165" y2="0" class="enu-axis" />
-                      <line x1="0" y1="-165" x2="0" y2="165" class="enu-axis" />
+                          <!-- 동심원 반경 눈금 라벨 (축 우측에 깔끔 배치) -->
+                          <text id="enu-ring-outer-label" x="6" y="-128" class="enu-ring-label">1.0 mm</text>
+                          <text id="enu-ring-mid-label" x="6" y="-83" class="enu-ring-label">0.67 mm</text>
+                          <text id="enu-ring-inner-label" x="6" y="-38" class="enu-ring-label">0.33 mm</text>
 
-                      <!-- 동심원 반경 눈금 라벨 (축 우측에 깔끔 배치) -->
-                      <text id="enu-ring-outer-label" x="6" y="-128" class="enu-ring-label">1.0 mm</text>
-                      <text id="enu-ring-mid-label" x="6" y="-83" class="enu-ring-label">0.67 mm</text>
-                      <text id="enu-ring-inner-label" x="6" y="-38" class="enu-ring-label">0.33 mm</text>
-
+                        </g>
+                      </g>
+                      <g id="pvt-history-rings" class="pvt-history-plane" aria-label="Reference 기준 거리 눈금"></g>
+                      <g id="pvt-history-axes" class="pvt-history-plane">
+                        <line x1="-165" y1="0" x2="165" y2="0" class="enu-axis" />
+                        <line x1="0" y1="-165" x2="0" y2="165" class="enu-axis" />
+                      </g>
                       <!-- 방위 지시 화살표 & 라벨 (화살표와 글씨 겹침 완전 방지) -->
                       <polygon points="0,-176 -6,-164 6,-164" class="enu-pointer-n" />
                       <text x="0" y="-148" class="enu-cardinal-label cardinal-n">N (+North)</text>
@@ -251,16 +266,20 @@
                       <polygon points="-176,0 -164,-6 -164,6" class="enu-pointer-w" />
                       <text x="-156" y="-9" class="enu-cardinal-label cardinal-w">W (-West)</text>
 
-                      <!-- 송신 기준 중심점 (0,0) -->
-                      <circle cx="0" cy="0" r="7" class="enu-center-halo" />
-                      <circle cx="0" cy="0" r="3.5" class="enu-center-point" title="비교 기준 원점 (0, 0)" />
+                      <g class="pvt-history-plane">
+                        <g id="pvt-history-origin-layer">
+                          <!-- 송신 기준 중심점 (0,0) -->
+                          <circle cx="0" cy="0" r="7" class="enu-center-halo" />
+                          <circle cx="0" cy="0" r="3.5" class="enu-center-point" title="비교 기준 원점 (0, 0)" />
 
-                      <!-- 편차 벡터 선 및 수신 복원 타깃 점 -->
-                      <line id="enu-vector-line" x1="0" y1="0" x2="0" y2="0" class="enu-vector-line" />
-                      <circle id="enu-target-pulse" cx="0" cy="0" r="12" class="enu-target-pulse" />
-                      <circle id="enu-target-point" cx="0" cy="0" r="6" class="enu-target-point" title="수신 복원 위치" />
-                      <g id="pvt-history-points" aria-label="시험별 수평 편차"></g>
-                      <text x="0" y="17" text-anchor="middle" class="pvt-history-origin">Reference</text>
+                          <!-- 편차 벡터 선 및 수신 복원 타깃 점 -->
+                          <line id="enu-vector-line" x1="0" y1="0" x2="0" y2="0" class="enu-vector-line" />
+                          <circle id="enu-target-pulse" cx="0" cy="0" r="12" class="enu-target-pulse" />
+                          <circle id="enu-target-point" cx="0" cy="0" r="6" class="enu-target-point" title="수신 복원 위치" />
+                          <text x="0" y="17" text-anchor="middle" class="pvt-history-origin">Reference</text>
+                        </g>
+                        <g id="pvt-history-points" aria-label="시험별 수평 편차"></g>
+                      </g>
                     </svg>
                   </div>
 
@@ -324,10 +343,6 @@
 
             <!-- 타깃 정밀 오차 호버 인스펙터 팝오버 -->
             <div id="pvt-target-tooltip" class="pvt-target-tooltip" hidden></div>
-            <div id="pvt-history-picker" class="pvt-history-picker" hidden>
-              <div><strong id="pvt-history-picker-title"></strong><button type="button" id="pvt-history-picker-close" aria-label="겹친 시험 목록 닫기">✕</button></div>
-              <div id="pvt-history-picker-list"></div>
-            </div>
           </div>
 
           <!-- 우측 (2/3): 편차 지표 요약 + WGS-84 대조표 + ENU 축별 성분 분해 -->
@@ -414,6 +429,10 @@
               </div>
             </div>
           </div>
+        </div>
+        <div id="pvt-history-picker" class="pvt-history-picker" hidden>
+          <div><strong id="pvt-history-picker-title"></strong><button type="button" id="pvt-history-picker-close" aria-label="겹친 시험 목록 닫기">✕</button></div>
+          <div id="pvt-history-picker-list"></div>
         </div>
         <div id="pvt-history-footer" class="pvt-history-footer" hidden>
           <div id="pvt-history-legend" class="pvt-history-legend"></div>
@@ -537,6 +556,6 @@
   <span class="software-version" title="소프트웨어 버전" aria-label="소프트웨어 버전 @lnisVersion@">v@lnisVersion@</span>
 </footer>
 
-<script type="module" src="/lnis/assets/dtn/dtn-receiver.js?v=20261105-pvt-history-2"></script>
+<script type="module" src="/lnis/assets/dtn/dtn-receiver.js?v=20261106-reference-rings"></script>
 </body>
 </html>

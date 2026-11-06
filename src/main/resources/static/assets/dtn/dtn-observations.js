@@ -1314,7 +1314,6 @@ export function createObservationView(container, onSelect = () => {}, role = '')
     const reasons = container.querySelector('[data-pvt-status-reasons]');
     reasons.replaceChildren();
     const messages = [...state.reasons];
-    if (role === '수신 원본' && report?.clockWarning) messages.push(report.clockWarning);
     for (const reason of messages) {
       const item = document.createElement('li');
       item.textContent = reason;

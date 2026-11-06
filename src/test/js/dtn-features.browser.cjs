@@ -815,12 +815,12 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
  const historyReference={week:2400,towSeconds:1000,positionValid:true,velocityValid:true,
    ecefMeters:[6378137,0,0],velocityMetersPerSecond:[0,0,0],receiverClockBiasSeconds:0,satellitesUsed:6};
  let historyTrials=Array.from({length:240},(_,i)=>{
-   const e=i<2?0.002:i===3?0:0.012*Math.cos(i*0.73);
-   const n=i<2?0.003:i===3?0:0.012*Math.sin(i*0.73);
+   const e=i<2?0.002:i===2?0.00201:i===3?0:0.012*Math.cos(i*0.73);
+   const n=i<2?0.003:i===2?0.003005:i===3?0:0.012*Math.sin(i*0.73);
    return {testId:'history-'+String(i+1).padStart(3,'0'),state:'COMPLETED',senderMode:i%2?'HDTN':'DTN',
      receiverMode:i%4<2?'DTN':'HDTN',startedAt:new Date(Date.UTC(2026,10,5,0,0,i)).toISOString(),
      receivedAt:new Date(Date.UTC(2026,10,5,0,0,i+1)).toISOString(),delaySeconds:1,
-     availability:'AVAILABLE',ecefMeters:[6378137+(i===1?2:0.001),e,n]};
+     availability:'AVAILABLE',clockWarning:'수신 시험 시각 미보정 또는 마지막 보정 후 5분 경과',ecefMeters:[6378137+(i===1?2:0.001),e,n]};
  });
  const historyJob=(id,key=historyKey)=>({testId:id,pvtHistoryKey:key,testType:'GNSS_RAW',
    selectedEpoch:{recordIndex:4,week:2400,towSeconds:1000},state:'COMPLETED',
@@ -838,7 +838,7 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
      const other=path.includes('/other-group/');
      if(historyFailure)return route.fulfill({status:500,json:{message:'history unavailable'}});
      if(holdHistory&&!other)await new Promise(resolve=>historyRelease=resolve);
-     const trials=other?[{...historyTrials[2],testId:'other-group'}]:historyTrials;
+     const trials=other?[{...historyTrials[2],testId:'other-group',ecefMeters:[6378137,-0.00003,-0.00007]}]:historyTrials;
      return route.fulfill({json:{historyKey:other?otherHistoryKey:historyKey,testType:'GNSS_RAW',
        selectedEpoch:{recordIndex:4,week:2400,towSeconds:1000},referenceEcefMeters:[6378137,0,0],
        total:trials.length+(other||waitingCompleted?0:1),waiting:other||waitingCompleted?0:1,unavailable:0,trials}});
@@ -869,12 +869,87 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
  assert.ok(position.x>0&&position.y<0,'east is right and north is up');
  assert.equal(await historyPage.locator('#pvt-history-legend span').count(),4);
  const scope=historyPage.locator('#pvt-geodetic-visualizer');
+ const overview=historyPage.locator('#pvt-history-overview');
+ async function checkNavigation(plot) {
+   await plot.scrollIntoViewIfNeeded();
+   const dot=plot.locator('[data-test-id="history-001"]');
+   const plotId=await plot.getAttribute('id');
+   const center=id=>historyPage.evaluate(({plotId,id})=>{
+     const el=document.getElementById(plotId).querySelector('[data-test-id="'+id+'"]');
+     const b=el.getBoundingClientRect();
+     return {x:b.x+b.width/2,y:b.y+b.height/2};
+   },{plotId,id});
+   const original=await center('history-001'), jobId=await historyPage.locator('#test-id').innerText();
+   const label=await dot.getAttribute('aria-label');
+   const rings=historyPage.locator('#pvt-history-rings');
+   const ringX=plotId==='enu-target-svg' ? Number(await rings.locator('circle').first().getAttribute('cx')) : null;
+   await historyPage.mouse.move(original.x,original.y);
+   await historyPage.mouse.down();
+   await historyPage.mouse.move(original.x+24,original.y+18,{steps:8});
+   await historyPage.mouse.up();
+   await historyPage.evaluate(()=>new Promise(requestAnimationFrame));
+   const moved=await center('history-001');
+   assert.ok(Math.abs(moved.x-original.x-24)<2&&Math.abs(moved.y-original.y-18)<2,'drag follows the pointer');
+   assert.equal(await historyPage.locator('#test-id').innerText(),jobId,'drag must not select a different trial');
+   assert.equal(await historyPage.locator('#pvt-history-picker').isVisible(),false,'drag must not open overlapping trial picker');
+   assert.equal(await dot.getAttribute('aria-label'),label,'panning never changes measurements');
+   if(plotId==='enu-target-svg') assert.ok(Number(await rings.locator('circle').first().getAttribute('cx'))>ringX,'Reference distance rings follow pan');
+   const other=await center('history-004'), initialDistance=Math.hypot(moved.x-other.x,moved.y-other.y);
+   const scroll=await historyPage.evaluate(()=>scrollY);
+   await historyPage.mouse.move(moved.x,moved.y);
+   await historyPage.mouse.wheel(0,-200);
+   await historyPage.waitForFunction(({plotId,initialDistance})=>{
+     const root=document.getElementById(plotId);
+     const a=root.querySelector('[data-test-id="history-001"]').getBoundingClientRect();
+     const b=root.querySelector('[data-test-id="history-004"]').getBoundingClientRect();
+     return Math.hypot(a.x+a.width/2-b.x-b.width/2,a.y+a.height/2-b.y-b.height/2)>initialDistance*1.2;
+   },{plotId,initialDistance});
+   const zoomed=await center('history-001');
+   assert.ok(Math.hypot(zoomed.x-moved.x,zoomed.y-moved.y)<2,'wheel zoom keeps the point under the pointer');
+   assert.equal(await historyPage.evaluate(()=>scrollY),scroll,'wheel over the plot must not scroll the page');
+   assert.equal(await dot.getAttribute('aria-label'),label,'zoom never changes measurements');
+   await historyPage.mouse.wheel(0,200);
+   await historyPage.waitForFunction(({plotId,initialDistance})=>{
+     const root=document.getElementById(plotId);
+     const a=root.querySelector('[data-test-id="history-001"]').getBoundingClientRect();
+     const b=root.querySelector('[data-test-id="history-004"]').getBoundingClientRect();
+     return Math.abs(Math.hypot(a.x+a.width/2-b.x-b.width/2,a.y+a.height/2-b.y-b.height/2)-initialDistance)<0.5;
+   },{plotId,initialDistance});
+   if(plotId==='enu-target-svg'){
+     const anchor=await center('history-001');
+     await historyPage.mouse.move(anchor.x,anchor.y);
+     for(let i=0;i<24;i++){
+       const current=await center('history-001');
+       await historyPage.mouse.move(current.x,current.y);
+       const previous=await historyPage.locator('#pvt-history-summary').textContent();
+       await historyPage.mouse.wheel(0,-400);
+       await historyPage.waitForFunction(previous=>document.getElementById('pvt-history-summary').textContent!==previous,previous);
+     }
+     assert.ok(await rings.locator('path').count()>0,'Reference rings remain visible with the origin outside the viewport');
+     assert.equal(await rings.locator('circle').count(),0,'distant rings use local arcs instead of huge SVG circles');
+     const precise=await center('history-001');
+     assert.ok(Math.hypot(precise.x-anchor.x,precise.y-anchor.y)<30,'deep zoom remains stable when following a point');
+     assert.ok(await dot.evaluate(el=>Math.hypot(Number(el.getAttribute('cx')),Number(el.getAttribute('cy')))<=140),'rendered coordinates stay local at deep zoom');
+   }
+   await historyPage.locator('#pvt-history-auto').click();
+   const restored=await center('history-001');
+   assert.ok(Math.hypot(restored.x-original.x,restored.y-original.y)<2,'automatic view resets pan and zoom');
+ }
+ await checkNavigation(historyPage.locator('#enu-target-svg'));
+
  await scope.screenshot({path:'build/pvt-history-inline.png'});
  await historyPage.locator('#pvt-history-expand').click();
  assert.equal(await scope.getAttribute('role'),'dialog');
  let bounds=await scope.boundingBox();
  assert.ok(bounds.width>=1340&&bounds.height>=875,'enlarged HUD fills viewport');
- await historyPage.locator('#pvt-history-points circle[data-test-id="history-001"]').click();
+ assert.equal(await historyPage.locator('#pvt-history-detail').count(),0,'fullscreen detail panel was removed');
+ assert.equal(await overview.locator('[data-test-id]').count(),240);
+ assert.equal(await historyPage.locator('#enu-target-svg').isVisible(),false,'fullscreen uses the rectangular plot');
+ assert.doesNotMatch(await overview.locator('[data-test-id="history-001"]').getAttribute('aria-label'),/미보정|5분 경과/);
+ assert.equal(await overview.locator('.pvt-history-point.selected').getAttribute('r'),'9','fullscreen selection is easier to click');
+ assert.equal(await overview.locator('.pvt-history-point:not(.selected)').first().getAttribute('r'),'7');
+ await checkNavigation(overview);
+ await historyPage.locator('#pvt-history-overview circle[data-test-id="history-001"]').click();
  await historyPage.waitForFunction(()=>!document.getElementById('pvt-history-picker').hidden);
  await historyPage.locator('#pvt-history-picker-list button[title="history-002"]').click();
  await historyPage.waitForFunction(()=>document.getElementById('test-id').textContent==='history-002');
@@ -886,6 +961,7 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
  await scope.screenshot({path:'build/pvt-history-expanded.png'});
  await historyPage.keyboard.press('Escape');
  assert.equal(await scope.getAttribute('role'),null);
+ assert.match(await historyPage.locator('#pvt-history-summary').innerText(),/반경 2.00 cm · 자동/);
  assert.equal(await historyPage.locator('#dtn-tests').inputValue(),'history-002');
  await historyPage.locator('#pvt-history-zoom-in').click();
  assert.match(await historyPage.locator('#pvt-history-summary').innerText(),/수동/);
@@ -902,6 +978,11 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
  await historyPage.waitForFunction(()=>document.getElementById('test-id').textContent==='waiting-round');
  assert.equal(await historyPage.locator('#pvt-history-points circle').count(),240,'waiting selection preserves previous points');
  assert.equal(await historyPage.locator('.pvt-details-section').isVisible(),false,'waiting selection does not retain prior PVT details');
+ await historyPage.locator('#pvt-history-expand').click();
+ assert.equal(await overview.locator('[data-test-id]').count(),240);
+ assert.equal(await overview.locator('[aria-pressed="true"]').count(),0,'waiting trial has no selected point');
+ await historyPage.keyboard.press('Escape');
+
  waitingCompleted=true;
  historyTrials.push({...historyTrials[0],testId:'waiting-round',ecefMeters:[6378137,2,0]});
  historyList=historyList.map(p=>p.testId==='waiting-round'?{...p,state:'COMPLETED',dtnReceived:true,receivedEpochs:1,updatedAt:'2'}:p);
@@ -921,20 +1002,38 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
  await historyPage.locator('#pvt-history-auto').click();
  await historyPage.locator('#dtn-tests').selectOption('other-group');
  await historyPage.waitForFunction(()=>document.querySelectorAll('#pvt-history-points circle').length===1);
+ await historyPage.locator('#pvt-history-expand').click();
+ const referenceLabel=overview.locator('text').filter({hasText:/^Reference$/});
+ assert.equal(await referenceLabel.count(),1);
+ const referenceBox=await referenceLabel.boundingBox(), detailBox=await overview.boundingBox();
+ assert.ok(referenceBox.x>=detailBox.x&&referenceBox.x+referenceBox.width<=detailBox.x+detailBox.width,'Reference label stays inside the plot');
+ await historyPage.keyboard.press('Escape');
  await historyPage.locator('#dtn-tests').selectOption('history-001');
  await historyPage.waitForFunction(()=>document.querySelectorAll('#pvt-history-points circle').length===242);
  for(const width of [1366,390]){
    await historyPage.setViewportSize({width,height:900});
+   await historyPage.locator('#pvt-history-zoom-in').click();
+   const inlineScale=await historyPage.locator('#pvt-history-summary').innerText();
    await historyPage.locator('#pvt-history-expand').click();
    await historyPage.screenshot({path:'build/pvt-history-expanded-'+width+'.png'});
    assert.ok(await scope.evaluate(el=>el.scrollWidth<=el.clientWidth+1),'HUD fits '+width);
+   await historyPage.evaluate(()=>document.activeElement.blur());
    await historyPage.keyboard.press('Tab');
-   assert.ok(await scope.evaluate(el=>el.contains(document.activeElement)),'keyboard focus stays within enlarged HUD');
-   const thumb=await historyPage.locator('#alt-gauge-thumb-val').boundingBox();
-   const panel=await scope.boundingBox();
-   assert.ok(thumb.x>=panel.x&&thumb.x+thumb.width<=panel.x+panel.width,'vertical value stays inside the enlarged HUD');
+   assert.ok(await scope.evaluate(el=>el.contains(document.activeElement)),'keyboard focus returns to enlarged HUD after a point leaves the view');
+   assert.equal(await overview.locator('[data-test-id]').count(),242,'automatic rectangular view contains every result');
+   for(const plot of [overview]){
+     const box=await plot.boundingBox(), panel=await scope.boundingBox();
+     assert.ok(box.width>panel.width-70&&box.height>300,'single plot uses the full available width at '+width);
+     assert.ok(box.x>=panel.x&&box.x+box.width<=panel.x+panel.width+1,'plot stays inside enlarged HUD');
+     assert.ok(await plot.evaluate(el=>[...el.querySelectorAll('[data-test-id]')].every(dot=>{
+       const x=Number(dot.getAttribute('cx')), y=Number(dot.getAttribute('cy'));
+       return x>=62&&x<=el.viewBox.baseVal.width-22&&y>=14&&y<=el.viewBox.baseVal.height-38;
+     })),'points remain within rectangular axes');
+   }
    await historyPage.keyboard.press('Escape');
    assert.ok(await scope.evaluate(el=>el.scrollWidth<=el.clientWidth+1),'inline HUD fits '+width);
+   assert.equal(await historyPage.locator('#pvt-history-summary').innerText(),inlineScale,'fullscreen preserves the prior inline scale');
+   await historyPage.locator('#pvt-history-auto').click();
  }
  await historyPage.setViewportSize({width:1366,height:900});
  historyFailure=true;
@@ -1010,9 +1109,9 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
  await capturedPage.goto(base+'/sender');
  await capturedPage.locator('#dtn-settings-open').click();
  await capturedPage.locator('.input-mode[data-input-mode="capture"]').click();
- await capturedPage.locator('#dtn-settings-close').click();
  assert.equal(await capturedPage.locator('#capture-epoch-target').inputValue(),'10');
  await capturedPage.waitForFunction(()=>!document.getElementById('dtn-start').disabled);
+ await capturedPage.locator('#dtn-capture-panel').screenshot({path:'build/com-connected.png'});
  for(const bad of ['0','1.5','51']){
    await capturedPage.locator('#capture-epoch-target').fill(bad);
    await capturedPage.locator('#dtn-start').click();
@@ -1023,14 +1122,14 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
  await capturedPage.waitForFunction(()=>document.getElementById('capture-epoch-count').textContent==='유효 Epoch 3 / 10');
  await capturedPage.waitForFunction(()=>document.getElementById('capture-elapsed').textContent!=='0초');
  assert.equal(captureRequests[0].epochCount,10);
- assert.equal(await capturedPage.locator('#dtn-message').innerText(),'GNSS 수집 중');
+ assert.equal(await capturedPage.locator('#dtn-message').textContent(),'GNSS 수집 중');
  assert.equal(await capturedPage.locator('#capture-epoch-target').isDisabled(),true);
  assert.match(await capturedPage.locator('#dtn-capture-status').innerText(),/수신 RAWX 12/);
  assert.equal(await capturedPage.locator('#capture-ubx-download').isVisible(),false);
  for(const width of [1366,390]){
    await capturedPage.setViewportSize({width,height:900});
    assert.ok(await capturedPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'capture progress fits '+width);
-   await capturedPage.locator('.sender-actions').screenshot({path:'build/capture-progress-'+width+'.png'});
+   await capturedPage.locator('#dtn-capture-panel').screenshot({path:'build/capture-progress-'+width+'.png'});
  }
  captureFinished=true;
  await capturedPage.waitForFunction(()=>document.getElementById('dtn-input-state').textContent==='수집 완료 · 유효 Epoch 10개');
@@ -1040,11 +1139,13 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
  await capturedPage.locator('#capture-ubx-download').click();
  await downloadPromise;assert.equal(downloads,1);
  assert.equal(captureObservations().epochs.length,10);
+ await capturedPage.locator('#dtn-settings-close').click();
  const epochSelect=capturedPage.locator('#dtn-observations select[data-epoch]');
  assert.equal(await epochSelect.locator('option').count(),10);
  await epochSelect.selectOption('2');
  assert.match(await capturedPage.locator('#dtn-gnss-time').innerText(),/1002/);
  await capturedPage.setViewportSize({width:1366,height:900});
+ await capturedPage.locator('#dtn-settings-open').click();
  for(const count of [1,3,50]){
    await capturedPage.locator('#capture-epoch-target').fill(String(count));
    await capturedPage.locator('#dtn-start').click();

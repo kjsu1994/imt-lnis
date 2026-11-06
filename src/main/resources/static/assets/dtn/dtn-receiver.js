@@ -1,11 +1,11 @@
 import {parseNodeAddress, renderTrialSettings, trialTypeLabel, trialOption, colorTrialSelection, initWaitingCancellation, initTrialSettingsDialog} from './dtn-settings.js?v=20261104-peer-address-validation-2';
 import {requestJson} from '../common/http.js?v=20261103-management-reset';
-import {createPvtHistory} from './dtn-pvt-history.js?v=20261105-2';
+import {createPvtHistory} from './dtn-pvt-history.js?v=20261106-reference-rings';
 import {initGnssControls} from './dtn-gnss.js?v=20261104-serial-controls';
 import {createDtnLog} from './dtn-log.js?v=20261103-management-reset';
 import {initAdapterHealth} from './dtn-adapter-health.js?v=20261026-frame6';
 import {createPayloadViewer} from './dtn-payload.js?v=20261026-frame6';
-import {createObservationView, numeric, renderClockBias} from './dtn-observations.js?v=20261104-receiver-epoch-ui-v2';
+import {createObservationView, numeric, renderClockBias} from './dtn-observations.js?v=20261106-observation-status';
 
 const $ = id => document.getElementById(id);
 const payloadViewer = createPayloadViewer($('dtn-payload'), {receivedOnly: true});

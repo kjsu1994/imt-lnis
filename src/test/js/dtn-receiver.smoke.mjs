@@ -1,15 +1,39 @@
 import {pageSource} from './browser-source.mjs';
 import {numeric, renderClockBias} from '../../main/resources/static/assets/dtn/dtn-observations.js';
 import assert from 'node:assert/strict';
-import {historyDistance, historyRadius} from '../../main/resources/static/assets/dtn/dtn-pvt-history.js';
+import {historyDistance, historyRadius, historyExtent, historyViewport, historyRings} from '../../main/resources/static/assets/dtn/dtn-pvt-history.js';
 assert.equal(historyDistance(0),'0.000 mm');
 assert.equal(historyDistance(1e-9),'1.00e-9 m');
 assert.equal(historyDistance(-1e-9),'-1.00e-9 m');
 assert.equal(historyDistance(1e-6),'0.001 mm');
 assert.equal(historyRadius(0),0.001);
+for (const [e,n,radius] of [[0,0,0.002],[0.001,0.001,0.002],[0.001,0.001,1e-9],[2,0,1e-9]]) {
+  const rings=historyRings(e,n,radius);
+  assert.ok(rings.length>=2&&rings.length<=12,'visible radial grid stays bounded');
+  for(const ring of rings) {
+    assert.ok(Number.isFinite(ring.labelX)&&Number.isFinite(ring.labelY));
+    assert.ok(ring.meters>0);
+    if(ring.path) {
+      const coordinates=ring.path.match(/[-+]?[0-9]*\.?[0-9]+(?:e[-+]?[0-9]+)?/gi).map(Number);
+      assert.ok(coordinates.every(v=>Number.isFinite(v)&&Math.abs(v)<350),'deep zoom arc coordinates remain local');
+    } else assert.ok(Math.hypot(ring.x,ring.y)<=290);
+  }
+}
+
 assert.equal(historyRadius(0.012),0.02);
 assert.equal(historyRadius(2),5);
 assert.equal(historyRadius(2300),5000);
+const spread = [{e:200,n:0.003},{e:-0.002,n:0.00301}];
+const extent = historyExtent(spread);
+assert.deepEqual(extent,{minE:-0.002,maxE:200,minN:0,maxN:0.00301});
+const wide = historyViewport(extent,1200,700);
+assert.ok(wide.minE < -0.002 && wide.maxE > 200 && wide.minN < 0 && wide.maxN > 0.00301);
+assert.ok(Math.abs((wide.maxE-wide.minE)/wide.plotWidth - (wide.maxN-wide.minN)/wide.plotHeight) < 1e-12);
+assert.deepEqual(historyExtent(spread,extent),extent,'redrawing must not grow padded bounds');
+assert.deepEqual(historyExtent([],extent),extent,'automatic bounds must not shrink');
+assert.ok(historyViewport(historyExtent([]),400,300).scale > 0,'empty and coincident points have a usable scale');
+assert.ok(historyViewport(historyExtent([{e:0,n:0}]),390,900).scale > 0);
+
 
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
