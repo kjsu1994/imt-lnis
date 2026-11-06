@@ -21,6 +21,11 @@ public class WebPageController {
         return "forward:/user-manual/index.html";
     }
 
+    @GetMapping("/user-manual/lnis-user-manual.pdf")
+    String previousManualPdf() {
+        return "redirect:/user-manual/user-manual.pdf";
+    }
+
     @GetMapping("/dtn-intro")
     String dtnIntro() {
         return "forward:/dtn-intro.html";

@@ -1,11 +1,11 @@
 <!doctype html>
 <html lang="ko" xmlns="http://www.w3.org/1999/html">
 <head>
-  <link rel="icon" type="image/png" href="/lnis/assets/common/logo_v3.png?v=995392000e36">
+  <link rel="icon" type="image/svg+xml" href="/lnis/assets/common/transfer-mark.svg?v=20261106">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="GNSS 데이터의 DTN/HDTN 전송 과정과 지연·PVT 비교 시험을 설명하는 대화형 안내">
-  <title>LNIS · 시험 구조와 동작 안내</title>
+  <title>GNSS 전송 시험 · 동작 안내</title>
   <style>
 
     :root {
@@ -274,8 +274,8 @@
             </svg>
             <div class="pc-boundary tx-pc"><strong><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14v13H5zM2 20h20l-3-4H5z"/></svg>송신부 PC</strong></div>
             <div class="pc-boundary rx-pc"><strong><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14v13H5zM2 20h20l-3-4H5z"/></svg>수신부 PC</strong></div>
-            <div class="scope-boundary tx-service"><strong>LNIS 송신 서비스</strong></div>
-            <div class="scope-boundary rx-service"><strong>LNIS 수신 서비스</strong></div>
+            <div class="scope-boundary tx-service"><strong>송신 서비스</strong></div>
+            <div class="scope-boundary rx-service"><strong>수신 서비스</strong></div>
             <div class="scope-boundary tx-routing"><strong>어댑터 · 라우터</strong></div>
             <div class="scope-boundary rx-routing"><strong>어댑터 · 라우터</strong></div>
             <button type="button" id="tx-adapter" class="adapter-node" data-link="send" title="POST /transfers">송신 어댑터 · REST JSON</button>
@@ -356,7 +356,7 @@
                     </tbody>
                   </table>
                 </div>
-                <p class="fine">RAWX는 위성 관측값, SFRBX는 위성이 보낸 항법 메시지입니다. 관측값이 있다고 항법정보가 모두 확보됐다는 뜻은 아닙니다. LNIS는 u-blox LNAV 720비트 복원에 필요한 정보를 <strong>SB2(801 / 1,176 bits)</strong>에 저장합니다. 미사용 <strong>SB3(846 bits)</strong>는 <code>0101…</code> 패딩으로 채웁니다.</p>
+                <p class="fine">RAWX는 위성 관측값, SFRBX는 위성이 보낸 항법 메시지입니다. 관측값이 있다고 항법정보가 모두 확보됐다는 뜻은 아닙니다. 서비스는 u-blox LNAV 720비트 복원에 필요한 정보를 <strong>SB2(801 / 1,176 bits)</strong>에 저장합니다. 미사용 <strong>SB3(846 bits)</strong>는 <code>0101…</code> 패딩으로 채웁니다.</p>
               </div>
 
 <div id="data-engine-fields" hidden>
@@ -401,22 +401,22 @@
                 <div id="sb-detail-view" class="bit-spec-box"></div>
 
                 <div class="deep-dive-card" id="space-vs-dtn-card">
-                  <h3>AFS 규격과 LNIS 구현</h3>
-                  <p>프레임 길이와 부호화 구조는 AFS 규격을 사용합니다. GPS 항법정보와 시험 관측값의 배치는 LNIS 시험용 정의이며, LunaNet 메시지 상호운용성 검증과 구분합니다.</p>
+                  <h3>AFS 규격과 시험용 필드</h3>
+                  <p>프레임 길이와 부호화 구조는 AFS 규격을 사용합니다. GPS 항법정보와 시험 관측값의 배치는 서비스 시험용 정의이며, LunaNet 메시지 상호운용성 검증과 구분합니다.</p>
                   <div class="table-scroll"><table class="deep-dive-table">
                       <thead>
-                        <tr><th scope="col">구분</th><th scope="col">AFS 규격</th><th scope="col">현재 LNIS 구현</th></tr>
+                        <tr><th scope="col">구분</th><th scope="col">AFS 규격</th><th scope="col">시험용 필드</th></tr>
                       </thead>
                       <tbody>
                         <tr><th scope="row">프레임</th><td>6,000심볼 · 500심볼/초 · 12초</td><td>6,000비트를 750바이트로 저장. I/Q 생성에도 같은 구성기 사용</td></tr>
 
                         <tr><th scope="row">SP · SB1</th><td>SP 68심볼, SB1 52심볼</td><td>고정 SP, FID·TOI 부호화. 파일 경로는 예상 SB1 대조, I/Q 경로는 신호 동기·복호</td></tr>
 
-                        <tr><th scope="row">SB2</th><td>정보 1,176비트 + CRC 24비트 → 2,400심볼. CED·ToT·건전성·시간 변환 메시지 할당</td><td>GPS LNAV 복원용 801비트 사용. Type 63 보충 헤더와 필드 배치는 LNIS 정의</td></tr>
+                        <tr><th scope="row">SB2</th><td>정보 1,176비트 + CRC 24비트 → 2,400심볼. CED·ToT·건전성·시간 변환 메시지 할당</td><td>GPS LNAV 복원용 801비트 사용. Type 63 보충 헤더와 필드 배치는 시험용 정의</td></tr>
 
                         <tr><th scope="row">SB3</th><td>정보 846비트 + CRC 24비트 → 1,740심볼. MSG-G5 Morbit Almanac 등 메시지 할당</td><td>정보 영역 전체를 0101… 패턴으로 채움. 공식 메시지 내용은 구현하지 않음</td></tr>
 
-                        <tr><th scope="row">SB4</th><td>정보 846비트 + CRC 24비트 → 1,740심볼. MSG-G1 네트워크 접속정보 및 선택 메시지 할당</td><td>LNIS 관측정보 670비트 사용. 원본 의사거리 대신 가상 송신 시각 저장</td></tr>
+                        <tr><th scope="row">SB4</th><td>정보 846비트 + CRC 24비트 → 1,740심볼. MSG-G1 네트워크 접속정보 및 선택 메시지 할당</td><td>시험 관측정보 670비트 사용. 원본 의사거리 대신 가상 송신 시각 저장</td></tr>
                       </tbody>
                     </table>
                   </div>
@@ -580,9 +580,9 @@
                         </marker>
                       </defs>
 
-                      <!-- Node 1: LNIS 송신 서비스 -->
+                      <!-- Node 1: 송신 서비스 -->
                       <rect x="20" y="15" width="230" height="58" rx="7" fill="#e8f0fe" stroke="#1a73e8" stroke-width="1.5" />
-                      <text x="135" y="38" text-anchor="middle" font-size="13" font-weight="700" fill="#174ea6">LNIS 송신 서비스 (LnisServer)</text>
+                      <text x="135" y="38" text-anchor="middle" font-size="13" font-weight="700" fill="#174ea6">송신 서비스</text>
                       <text x="135" y="56" text-anchor="middle" font-size="10.5" fill="#334e68">시험 접수 · 메타데이터 JSON 생성</text>
 
                       <!-- Arrow 1: Service -> Shared Folder -->
@@ -620,8 +620,8 @@
 
                 <div class="deep-dive-card">
                   <h3>HDTN 요청 설정</h3>
-                  <p>HDTN이 포함된 경로에는 hdtnConfig를 전달합니다. 아래 값은 LNIS 설정 화면의 초기 기본값이며, 실제 요청에는 저장한 설정이 적용됩니다.</p>
-                  <div class="table-scroll"><table class="deep-dive-table"><thead><tr><th scope="col">항목</th><th scope="col">LNIS 기본값</th><th scope="col">단위</th><th scope="col">용도</th></tr></thead><tbody><tr><th scope="row">maxNumberOfBundlesInPipeline</th><td>50</td><td>개</td><td>동시 번들 수 요청 상한</td></tr><tr><th scope="row">maxSumOfBundleBytesInPipeline</th><td>3,000,000,000</td><td>Bytes</td><td>동시 번들 용량 요청 상한</td></tr><tr><th scope="row">maxBundleSizeBytes</th><td>3,000,000,000</td><td>Bytes</td><td>단일 번들 크기 요청 상한</td></tr><tr><th scope="row">tcpclMaxSegmentSizeBytes</th><td>200,000</td><td>Bytes</td><td>TCPCL 세그먼트 크기</td></tr><tr><th scope="row">neighborDepletedStorageDelaySeconds</th><td>10</td><td>초</td><td>인접 노드 저장 공간 부족 시 대기</td></tr><tr><th scope="row">enforceBundlePriority</th><td>false</td><td>Boolean</td><td>번들 우선순위 적용 요청</td></tr><tr><th scope="row">storageDeletionPolicy</th><td>never</td><td>정책</td><td>만료 번들 자동 정리 비활성화 요청</td></tr><tr><th scope="row">totalStorageCapacityBytes</th><td>8,589,934,592</td><td>Bytes</td><td>전체 저장 용량 요청</td></tr><tr><th scope="row">acsSendPeriodMilliseconds</th><td>1,000</td><td>ms</td><td>ACS 집계 전송 주기 요청</td></tr></tbody></table></div>
+                  <p>HDTN이 포함된 경로에는 hdtnConfig를 전달합니다. 아래 값은 서비스 설정 화면의 초기 기본값이며, 실제 요청에는 저장한 설정이 적용됩니다.</p>
+                  <div class="table-scroll"><table class="deep-dive-table"><thead><tr><th scope="col">항목</th><th scope="col">서비스 기본값</th><th scope="col">단위</th><th scope="col">용도</th></tr></thead><tbody><tr><th scope="row">maxNumberOfBundlesInPipeline</th><td>50</td><td>개</td><td>동시 번들 수 요청 상한</td></tr><tr><th scope="row">maxSumOfBundleBytesInPipeline</th><td>3,000,000,000</td><td>Bytes</td><td>동시 번들 용량 요청 상한</td></tr><tr><th scope="row">maxBundleSizeBytes</th><td>3,000,000,000</td><td>Bytes</td><td>단일 번들 크기 요청 상한</td></tr><tr><th scope="row">tcpclMaxSegmentSizeBytes</th><td>200,000</td><td>Bytes</td><td>TCPCL 세그먼트 크기</td></tr><tr><th scope="row">neighborDepletedStorageDelaySeconds</th><td>10</td><td>초</td><td>인접 노드 저장 공간 부족 시 대기</td></tr><tr><th scope="row">enforceBundlePriority</th><td>false</td><td>Boolean</td><td>번들 우선순위 적용 요청</td></tr><tr><th scope="row">storageDeletionPolicy</th><td>never</td><td>정책</td><td>만료 번들 자동 정리 비활성화 요청</td></tr><tr><th scope="row">totalStorageCapacityBytes</th><td>8,589,934,592</td><td>Bytes</td><td>전체 저장 용량 요청</td></tr><tr><th scope="row">acsSendPeriodMilliseconds</th><td>1,000</td><td>ms</td><td>ACS 집계 전송 주기 요청</td></tr></tbody></table></div>
                   <p class="fine">라우터 설정 변환과 적용은 외부 어댑터가 담당합니다. 번들 분할·우선순위·삭제 동작은 어댑터와 라우터의 적용 결과로 확인합니다. API의 선택 항목 maxLtpReceiveUdpPacketSizeBytes는 현재 설정 화면에서 입력하지 않습니다.</p>
                 </div>
 
@@ -645,7 +645,7 @@
                       <tr>
                         <th scope="row">다음 시험 시작</th>
                         <td>상대 수신을 기다리지 않고 <strong>다음 시험 시작 가능</strong></td>
-                        <td>라우터 대기와 LNIS 요청 처리를 분리</td>
+                        <td>라우터 대기와 서비스 요청 처리를 분리</td>
                       </tr>
                       <tr>
                         <th scope="row">미확인 요청 처리</th>
@@ -723,8 +723,8 @@
                 </div>
 
                 <div class="deep-dive-card">
-                  <h3>라우터와 LNIS의 역할</h3>
-                  <p>화면의 DTN은 ION, HDTN은 HDTN 라우터를 선택합니다. 번들 저장·라우팅·전달은 외부 어댑터와 라우터가 처리합니다. LNIS는 testId별 접수·데이터 일치 여부·PVT 결과를 기록합니다.</p>
+                  <h3>라우터와 서비스의 역할</h3>
+                  <p>화면의 DTN은 ION, HDTN은 HDTN 라우터를 선택합니다. 번들 저장·라우팅·전달은 외부 어댑터와 라우터가 처리합니다. 서비스는 testId별 접수·데이터 일치 여부·PVT 결과를 기록합니다.</p>
                   <p class="fine">여러 시험의 도착 순서가 달라도 testId로 구분합니다. 특정 경로의 라우팅 동작을 확인하려면 라우터 로그와 접촉 계획·설정을 함께 확인해야 합니다.</p>
                 </div>
 
@@ -744,7 +744,7 @@
                       <tr>
                         <th scope="row">수신 대기 중<br><span style="font-weight: normal; font-size: 10px; color: #486581;">(WAITING_DTN)</span></th>
                         <td>단건 취소 또는 대기 전체 종료 가능</td>
-                        <td><strong>회수 보장 안 함</strong><br>(LNIS 대기 종료와 별도)</td>
+                        <td><strong>회수 보장 안 함</strong><br>(서비스 대기 종료와 별도)</td>
                         <td><span class="pvt-step-tag tag-purple">AFTER_CANCEL</span><br>수신 원문만 보관 (PVT 계산 미수행)</td>
                       </tr>
                       <tr>
@@ -797,13 +797,13 @@
                       <text x="625" y="37" text-anchor="middle" font-size="13" font-weight="700" fill="#b06000">수신 공유 폴더 (/exchange)</text>
                       <text x="625" y="54" text-anchor="middle" font-size="10.5" fill="#7c4a00">UUID.bin 바이너리 보관</text>
 
-                      <!-- Arrow 2: Adapter -> LNIS Service -->
+                      <!-- Arrow 2: Adapter -> 서비스 Service -->
                       <path d="M 130 67 L 130 92" fill="none" stroke="#1a73e8" stroke-width="1.8" marker-end="url(#arr-rx-blue)" />
                       <text x="138" y="83" font-size="10" font-weight="600" fill="#1a73e8">② POST /receive</text>
 
-                      <!-- Middle Node: LNIS 수신 서비스 (접수 · 원문 기록) -->
+                      <!-- Middle Node: 수신 서비스 (접수 · 원문 기록) -->
                       <rect x="20" y="98" width="720" height="48" rx="7" fill="#e8f0fe" stroke="#1a73e8" stroke-width="1.5" />
-                      <text x="35" y="120" font-size="12" font-weight="700" fill="#174ea6">LNIS 수신 서비스 (접수 · 원문 기록)</text>
+                      <text x="35" y="120" font-size="12" font-weight="700" fill="#174ea6">수신 서비스 (접수 · 원문 기록)</text>
                       <text x="35" y="136" font-size="10.5" fill="#334e68">인증 후 본문 기록 · 검증 ──► 시험별 접수 ──► 계산 순서 대기</text>
 
                       <!-- Arrow 3: 1차 접수 -> 2차 계산 실행 -->
@@ -1008,7 +1008,7 @@
             copy: '라우터가 번들을 저장·대기·전달합니다. 도착이 지연되거나 송신 순서와 다르게 도착할 수 있습니다.',
             summary: '라우팅과 대기 종료',
             detail: [
-              '요청 경로는 ' + state.tx + ' → ' + state.rx + '입니다. LNIS는 여러 시험을 testId로 구분하며 실제 중계 경로는 어댑터·라우터 로그로 확인합니다.',
+              '요청 경로는 ' + state.tx + ' → ' + state.rx + '입니다. 서비스는 여러 시험을 testId로 구분하며 실제 중계 경로는 어댑터·라우터 로그로 확인합니다.',
               '외부 수신 대기는 시간 제한이 없습니다. 번들 수명과 라우터 저장·삭제 정책은 별개입니다. 장시간 지연으로 항법정보 선택 조건을 벗어나면 수신돼도 PVT 비교가 불가능할 수 있습니다.',
               '시험별 대기 종료와 대기 전체 종료를 지원합니다. 전체 종료는 수신·계산 중인 시험을 제외합니다. 대기 종료가 이미 전달한 번들의 회수를 보장하지는 않습니다. 종료 후 도착한 정상 데이터는 원문만 보관합니다.'
             ].join('\n\n')
@@ -1052,7 +1052,7 @@
               ? 'raw.records의 transmitAt·Doppler·C/N0·관측 시각·항법정보와 startedAt을 확인합니다. 수신 원문은 유지하며 계산용 복사본에 의사거리를 생성합니다.'
               : [
                   iq
-                    ? '신호 동기·SB1 복호는 I/Q 추적·복호 단계에서 수행합니다. 이후 복호된 서브블록의 LNIS 필드를 읽습니다.'
+                    ? '신호 동기·SB1 복호는 I/Q 추적·복호 단계에서 수행합니다. 이후 복호된 서브블록의 서비스 필드를 읽습니다.'
                     : '프레임 파일은 정해진 위치의 SP와 예상 SB1을 대조합니다. SB1 BCH 오류 정정은 수행하지 않습니다. SB2~SB4는 디인터리빙·LDPC 복호·CRC 검증을 거칩니다.',
                   'SB2에서 GPS LNAV를 복원하고 SB3 패딩과 SB4 관측정보를 확인합니다. 복원한 내용을 재인코딩하여 수신 서브블록과 대조합니다.',
                   iq ? 'RF 관측으로 계산 가능한 첫 Epoch를 선택합니다. SB4는 프레임·생성 기준 확인에 사용하고 송신 Reference는 계산에 넣지 않습니다.' : 'SB4의 Tᵢ와 기준시각 A에서 T*ᵢ=Tᵢ+(S−A)를 구합니다. 원본 의사거리와 Reference는 이 복원 과정의 입력으로 사용하지 않습니다.'
@@ -1284,7 +1284,7 @@
               <p>공식 규격(LSIS-160, Figure 3 &amp; 11)은 송신 시 SP 첫 심볼과 I채널 Primary Code(2,046칩, 2ms)·Q채널 Tertiary Code(1,500칩, 12초) 시작점의 <code>0.5 ns(TBC)</code> 정렬을 규정합니다.</p>
             </div>
             <div class="time-why-card">
-              <strong>🛰️ LNIS 수신 경로별 SP 확인 방식</strong>
+              <strong>🛰️ 서비스 수신 경로별 SP 확인 방식</strong>
               <p><strong>I/Q 경로</strong>(<code>sdr_nav.c</code>)는 심볼 버퍼에서 <code>6,000심볼(12초)</code> 간격 연속 2회 SP 일치(<code>sync_frame</code>)로 동기를 잡고, <strong>AFS 파일 경로</strong>(<code>lnis_afs_codec.c</code>)는 750B 프레임 앞 68비트를 <code>memcmp</code>로 대조합니다.</p>
             </div>
           </div>
@@ -1331,7 +1331,7 @@
             </div>
           </div>
           <div class="toi-formula-bar">
-            <div class="toi-formula-eq">LNIS 파일 TOI 계산식 : (int)((TOW % 1200) / 12)</div>
+            <div class="toi-formula-eq">서비스 파일 TOI 계산식 : (int)((TOW % 1200) / 12)</div>
             <div class="toi-formula-parts">
               <span class="toi-part-pill"><code>TOW</code> 주 시작(일요일 0시) 기준 경과 시간(초)</span>
               <span class="toi-part-pill"><code>1200</code> 20분 주기(1,200초)</span>
@@ -1348,7 +1348,7 @@
               <p>20분 동안 변하지 않는 <code>Week(13b)·ITOW(9b)</code>는 항법 서브블록인 <strong>SB2(비트 0~21)</strong>에 두고, 12초마다 바뀌는 <code>TOI(7b)</code>만 인터리빙을 거치지 않는 <strong>초소형 SB1(52심볼)</strong>에 실어 빠르게 프레임 순번을 식별합니다.</p>
             </div>
             <div class="time-why-card">
-              <strong>🛰️ 공식 AFS 규격 vs LNIS 경로별 동작</strong>
+              <strong>🛰️ 공식 AFS 규격 vs 서비스 경로별 동작</strong>
               <p>공식 규격(LSIS-720)과 <strong>I/Q 생성기</strong>(<code>afs_sim.c</code>)의 SB1은 <em>다음 프레임 선두</em>(<code>toi + 1</code>)를 담고 매 12초마다 갱신하며, <strong>AFS 파일 시험</strong>(<code>DelayTransferCodec</code>)은 관측 Epoch의 12초 구간 번호 <code>(int)((TOW % 1200) / 12)</code>를 담습니다.</p>
             </div>
           </div>
@@ -1389,9 +1389,9 @@
             "cls": "badge-std"
           }
         ],
-        "note": "FID 2비트와 TOI 7비트를 사용합니다. 하위 8비트를 BCH(51,8)로 부호화하고 최상위 비트를 XOR·선두 비트에 적용합니다. 아래 시간 필드는 LNIS 구현 기준입니다.",
+        "note": "FID 2비트와 TOI 7비트를 사용합니다. 하위 8비트를 BCH(51,8)로 부호화하고 최상위 비트를 XOR·선두 비트에 적용합니다. 아래 시간 필드는 서비스 구현 기준입니다.",
         "fields": [
-          ["FID", "2 bits", "uint2", "-", "LNIS는 정규 항법 프레임 값 0 사용"],
+          ["FID", "2 bits", "uint2", "-", "서비스는 정규 항법 프레임 값 0 사용"],
           ["TOI", "7 bits", "0~99", "RAWX / SFRBX", "12초 구간 식별값. 공식 다음 프레임 시각과 파일의 Epoch 식별 방식은 아래 설명 참조"],
           ["부호화 결과", "52 symbols", "MSB 1 + BCH 51", "-", "공식 BCH 생성다항식 763₈. 파일 수신 경로는 예상 부호열 대조, I/Q 경로는 신호 복호"]
         ],
@@ -1401,7 +1401,7 @@
         "title": "SB2 · GPS 항법정보",
         "badges": [
           {
-            "text": "LNIS 필드 정의",
+            "text": "시험용 필드 정의",
             "cls": "badge-ext"
           },
           {
@@ -1413,7 +1413,7 @@
             "cls": "badge-std"
           }
         ],
-        "note": "전반부 284비트의 케플러 기본 궤도·시계 배치를 유지하고, 517비트(헤더 58b + LNAV 잔여 459b)의 LNIS 보충 영역을 추가합니다. 패리티 제외 GPS LNAV SF1~3 원본 720비트 중 전반부에 배치된 261비트를 뺀 나머지 459비트(섭동 보정·변화율·보조 시계 등)를 순서대로 수록해 수신부에서 원본 LNAV 720비트를 무손실 복원합니다. NASA MSG-G4의 공식 비트 배치나 달 궤도력 구현을 뜻하지 않습니다.",
+        "note": "전반부 284비트의 케플러 기본 궤도·시계 배치를 유지하고, 517비트(헤더 58b + LNAV 잔여 459b)의 서비스 보충 영역을 추가합니다. 패리티 제외 GPS LNAV SF1~3 원본 720비트 중 전반부에 배치된 261비트를 뺀 나머지 459비트(섭동 보정·변화율·보조 시계 등)를 순서대로 수록해 수신부에서 원본 LNAV 720비트를 무손실 복원합니다. NASA MSG-G4의 공식 비트 배치나 달 궤도력 구현을 뜻하지 않습니다.",
         "fields": [
           ["Week / ITOW", "22 bits (0~21)", "13b + 9b", "RAWX / SFRBX", "GPS Week(13b)와 20분(1,200초) 구간 번호 ITOW(9b)"],
           ["t_oe", "16 bits (22~37)", "2⁴ s", "SF2", "GPS 궤도력 기준 시각 (SF2 비트 216~231)"],
@@ -1442,17 +1442,17 @@
             "cls": "badge-std"
           }
         ],
-        "note": "공식 규격은 MSG-G5 Morbit Almanac과 LunaSAR·경보 등의 메시지를 할당합니다. 현재 LNIS는 해당 메시지를 구현하지 않고 정보 영역을 채움 패턴으로 사용합니다.",
+        "note": "공식 규격은 MSG-G5 Morbit Almanac과 LunaSAR·경보 등의 메시지를 할당합니다. 현재 서비스는 해당 메시지를 구현하지 않고 정보 영역을 채움 패턴으로 사용합니다.",
         "fields": [
-          ["정보 영역", "846 bits (0~845)", "0101…", "-", "현재 LNIS 시험에서 미사용. 공식 메시지 구현을 의미하지 않음"],
+          ["정보 영역", "846 bits (0~845)", "0101…", "-", "현재 서비스 시험에서 미사용. 공식 메시지 구현을 의미하지 않음"],
           ["CRC·LDPC", "CRC 24b → 1,740심볼", "AFS SF3", "-", "패딩을 포함한 정보 영역의 CRC·부호화 적용"]
         ]
       }),
       4: () => ({
-        "title": "SB4 · LNIS 관측정보",
+        "title": "SB4 · 시험 관측정보",
         "badges": [
           {
-            "text": "LNIS 시험용 확장",
+            "text": "서비스 시험용 확장",
             "cls": "badge-ext"
           },
           {
@@ -1474,7 +1474,7 @@
           ["추적 상태", "8 bits (299~306)", "uint8", "RAWX", "원본 관측 유효성 플래그"],
           ["전리층 정보", "249 bits (307~555)", "플래그·PRN·계수", "SFRBX SF4", "GPS Klobuchar 모델 계수"],
           ["프레임 기준시각 A", "114 bits (556~669)", "정수 초 64b + 소수부 50b", "-", "AFS는 A=S로 가상 송신 시각을 보정. I/Q는 생성 시 정한 파형 시작 기준"],
-          ["미사용 영역", "176 bits (670~845)", "0101…", "-", "LNIS가 사용하지 않는 정보 영역"],
+          ["미사용 영역", "176 bits (670~845)", "0101…", "-", "서비스가 사용하지 않는 정보 영역"],
           ["CRC·LDPC", "CRC 24b → 1,740심볼", "AFS SF3", "-", "정보 846비트에 CRC를 붙이고 부호화·천공"]
         ]
       })
@@ -1484,7 +1484,7 @@
       const descriptions = {
         0: 'SP · 프레임 동기 패턴입니다. 68비트 고정 부호로 프레임 시작점을 식별합니다.',
         1: 'SB1 · 기존 프레임 식별 구조를 유지합니다. BCH 부호화 후 52 bits입니다.',
-        2: 'SB2 · GPS LNAV 복원용 LNIS 필드입니다. 정보 801/1,176비트를 사용하고 CRC·LDPC 부호화 후 2,400심볼입니다.',
+        2: 'SB2 · GPS LNAV 복원용 서비스 필드입니다. 정보 801/1,176비트를 사용하고 CRC·LDPC 부호화 후 2,400심볼입니다.',
         3: 'SB3 · 현재 시험에서는 정보 846비트를 0101… 패턴으로 채웁니다. 공식 메시지 내용은 구현하지 않습니다.',
         4: 'SB4 · 가상 송신 시각·프레임 기준시각·Doppler·C/N0·관측 시각·유효성을 담습니다. 원본 의사거리는 없으며 670/846 bits를 사용합니다.'
       };

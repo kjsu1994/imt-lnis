@@ -93,3 +93,66 @@ body:has(.log-maximized) > .site-footer { display: none; }
 @media (max-width: 600px) {
   body[data-page="dtn-sender"] .site-footer { padding-left: 12px; padding-right: 110px; }
 }
+
+/* 기능 옆 도움말은 제목 행을 유지하고 팝업에서 해당 항목만 연다. */
+button.manual-help.manual-help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 20px;
+  min-width: 20px;
+  height: 20px;
+  min-height: 20px;
+  margin: 0 0 0 5px;
+  padding: 0;
+  border: 1px solid #b4c1c8;
+  border-radius: 50%;
+  background: transparent;
+  color: #6c7e88;
+  font: 600 11px/1 Arial, sans-serif;
+  vertical-align: middle;
+  box-shadow: none;
+}
+button.manual-help.manual-help:hover { color: var(--teal); border-color: var(--teal); background: #eef6f7; }
+button.manual-help.manual-help:focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; }
+body[data-page="dtn-sender"] .adapter-url-controls:has(> .manual-help) { position: relative; }
+body[data-page="dtn-sender"] .adapter-url-controls > button.manual-help {
+  position: absolute;
+  top: 0;
+  right: 0;
+  margin: 0;
+}
+dialog.manual-help-dialog {
+  width: min(1120px, 92vw);
+  height: min(800px, 84dvh);
+  max-width: 92vw;
+  max-height: 84dvh;
+  margin: auto;
+  padding: 0;
+  border: 1px solid #b9c9d2;
+  border-radius: 12px;
+  background: #fff;
+  color: var(--ink);
+  box-shadow: 0 16px 64px #15344744;
+  overflow: hidden;
+}
+dialog.manual-help-dialog[open] { display: flex; flex-direction: column; }
+dialog.manual-help-dialog::backdrop { background: #15344766; }
+.manual-help-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+  background: #f5f8fa;
+}
+.manual-help-heading strong { margin-right: auto; font-size: 14px; }
+.manual-help-heading a { font-size: 12px; white-space: nowrap; }
+.manual-help-heading button { min-height: 28px; padding: 3px 9px; font-size: 12px; }
+.manual-help-dialog iframe { width: 100%; flex: 1 1 auto; min-height: 0; border: 0; background: #fff; }
+@media (max-width: 600px) {
+  .manual-help-heading { gap: 8px; padding: 8px 10px; }
+  .manual-help-heading strong { font-size: 12px; }
+}

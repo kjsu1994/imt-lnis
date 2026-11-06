@@ -1,6 +1,10 @@
-# LNIS — Lunar Navigation & Delay-Tolerant Networking Integration System
+# GNSS 전송 시험
 
-**사용자 설명서:** [실제 화면·실행 순서·결과 해석·관리자 부록](manual/index.html) · 오프라인 HTML / A4 가로 PDF. `gradlew userManualDistZip`으로 `build/distributions/lnis-user-manual.pdf`와 HTML·이미지·PDF ZIP을 생성합니다. 기존 Playwright 설치본을 사용하며 필요하면 `PLAYWRIGHT_MODULE`에 모듈 경로를 지정합니다. 문서에는 내부 IP·포트·시험 ID가 포함됩니다. [Word 편집본](manual/lnis-user-manual.docx)은 본문·표를 직접 수정할 수 있습니다. Word 수정 사항은 웹 설명서·PDF에 자동 반영되지 않습니다. 송수신 화면 좌측 상단의 동작 안내 아이콘 아래 문서 아이콘은 `/user-manual/`을 새 탭에서 엽니다. HTML·이미지·PDF는 서비스에 함께 포함되며, 설명서 갱신 후 `userManualDistZip`으로 배포용 PDF도 갱신합니다.
+**사용자 설명서:** [웹 설명서](manual/index.html) · [PDF](manual/user-manual.pdf) · [Word](manual/user-manual.docx)
+
+본문은 `manual/index.html`에서 수정합니다. 버전은 **1.0**으로 유지하고 `manual-updated` 날짜를 갱신합니다. `gradlew.bat userManualDistZip`은 검색·화면 검사를 거쳐 HTML·이미지·PDF·Word를 `build/distributions/user-manual.zip`에 묶습니다. 생성에는 Node.js, Playwright/Chromium, Python의 `beautifulsoup4`, `python-docx`, `Pillow`가 필요합니다. 기존 Playwright를 쓰려면 `PLAYWRIGHT_MODULE`에 모듈 경로를 지정합니다.
+
+`gradlew.bat userManualDistZip bootJar`로 설명서와 프로그램을 함께 빌드한 뒤 기존 절차로 배포·재기동합니다. 설명서는 프로그램에 포함됩니다. Word 수정 사항은 HTML 원본에도 반영합니다.
 
 ![Java](https://img.shields.io/badge/Java-21%20LTS-007396?logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.16-6DB33F?logo=springboot&logoColor=white)

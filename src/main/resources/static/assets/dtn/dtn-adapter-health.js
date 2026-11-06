@@ -64,7 +64,7 @@ export function initAdapterHealth(defaultUrl, log = () => {}, onStatus = () => {
       status(value.status === 'ready' ? '연결됨' : value.message, value.status === 'ready' ? 'online' : value.status === 'busy' ? 'warning' : 'error');
       detailText('dtn-adapter-detail', (value.httpStatus == null ? '' : 'HTTP ' + value.httpStatus + ' · ')
         + value.elapsedMillis + ' ms · ' + value.url);
-      detailText('dtn-adapter-health-time', '마지막 확인 ' + new Date(report.checkedAt).toLocaleString('ko-KR', {hour12: false}) + ' · LNIS 서버 기준');
+      detailText('dtn-adapter-health-time', '마지막 확인 ' + new Date(report.checkedAt).toLocaleString('ko-KR', {hour12: false}) + ' · 서비스 시각');
       detailText('dtn-adapter-health-json', JSON.stringify(report, null, 2));
     } catch (error) {
       if (!current()) return;

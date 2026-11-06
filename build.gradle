@@ -183,7 +183,7 @@ tasks.register('nativeLinuxSourcesZip', Zip) {
 tasks.register('linuxNodeDistZip', Zip) {
     group = 'distribution'
     description = '동일 이미지로 송신/수신 PC에서 실행할 Linux Compose 묶음을 생성한다.'
-    dependsOn tasks.named('bootJar'), tasks.named('check'), tasks.named('nativeLinuxSourcesZip'), tasks.named('nativeBuild')
+    dependsOn tasks.named('userManualDistZip'), tasks.named('bootJar'), tasks.named('check'), tasks.named('nativeLinuxSourcesZip'), tasks.named('nativeBuild')
     archiveFileName = 'lnis-node-linux.zip'
     destinationDirectory = layout.buildDirectory.dir('distributions')
     from('deployment/node') {
@@ -258,7 +258,7 @@ tasks.register('windowsSerialBridgeDist', Sync) {
     }) { into 'lib' }
 }
 // Service guide is the source; publishing only changes links for the static site.
-def introAssets = ['logo_v3.png', 'imt_logo.png', 'system_logo.png']
+def introAssets = ['transfer-mark.svg', 'imt_logo.png', 'system_logo.png']
 def introForDocs = {
     def html = file('src/main/resources/static/dtn-intro.html').getText('UTF-8')
     introAssets.each { name ->
@@ -327,18 +327,30 @@ tasks.register('userManualPdf', Exec) {
     description = '오프라인 사용자 설명서를 검사하고 A4 가로 PDF를 생성한다.'
     inputs.file('scripts/export-user-manual.cjs')
     inputs.files(fileTree('manual') { exclude '*.pdf', '*.docx' })
-    outputs.file(layout.buildDirectory.file('distributions/lnis-user-manual.pdf'))
-    outputs.file('manual/lnis-user-manual.pdf')
+    outputs.file(layout.buildDirectory.file('distributions/user-manual.pdf'))
+    outputs.file('manual/user-manual.pdf')
     commandLine 'node', 'scripts/export-user-manual.cjs'
+}
+
+tasks.register('userManualWord', Exec) {
+    group = 'documentation'
+    description = 'HTML 원본에서 편집 가능한 Word 설명서를 생성한다.'
+    dependsOn tasks.named('userManualPdf')
+    inputs.file('scripts/export-user-manual-docx.py')
+    inputs.files(fileTree('manual') { exclude '*.pdf', '*.docx' })
+    outputs.file(layout.buildDirectory.file('distributions/user-manual.docx'))
+    outputs.file('manual/user-manual.docx')
+    commandLine (System.getProperty('os.name').toLowerCase().contains('windows') ? 'python' : 'python3'),
+            'scripts/export-user-manual-docx.py'
 }
 
 tasks.register('userManualDistZip', Zip) {
     group = 'documentation'
-    description = '사용자 설명서 HTML·화면 이미지·PDF를 오프라인 배포용으로 묶는다.'
-    dependsOn tasks.named('userManualPdf')
-    archiveFileName = 'lnis-user-manual.zip'
+    description = '사용자 설명서 HTML·화면 이미지·PDF·Word를 오프라인 배포용으로 묶는다.'
+    dependsOn tasks.named('userManualPdf'), tasks.named('userManualWord')
+    archiveFileName = 'user-manual.zip'
     destinationDirectory = layout.buildDirectory.dir('distributions')
-    from('manual') { into 'lnis-user-manual' }
+    from('manual') { into 'user-manual' }
     preserveFileTimestamps = false
     reproducibleFileOrder = true
 }
@@ -352,10 +364,9 @@ tasks.named('processResources') {
         filter { line -> line.replace('@lnisVersion@', applicationVersion) }
     }
     from('manual') {
-        exclude '*.docx'
         into 'static/user-manual'
     }
-    mustRunAfter tasks.named('userManualPdf')
+    mustRunAfter tasks.named('userManualPdf'), tasks.named('userManualWord')
 }
 
 tasks.named('browserTest') {
@@ -366,7 +377,7 @@ tasks.named('browserTest') {
 tasks.register('prepareWindowsNode', Exec) {
     group = 'distribution'
     description = 'Windows 11 오프라인 설치 자료와 서비스 이미지를 준비한다.'
-    dependsOn tasks.named('bootJar'), tasks.named('check'), tasks.named('nativeLinuxSourcesZip'),
+    dependsOn tasks.named('userManualDistZip'), tasks.named('bootJar'), tasks.named('check'), tasks.named('nativeLinuxSourcesZip'),
             tasks.named('nativeBuild'), tasks.named('windowsSerialBridgeDist')
     doFirst {
         commandLine 'powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass',

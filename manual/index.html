@@ -1,7 +1,5 @@
 <!DOCTYPE html>
-
-<html lang="ko"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><meta content="LNIS DTN/HDTN 송수신 시험의 실제 화면, 실행 순서, 결과 해석 및 관리자 데이터 관리 절차" name="description"/><meta content="9e0b3f5 + HUD 이동·확대 및 COM 화면 변경" name="manual-source"/><meta content="2026-11-06" name="manual-captured"/><title>LNIS DTN/HDTN 송수신 시험 사용자 설명서</title><link href="assets/logo_v3.png" rel="icon"/><style>
-
+<html lang="ko"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><meta content="GNSS 전송 시험의 설정, 실행 순서, 결과 확인과 설치 방법" name="description"/><meta content="9e0b3f5 + HUD 이동·확대 및 COM 화면 변경" name="manual-source"/><meta content="2026-11-06" name="manual-captured"/><title>GNSS 전송 시험 사용자 설명서</title><link href="assets/transfer-mark.png" rel="icon"/><style>
 :root{--ink:#153447;--muted:#526675;--line:#cedce4;--teal:#006f72;--paper:#fff;--tint:#edf5f8}
 *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;color:var(--ink);background:#e7eef3;font-family:"Malgun Gothic","맑은 고딕",Arial,sans-serif;font-size:14px;line-height:1.6}
 a{color:#006c86;text-underline-offset:3px}a:hover{color:#004d60}a:focus-visible,button:focus-visible,input:focus-visible{outline:3px solid #e0a229;outline-offset:3px}
@@ -53,92 +51,3569 @@ code{font: .93em Consolas,monospace;background:#edf3f7;padding:1px 4px;overflow-
  a{text-decoration:none;color:inherit}a[href^="assets/"]{color:inherit}
 }
 @media screen and (max-width:900px){.layout{display:block;padding:12px}nav{position:static;height:auto;max-height:230px;margin-bottom:14px}.sheet{padding:22px;min-height:0}.toolbar{flex-wrap:wrap;padding:10px 14px;gap:8px}.toolbar strong{font-size:12px}.toolbar label{flex-basis:100%}.split,.three{grid-template-columns:1fr}.flow{flex-direction:column}.flow>div{width:100%}.flow i{transform:rotate(90deg)}.formula{font-size:16px;padding:14px}table{font-size:12px}td,th{padding:6px}.cover h2{font-size:28px}.frame-bar{flex-wrap:wrap}#printed-toc{grid-template-columns:1fr}}
-
 .sheet-head{position:relative;padding-right:190px;min-height:65px}.manual-kari{position:absolute;right:0;top:0;width:168px;height:57px;object-fit:contain}@media print{.sheet-head{padding-right:48mm;min-height:17mm}.manual-kari{width:42mm;height:14mm}}@media screen and (max-width:600px){.sheet-head{padding-right:0;padding-top:52px}.manual-kari{width:140px;height:45px}}
 @media print{#printed-toc a{font-size:8.6pt;padding:.8mm 0}#iq-observations figure img,#received-values figure img,#reference figure img,#pvt-numbers figure img,#delete figure img,#intro figure img{max-height:88mm}#retention figure img{max-height:84mm}#logs figure img,#log-evidence figure img{max-height:78mm}}
-</style></head><body>
+:root{--toolbar-height:66px;--accent:#1766a5;--accent-soft:#eaf2fb}
+[hidden]{display:none!important}
+.sr-only{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+.toolbar{background:#fff;color:var(--ink);border-bottom:1px solid #d9e2e9;padding:12px 24px;gap:18px;flex-wrap:nowrap}
+.manual-brand{display:flex;align-items:center;gap:9px;color:var(--ink);text-decoration:none;white-space:nowrap}
+.manual-brand img{width:32px;height:32px}
+.manual-brand strong{font-size:15px}
+.search-box{display:flex;align-items:center;flex:1;min-width:200px;max-width:740px;border:1px solid #b9c9d5;border-radius:7px;padding:2px 4px 2px 10px;gap:3px}
+.search-box:focus-within{border-color:var(--accent);box-shadow:0 0 0 2px #1766a51a}
+.toolbar .search-box input{flex:1;width:100%;min-width:70px;border:0;background:transparent;outline:none;padding:7px 0;box-shadow:none}
+.search-box button{width:29px;height:30px;padding:0;border:0;background:transparent;font-size:21px;line-height:1}
+.search-box button:disabled{opacity:.3;cursor:default}
+.toolbar output{font-size:12px;white-space:nowrap;min-width:0;color:#496073;margin:0 7px}
+.toolbar output:empty{display:none}
+.toolbar-actions{display:flex;align-items:center;gap:8px;margin-left:auto;white-space:nowrap}
+.toolbar-actions button,.downloads summary{font-size:12px;padding:6px 10px;border:1px solid #cbd7e0;border-radius:6px;background:#fff;cursor:pointer}
+.toolbar a{color:var(--ink)}
+.manual-version{font-size:12px;color:var(--muted);margin-right:4px}
+.downloads{position:relative}
+.downloads summary{list-style:none}
+.downloads summary::-webkit-details-marker{display:none}
+.download-menu{position:absolute;right:0;top:calc(100% + 8px);z-index:30;min-width:160px;background:#fff;border:1px solid #ccd9e2;border-radius:7px;box-shadow:0 5px 16px #17344a14;padding:5px}
+.download-menu a{display:block;text-decoration:none;padding:7px 10px;font-size:13px}
+.download-menu a:hover{background:var(--accent-soft)}
+#contents-toggle{display:none}
+.layout{grid-template-columns:260px minmax(0,1fr);gap:24px;padding:24px;align-items:start}
+.sidebar{position:sticky;top:calc(var(--toolbar-height) + 20px);max-height:calc(100vh - var(--toolbar-height) - 40px);overflow:auto;background:#fff;border:1px solid #d9e2e9;border-radius:8px}
+.sidebar-tabs{display:flex;gap:4px;padding:8px;position:sticky;top:0;background:#fff;border-bottom:1px solid #e4eaf0;z-index:1}
+.sidebar-tabs button{flex:1;padding:6px 4px;border:0;border-radius:5px;font-size:12px;color:var(--muted);background:transparent}
+.sidebar-tabs [aria-selected="true"]{color:var(--accent);font-weight:700;background:var(--accent-soft)}
+.sidebar nav{position:static;height:auto;max-height:none;border:0;border-radius:0;background:transparent;overflow:visible;padding:6px}
+.sidebar nav details{border-bottom:1px solid #edf1f5;padding:3px 0}
+.sidebar nav details:last-child{border:0}
+.sidebar nav summary{padding:7px 6px;font-size:12px;font-weight:700;cursor:pointer;color:#456174}
+.sidebar nav a{padding:7px 9px 7px 16px;margin:1px 0;border:0;border-left:3px solid transparent;border-radius:3px;font-size:12px;line-height:1.45}
+.sidebar nav a[aria-current="page"]{color:var(--accent);font-weight:700;border-left-color:var(--accent);background:var(--accent-soft)}
+#results-panel{padding:8px}
+#empty{font-size:13px;padding:14px 6px;margin:0;line-height:1.6;color:var(--muted)}
+.result-link{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid #edf1f5;border-radius:4px;padding:10px 8px;background:transparent}
+.result-link:hover,.result-link[aria-current="true"]{background:#f0f5fb}
+.result-link strong{font-size:12px;line-height:1.5;color:var(--ink)}
+.result-link small{font-size:11px;color:var(--accent);margin-left:6px;white-space:nowrap}
+.result-link span{display:block;font-size:12px;font-weight:400;color:var(--muted);margin-top:4px;line-height:1.5;overflow-wrap:anywhere}
+mark{color:inherit;background:#fff0a8;padding:0;border-radius:2px}
+mark.current-match{background:#ffd173;outline:1px solid #c47e11}
+.topic-pagination{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;position:sticky;top:calc(var(--toolbar-height) + 8px);z-index:5;margin:0 0 12px;padding:0;background:#f4f6f9}
+.topic-pagination a{display:flex;align-items:center;gap:8px;min-width:0;height:34px;padding:5px 10px;background:#fff;border:1px solid #d9e2e9;border-radius:6px;text-decoration:none}
+#topic-next{grid-column:2;justify-content:flex-end}
+#topic-next small{order:2}
+.topic-pagination small{flex-shrink:0;color:var(--muted);font-size:11px;white-space:nowrap}
+.topic-pagination strong{display:block;min-width:0;font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media screen{
+ body{background:#f4f6f9}
+ .sheet{margin:0;min-height:0;box-shadow:none;border:1px solid #d9e2e9;border-radius:8px;padding:26px 32px;scroll-margin-top:calc(var(--toolbar-height) + 60px)}
+ .sheet-head{border-bottom:1px solid #cedce4;margin-bottom:20px}
+ .sheet .page-foot{margin-top:24px}
+ .sheet .page-foot>span:last-child{display:none}
+ .cover{padding:12px 0}
+ .cover-meta{margin-top:26px;padding-top:16px}
+ h1{font-size:23px;line-height:1.5}
+ h2{font-size:22px}
+ .note{border-radius:4px;background:#f2f6fa;border-left-color:#7b98ac}
+}
+@media screen and (max-width:980px){
+ .toolbar{flex-wrap:wrap;padding:10px 14px;gap:8px 12px}
+ .search-box{order:3;max-width:none;flex-basis:100%}
+ .manual-brand strong{font-size:13px}
+ #contents-toggle{display:block;padding:5px 8px;font-size:12px}
+ .layout{display:block;padding:12px}
+ .sidebar{display:none;position:static;max-height:55vh;margin:0 0 12px}
+ .sidebar.is-open{display:block}
+ .sheet{padding:20px;border-radius:6px}
+ .toolbar-actions{gap:6px}
+ .manual-version{font-size:11px}
+ .toolbar-actions button,.downloads summary{padding:5px 7px}
+ .topic-pagination{gap:8px}
+ .topic-pagination a{padding:5px 8px}
+}
+@media print{
+ .toolbar,.sidebar,.topic-pagination{display:none!important}
+ .sheet[hidden]{display:block!important}
+ mark,mark.current-match{background:transparent;outline:0;color:inherit}
+ .layout{display:block}
+ .sheet{border-radius:0}
+}
+
+html.manual-embedded { scroll-behavior: auto; }
+.manual-embedded body { background: #fff; }
+.manual-embedded .toolbar, .manual-embedded #manual-sidebar,
+.manual-embedded .topic-pagination, .manual-embedded .skip { display: none !important; }
+.manual-embedded .layout { display: block; max-width: none; margin: 0; padding: 0; }
+.manual-embedded main { margin: 0; padding: 0; max-width: none; }
+.manual-embedded .sheet { width: auto; min-height: 0; margin: 0; padding: 24px; border: 0; border-radius: 0; box-shadow: none; }
+@media (max-width: 600px) { .manual-embedded .sheet { padding: 16px; } }
+#search::-webkit-search-cancel-button { -webkit-appearance: none; }
+</style><meta content="1.0" name="manual-version"/><meta content="2026-11-06" name="manual-updated"/></head><body>
 <a class="skip" href="#manual">본문으로 이동</a>
-<header class="toolbar"><strong>LNIS · 사용자 설명서</strong><label for="search">문서 검색<input autocomplete="off" id="search" placeholder="기능·버튼·오류 검색" type="search"/></label><output aria-live="polite" id="matches"></output><button id="reset" type="button">검색 초기화</button><a download="" href="lnis-user-manual.pdf">PDF 다운로드</a><button id="print" type="button">인쇄</button></header>
-<div class="layout"><nav aria-label="설명서 목차"><b>사용 안내</b><a href="#cover">01 · LNIS DTN/HDTN 송수신 시험 사용자 설명서</a><a href="#reading">02 · 설명서 적용 범위</a><a href="#contents">03 · 목차</a><b>시작 전 확인</b><a href="#roles">04 · 서비스와 어댑터의 역할</a><a href="#access">05 · 접속과 시험 전 준비</a><b>기본 실행 순서</b><a href="#quick">06 · 빠른 실행 · 파일 입력으로 첫 시험</a><b>송신 화면</b><a href="#sender-map">07 · 송신 화면에서 구분할 영역</a><b>송신 설정</b><a href="#settings">08 · 설정 열기와 적용 시점</a><a href="#types">09 · 시험 유형 선택</a><a href="#routes">10 · 전송 경로와 연결 주소</a><a href="#health">11 · 어댑터 연결 확인</a><a href="#presets">12 · 프리셋 저장·불러오기·수정</a><a href="#hdtn">13 · HDTN 파라미터</a><a href="#hdtn-advanced">14 · HDTN 고급 설정과 입력 제한</a><a href="#dtn">15 · DTN(ION) 파라미터</a><b>GNSS 입력</b><a href="#upload">16 · UBX / GRAW 파일 적용</a><a href="#serial">17 · COM 포트 연결과 장비 설정</a><a href="#capture">18 · GNSS 수집과 UBX 다운로드</a><b>시각 준비</b><a href="#clock">19 · 기준시각 확인과 시간 맞추기</a><b>관측값 확인</b><a href="#sender-data">20 · 송신 원본 GNSS 관측값 읽기</a><a href="#rawx">21 · RAWX 필드와 PRN</a><a href="#navigation">22 · 항법정보와 RAWX의 관계</a><a href="#receiver-info">23 · 수신기 정보와 입력 상태</a><b>유형별 실행</b><a href="#run-raw">24 · GNSS RAW 시험 실행</a><a href="#run-afs">25 · AFS Frame 시험 실행</a><a href="#iq-generate">26 · I/Q Sample 생성과 저장 파일 선택</a><a href="#iq-files">27 · I/Q 공유 폴더와 파일 전달</a><b>송신 결과 확인</b><a href="#sender-reference">28 · 송신 Reference PVT와 시험 이력</a><b>수신 화면</b><a href="#receiver-map">29 · 수신 화면과 처리 단계</a><b>수신 결과 확인</b><a href="#received-values">30 · 수신 원본 GNSS 관측값</a><a href="#iq-observations">31 · I/Q RF 관측값과 지연 비교</a><a href="#reference">32 · 송신 비교 자료 확인</a><a href="#pvt-result">33 · PVT 결과에서 확인할 순서</a><a href="#pvt-views">34 · 반복 시험 위치 편차</a><a href="#pvt-numbers">35 · ECEF 상세 수치와 시간 잔차</a><b>결과 해석</b><a href="#delay-model">36 · 공통 지연과 의사거리 계산</a><a href="#delay-meaning">37 · 지연이 큰데 위치 차이가 작은 이유</a><a href="#iq-integrity">38 · I/Q 파일 일치와 처리 시간</a><b>시험 관리</b><a href="#history">39 · 여러 시험 전송과 이력 조회</a><a href="#cancel">40 · 시험별 중지와 대기 전체 종료</a><b>원문과 로그</b><a href="#json">41 · 송신·수신 JSON 원문 확인</a><a href="#logs">42 · 로그 상세·다운로드·전체화면</a><a href="#log-evidence">43 · 로그를 이용한 장애 전달</a><b>장애 대응</b><a href="#errors">44 · 문제 발생 시 확인 순서</a><a href="#actual-errors">45 · 실제 이력으로 보는 비교 불가와 실패</a><b>관리자 부록</b><a href="#management">46 · 데이터 관리 접속과 조회</a><a href="#management-detail">47 · 시험·수신 원문·파일 상세</a><a href="#delete">48 · 자료 선택 삭제</a><a href="#retention">49 · 보관 기간과 자동 정리</a><a href="#install-prepare">50 · Windows PC 설치 준비</a><a href="#install-settings">51 · 송신·수신 PC 설정</a><a href="#install-start">52 · 설치 완료 확인과 일상 실행</a><a href="#operations">53 · 기동·종료·업데이트와 백업</a><a href="#environment">54 · 다른 PC 설치 시 확인할 설정</a><a href="#docker-logs">55 · Docker 로그 확인</a><b>참고</b><a href="#intro">56 · 구조·동작 안내 화면 사용</a><a href="#glossary">57 · 용어와 단위</a><a href="#record">58 · 시험 결과 기록 항목</a></nav><main id="manual"><p hidden="" id="empty">검색 결과가 없습니다. 검색어를 바꾸거나 검색 초기화를 누르세요.</p><section aria-labelledby="title-cover" class="sheet" id="cover"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">사용 안내 · 01</p><h1 id="title-cover">LNIS DTN/HDTN 송수신 시험 사용자 설명서</h1></div><div class="cover"><img alt="LNIS" src="assets/logo_v3.png" width="112"/><p class="eyebrow">OPERATOR MANUAL · 내부 배포용</p><h2>GNSS 데이터 전송부터<br/>지연 반영 PVT 비교까지</h2><p>GNSS RAW · AFS Frame · I/Q Sample</p><div class="cover-meta">문서 버전 1.0 · Windows 오프라인 설치 반영 2026. 11. 4.<br/>운영자 본문 / 설치·관리자 부록</div></div><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>1 / 58</span></div></section>
-<section aria-labelledby="title-reading" class="sheet" id="reading"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">사용 안내 · 02</p><h1 id="title-reading">설명서 적용 범위</h1></div><p>송신 PC와 수신 PC에서 LNIS 시험을 준비하고, DTN/HDTN 어댑터를 통해 전달된 데이터와 PVT 결과를 확인하는 절차입니다. 설치 환경에 따라 주소·포트·직렬 포트는 달라집니다.</p><table><thead><tr><th>구분</th><th>이 설명서의 기준</th></tr></thead><tbody><tr><td>화면</td><td>실행 중인 LNIS의 실제 화면을 촬영했습니다. 서버 주소·시험 ID·포트·수치는 촬영 당시 값입니다.</td></tr><tr><td>완료 예시</td><td>저장된 AFS Frame 및 I/Q Sample 시험을 사용했습니다. GNSS RAW 완료 기록이 없어 RAW 완료 화면은 수록하지 않았습니다.</td></tr><tr><td>진행 상태</td><td>운영 시험·수집 상태는 변경하지 않았습니다. 새 I/Q 경로는 90초 파일의 오프라인 생성·추적 자료로 검증합니다. COM 수집·누적 HUD 화면은 기록 재생 및 동작검사 자료를 포함합니다. 진행 중 표시와 삭제 확인 절차는 코드에 근거합니다.</td></tr><tr><td>현재 방식과 이력</td><td>이전 시험의 설정·오류·처리 시간은 해당 시험의 기록입니다. 현재 기본값이나 성능 보장값으로 해석하지 않습니다.</td></tr><tr><td>문서 사용</td><td>오프라인 HTML은 목차·검색·이미지 확대를 지원합니다. PDF는 A4 가로 인쇄용입니다.</td></tr><tr><td>보안</td><td>실제 IP·포트·시험 ID·일부 경로가 포함됩니다. 인증 토큰과 비밀번호는 수록하지 않습니다.</td></tr></tbody></table><aside class="note">“완료”, “파일 일치”, “PVT 측정 완료”는 서로 다른 확인 항목입니다. 완료 표시만으로 위치 정확도나 전체 라우팅 기능이 검증된 것은 아닙니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>2 / 58</span></div></section>
-<section aria-labelledby="title-contents" class="sheet" id="contents"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">사용 안내 · 03</p><h1 id="title-contents">목차</h1></div><div id="printed-toc"><a href="#roles"><span>서비스와 어댑터의 역할</span><small>04</small></a><a href="#access"><span>접속과 시험 전 준비</span><small>05</small></a><a href="#quick"><span>빠른 실행 · 파일 입력으로 첫 시험</span><small>06</small></a><a href="#sender-map"><span>송신 화면에서 구분할 영역</span><small>07</small></a><a href="#settings"><span>설정 열기와 적용 시점</span><small>08</small></a><a href="#types"><span>시험 유형 선택</span><small>09</small></a><a href="#routes"><span>전송 경로와 연결 주소</span><small>10</small></a><a href="#health"><span>어댑터 연결 확인</span><small>11</small></a><a href="#presets"><span>프리셋 저장·불러오기·수정</span><small>12</small></a><a href="#hdtn"><span>HDTN 파라미터</span><small>13</small></a><a href="#hdtn-advanced"><span>HDTN 고급 설정과 입력 제한</span><small>14</small></a><a href="#dtn"><span>DTN(ION) 파라미터</span><small>15</small></a><a href="#upload"><span>UBX / GRAW 파일 적용</span><small>16</small></a><a href="#serial"><span>COM 포트 연결과 장비 설정</span><small>17</small></a><a href="#capture"><span>GNSS 수집과 UBX 다운로드</span><small>18</small></a><a href="#clock"><span>기준시각 확인과 시간 맞추기</span><small>19</small></a><a href="#sender-data"><span>송신 원본 GNSS 관측값 읽기</span><small>20</small></a><a href="#rawx"><span>RAWX 필드와 PRN</span><small>21</small></a><a href="#navigation"><span>항법정보와 RAWX의 관계</span><small>22</small></a><a href="#receiver-info"><span>수신기 정보와 입력 상태</span><small>23</small></a><a href="#run-raw"><span>GNSS RAW 시험 실행</span><small>24</small></a><a href="#run-afs"><span>AFS Frame 시험 실행</span><small>25</small></a><a href="#iq-generate"><span>I/Q Sample 생성과 저장 파일 선택</span><small>26</small></a><a href="#iq-files"><span>I/Q 공유 폴더와 파일 전달</span><small>27</small></a><a href="#sender-reference"><span>송신 Reference PVT와 시험 이력</span><small>28</small></a><a href="#receiver-map"><span>수신 화면과 처리 단계</span><small>29</small></a><a href="#received-values"><span>수신 원본 GNSS 관측값</span><small>30</small></a><a href="#iq-observations"><span>I/Q RF 관측값과 지연 비교</span><small>31</small></a><a href="#reference"><span>송신 비교 자료 확인</span><small>32</small></a><a href="#pvt-result"><span>PVT 결과에서 확인할 순서</span><small>33</small></a><a href="#pvt-views"><span>반복 시험 위치 편차</span><small>34</small></a><a href="#pvt-numbers"><span>ECEF 상세 수치와 시간 잔차</span><small>35</small></a><a href="#delay-model"><span>공통 지연과 의사거리 계산</span><small>36</small></a><a href="#delay-meaning"><span>지연이 큰데 위치 차이가 작은 이유</span><small>37</small></a><a href="#iq-integrity"><span>I/Q 파일 일치와 처리 시간</span><small>38</small></a><a href="#history"><span>여러 시험 전송과 이력 조회</span><small>39</small></a><a href="#cancel"><span>시험별 중지와 대기 전체 종료</span><small>40</small></a><a href="#json"><span>송신·수신 JSON 원문 확인</span><small>41</small></a><a href="#logs"><span>로그 상세·다운로드·전체화면</span><small>42</small></a><a href="#log-evidence"><span>로그를 이용한 장애 전달</span><small>43</small></a><a href="#errors"><span>문제 발생 시 확인 순서</span><small>44</small></a><a href="#actual-errors"><span>실제 이력으로 보는 비교 불가와 실패</span><small>45</small></a><a href="#management"><span>데이터 관리 접속과 조회</span><small>46</small></a><a href="#management-detail"><span>시험·수신 원문·파일 상세</span><small>47</small></a><a href="#delete"><span>자료 선택 삭제</span><small>48</small></a><a href="#retention"><span>보관 기간과 자동 정리</span><small>49</small></a><a href="#install-prepare"><span>Windows PC 설치 준비</span><small>50</small></a><a href="#install-settings"><span>송신·수신 PC 설정</span><small>51</small></a><a href="#install-start"><span>설치 완료 확인과 일상 실행</span><small>52</small></a><a href="#operations"><span>기동·종료·업데이트와 백업</span><small>53</small></a><a href="#environment"><span>다른 PC 설치 시 확인할 설정</span><small>54</small></a><a href="#docker-logs"><span>Docker 로그 확인</span><small>55</small></a><a href="#intro"><span>구조·동작 안내 화면 사용</span><small>56</small></a><a href="#glossary"><span>용어와 단위</span><small>57</small></a><a href="#record"><span>시험 결과 기록 항목</span><small>58</small></a></div><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>3 / 58</span></div></section>
-<section aria-labelledby="title-roles" class="sheet" id="roles"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">시작 전 확인 · 04</p><h1 id="title-roles">서비스와 어댑터의 역할</h1></div><div class="flow"><div><b>송신 PC · LNIS</b><span>입력 확보 → 기준 PVT 계산<br/>전송용 데이터 구성</span></div><i>→</i><div><b>어댑터 · DTN/HDTN</b><span>접수 → 저장·대기·전달<br/>상대 어댑터로 전송</span></div><i>→</i><div><b>수신 PC · LNIS</b><span>본문 접수 → 복원·검증<br/>지연 반영 PVT 비교</span></div></div><table><thead><tr><th>연결</th><th>용도</th><th>확인 사항</th></tr></thead><tbody><tr><td>송신 서비스 ↔ 수신 서비스</td><td>시험 등록, 상태 확인, 비교 자료 요청</td><td>상대 LNIS 서비스 주소를 입력합니다. 어댑터 주소와 구분합니다.</td></tr><tr><td>각 LNIS → 각 어댑터</td><td>전송 요청 및 연결 상태 확인</td><td>각 PC가 연결할 어댑터의 IP·포트를 입력합니다.</td></tr><tr><td>I/Q 공유 폴더</td><td>어댑터가 .bin 파일을 읽고 전달</td><td>JSON에는 경로 등 파일 정보를 전달합니다. 경로만 맞아도 실제 파일 권한·공유 상태가 별도로 필요합니다.</td></tr><tr><td>수신 결과 확인</td><td>testId로 해당 시험에 결과 연결</td><td>송수신 서비스에서 같은 시험 ID인지 확인합니다. 도착 순서만으로 시험을 구분하지 않습니다.</td></tr></tbody></table><aside class="note">LNIS의 처리기 “준비됨”은 해당 LNIS 처리기의 상태입니다. 어댑터 연결이나 상대 데이터 도착까지 의미하지 않습니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>4 / 58</span></div></section>
-<section aria-labelledby="title-access" class="sheet" id="access"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">시작 전 확인 · 05</p><h1 id="title-access">접속과 시험 전 준비</h1></div><table><thead><tr><th>화면</th><th>접속 주소 형식</th></tr></thead><tbody><tr><td>송신 시험</td><td>http://송신-PC-IP:서비스-포트/lnis/dtntest/sender</td></tr><tr><td>수신 시험</td><td>http://수신-PC-IP:서비스-포트/lnis/dtntest/receiver</td></tr><tr><td>사용자 설명서</td><td>http://해당-PC-IP:서비스-포트/user-manual/</td></tr><tr><td>구조·동작 안내</td><td>http://해당-PC-IP:서비스-포트/dtn-intro</td></tr><tr><td>데이터 관리 · 관리자</td><td>http://해당-PC-IP:서비스-포트/lnis/data-manager</td></tr></tbody></table><ol class="steps"><li>각 PC의 LNIS 서비스를 기동한 뒤 브라우저로 접속합니다. 루트 주소(/)에 접속하면 설정된 송신·수신 역할 화면으로 이동합니다.</li><li>양쪽 서비스 연결 상태와 각 어댑터의 연결 상태를 확인합니다.</li><li>GNSS 입력 파일 또는 직렬 포트를 준비합니다. PVT 비교에는 계산 가능한 GPS L1 C/A 관측과 선행 항법정보가 필요합니다.</li><li>지연 비교 전 양쪽 시험 기준시각을 확인합니다. I/Q 시험은 공유 폴더·여유 저장 공간·I/Q 사용 설정도 확인합니다.</li></ol><aside class="note">같은 PC의 예시 화면은 송신 8088, 수신 8089 포트를 사용합니다. 실제 운영 주소와 포트는 설치 담당자가 제공한 값을 사용합니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>5 / 58</span></div></section>
-<section aria-labelledby="title-quick" class="sheet" id="quick"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">기본 실행 순서 · 06</p><h1 id="title-quick">빠른 실행 · 파일 입력으로 첫 시험</h1></div><ol class="steps"><li>송신 화면의 <b>설정</b>에서 시험 유형과 전송 경로를 선택합니다.</li><li><b>상대 수신 서비스</b>와 <b>DTN 어댑터 서버 주소</b>를 확인합니다. 필요한 경우 저장·적용 후 연결 확인을 실행합니다.</li><li><b>UBX / GRAW 파일</b>에서 파일을 선택하고 <b>파일 적용</b>을 누릅니다. 파일 적용 완료 및 PVT 계산 상태를 확인합니다.</li><li>설정을 닫고 상단의 <b>다음 전송</b> 요약을 확인합니다. I/Q는 먼저 <b>90초 I/Q 생성</b> 또는 저장된 파일 선택을 완료합니다.</li><li><b>전송시험 시작</b>을 누릅니다. 생성된 시험 ID와 어댑터 접수 결과를 확인합니다.</li><li>수신 화면에서 같은 시험을 선택하고 <b>시험 등록 → 번들 수신 → 복원·PVT 계산</b> 상태를 확인합니다.</li><li>데이터 일치 여부, PVT 비교 가능 여부, 지연·시계오차·위치·속도 차이를 확인하고 로그와 JSON을 다운로드합니다.</li></ol><aside class="note">전송시험 시작 버튼이 비활성 상태이면 버튼 위 준비 조건 안내와 상단 메시지를 확인합니다. 완료된 과거 시험을 선택하는 것으로 새 전송이 시작되지는 않습니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>6 / 58</span></div></section>
-<section aria-labelledby="title-sender-map" class="sheet" id="sender-map"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">송신 화면 · 07</p><h1 id="title-sender-map">송신 화면에서 구분할 영역</h1></div><figure class="wide"><a aria-label="송신 화면 상단 · 연결 상태와 다음 전송 요약 확대" href="assets/sender-status.png" target="_blank"><img alt="송신 화면 상단 · 연결 상태와 다음 전송 요약" src="assets/sender-status.png"/></a><figcaption>송신 화면 상단 · 연결 상태와 다음 전송 요약</figcaption></figure><figure class="wide"><a aria-label="송신 화면 · 입력 요약, 시험 기록 및 실행 버튼 확대" href="assets/sender-history.png" target="_blank"><img alt="송신 화면 · 입력 요약, 시험 기록 및 실행 버튼" src="assets/sender-history.png"/></a><figcaption>송신 화면 · 입력 요약, 시험 기록 및 실행 버튼</figcaption></figure><table><thead><tr><th>영역</th><th>확인 내용</th></tr></thead><tbody><tr><td>연결 상태 / 기준시각</td><td>송수신 처리기, 어댑터, 시험 상태, 서비스 내부 기준시각과 보정 상태</td></tr><tr><td>다음 전송</td><td>앞으로 시작할 시험 유형·경로입니다. 클릭하면 설정을 엽니다.</td></tr><tr><td>시험 기록</td><td>선택한 과거 시험의 관측값·PVT·원문·로그를 조회합니다. 다음 시험 설정과 별개입니다.</td></tr><tr><td>어댑터 설정 상세</td><td>선택한 시험을 시작할 때 요청한 값입니다. 라우터에서 실제 반영한 값의 조회 결과는 아닙니다.</td></tr></tbody></table><aside class="note">새로고침 후 기본 시험 유형은 AFS Frame입니다. 다른 유형은 다시 선택하거나 프리셋을 불러와 다음 전송 요약을 확인합니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>7 / 58</span></div></section>
-<section aria-labelledby="title-settings" class="sheet" id="settings"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">송신 설정 · 08</p><h1 id="title-settings">설정 열기와 적용 시점</h1></div><div class="split"><div><figure class=""><a aria-label="송수신 설정 · 시험 유형, 경로 및 프리셋 확대" href="assets/settings-top.png" target="_blank"><img alt="송수신 설정 · 시험 유형, 경로 및 프리셋" src="assets/settings-top.png"/></a><figcaption>송수신 설정 · 시험 유형, 경로 및 프리셋</figcaption></figure></div><div><ol class="steps"><li>우측 하단 <b>설정</b> 또는 <b>다음 전송</b>을 누릅니다.</li><li>GNSS RAW / AFS Frame / I/Q Sample 중 유형을 선택합니다.</li><li>송신 엔진 → 수신 엔진 순서로 경로를 선택합니다.</li><li>경로에 사용되는 DTN·HDTN 설정을 확인하고 <b>닫기</b> 또는 Esc로 돌아옵니다.</li></ol><table><thead><tr><th>항목</th><th>적용</th></tr></thead><tbody><tr><td>유형·경로</td><td>다음 시험 요청에 포함됩니다. 기존 시험 조건을 바꾸지 않습니다.</td></tr><tr><td>DTN/HDTN 값</td><td>유효한 입력은 해당 브라우저에 자동 저장됩니다.</td></tr><tr><td>프리셋</td><td>이 PC의 서버에 시험 조건을 저장합니다.</td></tr><tr><td>연결 주소</td><td>주소 항목별 저장·적용을 사용합니다. 프리셋에 포함되지 않습니다.</td></tr></tbody></table></div></div><aside class="note">준비·전송 요청·수집 판단 등 처리 중에는 설정 변경이 제한될 수 있습니다. 수신 대기만 남은 상태에서는 다음 시험을 준비할 수 있습니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>8 / 58</span></div></section>
-<section aria-labelledby="title-types" class="sheet" id="types"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">송신 설정 · 09</p><h1 id="title-types">시험 유형 선택</h1></div><table><thead><tr><th>시험 유형</th><th>어댑터로 전달하는 계산 입력</th><th>수신 처리</th><th>선택 기준</th></tr></thead><tbody><tr><td>GNSS RAW</td><td>의사거리를 가상 송신 시각으로 치환한 1 Epoch JSON</td><td>변환 RAW 해석 → 의사거리 재계산 → PVT</td><td>프레임·RF 처리 없이 데이터 전송과 공통 지연 계산을 확인할 때</td></tr><tr><td>AFS Frame</td><td>GPS 위성별 6,000-bit AFS 프레임을 포함한 JSON</td><td>AFS 복호 → 입력 복원 → 의사거리 재계산 → PVT</td><td>프레임 구성·복원까지 포함해 시험할 때</td></tr><tr><td>I/Q Sample</td><td>I/Q 파일 경로·해시 등 manifest JSON과 별도 .bin 파일</td><td>파일 검증 → RF 추적·프레임 복호 → 공통 지연 PVT</td><td>신호 생성·추적·복호 경로까지 포함할 때</td></tr></tbody></table><p>세 유형의 지연 반영 PVT 계산은 기본 동작입니다. 별도의 지연 반영 체크박스는 사용하지 않습니다. GNSS RAW는 업로드한 UBX 전체를 그대로 보내는 모드가 아닙니다.</p><figure class="medium"><a aria-label="시험 데이터 유형 선택 · RAW 선택 예시 확대" href="assets/settings-raw.png" target="_blank"><img alt="시험 데이터 유형 선택 · RAW 선택 예시" src="assets/settings-raw.png"/></a><figcaption>시험 데이터 유형 선택 · RAW 선택 예시</figcaption></figure><aside class="note">AFS_METADATA는 내부 유형명이며 화면에는 AFS Frame으로 표시합니다. I/Q도 같은 AFS 프레임 구성기를 사용하지만 위성별 PRN 신호 채널은 유지합니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>9 / 58</span></div></section>
-<section aria-labelledby="title-routes" class="sheet" id="routes"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">송신 설정 · 10</p><h1 id="title-routes">전송 경로와 연결 주소</h1></div><table><thead><tr><th>선택 경로</th><th>설정 탭의 적용 대상</th></tr></thead><tbody><tr><td>DTN → HDTN</td><td>DTN: 송신 / HDTN: 수신</td></tr><tr><td>DTN → DTN</td><td>DTN: 송·수신</td></tr><tr><td>HDTN → DTN</td><td>HDTN: 송신 / DTN: 수신</td></tr><tr><td>HDTN → HDTN</td><td>HDTN: 송·수신</td></tr></tbody></table><div><h3>주소 입력 순서</h3><ol class="steps"><li>상대 수신 LNIS의 IP와 서비스 포트를 입력하고 <b>저장·적용</b>합니다.</li><li><b>DTN 어댑터 서버 주소</b>에 <code>http://어댑터-IP:포트</code> 형식으로 입력합니다.</li><li>각 연결 확인 결과를 구분합니다. LNIS 간 연결 성공과 어댑터 연결 성공은 별개입니다.</li></ol><p>어댑터 주소는 기본값을 환경 설정에서 읽고, 화면에서 저장한 주소를 해당 브라우저에 적용합니다. 송신 PC와 수신 PC가 서로 다른 어댑터를 사용하면 각 화면에 각자의 주소를 설정합니다.</p></div><aside class="note">라우터 경로를 선택했다고 해서 중계 노드의 라우팅 정책이나 BP 버전 호환성이 자동으로 검증되지는 않습니다. 외부 어댑터 담당자와 조건을 맞춥니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>10 / 58</span></div></section>
-<section aria-labelledby="title-health" class="sheet" id="health"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">송신 설정 · 11</p><h1 id="title-health">어댑터 연결 확인</h1></div><figure class="wide"><a aria-label="어댑터 상태는 상단에도 표시됩니다. 촬영 시에는 연결실패 상태입니다. 확대" href="assets/sender-status.png" target="_blank"><img alt="어댑터 상태는 상단에도 표시됩니다. 촬영 시에는 연결실패 상태입니다." src="assets/sender-status.png"/></a><figcaption>어댑터 상태는 상단에도 표시됩니다. 촬영 시에는 연결실패 상태입니다.</figcaption></figure><table><thead><tr><th>표시</th><th>의미</th><th>다음 조치</th></tr></thead><tbody><tr><td>정상연결 · 녹색</td><td>health 응답의 status가 ready</td><td>전송 준비 조건을 확인합니다. 상대 수신 완료 표시는 아닙니다.</td></tr><tr><td>시험대기 · 노란색</td><td>health 응답의 status가 busy</td><td>어댑터 작업 상태를 확인하고 필요하면 대기합니다.</td></tr><tr><td>연결실패 · 빨간색</td><td>응답 없음, 연결 오류 등 정상 상태를 확인하지 못함</td><td>IP·포트·어댑터 실행·방화벽·응답 내용을 확인합니다.</td></tr></tbody></table><p>화면에서 약 10초 간격으로 상태를 요청합니다. <b>연결 확인</b>은 수동 재조회입니다. 송신 설정의 상세 보기에는 요청 주소·응답 상태·처리 시간·마지막 확인 및 개발자 JSON 원문이 표시됩니다. 수신 화면은 간단한 상태 표시를 제공합니다.</p><aside class="note">송신 역할은 /sender/health, 수신 역할은 /receiver/health를 사용합니다. health의 처리 시간(ms)은 LNIS가 확인 요청을 처리한 시간이며 시험의 end-to-end 전송 지연과 다릅니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>11 / 58</span></div></section>
-<section aria-labelledby="title-presets" class="sheet" id="presets"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">송신 설정 · 12</p><h1 id="title-presets">프리셋 저장·불러오기·수정</h1></div><div class="split"><div><figure class=""><a aria-label="설정 저장하기 대화상자 확대" href="assets/preset-dialog.png" target="_blank"><img alt="설정 저장하기 대화상자" src="assets/preset-dialog.png"/></a><figcaption>설정 저장하기 대화상자</figcaption></figure></div><div><ol class="steps"><li>시험 유형·전송 경로·DTN/HDTN 값을 먼저 설정합니다.</li><li><b>설정 저장하기</b>를 누르고 40자 이내 이름을 입력해 저장합니다. 최대 5개입니다.</li><li>목록에서 프리셋을 선택하고 <b>불러오기</b>를 누릅니다. 다음 전송 요약과 각 값을 확인합니다.</li><li>값을 수정한 후 <b>변경 저장</b>으로 선택한 프리셋을 갱신합니다.</li><li><b>관리</b>에서 이름 변경 또는 삭제를 수행합니다. 다른 화면에서 수정되었다는 메시지가 나오면 새로고침 후 다시 확인합니다.</li></ol></div></div><table><thead><tr><th>저장 대상</th><th>포함 여부</th></tr></thead><tbody><tr><td>시험 유형 / 송수신 엔진 / GPS 계산 대상 / DTN·HDTN 파라미터</td><td>포함</td></tr><tr><td>GNSS 입력 파일 / 저장된 I/Q 선택 / COM 연결 상태</td><td>미포함 · 사용 시 별도 준비</td></tr><tr><td>상대 서비스·어댑터 주소 / 인증 토큰 / 시험 이력</td><td>미포함</td></tr></tbody></table><aside class="note">프리셋은 송신 서비스 DB에 보관됩니다. 브라우저의 파라미터 자동 저장과 구분합니다. 프리셋 불러오기는 과거 시험 결과를 변경하지 않습니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>12 / 58</span></div></section>
-<section aria-labelledby="title-hdtn" class="sheet" id="hdtn"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">송신 설정 · 13</p><h1 id="title-hdtn">HDTN 파라미터</h1></div><figure class="medium"><a aria-label="HDTN 설정 · 촬영 화면의 현재 입력값 확대" href="assets/settings-hdtn.png" target="_blank"><img alt="HDTN 설정 · 촬영 화면의 현재 입력값" src="assets/settings-hdtn.png"/></a><figcaption>HDTN 설정 · 촬영 화면의 현재 입력값</figcaption></figure><table><thead><tr><th>입력 항목 / JSON 키</th><th>초기 기본값</th><th>의미</th></tr></thead><tbody><tr><td>최대 동시 번들 수 / maxNumberOfBundlesInPipeline</td><td>50 개</td><td>동시에 유지할 번들 수의 요청 한도</td></tr><tr><td>최대 동시 번들 용량 / maxSumOfBundleBytesInPipeline</td><td>3,000,000,000 Bytes</td><td>파이프라인 누적 바이트 한도</td></tr><tr><td>최대 번들 크기 / maxBundleSizeBytes</td><td>3,000,000,000 Bytes</td><td>단일 번들 크기 관련 요청값</td></tr><tr><td>TCPCL 세그먼트 크기 / tcpclMaxSegmentSizeBytes</td><td>200,000 Bytes</td><td>TCPCL 세그먼트 크기</td></tr><tr><td>저장 공간 부족 시 대기 / neighborDepletedStorageDelaySeconds</td><td>10 초</td><td>상대 저장 공간 부족 시 대기 요청</td></tr><tr><td>우선순위 / enforceBundlePriority</td><td>사용 안 함 · false</td><td>번들 우선순위 적용 요청</td></tr><tr><td>삭제 정책 / storageDeletionPolicy</td><td>never</td><td>자동 삭제 안 함 요청</td></tr></tbody></table><aside class="note">표는 이 버전의 초기 기본값입니다. 브라우저 저장값이나 프리셋을 불러오면 달라집니다. 라우터의 실제 적용 방식은 어댑터 구현과 구성에 따릅니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>13 / 58</span></div></section>
-<section aria-labelledby="title-hdtn-advanced" class="sheet" id="hdtn-advanced"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">송신 설정 · 14</p><h1 id="title-hdtn-advanced">HDTN 고급 설정과 입력 제한</h1></div><figure class="medium"><a aria-label="고급 설정 · 전체 저장 용량과 ACS 주기 확대" href="assets/settings-hdtn-advanced.png" target="_blank"><img alt="고급 설정 · 전체 저장 용량과 ACS 주기" src="assets/settings-hdtn-advanced.png"/></a><figcaption>고급 설정 · 전체 저장 용량과 ACS 주기</figcaption></figure><table><thead><tr><th>항목</th><th>초기 기본값</th><th>용도</th></tr></thead><tbody><tr><td>전체 저장 용량 / totalStorageCapacityBytes</td><td>8,589,934,592 Bytes</td><td>라우터 저장 용량 요청</td></tr><tr><td>ACS 전송 주기 / acsSendPeriodMilliseconds</td><td>1,000 ms</td><td>집계 보관 신호의 전송 주기 요청</td></tr></tbody></table><ol class="steps"><li>경로에 HDTN이 포함되는지 확인하고 <b>HDTN 설정</b> 탭을 엽니다.</li><li>항목의 ⓘ에 마우스를 올려 설명을 확인합니다. 값은 정수로 입력합니다.</li><li>기본 상태로 복원하려면 <b>전체 기본값</b>을 누릅니다. 고급 항목도 함께 초기화됩니다.</li><li>전송 후 <b>어댑터 설정 상세</b>에서 실제 요청에 포함된 값을 확인합니다.</li></ol><aside class="note">현재 화면은 과거 권장 범위를 상한·하한으로 강제하지 않습니다. 숫자 항목은 안전한 정수 범위의 양의 정수, 혼잡 대기 시간은 0 이상을 받습니다. 형식 오류는 수정한 뒤 전송합니다. 큰 값이 라우터의 가용 메모리·디스크에 적합한지는 별도 확인해야 합니다.</aside><p>삭제 정책 선택: never / on_forward / on_delivery / DELETE_AFTER_FORWARDING. 선택 이름은 어댑터에 보내는 요청값입니다. 이 화면에서 디스크 삭제 여부나 Custody 동작을 직접 확인하는 것은 아닙니다. 현재 화면에는 LTP 최대 수신 패킷 크기 입력란이 없습니다.</p><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>14 / 58</span></div></section>
-<section aria-labelledby="title-dtn" class="sheet" id="dtn"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">송신 설정 · 15</p><h1 id="title-dtn">DTN(ION) 파라미터</h1></div><figure class="medium"><a aria-label="DTN 설정 · 경로에 DTN이 포함될 때 사용 확대" href="assets/settings-dtn.png" target="_blank"><img alt="DTN 설정 · 경로에 DTN이 포함될 때 사용" src="assets/settings-dtn.png"/></a><figcaption>DTN 설정 · 경로에 DTN이 포함될 때 사용</figcaption></figure><table><thead><tr><th>입력 항목 / JSON 키</th><th>초기 기본값</th><th>용도</th></tr></thead><tbody><tr><td>SDR 힙 / sdrHeapSizeBytes</td><td>3,500,000,000 Bytes</td><td>SDR 저장 영역 크기 요청</td></tr><tr><td>SDR 작업 메모리 / sdrWorkingMemorySizeBytes</td><td>350,000,000 Bytes</td><td>작업 메모리 크기 요청</td></tr><tr><td>SDR 임시 모드 / sdrTransientMode</td><td>디스크 기반 · false</td><td>일시적 메모리 운용 여부</td></tr><tr><td>최대 번들 / maxBundleSizeBytes</td><td>3,000,000,000 Bytes</td><td>번들 크기 관련 요청값</td></tr><tr><td>접촉 전송 속도 / contactRateBytesPerSec</td><td>125,000,000 Bytes/s</td><td>접촉 구간의 전송률 요청</td></tr><tr><td>최대 생성 / 최대 소비 속도</td><td>각 100,000,000 Bytes/s</td><td>생성·소비 전송률 요청</td></tr><tr><td>TCPCL 세그먼트 / tcpclMaxSegmentSizeBytes</td><td>20,000 Bytes</td><td>세그먼트 크기</td></tr><tr><td>라우팅 모드 / routingMode</td><td>StaticPlan</td><td>라우팅 모드 문자열</td></tr></tbody></table><aside class="note">정수 항목은 양의 정수로 입력합니다. 사용하지 않는 엔진 탭의 값은 해당 경로의 요청에서 제외됩니다. ION 설정 파일의 구체적 매핑은 어댑터 담당자가 확인합니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>15 / 58</span></div></section>
-<section aria-labelledby="title-upload" class="sheet" id="upload"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">GNSS 입력 · 16</p><h1 id="title-upload">UBX / GRAW 파일 적용</h1></div><div class="split"><div><figure class=""><a aria-label="GNSS 입력 · 파일 선택과 파일 적용 확대" href="assets/input-upload.png" target="_blank"><img alt="GNSS 입력 · 파일 선택과 파일 적용" src="assets/input-upload.png"/></a><figcaption>GNSS 입력 · 파일 선택과 파일 적용</figcaption></figure></div><div><ol class="steps"><li>송신 설정에서 <b>UBX / GRAW 파일</b>을 선택합니다.</li><li><b>GNSS 파일</b>에서 .ubx 또는 .graw 파일을 선택합니다.</li><li><b>파일 적용</b>을 누르고 적용 상태가 완료될 때까지 기다립니다.</li><li>설정을 닫고 관측 시점, PVT 계산 상태, GPS L1 관측·항법정보 수를 확인합니다.</li></ol></div></div><table><thead><tr><th>표시</th><th>의미</th></tr></thead><tbody><tr><td>파일 적용 상태</td><td>업로드와 입력 검증의 진행 상태입니다. 외부 DTN 전송률이 아닙니다.</td></tr><tr><td>GNSS 기준시간</td><td>선택한 RAWX Epoch의 GPS Week / TOW입니다. 파일 생성 시각·PC 시각과 다릅니다.</td></tr><tr><td>관측 시점</td><td>지연 시험에 사용할 유효한 첫 Epoch를 자동 선택합니다. 화면의 시점 선택으로 관측 자료를 확인합니다.</td></tr><tr><td>파일 수집 범위</td><td>입력 파일에는 여러 Epoch와 여러 위성군이 있을 수 있습니다. 시험 계산 입력은 선택된 1 Epoch와 필요한 선행 정보로 구성됩니다.</td></tr></tbody></table><aside class="note">확장자만 바꾼 파일은 사용할 수 없습니다. 관측만 있고 GPS 항법정보가 부족하면 PVT 계산이 불가능할 수 있습니다. 원본 입력을 유지한 채 원인 메시지를 확인합니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>16 / 58</span></div></section>
-<section aria-labelledby="title-serial" class="sheet" id="serial"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">GNSS 입력 · 17</p><h1 id="title-serial">COM 포트 연결과 장비 설정</h1></div><div class="split"><div><figure class=""><a aria-label="COM 입력 · 연결 상태와 수집 개수 확대" href="assets/input-com.png" target="_blank"><img alt="COM 입력 · 연결 상태와 수집 개수" src="assets/input-com.png"/></a><figcaption>COM 입력 · 연결 상태와 수집 개수</figcaption></figure></div><div><ol class="steps"><li>u-center 등 다른 프로그램이 같은 COM 포트를 점유하고 있으면 연결을 해제합니다.</li><li><b>COM 포트 → 포트 조회</b>에서 장비 포트를 선택합니다.</li><li>장비 출력 속도에 맞는 <b>통신 속도</b>를 선택합니다. 화면 초기값은 38400 baud입니다.</li><li><b>연결</b>을 눌러 선택한 COM 포트를 연결합니다.</li><li>연결 상태와 시간 수신 상태를 각각 확인합니다. 수집은 별도 <b>GNSS 수집</b>으로 시작합니다.</li></ol></div></div><table><thead><tr><th>항목</th><th>의미</th></tr></thead><tbody><tr><td>연결됨 / 시간 미확인</td><td>포트는 연결됐지만 유효한 GNSS 시간을 아직 확보하지 못했을 수 있습니다.</td></tr><tr><td>포트 없음</td><td>장치 인식, Windows 직렬 브릿지, COM 점유 상태 및 설치 설정을 확인합니다.</td></tr></tbody></table><aside class="note">브라우저를 닫는 것으로 서버의 COM 연결이 해제되지는 않습니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>17 / 58</span></div></section>
-<section aria-labelledby="title-capture" class="sheet" id="capture"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">GNSS 입력 · 18</p><h1 id="title-capture">GNSS 수집과 UBX 다운로드</h1></div><div class="split"><div><ol class="steps"><li>송신 설정의 <b>COM 포트</b>에서 연결한 뒤 같은 영역의 <b>유효 Epoch</b> 개수를 입력합니다. 기본 10개, 범위 1~50개입니다.</li><li><b>GNSS 수집</b>을 누릅니다. 위치·속도 PVT가 모두 유효한 Epoch만 집계하며, 지정 개수를 모으면 자동 종료합니다.</li><li>진행률·경과 시간과 RAWX·항법정보 수신 상태를 확인합니다. 무효·중복 Epoch는 개수에서 제외됩니다.</li><li>필요하면 같은 영역의 <b>UBX 다운로드</b>로 수집 원문을 저장합니다. 다운로드·재업로드 없이 수집한 입력으로 바로 시험할 수 있습니다.</li><li>수집 완료 후 설정을 닫고 관측 시각에서 Epoch 하나를 선택한 뒤 <b>전송시험 시작</b>을 누릅니다.</li></ol></div><div><figure><a href="assets/com-capture.png" target="_blank" aria-label="GNSS 수집 진행 화면 확대"><img src="assets/com-capture.png" alt="유효 Epoch 개수·진행률·경과 시간·수신 상태"/></a><figcaption>COM 설정 내 GNSS 수집 진행 · 화면 동작검사</figcaption></figure><table><thead><tr><th>항목</th><th>기준</th></tr></thead><tbody><tr><td>수집 제한</td><td>최대 120초, GRAW·UBX 각 1 MiB. 미달·용량 초과·연결 오류는 미완료로 표시합니다.</td></tr><tr><td>UBX 내용</td><td>선택한 RAWX와 선행·중간 SFRBX, 확보한 MON-VER 원문. 해당 입력 삭제 시 함께 삭제됩니다.</td></tr><tr><td>관측 간격</td><td>수신기 출력 주기에 따릅니다. 무효 Epoch가 제외되므로 개수와 초는 다릅니다.</td></tr></tbody></table></div></div><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>18 / 58</span></div></section>
-<section aria-labelledby="title-clock" class="sheet" id="clock"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">시각 준비 · 19</p><h1 id="title-clock">기준시각 확인과 시간 맞추기</h1></div><figure class="wide"><a aria-label="기준시각 · PC 시각 미보정 예시 확대" href="assets/sender-status.png" target="_blank"><img alt="기준시각 · PC 시각 미보정 예시" src="assets/sender-status.png"/></a><figcaption>기준시각 · PC 시각 미보정 예시</figcaption></figure><ol class="steps"><li>송신·수신 화면의 <b>기준시각</b>과 보정 상태를 확인합니다.</li><li><b>상세</b>에서 시각 원천, 보정량, 보정 시점 및 시계 변경 정보를 확인합니다.</li><li>필요하면 <b>시간 맞추기</b>를 눌러 제안된 원천·보정량을 검토합니다.</li><li>확인 후 적용하고 양쪽 상태를 다시 확인합니다. 지연 시험 중에는 시각 원천·보정 상태를 바꾸지 않습니다.</li></ol><table><thead><tr><th>상태</th><th>해석</th></tr></thead><tbody><tr><td>PC 시각 · 미보정 (SYSTEM)</td><td>현재 PC 시각을 사용하는 상태</td></tr><tr><td>GNSS 근사보정 (GNSS_USB)</td><td>로컬 GNSS 입력을 이용한 서비스 내부 시각 보정</td></tr><tr><td>상대 GNSS 근사보정 (PEER_GNSS)</td><td>상대 서비스의 GNSS 기준을 활용한 근사보정</td></tr><tr><td>공통 NTP 근사보정 (NTP)</td><td>공통 시각 기준을 활용한 근사보정</td></tr></tbody></table><aside class="note">시간 맞추기는 LNIS 서비스 내부 시험 시각을 보정합니다. Windows 시스템 시계 자체를 변경하는 기능이 아닙니다. 재기동 후 상태를 다시 확인합니다. GNSS 연결만으로 자동 보정 완료를 판단하지 않습니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>19 / 58</span></div></section>
-<section aria-labelledby="title-sender-data" class="sheet" id="sender-data"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">관측값 확인 · 20</p><h1 id="title-sender-data">송신 원본 GNSS 관측값 읽기</h1></div><figure class="wide"><a aria-label="기존 AFS 시험의 송신 원본 관측값 · 표 상단과 항법정보 일부 확대" href="assets/sender-observations.png" target="_blank"><img alt="기존 AFS 시험의 송신 원본 관측값 · 표 상단과 항법정보 일부" src="assets/sender-observations.png"/></a><figcaption>기존 AFS 시험의 송신 원본 관측값 · 표 상단과 항법정보 일부</figcaption></figure><table><thead><tr><th>영역</th><th>확인할 내용</th></tr></thead><tbody><tr><td>GNSS 기준시간</td><td>현재 표시하는 Epoch의 GPS Week / TOW. 여러 Epoch 입력에서는 시점을 바꾸어 조회합니다.</td></tr><tr><td>계산 상태</td><td>PVT 완료 또는 계산 불가 사유. 파일 적용·관측 수신과 별도입니다.</td></tr><tr><td>요약 수</td><td>전체 관측 신호, GPS L1, 입력 대상, SF1~3 준비, RTKLIB 실제 사용 위성을 구분합니다.</td></tr><tr><td>RAWX / 항법정보</td><td>위성·신호별 측정값과 방송 항법 메시지를 함께 확인합니다. 계산 위성 필터가 있으면 표시 범위를 바꿀 수 있습니다.</td></tr></tbody></table><aside class="note">표에 관측된 위성 수와 PVT 실제 사용 위성 수는 같지 않을 수 있습니다. 위성군·신호 조건, 관측 유효성, 항법정보 준비 상태 및 계산기 필터가 각각 적용됩니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>20 / 58</span></div></section>
-<section aria-labelledby="title-rawx" class="sheet" id="rawx"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">관측값 확인 · 21</p><h1 id="title-rawx">RAWX 필드와 PRN</h1></div><table><thead><tr><th>표시</th><th>단위 / 의미</th><th>사용 목적</th></tr></thead><tbody><tr><td>GNSS / 위성 / 신호</td><td>위성군 + 위성번호 + 신호 ID</td><td>GPS 03은 GPS PRN 3입니다. 다른 위성군의 같은 숫자와 구분합니다.</td></tr><tr><td>의사거리</td><td>m · 수신 시각과 신호 전파시간을 포함한 거리 관측</td><td>송신부 가상 송신 시각 산출의 원본 입력</td></tr><tr><td>반송파 위상</td><td>cycle</td><td>수신 측정 정보 표시. 현재 SPP 위치 계산의 의사거리와 구분</td></tr><tr><td>Doppler</td><td>Hz · 주파수 변화 측정</td><td>속도 계산 입력. 공통 지연 계산에서도 원본값 유지</td></tr><tr><td>C/N₀</td><td>dB-Hz · 신호 품질 지표</td><td>측정 품질 확인용. 현재 계산 설정은 C/N₀를 직접 가중치로 사용하지 않음</td></tr><tr><td>추적 유지 / Lock</td><td>초 · 연속 추적 시간</td><td>추적 안정 상태 확인. 포화 표시는 최소 지속시간 의미</td></tr><tr><td>표준편차 코드 PR / CP / D</td><td>의사거리 / 반송파 / Doppler 오차등급 코드</td><td>m 또는 Hz 실수 오차값과 구분</td></tr><tr><td>측정 유효성 / PVT 입력</td><td>PR 유효, CP 유효 등 / 입력 대상 여부</td><td>관측 상태와 계산 대상 여부를 따로 확인</td></tr></tbody></table><p>RAWX는 한 Epoch 안에 여러 위성·여러 신호가 들어옵니다. 위성 하나가 여러 신호 행을 만들 수 있으므로 “행 수 = 서로 다른 위성 수”로 계산하지 않습니다.</p><aside class="note">입력 대상은 계산에 전달할 후보입니다. 최종 실제 사용 위성 수는 PVT 결과에서 확인합니다. 모든 유효 관측이 최종 계산에 채택되는 것은 아닙니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>21 / 58</span></div></section>
-<section aria-labelledby="title-navigation" class="sheet" id="navigation"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">관측값 확인 · 22</p><h1 id="title-navigation">항법정보와 RAWX의 관계</h1></div><table><thead><tr><th>항법정보 표시</th><th>역할 / RAWX와의 관계</th></tr></thead><tbody><tr><td>GPS SF1</td><td>해당 위성의 시계 보정·상태 관련 정보</td></tr><tr><td>GPS SF2 / SF3</td><td>해당 위성의 궤도정보. 일관된 세트를 사용해 위치·속도·시계 보정값을 산출</td></tr><tr><td>SF4 Page 18 등</td><td>전리층 보정 등 보충 정보. 메시지별 유효성과 수집 시점을 확인</td></tr><tr><td>선택 Epoch PVT 계산 활성</td><td>선택 관측 시점의 계산에 채택한 항법정보 세트</td></tr><tr><td>원문 HEX 32 bit</td><td>수신한 navigation word. RAWX 거리 측정값과 다른 종류의 자료</td></tr><tr><td>프레임 복원</td><td>AFS에서 복원한 항법정보. 원본 UBX의 수집 순번·수신 시각이 없을 수 있음</td></tr></tbody></table><p>RAWX는 “위성이 어떻게 측정됐는가”, 항법정보는 “그 위성이 어디에 있고 시계가 어떻게 보정되는가”를 제공합니다. 같은 GPS PRN을 기준으로 대응시킵니다. SF1~3이 서로 다른 시점·세트로 불완전하면 관측이 있어도 계산에 쓰이지 않을 수 있습니다.</p><p>SFRBX는 위성별 메시지가 도착할 때마다 누적되며 RAWX는 관측 Epoch마다 여러 신호를 묶습니다. 수집 주기와 자료 단위가 달라 RAWX와 SFRBX 행 수가 다른 것이 일반적입니다.</p><aside class="note">BeiDou·Galileo·QZSS 등의 항법정보 수신은 표시할 수 있지만 현재 GPS 전용 PVT 계산에는 사용하지 않습니다. “미사용”을 수신 실패나 데이터 손상으로 해석하지 않습니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>22 / 58</span></div></section>
-<section aria-labelledby="title-receiver-info" class="sheet" id="receiver-info"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">관측값 확인 · 23</p><h1 id="title-receiver-info">수신기 정보와 입력 상태</h1></div><table><thead><tr><th>정보</th><th>확인 내용</th></tr></thead><tbody><tr><td>수신기 정보</td><td>송신 원본 관측값 제목 줄 우측의 수신기 정보에서 입력에 포함된 모델·펌웨어·프로토콜 등을 확인합니다.</td></tr><tr><td>MON-VER</td><td>UBX에 기록된 장치 식별 정보의 출처입니다. 해당 메시지가 없으면 정보를 표시하지 못할 수 있습니다.</td></tr><tr><td>Epoch / 수집 기간</td><td>입력에 포함된 관측 시점 수와 범위를 확인합니다. 1 Epoch 전송 범위와 구분합니다.</td></tr><tr><td>지원 위성군</td><td>장비가 보고한 지원 정보입니다. 실제 관측한 위성군이나 현재 PVT 계산 지원 범위와 다릅니다.</td></tr><tr><td>파일과 장비</td><td>UBX 파일의 수신기 정보는 파일을 기록한 장비 정보입니다. 지금 연결된 COM 장비와 같다고 단정하지 않습니다.</td></tr></tbody></table><p>실제 입력 예시 real-gnss-source.ubx에는 ZED-F9T-20B, TIM 2.25, Protocol 29.25 정보가 포함됩니다. 장비·파일을 바꾸면 값도 달라집니다.</p><aside class="note">수신기 정보 버튼이 없거나 값이 비어 있으면 먼저 선택한 입력과 MON-VER 포함 여부를 확인합니다. 이 정보는 장비 확인용이며 PVT 계산 성공 여부를 대신하지 않습니다.</aside><p>관측값 표와 항법정보의 펼쳐진 원문을 함께 확인합니다. 실제 전달 본문은 송신·수신 JSON 원문 영역의 정렬 보기와 JSON 다운로드로 확인합니다.</p><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>23 / 58</span></div></section>
-<section aria-labelledby="title-run-raw" class="sheet" id="run-raw"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">유형별 실행 · 24</p><h1 id="title-run-raw">GNSS RAW 시험 실행</h1></div><ol class="steps"><li>설정에서 <b>GNSS RAW</b>와 전송 경로를 선택합니다.</li><li>GNSS 파일 적용 또는 COM 수집을 완료하고 선택 Epoch와 Reference 계산 상태를 확인합니다.</li><li>설정을 닫고 <b>다음 전송 · RAW</b>를 확인합니다.</li><li><b>전송시험 시작</b>을 누른 후 시험 ID와 어댑터 응답을 확인합니다.</li><li>수신 화면에서 같은 ID를 선택하고 RAW 해석·지연 반영 결과 및 비교 자료 수신 상태를 확인합니다.</li></ol><table><thead><tr><th>단계</th><th>현재 처리</th></tr></thead><tbody><tr><td>송신</td><td>원본 의사거리 Pᵢ로 T*ᵢ = S − Pᵢ/c를 계산합니다. RAW 관측의 pseudorangeMeters 대신 transmitAt을 전달합니다.</td></tr><tr><td>전송</td><td>변환한 관측과 항법정보를 JSON으로 전달합니다. 원본 UBX 전체·원본 의사거리·Reference를 이 경로의 계산 입력으로 보내지 않습니다.</td></tr><tr><td>수신</td><td>T*ᵢ와 본문 수신 완료 시각 R로 P′ᵢ를 계산합니다. 원본 Doppler 등 유지된 입력으로 PVT를 계산합니다.</td></tr><tr><td>비교</td><td>송신 서비스에서 별도로 조회한 비교 자료와 대조합니다. 수신측 계산을 Reference로 대체하지 않습니다.</td></tr></tbody></table><aside class="note">이 설명서에는 GNSS RAW 완료 화면이 없습니다. 결과 확인 위치는 AFS 예시를 참고하되 유형명·복원 단계·전송 본문은 RAW 기준으로 확인합니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>24 / 58</span></div></section>
-<section aria-labelledby="title-run-afs" class="sheet" id="run-afs"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">유형별 실행 · 25</p><h1 id="title-run-afs">AFS Frame 시험 실행</h1></div><ol class="steps"><li>설정에서 <b>AFS Frame</b>과 전송 경로를 선택합니다.</li><li>GNSS 입력의 GPS L1 관측과 선행 항법정보, Reference 상태를 확인합니다.</li><li><b>전송시험 시작</b>을 누릅니다. 송신에서 가상 송신 시각을 구성하고 위성별 AFS를 생성합니다.</li><li>수신에서 프레임 복원·검증 후 PVT 계산이 완료되는지 확인합니다.</li><li>관측값의 보정 송신 시각·변환 후 의사거리와 Reference 비교 결과를 확인합니다.</li></ol><div class="frame-bar"><span style="flex:68">동기<br/>68</span><span style="flex:52">SB1<br/>52</span><span style="flex:2400">SB2 · 2,400 bits</span><span style="flex:1740">SB3 · 1,740 bits</span><span style="flex:1740">SB4 · 1,740 bits</span></div><table><thead><tr><th>AFS 물리 프레임</th><th>LNIS의 현재 사용</th></tr></thead><tbody><tr><td>6,000 bits / 750 bytes</td><td>동기와 부호화·인터리빙된 SB1~4로 구성됩니다.</td></tr><tr><td>SB2</td><td>통합 항법정보와 보충 데이터를 구성합니다.</td></tr><tr><td>SB3</td><td>현재 LNIS 확장의 미사용 영역은 0101 패턴으로 채웁니다.</td></tr><tr><td>SB4</td><td>선택 Epoch의 가상 송신 시각·관측 시각·Doppler·C/N₀·유효성 등 계산 입력을 구성합니다. 원본 의사거리는 넣지 않습니다.</td></tr></tbody></table><aside class="note">물리 프레임 구조와 LNIS 자체 메시지 할당을 구분합니다. LNIS의 SB 내용이 NASA 표준 서비스 메시지 전체와 동일하거나 인증받았다는 의미는 아닙니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>25 / 58</span></div></section>
-<section aria-labelledby="title-iq-generate" class="sheet" id="iq-generate"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">유형별 실행 · 26</p><h1 id="title-iq-generate">I/Q Sample 생성과 저장 파일 선택</h1></div><div class="split"><div><figure class=""><a aria-label="I/Q 유형에서 표시되는 저장 파일 선택 · 미선택 상태 확대" href="assets/settings-iq.png" target="_blank"><img alt="I/Q 유형에서 표시되는 저장 파일 선택 · 미선택 상태" src="assets/settings-iq.png"/></a><figcaption>I/Q 유형에서 표시되는 저장 파일 선택 · 미선택 상태</figcaption></figure></div><div><ol class="steps"><li>설정에서 <b>I/Q Sample</b>을 선택하고 GNSS 입력을 준비합니다.</li><li>새 파일을 만들려면 설정을 닫고 <b>90초 I/Q 생성</b>을 실행합니다.</li><li>생성 상태·진행률·결과 경로를 확인합니다. 필요하면 <b>생성 취소</b>를 사용합니다.</li><li>기존 파일은 설정의 <b>저장된 I/Q</b>에서 선택합니다. 파일에 연결된 기준 PVT·원본 정보가 있는지 확인합니다.</li><li>선택 파일과 다음 전송 유형이 I/Q인지 확인하고 전송합니다.</li></ol></div></div><table><thead><tr><th>항목</th><th>내용</th></tr></thead><tbody><tr><td>파일 규모</td><td>90초 · 12 MHz · 약 2.16 GB. 공유 폴더와 생성 공간을 확보합니다.</td></tr><tr><td>생성 입력</td><td>항법정보가 준비된 GPS 위성별 AFS를 생성합니다. 생성 가능한 위성이 4개 미만이면 사유를 확인합니다. SB4와 같은 시작 의사거리·Doppler로 파형을 보정하고 이후 궤도·이동 변화를 유지합니다.</td></tr><tr><td>프레임</td><td>AFS 시험과 같은 구성기를 사용하며 위성별 PRN 채널을 유지합니다.</td></tr><tr><td>선택 파일 삭제</td><td>저장 파일을 실제로 삭제하는 동작입니다. 사용 중·시험 참조 보호 여부와 메시지를 확인합니다.</td></tr></tbody></table><aside class="note">현재 설정에서 I/Q 사용이 비활성화되어 있으면 관리자가 LNIS_IQ_ENABLED와 생성기 배포 상태를 확인해야 합니다. 기존 파일의 옛 기록에는 송신 원본 관측값이 저장되어 있지 않을 수 있습니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>26 / 58</span></div></section>
-<section aria-labelledby="title-iq-files" class="sheet" id="iq-files"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">유형별 실행 · 27</p><h1 id="title-iq-files">I/Q 공유 폴더와 파일 전달</h1></div><div class="flow"><div><b>송신 LNIS</b><span>.bin 생성·보관<br/>경로·크기·해시 JSON</span></div><i>→</i><div><b>송신 어댑터</b><span>공유 경로에서 파일 읽기<br/>DTN/HDTN 파일 전달</span></div><i>→</i><div><b>수신 어댑터 → LNIS</b><span>수신 파일 경로 통보<br/>검증 후 RF 추적</span></div></div><table><thead><tr><th>확인 위치</th><th>확인할 내용</th></tr></thead><tbody><tr><td>송신 저장 위치</td><td>LNIS가 생성하는 파일과 어댑터가 읽는 경로가 같은 실제 파일을 가리켜야 합니다.</td></tr><tr><td>수신 저장 위치</td><td>수신 LNIS에서 전달받은 경로를 읽을 수 있어야 합니다. 송신 PC의 경로를 그대로 열 수 있다는 가정은 금물입니다.</td></tr><tr><td>경로와 권한</td><td>컨테이너 /exchange 경로와 호스트·어댑터의 Windows 경로는 다를 수 있습니다. 마운트와 공유 권한을 확인합니다.</td></tr><tr><td>전송 본문</td><td>REST에는 파일 정보를 전달합니다. 대용량 .bin 내용을 JSON 문자열로 넣지 않습니다.</td></tr><tr><td>검증 중 파일</td><td>현재 처리는 공유 원본 파일이 처리 중 변경되지 않는 운용을 전제로 합니다. 복호 완료 전 이동·덮어쓰기·삭제하지 않습니다.</td></tr></tbody></table><aside class="note">전송 버튼을 누르는 시점에 파일을 다시 전체 해시 검사하지 않습니다. 수신에서 기대 SHA-256과 대조하며, 생성·보관 후 파일을 변경하지 않는 것이 전제입니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>27 / 58</span></div></section>
-<section aria-labelledby="title-sender-reference" class="sheet" id="sender-reference"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">송신 결과 확인 · 28</p><h1 id="title-sender-reference">송신 Reference PVT와 시험 이력</h1></div><figure class="wide"><a aria-label="AFS 시험의 송신 기준 지구 PVT · 실제 저장 결과 확대" href="assets/sender-pvt.png" target="_blank"><img alt="AFS 시험의 송신 기준 지구 PVT · 실제 저장 결과" src="assets/sender-pvt.png"/></a><figcaption>AFS 시험의 송신 기준 지구 PVT · 실제 저장 결과</figcaption></figure><table><thead><tr><th>표시</th><th>해석</th></tr></thead><tbody><tr><td>지구 중심 X/Y/Z</td><td>ECEF 좌표(m). 위도·경도 값이 아닙니다.</td></tr><tr><td>속도 X/Y/Z</td><td>ECEF 축 방향 속도(m/s). 원본 Doppler 기반 계산 결과입니다.</td></tr><tr><td>사용 위성</td><td>해당 해에 실제 사용된 위성 수</td></tr><tr><td>수신기 시계오차</td><td>PVT 계산기의 시간 오프셋(s). PC의 현재 시각 오차와 구분합니다.</td></tr><tr><td>시험 기록 선택</td><td>선택한 시험 당시의 기준 결과를 조회합니다. 다음 전송용 새 입력을 대신하지 않습니다.</td></tr></tbody></table><p>Reference는 장비의 UBX-NAV-PVT 값을 그대로 표시한 것이 아니라 LNIS가 원본 관측으로 계산한 기준 해입니다. 송신 상세 로그의 Reference와 화면의 Reference는 같은 시험 ID·같은 관측 Epoch·같은 유효 결과를 기준으로 비교합니다. 매우 작은 수는 과학 표기와 소수 표기로 다르게 보일 수 있습니다.</p><aside class="note">송신 화면은 원본·전송 준비와 어댑터 접수 결과가 중심입니다. 수신측 복호·PVT 세부 과정은 수신 로그에서 확인합니다. 상대 결과 확인 로그는 상태 조회이며 송신부가 상대 계산을 수행한 것은 아닙니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>28 / 58</span></div></section>
-<section aria-labelledby="title-receiver-map" class="sheet" id="receiver-map"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">수신 화면 · 29</p><h1 id="title-receiver-map">수신 화면과 처리 단계</h1></div><figure class="wide"><a aria-label="AFS 완료 시험을 선택한 수신 화면 상단 확대" href="assets/receiver-header.png" target="_blank"><img alt="AFS 완료 시험을 선택한 수신 화면 상단" src="assets/receiver-header.png"/></a><figcaption>AFS 완료 시험을 선택한 수신 화면 상단</figcaption></figure><table><thead><tr><th>영역</th><th>조작 / 확인</th></tr></thead><tbody><tr><td>수신 시험 / 전송 경로</td><td>선택한 시험의 유형과 실제 기록된 송수신 엔진입니다.</td></tr><tr><td>상대 송신 서비스</td><td>송신 LNIS 주소를 저장·적용하고 연결 확인합니다. 비교 자료·상태 교환에 사용합니다.</td></tr><tr><td>수신 어댑터 서버 주소</td><td>이 PC의 어댑터 health 확인 주소입니다. 상대 LNIS 주소와 다릅니다.</td></tr><tr><td>GNSS 시간 입력</td><td>수신측 서비스 기준시각용 장비 연결입니다. 송신 원본 관측값을 수집하는 버튼과 구분합니다.</td></tr><tr><td>시험 등록 → 번들 수신 → 복원·PVT 계산</td><td>등록, 본문 수신, 계산 단계를 따로 확인합니다. 처리 시간은 단계별 기록입니다.</td></tr></tbody></table><aside class="note">어댑터 연결실패가 현재 표시돼도 과거 완료 이력은 조회할 수 있습니다. 현재 연결 상태와 선택한 시험의 과거 결과를 혼동하지 않습니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>29 / 58</span></div></section>
-<section aria-labelledby="title-received-values" class="sheet" id="received-values"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">수신 결과 확인 · 30</p><h1 id="title-received-values">수신 원본 GNSS 관측값</h1></div><figure class="wide"><a aria-label="AFS 프레임에서 복원한 계산 입력과 지연 반영 값 · 상단 일부 확대" href="assets/receiver-observations.png" target="_blank"><img alt="AFS 프레임에서 복원한 계산 입력과 지연 반영 값 · 상단 일부" src="assets/receiver-observations.png"/></a><figcaption>AFS 프레임에서 복원한 계산 입력과 지연 반영 값 · 상단 일부</figcaption></figure><table><thead><tr><th>표시</th><th>출처와 의미</th></tr></thead><tbody><tr><td>수신 원본 관측값</td><td>DTN/HDTN 경로로 실제 전달받은 계산 입력을 해석한 내용입니다. 송신 비교 원본을 대신 표시하는 영역이 아닙니다.</td></tr><tr><td>보정 송신 시각 · Unix s</td><td>송신이 원본 의사거리로 계산한 가상 시각. 변경된 계산 입력이므로 빨간색으로 구분합니다.</td></tr><tr><td>원본 / 변환 후 의사거리</td><td>원본을 조회할 수 있을 때 비교용으로 표시합니다. 변환 후 값은 빨간색입니다. 빨간색 자체가 오류 판정은 아닙니다.</td></tr><tr><td>Doppler / C/N₀</td><td>프레임·변환 RAW에 포함되어 전달된 관측값. 임의로 다시 측정한 값이 아닙니다.</td></tr><tr><td>데이터 일치 / PVT 상태</td><td>의도적 치환·생략을 제외하고 비교 가능한 필드를 확인합니다. PVT 측정 완료와 별도 상태입니다.</td></tr></tbody></table><aside class="note">AFS에서 전달하지 않은 반송파·수집 순번 등은 원본과 동일하게 복원했다고 주장하지 않습니다. 없는 필드와 변환한 필드를 데이터 손실로 일괄 판정하지 않습니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>30 / 58</span></div></section>
-<section aria-labelledby="title-iq-observations" class="sheet" id="iq-observations"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">수신 결과 확인 · 31</p><h1 id="title-iq-observations">I/Q RF 관측값과 지연 비교</h1></div><figure class="wide"><a aria-label="90초 I/Q의 실제 RF 추적 결과 · 오프라인 수신 검증 확대" href="assets/iq-observations.png" target="_blank"><img alt="90초 I/Q의 실제 RF 추적 결과 · 오프라인 수신 검증" src="assets/iq-observations.png"/></a><figcaption>90초 I/Q의 실제 RF 추적 결과 · 오프라인 수신 검증</figcaption></figure><table><thead><tr><th>표시 묶음</th><th>계산·진단 역할</th></tr></thead><tbody><tr><td>RF 추적 관측값 · PVT 계산 입력</td><td>새 I/Q 시험은 RF 추적 의사거리·Doppler·C/N₀와 CRC 통과 프레임의 항법정보를 계산 입력으로 사용합니다.</td></tr><tr><td>지연 반영 의사거리</td><td>RF 의사거리에 c×송수신 지연을 더한 값입니다. RAW·AFS는 전달된 보정 송신 시각으로 재계산합니다.</td></tr><tr><td>RF 추적 의사거리 / Doppler / C/N₀ / 반송파</td><td>신호 추적기가 파일에서 얻은 값입니다. 계산 가능한 첫 RF Epoch를 사용하며 같은 관측으로 지연 미적용·적용 PVT를 계산합니다.</td></tr><tr><td>RF 시점</td><td>파일 내 초(s) 단위입니다. 선택된 계산 시점을 표시하고 전체 RF 관측은 보고서 JSON에 보관합니다. 과거 이력의 RF 시점 선택은 기존 진단 표시입니다.</td></tr></tbody></table><aside class="note">새 I/Q 관측표는 RF 기준·지연 반영 의사거리를 표시합니다. 파일 SHA-256과 동일 RF 관측의 PVT 전후 차이를 각각 확인합니다. 송신 원본 Reference는 별도 참고자료입니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>31 / 58</span></div></section>
-<section aria-labelledby="title-reference" class="sheet" id="reference"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">수신 결과 확인 · 32</p><h1 id="title-reference">송신 비교 자료 확인</h1></div><figure class="wide"><a aria-label="송신 원본 · 비교 기준을 펼친 예시 · 표 일부 확대" href="assets/receiver-reference.png" target="_blank"><img alt="송신 원본 · 비교 기준을 펼친 예시 · 표 일부" src="assets/receiver-reference.png"/></a><figcaption>송신 원본 · 비교 기준을 펼친 예시 · 표 일부</figcaption></figure><ol class="steps"><li>수신 시험 ID와 결과 상태를 확인합니다.</li><li><b>송신 원본 · 비교 기준</b>을 펼쳐 비교자료 수신 상태를 확인합니다.</li><li>원본 GNSS 관측값과 Reference PVT가 같은 시험·Epoch인지 확인합니다.</li><li>자료 조회가 실패하면 <b>다시 받기</b>를 사용하고 상대 송신 서비스 연결·기록 보존 상태를 확인합니다.</li></ol><p>RAW·AFS에서는 수신측 자체 계산 후 송신 서비스에서 비교 자료를 별도 조회합니다. 이 경로는 DTN/HDTN 어댑터 전송 경로와 구분됩니다. I/Q의 현재 manifest에는 비교용 Reference가 포함되며, 수신 PVT 계산 입력을 대신하지 않습니다.</p><aside class="note">이전 I/Q 파일·시험에는 송신 원본 관측값 저장본이 없을 수 있습니다. “관측값이 저장되지 않음”은 조회가 가능한 새 원본을 만들었다는 의미가 아닙니다. 보관 정책으로 송신 자료가 삭제된 경우도 확인합니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>32 / 58</span></div></section>
-<section aria-labelledby="title-pvt-result" class="sheet" id="pvt-result"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">수신 결과 확인 · 33</p><h1 id="title-pvt-result">PVT 결과에서 확인할 순서</h1></div><figure class="wide"><a aria-label="AFS 완료 예시 · 지연, 시계오차 및 위치·속도 비교 확대" href="assets/receiver-pvt.png" target="_blank"><img alt="AFS 완료 예시 · 지연, 시계오차 및 위치·속도 비교" src="assets/receiver-pvt.png"/></a><figcaption>AFS 완료 예시 · 지연, 시계오차 및 위치·속도 비교</figcaption></figure><div class="three"><div><b>1 · 비교 가능 여부</b><p>위치·속도 유효성, 비교 기준 확보, 시간 조건과 오류 사유를 확인합니다. RAW·AFS는 송신 Reference, 새 I/Q는 RF 기준 PVT를 사용합니다.</p></div><div><b>2 · 지연과 시계오차</b><p>측정 지연, Clock Bias 증가량, 두 값의 잔차를 함께 확인합니다.</p></div><div><b>3 · 위치·속도 차이</b><p>좌표·속도 차이와 사용 위성을 기록합니다. 실제 위치 정확도와 구분합니다.</p></div></div><aside class="note">MEASURED는 지연 반영 PVT 비교를 측정했다는 상태입니다. 위치·속도가 완전히 같거나 시험 전체가 합격했다는 뜻으로 사용하지 않습니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>33 / 58</span></div></section>
-<section aria-labelledby="title-pvt-views" class="sheet" id="pvt-views">
-<div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">수신 결과 확인 · 34</p><h1 id="title-pvt-views">반복 시험 위치 편차</h1></div>
-<div class="split"><div><figure><a href="assets/pvt-history.png" target="_blank" aria-label="전체 분포 화면 확대"><img src="assets/pvt-history.png" alt="전체화면 사각 좌표판과 드래그·휠 조작"/></a><figcaption>전체화면 HUD · 화면 동작검사 자료(예시 좌표)</figcaption></figure></div>
-<div><ol class="steps">
-<li>같은 입력·Epoch·RAW/AFS 유형으로 <b>전송시험 시작</b>을 반복합니다. 전송 준비·어댑터 요청 중에는 다음 요청을 제한합니다.</li>
-<li>수신부에서 시험을 선택합니다. 같은 조건의 위치 결과를 누적하고 전송 경로는 색으로 구분합니다.</li>
-<li>점을 누르면 해당 시험의 PVT·관측값·JSON·로그로 전환합니다. 겹친 점은 표시되는 시험 목록에서 선택합니다.</li>
-<li>원형 HUD와 <b>크게 보기</b>에서 드래그로 이동하고 휠로 확대·축소합니다. 휠은 마우스 위치를 기준으로 동작합니다. <b>− / ＋</b>도 사용할 수 있으며 <b>자동</b>으로 전체 점을 다시 표시합니다. 닫기·Esc로 전체화면을 종료합니다. 원형 점선은 Reference 기준 거리 눈금입니다. 드래그하면 Reference와 함께 이동하고 확대 비율에 맞춰 간격이 바뀝니다. Reference가 화면 밖에 있어도 화면에 걸치는 눈금을 표시합니다.</li>
+<header class="toolbar">
+<button aria-controls="manual-sidebar" aria-expanded="false" id="contents-toggle" type="button">목차</button>
+<a class="manual-brand" href="#quick"><img alt="" height="32" src="assets/transfer-mark.png" width="32"/><strong>사용자 설명서</strong></a>
+<div class="search-box" role="search">
+<label class="sr-only" for="search">문서 검색</label>
+<input autocomplete="off" id="search" placeholder="기능·버튼·오류 검색" type="search"/>
+<output aria-atomic="true" aria-live="polite" id="matches"></output>
+<button aria-label="이전 검색 결과" disabled="" id="match-prev" title="이전 검색 결과" type="button">‹</button>
+<button aria-label="다음 검색 결과" disabled="" id="match-next" title="다음 검색 결과" type="button">›</button>
+<button aria-label="검색 초기화" id="reset" title="검색 초기화" type="button">×</button>
+</div>
+<div class="toolbar-actions">
+<span class="manual-version">v<span data-doc-version=""></span></span>
+<details class="downloads"><summary>다운로드</summary><div class="download-menu"><a download="" href="user-manual.pdf">PDF 다운로드</a><a download="" href="user-manual.docx">Word 다운로드</a></div></details>
+<button id="print" type="button">인쇄</button>
+</div>
+</header>
+<div class="layout">
+<aside class="sidebar" id="manual-sidebar"><div aria-label="문서 탐색" class="sidebar-tabs" role="tablist">
+<button aria-controls="contents-panel" aria-selected="true" id="contents-tab" role="tab" type="button">목차</button>
+<button aria-controls="results-panel" aria-selected="false" disabled="" id="results-tab" role="tab" type="button">검색 결과</button>
+</div>
+<nav aria-label="설명서 목차" aria-labelledby="contents-tab" id="contents-panel" role="tabpanel"><details><summary>사용 안내</summary><a href="#cover">GNSS 전송 시험 사용자 설명서</a><a href="#reading">설명서 적용 범위</a><a href="#contents">목차</a></details><details><summary>시작 전 확인</summary><a href="#roles">서비스와 어댑터의 역할</a><a href="#access">접속과 시험 전 준비</a></details><details><summary>기본 실행 순서</summary><a href="#quick">빠른 실행 · 파일 입력으로 첫 시험</a></details><details><summary>송신 화면</summary><a href="#sender-map">송신 화면에서 구분할 영역</a></details><details><summary>송신 설정</summary><a href="#settings">설정 열기와 적용 시점</a><a href="#types">시험 유형 선택</a><a href="#routes">전송 경로와 연결 주소</a><a href="#health">어댑터 연결 확인</a><a href="#presets">프리셋 저장·불러오기·수정</a><a href="#hdtn">HDTN 파라미터</a><a href="#hdtn-advanced">HDTN 고급 설정과 입력 제한</a><a href="#dtn">DTN(ION) 파라미터</a></details><details><summary>GNSS 입력</summary><a href="#upload">UBX / GRAW 파일 적용</a><a href="#serial">COM 포트 연결과 장비 설정</a><a href="#capture">GNSS 수집과 UBX 다운로드</a></details><details><summary>시각 준비</summary><a href="#clock">기준시각 확인과 시간 맞추기</a></details><details><summary>관측값 확인</summary><a href="#sender-data">송신 원본 GNSS 관측값 읽기</a><a href="#rawx">RAWX 필드와 PRN</a><a href="#navigation">항법정보와 RAWX의 관계</a><a href="#receiver-info">수신기 정보와 입력 상태</a></details><details><summary>유형별 실행</summary><a href="#run-raw">GNSS RAW 시험 실행</a><a href="#run-afs">AFS Frame 시험 실행</a><a href="#iq-generate">I/Q Sample 생성과 저장 파일 선택</a><a href="#iq-files">I/Q 공유 폴더와 파일 전달</a></details><details><summary>송신 결과 확인</summary><a href="#sender-reference">송신 Reference PVT와 시험 이력</a></details><details><summary>수신 화면</summary><a href="#receiver-map">수신 화면과 처리 단계</a></details><details><summary>수신 결과 확인</summary><a href="#received-values">수신 원본 GNSS 관측값</a><a href="#iq-observations">I/Q RF 관측값과 지연 비교</a><a href="#reference">송신 비교 자료 확인</a><a href="#pvt-result">PVT 결과에서 확인할 순서</a><a href="#pvt-views">반복 시험 위치 편차</a><a href="#pvt-numbers">ECEF 상세 수치와 시간 잔차</a></details><details><summary>결과 해석</summary><a href="#delay-model">공통 지연과 의사거리 계산</a><a href="#delay-meaning">지연이 큰데 위치 차이가 작은 이유</a><a href="#iq-integrity">I/Q 파일 일치와 처리 시간</a></details><details><summary>시험 관리</summary><a href="#history">여러 시험 전송과 이력 조회</a><a href="#cancel">시험별 중지와 대기 전체 종료</a></details><details><summary>원문과 로그</summary><a href="#json">송신·수신 JSON 원문 확인</a><a href="#logs">로그 상세·다운로드·전체화면</a><a href="#log-evidence">로그를 이용한 장애 전달</a></details><details><summary>장애 대응</summary><a href="#errors">문제 발생 시 확인 순서</a><a href="#actual-errors">실제 이력으로 보는 비교 불가와 실패</a></details><details><summary>관리자 부록</summary><a href="#management">데이터 관리 접속과 조회</a><a href="#management-detail">시험·수신 원문·파일 상세</a><a href="#delete">자료 선택 삭제</a><a href="#retention">보관 기간과 자동 정리</a><a href="#install-prepare">Windows PC 설치 준비</a><a href="#install-settings">송신·수신 PC 설정</a><a href="#install-start">설치 완료 확인과 일상 실행</a><a href="#operations">기동·종료·업데이트와 백업</a><a href="#environment">다른 PC 설치 시 확인할 설정</a><a href="#docker-logs">Docker 로그 확인</a></details><details><summary>참고</summary><a href="#intro">구조·동작 안내 화면 사용</a><a href="#glossary">용어와 단위</a><a href="#record">시험 결과 기록 항목</a></details>
+</nav><div aria-labelledby="results-tab" hidden="" id="results-panel" role="tabpanel">
+<p hidden="" id="empty">검색 결과가 없습니다. 다른 단어로 검색해 보세요.
+</p>
+<div id="result-list"></div>
+</div>
+</aside>
+<main id="manual" tabindex="-1">
+<div aria-label="이전·다음 항목" class="topic-pagination">
+<a href="#cover" id="topic-prev"><small>← 이전</small><strong></strong></a>
+<a href="#reading" id="topic-next"><small>다음 →</small><strong></strong></a>
+</div>
+<section aria-labelledby="title-cover" class="sheet" id="cover"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">사용 안내 · 01
+</p>
+<h1 id="title-cover">GNSS 전송 시험 사용자 설명서
+</h1></div><div class="cover"><img alt="GNSS 전송 시험" src="assets/transfer-mark.png" width="88"/>
+<h2>GNSS 데이터 전송<br/>지연 반영 PVT 비교
+</h2>
+<p>GNSS RAW · AFS Frame · I/Q Sample
+</p><div class="cover-meta">문서 버전 <span data-doc-version=""></span> · <span data-doc-date=""></span><br/>송신·수신 시험 / 설치·관리</div></div><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>1 / 58</span></div>
+</section>
+<section aria-labelledby="title-reading" class="sheet" id="reading"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">사용 안내 · 02
+</p>
+<h1 id="title-reading">설명서 적용 범위
+</h1></div>
+<p>송신 PC와 수신 PC에서 서비스 시험을 준비하고, DTN/HDTN 어댑터를 통해 전달된 데이터와 PVT 결과를 확인하는 절차입니다. 설치 환경에 따라 주소·포트·직렬 포트는 달라집니다.
+</p>
+<table>
+<thead>
+<tr>
+<th>항목
+</th>
+<th>내용
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>사용 대상
+</td>
+<td>GNSS 데이터를 준비하고 DTN/HDTN 전송 결과와 PVT를 확인하는 운영자
+</td>
+</tr>
+<tr>
+<td>사용 환경
+</td>
+<td>송신 PC와 수신 PC. 접속 주소·포트·장비 연결은 설치 환경에 맞게 설정합니다.
+</td>
+</tr>
+<tr>
+<td>웹 설명서
+</td>
+<td>목차에서 항목을 선택하거나 본문 끝에서 스크롤해 이동합니다. 검색 결과를 누르면 해당 문장으로 이동합니다.
+</td>
+</tr>
+<tr>
+<td>PDF / Word
+</td>
+<td>같은 HTML 원본에서 생성합니다. PDF는 A4 가로 인쇄용, Word는 검토·편집용입니다.
+</td>
+</tr>
+<tr>
+<td>화면 예시
+</td>
+<td>저장된 시험과 장비 연결 화면을 사용했습니다. 예시 좌표를 사용한 그림은 캡션에 표시합니다.
+</td>
+</tr>
+</tbody>
+</table>
+<p>화면의 <b>?</b> 버튼으로 해당 기능의 설명서를 열 수 있습니다.</p>
+<div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>2 / 58</span></div>
+</section>
+<section aria-labelledby="title-contents" class="sheet" id="contents"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">사용 안내 · 03
+</p>
+<h1 id="title-contents">목차
+</h1></div><div id="printed-toc"><a href="#roles"><span>서비스와 어댑터의 역할</span><small>04</small></a><a href="#access"><span>접속과 시험 전 준비</span><small>05</small></a><a href="#quick"><span>빠른 실행 · 파일 입력으로 첫 시험</span><small>06</small></a><a href="#sender-map"><span>송신 화면에서 구분할 영역</span><small>07</small></a><a href="#settings"><span>설정 열기와 적용 시점</span><small>08</small></a><a href="#types"><span>시험 유형 선택</span><small>09</small></a><a href="#routes"><span>전송 경로와 연결 주소</span><small>10</small></a><a href="#health"><span>어댑터 연결 확인</span><small>11</small></a><a href="#presets"><span>프리셋 저장·불러오기·수정</span><small>12</small></a><a href="#hdtn"><span>HDTN 파라미터</span><small>13</small></a><a href="#hdtn-advanced"><span>HDTN 고급 설정과 입력 제한</span><small>14</small></a><a href="#dtn"><span>DTN(ION) 파라미터</span><small>15</small></a><a href="#upload"><span>UBX / GRAW 파일 적용</span><small>16</small></a><a href="#serial"><span>COM 포트 연결과 장비 설정</span><small>17</small></a><a href="#capture"><span>GNSS 수집과 UBX 다운로드</span><small>18</small></a><a href="#clock"><span>기준시각 확인과 시간 맞추기</span><small>19</small></a><a href="#sender-data"><span>송신 원본 GNSS 관측값 읽기</span><small>20</small></a><a href="#rawx"><span>RAWX 필드와 PRN</span><small>21</small></a><a href="#navigation"><span>항법정보와 RAWX의 관계</span><small>22</small></a><a href="#receiver-info"><span>수신기 정보와 입력 상태</span><small>23</small></a><a href="#run-raw"><span>GNSS RAW 시험 실행</span><small>24</small></a><a href="#run-afs"><span>AFS Frame 시험 실행</span><small>25</small></a><a href="#iq-generate"><span>I/Q Sample 생성과 저장 파일 선택</span><small>26</small></a><a href="#iq-files"><span>I/Q 공유 폴더와 파일 전달</span><small>27</small></a><a href="#sender-reference"><span>송신 Reference PVT와 시험 이력</span><small>28</small></a><a href="#receiver-map"><span>수신 화면과 처리 단계</span><small>29</small></a><a href="#received-values"><span>수신 원본 GNSS 관측값</span><small>30</small></a><a href="#iq-observations"><span>I/Q RF 관측값과 지연 비교</span><small>31</small></a><a href="#reference"><span>송신 비교 자료 확인</span><small>32</small></a><a href="#pvt-result"><span>PVT 결과에서 확인할 순서</span><small>33</small></a><a href="#pvt-views"><span>반복 시험 위치 편차</span><small>34</small></a><a href="#pvt-numbers"><span>ECEF 상세 수치와 시간 잔차</span><small>35</small></a><a href="#delay-model"><span>공통 지연과 의사거리 계산</span><small>36</small></a><a href="#delay-meaning"><span>지연이 큰데 위치 차이가 작은 이유</span><small>37</small></a><a href="#iq-integrity"><span>I/Q 파일 일치와 처리 시간</span><small>38</small></a><a href="#history"><span>여러 시험 전송과 이력 조회</span><small>39</small></a><a href="#cancel"><span>시험별 중지와 대기 전체 종료</span><small>40</small></a><a href="#json"><span>송신·수신 JSON 원문 확인</span><small>41</small></a><a href="#logs"><span>로그 상세·다운로드·전체화면</span><small>42</small></a><a href="#log-evidence"><span>로그를 이용한 장애 전달</span><small>43</small></a><a href="#errors"><span>문제 발생 시 확인 순서</span><small>44</small></a><a href="#actual-errors"><span>실제 이력으로 보는 비교 불가와 실패</span><small>45</small></a><a href="#management"><span>데이터 관리 접속과 조회</span><small>46</small></a><a href="#management-detail"><span>시험·수신 원문·파일 상세</span><small>47</small></a><a href="#delete"><span>자료 선택 삭제</span><small>48</small></a><a href="#retention"><span>보관 기간과 자동 정리</span><small>49</small></a><a href="#install-prepare"><span>Windows PC 설치 준비</span><small>50</small></a><a href="#install-settings"><span>송신·수신 PC 설정</span><small>51</small></a><a href="#install-start"><span>설치 완료 확인과 일상 실행</span><small>52</small></a><a href="#operations"><span>기동·종료·업데이트와 백업</span><small>53</small></a><a href="#environment"><span>다른 PC 설치 시 확인할 설정</span><small>54</small></a><a href="#docker-logs"><span>Docker 로그 확인</span><small>55</small></a><a href="#intro"><span>구조·동작 안내 화면 사용</span><small>56</small></a><a href="#glossary"><span>용어와 단위</span><small>57</small></a><a href="#record"><span>시험 결과 기록 항목</span><small>58</small></a></div><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>3 / 58</span></div>
+</section>
+<section aria-labelledby="title-roles" class="sheet" id="roles"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">시작 전 확인 · 04
+</p>
+<h1 id="title-roles">서비스와 어댑터의 역할
+</h1></div><div class="flow"><div><b>송신 PC</b><span>입력 확보 → 기준 PVT 계산<br/>전송용 데이터 구성</span></div><i>→</i><div><b>어댑터 · DTN/HDTN</b><span>접수 → 저장·대기·전달<br/>상대 어댑터로 전송</span></div><i>→</i><div><b>수신 PC</b><span>본문 접수 → 복원·검증<br/>지연 반영 PVT 비교</span></div></div>
+<table>
+<thead>
+<tr>
+<th>연결
+</th>
+<th>용도
+</th>
+<th>확인 사항
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>송신 서비스 ↔ 수신 서비스
+</td>
+<td>시험 등록, 상태 확인, 비교 자료 요청
+</td>
+<td>상대 서비스 주소를 입력합니다. 어댑터 주소와 구분합니다.
+</td>
+</tr>
+<tr>
+<td>각 서비스 → 연결된 어댑터
+</td>
+<td>전송 요청 및 연결 상태 확인
+</td>
+<td>각 PC가 연결할 어댑터의 IP·포트를 입력합니다.
+</td>
+</tr>
+<tr>
+<td>I/Q 공유 폴더
+</td>
+<td>어댑터가 .bin 파일을 읽고 전달
+</td>
+<td>JSON에는 경로 등 파일 정보를 전달합니다. 경로만 맞아도 실제 파일 권한·공유 상태가 별도로 필요합니다.
+</td>
+</tr>
+<tr>
+<td>수신 결과 확인
+</td>
+<td>testId로 해당 시험에 결과 연결
+</td>
+<td>송수신 서비스에서 같은 시험 ID인지 확인합니다. 도착 순서만으로 시험을 구분하지 않습니다.
+</td>
+</tr>
+</tbody>
+</table>
+<div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>4 / 58</span></div>
+</section>
+<section aria-labelledby="title-access" class="sheet" id="access"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">시작 전 확인 · 05
+</p>
+<h1 id="title-access">접속과 시험 전 준비
+</h1></div>
+<table>
+<thead>
+<tr>
+<th>화면
+</th>
+<th>접속 주소 형식
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>송신 시험
+</td>
+<td>http://송신-PC-IP:서비스-포트/lnis/dtntest/sender
+</td>
+</tr>
+<tr>
+<td>수신 시험
+</td>
+<td>http://수신-PC-IP:서비스-포트/lnis/dtntest/receiver
+</td>
+</tr>
+<tr>
+<td>사용자 설명서
+</td>
+<td>http://해당-PC-IP:서비스-포트/user-manual/
+</td>
+</tr>
+<tr>
+<td>구조·동작 안내
+</td>
+<td>http://해당-PC-IP:서비스-포트/dtn-intro
+</td>
+</tr>
+<tr>
+<td>데이터 관리 · 관리자
+</td>
+<td>http://해당-PC-IP:서비스-포트/lnis/data-manager
+</td>
+</tr>
+</tbody>
+</table>
+<ol class="steps">
+<li>각 PC의 서비스를 기동한 뒤 브라우저로 접속합니다. 루트 주소(/)에 접속하면 설정된 송신·수신 역할 화면으로 이동합니다.
+</li>
+<li>양쪽 서비스 연결 상태와 각 어댑터의 연결 상태를 확인합니다.
+</li>
+<li>GNSS 입력 파일 또는 직렬 포트를 준비합니다. PVT 비교에는 계산 가능한 GPS L1 C/A 관측과 선행 항법정보가 필요합니다.
+</li>
+<li>지연 비교 전 양쪽 시험 기준시각을 확인합니다. I/Q 시험은 공유 폴더·여유 저장 공간·I/Q 사용 설정도 확인합니다.
+</li>
+</ol>
+<p>화면의 주소와 포트는 예시입니다. 설치 담당자가 안내한 주소로 접속하세요.
+</p><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>5 / 58</span></div>
+</section>
+<section aria-labelledby="title-quick" class="sheet" id="quick"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">기본 실행 순서 · 06
+</p>
+<h1 id="title-quick">빠른 실행 · 파일 입력으로 첫 시험
+</h1></div>
+<ol class="steps">
+<li>송신 화면의 <b>설정</b>에서 시험 유형과 전송 경로를 선택합니다.
+</li>
+<li><b>상대 수신 서비스</b>와 <b>DTN 어댑터 서버 주소</b>를 확인합니다. 필요한 경우 저장·적용 후 연결 확인을 실행합니다.
+</li>
+<li><b>UBX / GRAW 파일</b>에서 파일을 선택하고 <b>파일 적용</b>을 누릅니다. 파일 적용 완료 및 PVT 계산 상태를 확인합니다.
+</li>
+<li>설정을 닫고 상단의 <b>다음 전송</b> 요약을 확인합니다. I/Q는 먼저 <b>90초 I/Q 생성</b> 또는 저장된 파일 선택을 완료합니다.
+</li>
+<li><b>전송시험 시작</b>을 누릅니다. 생성된 시험 ID와 어댑터 접수 결과를 확인합니다.
+</li>
+<li>수신 화면에서 같은 시험을 선택하고 <b>시험 등록 → 번들 수신 → 복원·PVT 계산</b> 상태를 확인합니다.
+</li>
+<li>데이터 일치 여부, PVT 비교 가능 여부, 지연·시계오차·위치·속도 차이를 확인하고 로그와 JSON을 다운로드합니다.
+</li>
+</ol>
+<p>시작 버튼이 비활성화되어 있으면 버튼 위의 준비 조건과 상단 메시지를 확인하세요.
+</p><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>6 / 58</span></div>
+</section>
+<section aria-labelledby="title-sender-map" class="sheet" id="sender-map"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">송신 화면 · 07
+</p>
+<h1 id="title-sender-map">송신 화면에서 구분할 영역
+</h1></div>
+<figure class="wide"><a aria-label="송신 화면 상단 · 연결 상태와 다음 전송 요약 확대" href="assets/sender-status.png" target="_blank"><img alt="송신 화면 상단 · 연결 상태와 다음 전송 요약" src="assets/sender-status.png"/></a>
+<figcaption>송신 화면 상단 · 연결 상태와 다음 전송 요약
+</figcaption>
+</figure>
+<figure class="wide"><a aria-label="송신 화면 · 입력 요약, 시험 기록 및 실행 버튼 확대" href="assets/sender-history.png" target="_blank"><img alt="송신 화면 · 입력 요약, 시험 기록 및 실행 버튼" src="assets/sender-history.png"/></a>
+<figcaption>송신 화면 · 입력 요약, 시험 기록 및 실행 버튼
+</figcaption>
+</figure>
+<table>
+<thead>
+<tr>
+<th>영역
+</th>
+<th>확인 내용
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>연결 상태 / 기준시각
+</td>
+<td>송수신 처리기, 어댑터, 시험 상태, 서비스 내부 기준시각과 보정 상태
+</td>
+</tr>
+<tr>
+<td>다음 전송
+</td>
+<td>앞으로 시작할 시험 유형·경로입니다. 클릭하면 설정을 엽니다.
+</td>
+</tr>
+<tr>
+<td>시험 기록
+</td>
+<td>선택한 과거 시험의 관측값·PVT·원문·로그를 조회합니다. 다음 시험 설정과 별개입니다.
+</td>
+</tr>
+<tr>
+<td>어댑터 설정 상세
+</td>
+<td>선택한 시험을 시작할 때 어댑터에 보낸 설정입니다.
+</td>
+</tr>
+</tbody>
+</table>
+<p>새로고침하면 AFS Frame이 선택됩니다. 다른 유형은 직접 선택하거나 프리셋을 불러오세요.
+</p><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>7 / 58</span></div>
+</section>
+<section aria-labelledby="title-settings" class="sheet" id="settings"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">송신 설정 · 08
+</p>
+<h1 id="title-settings">설정 열기와 적용 시점
+</h1></div><div class="split"><div>
+<figure class=""><a aria-label="송수신 설정 · 시험 유형, 경로 및 프리셋 확대" href="assets/settings-top.png" target="_blank"><img alt="송수신 설정 · 시험 유형, 경로 및 프리셋" src="assets/settings-top.png"/></a>
+<figcaption>송수신 설정 · 시험 유형, 경로 및 프리셋
+</figcaption>
+</figure></div><div>
+<ol class="steps">
+<li>우측 하단 <b>설정</b> 또는 <b>다음 전송</b>을 누릅니다.
+</li>
+<li>GNSS RAW / AFS Frame / I/Q Sample 중 유형을 선택합니다.
+</li>
+<li>송신 엔진 → 수신 엔진 순서로 경로를 선택합니다.
+</li>
+<li>경로에 사용되는 DTN·HDTN 설정을 확인하고 <b>닫기</b> 또는 Esc로 돌아옵니다.
+</li>
+</ol>
+<table>
+<thead>
+<tr>
+<th>항목
+</th>
+<th>적용
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>유형·경로
+</td>
+<td>다음 시험 요청에 포함됩니다. 기존 시험 조건을 바꾸지 않습니다.
+</td>
+</tr>
+<tr>
+<td>DTN/HDTN 값
+</td>
+<td>유효한 입력은 해당 브라우저에 자동 저장됩니다.
+</td>
+</tr>
+<tr>
+<td>프리셋
+</td>
+<td>이 PC의 서버에 시험 조건을 저장합니다.
+</td>
+</tr>
+<tr>
+<td>연결 주소
+</td>
+<td>주소 항목별 저장·적용을 사용합니다. 프리셋에 포함되지 않습니다.
+</td>
+</tr>
+</tbody>
+</table></div></div>
+<p>수집·전송 준비 중에는 일부 설정을 바꿀 수 없습니다. 수신 대기 중에는 다음 시험을 준비할 수 있습니다.
+</p><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>8 / 58</span></div>
+</section>
+<section aria-labelledby="title-types" class="sheet" id="types"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">송신 설정 · 09
+</p>
+<h1 id="title-types">시험 유형 선택
+</h1></div>
+<table>
+<thead>
+<tr>
+<th>시험 유형
+</th>
+<th>어댑터로 전달하는 계산 입력
+</th>
+<th>수신 처리
+</th>
+<th>선택 기준
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GNSS RAW
+</td>
+<td>의사거리를 가상 송신 시각으로 치환한 1 Epoch JSON
+</td>
+<td>변환 RAW 해석 → 의사거리 재계산 → PVT
+</td>
+<td>프레임·RF 처리 없이 데이터 전송과 공통 지연 계산을 확인할 때
+</td>
+</tr>
+<tr>
+<td>AFS Frame
+</td>
+<td>GPS 위성별 6,000-bit AFS 프레임을 포함한 JSON
+</td>
+<td>AFS 복호 → 입력 복원 → 의사거리 재계산 → PVT
+</td>
+<td>프레임 구성·복원까지 포함해 시험할 때
+</td>
+</tr>
+<tr>
+<td>I/Q Sample
+</td>
+<td>I/Q 파일 경로·해시 등 manifest JSON과 별도 .bin 파일
+</td>
+<td>파일 검증 → RF 추적·프레임 복호 → 공통 지연 PVT
+</td>
+<td>신호 생성·추적·복호 경로까지 포함할 때
+</td>
+</tr>
+</tbody>
+</table>
+<p>모든 유형에서 지연 반영 PVT를 계산합니다. GNSS RAW는 선택한 Epoch의 계산 입력을 JSON으로 전송합니다.
+</p>
+<figure class="medium"><a aria-label="시험 데이터 유형 선택 · RAW 선택 예시 확대" href="assets/settings-raw.png" target="_blank"><img alt="시험 데이터 유형 선택 · RAW 선택 예시" src="assets/settings-raw.png"/></a>
+<figcaption>시험 데이터 유형 선택 · RAW 선택 예시
+</figcaption>
+</figure>
+<p>AFS Frame의 내부 유형명은 AFS_METADATA입니다. I/Q도 같은 프레임 구성을 사용하며 위성별 PRN 신호를 생성합니다.
+</p><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>9 / 58</span></div>
+</section>
+<section aria-labelledby="title-routes" class="sheet" id="routes"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">송신 설정 · 10
+</p>
+<h1 id="title-routes">전송 경로와 연결 주소
+</h1></div>
+<table>
+<thead>
+<tr>
+<th>선택 경로
+</th>
+<th>설정 탭의 적용 대상
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>DTN → HDTN
+</td>
+<td>DTN: 송신 / HDTN: 수신
+</td>
+</tr>
+<tr>
+<td>DTN → DTN
+</td>
+<td>DTN: 송·수신
+</td>
+</tr>
+<tr>
+<td>HDTN → DTN
+</td>
+<td>HDTN: 송신 / DTN: 수신
+</td>
+</tr>
+<tr>
+<td>HDTN → HDTN
+</td>
+<td>HDTN: 송·수신
+</td>
+</tr>
+</tbody>
+</table><div>
+<h3>주소 입력 순서
+</h3>
+<ol class="steps">
+<li>수신 서비스의 IP와 서비스 포트를 입력하고 <b>저장·적용</b>합니다.
+</li>
+<li><b>DTN 어댑터 서버 주소</b>에 <code>http://어댑터-IP:포트</code> 형식으로 입력합니다.
+</li>
+<li>각 연결 확인 결과를 구분합니다. 서비스 간 연결 성공과 어댑터 연결 성공은 별개입니다.
+</li>
+</ol>
+<p>어댑터 주소는 기본값을 환경 설정에서 읽고, 화면에서 저장한 주소를 해당 브라우저에 적용합니다. 송신 PC와 수신 PC가 서로 다른 어댑터를 사용하면 각 화면에 각자의 주소를 설정합니다.
+</p></div>
+<aside class="note">시험 전 어댑터 담당자와 라우팅 정책, 중계 노드, BP 버전을 맞추세요.
+</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>10 / 58</span></div>
+</section>
+<section aria-labelledby="title-health" class="sheet" id="health"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">송신 설정 · 11
+</p>
+<h1 id="title-health">어댑터 연결 확인
+</h1></div>
+<figure class="wide"><a aria-label="어댑터 상태는 상단에도 표시됩니다. 촬영 시에는 연결실패 상태입니다. 확대" href="assets/sender-status.png" target="_blank"><img alt="어댑터 상태는 상단에도 표시됩니다. 촬영 시에는 연결실패 상태입니다." src="assets/sender-status.png"/></a>
+<figcaption>어댑터 상태는 상단에도 표시됩니다. 촬영 시에는 연결실패 상태입니다.
+</figcaption>
+</figure>
+<table>
+<thead>
+<tr>
+<th>표시
+</th>
+<th>의미
+</th>
+<th>다음 조치
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>정상연결 · 녹색
+</td>
+<td>health 응답의 status가 ready
+</td>
+<td>어댑터가 전송 요청을 받을 수 있는 상태입니다.
+</td>
+</tr>
+<tr>
+<td>시험대기 · 노란색
+</td>
+<td>health 응답의 status가 busy
+</td>
+<td>어댑터 작업 상태를 확인하고 필요하면 대기합니다.
+</td>
+</tr>
+<tr>
+<td>연결실패 · 빨간색
+</td>
+<td>응답 없음, 연결 오류 등 정상 상태를 확인하지 못함
+</td>
+<td>IP·포트·어댑터 실행·방화벽·응답 내용을 확인합니다.
+</td>
+</tr>
+</tbody>
+</table>
+<p>화면에서 약 10초 간격으로 상태를 요청합니다. <b>연결 확인</b>은 수동 재조회입니다. 송신 설정의 상세 보기에는 요청 주소·응답 상태·처리 시간·마지막 확인 및 개발자 JSON 원문이 표시됩니다. 수신 화면은 간단한 상태 표시를 제공합니다.
+</p>
+<p>연결 확인은 송신 /sender/health, 수신 /receiver/health를 사용합니다. 표시된 ms는 연결 확인 응답 시간입니다.
+</p><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>11 / 58</span></div>
+</section>
+<section aria-labelledby="title-presets" class="sheet" id="presets"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">송신 설정 · 12
+</p>
+<h1 id="title-presets">프리셋 저장·불러오기·수정
+</h1></div><div class="split"><div>
+<figure class=""><a aria-label="설정 저장하기 대화상자 확대" href="assets/preset-dialog.png" target="_blank"><img alt="설정 저장하기 대화상자" src="assets/preset-dialog.png"/></a>
+<figcaption>설정 저장하기 대화상자
+</figcaption>
+</figure></div><div>
+<ol class="steps">
+<li>시험 유형·전송 경로·DTN/HDTN 값을 먼저 설정합니다.
+</li>
+<li><b>설정 저장하기</b>를 누르고 40자 이내 이름을 입력해 저장합니다. 최대 5개입니다.
+</li>
+<li>목록에서 프리셋을 선택하고 <b>불러오기</b>를 누릅니다. 다음 전송 요약과 각 값을 확인합니다.
+</li>
+<li>값을 수정한 후 <b>변경 저장</b>으로 선택한 프리셋을 갱신합니다.
+</li>
+<li><b>관리</b>에서 이름 변경 또는 삭제를 수행합니다. 다른 화면에서 수정되었다는 메시지가 나오면 새로고침 후 다시 확인합니다.
+</li>
 </ol></div></div>
-<table><thead><tr><th>항목</th><th>표시 기준</th></tr></thead><tbody>
-<tr><td>비교 묶음</td><td>같은 입력·Epoch·유형·송수신 노드·Reference 위치. 전송 경로와 어댑터 설정은 달라도 함께 표시합니다.</td></tr>
-<tr><td>좌표와 축척</td><td>E(동)·N(북)은 같은 거리 축척이며 수치는 Reference 대비 편차입니다. 이동·확대는 표시 범위만 바꿉니다. U는 수직 편차입니다. 유효한 위치 결과만 표시합니다.</td></tr>
-<tr><td>표시와 이력</td><td>일반 원형 HUD와 축척은 유지합니다. 새로고침·재기동 후 이력을 복원하며 삭제한 시험의 점은 제거됩니다. 적용 전 이력과 I/Q는 개별 표시입니다.</td></tr>
-</tbody></table>
-<aside class="note">Reference는 송신 관측값으로 계산한 PVT입니다. 표시 편차는 실측 기준점의 위치 정확도나 합격·불합격 판정이 아닙니다.</aside>
-<div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>34 / 58</span></div></section>
-<section aria-labelledby="title-pvt-numbers" class="sheet" id="pvt-numbers"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">수신 결과 확인 · 35</p><h1 id="title-pvt-numbers">ECEF 상세 수치와 시간 잔차</h1></div><figure class="wide"><a aria-label="ECEF 원시 수치 상세 대조표 · 상단 일부 확대" href="assets/receiver-ecef.png" target="_blank"><img alt="ECEF 원시 수치 상세 대조표 · 상단 일부" src="assets/receiver-ecef.png"/></a><figcaption>ECEF 원시 수치 상세 대조표 · 상단 일부</figcaption></figure><table><thead><tr><th>수치</th><th>비교 방법</th></tr></thead><tbody><tr><td>X/Y/Z · m</td><td>RAW·AFS는 송신 Reference와 수신 해, 새 I/Q는 RF 기준과 지연 반영 해를 같은 ECEF 축에서 대조합니다.</td></tr><tr><td>Vx/Vy/Vz · m/s</td><td>속도 성분과 차이를 확인합니다. Doppler가 같아도 해·위성 방향에 따라 작은 차이가 생길 수 있습니다.</td></tr><tr><td>수신기 시계오차 · s</td><td>RAW·AFS는 수신 − 송신 Reference, 새 I/Q는 지연 반영 − RF 기준의 증가량을 봅니다. 비교 기준의 시계오차가 0일 필요는 없습니다.</td></tr><tr><td>지연 잔차 · s</td><td>Clock Bias 증가량과 측정 지연의 차이를 확인합니다. 0에 가까운지와 계산 유효성을 함께 봅니다.</td></tr><tr><td>사용 위성 / 관측 시각</td><td>서로 다른 위성 집합·Epoch 결과를 섞어 비교하지 않습니다.</td></tr></tbody></table><aside class="note">수신기 시계오차가 작은 수일 때 화면 반올림으로 0처럼 보일 수 있습니다. 상세 수치·로그의 정밀 표기를 확인하고 s·ms·과학 표기 단위를 맞춰 비교합니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>35 / 58</span></div></section>
-<section aria-labelledby="title-delay-model" class="sheet" id="delay-model"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">결과 해석 · 36</p><h1 id="title-delay-model">공통 지연과 의사거리 계산</h1></div><div class="formula"><b>송신부</b> T*ᵢ = S − Pᵢ / c<br/><b>수신부</b> P′ᵢ = c × (R − T*ᵢ) = Pᵢ + c × (R − S)<br/><b>측정 지연</b> Δt = R − S · c = 299,792,458 m/s</div><table><thead><tr><th>기호 / 시각</th><th>뜻</th></tr></thead><tbody><tr><td>Pᵢ / t₀</td><td>RAW·AFS는 원본 Epoch, 새 I/Q는 선택 RF Epoch의 의사거리 / GNSS 관측 시각</td></tr><tr><td>S</td><td>송신 서비스가 시험 시작을 접수한 시각</td></tr><tr><td>T*ᵢ</td><td>시험 시작 시점에 맞춘 가상 위성 송신 시각. 실제 위성의 새 궤도 위치를 계산한 시각이 아닙니다.</td></tr><tr><td>R</td><td>수신 서비스가 요청 본문을 모두 받은 시각. I/Q는 파일을 다 복호한 시각이 아닙니다.</td></tr><tr><td>Δt</td><td>시작 접수부터 본문 수신 완료까지. 전송 준비·어댑터 대기 등을 포함하며 수집 후 시작 전 대기와 수신 후 복호·계산 시간은 제외합니다.</td></tr></tbody></table><p>수신측 계산의 관측 시각도 GNSS 시간축에서 Δt만큼 이동합니다. 궤도정보·Doppler·C/N₀ 등 유지 대상은 그대로 사용합니다. 새 I/Q는 RF 의사거리로 S 기준 가상 송신 시각을 역산하고 같은 지연 모델을 적용합니다. Doppler는 RF 추적값을 유지합니다.</p><aside class="note">예를 들어 1초 공통 지연은 모든 위성에 299,792,458 m를 더합니다. 최종 의사거리는 원래 거리가 서로 다르므로 위성마다 다릅니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>36 / 58</span></div></section>
-<section aria-labelledby="title-delay-meaning" class="sheet" id="delay-meaning"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">결과 해석 · 37</p><h1 id="title-delay-meaning">지연이 큰데 위치 차이가 작은 이유</h1></div><div class="formula">Pᵢ ≈ 위성까지의 거리 + c × 수신기 시계오차<br/>P′ᵢ ≈ 위성까지의 거리 + c × (수신기 시계오차 + Δt)</div><p>위치 계산기는 위치와 수신기 시계오차를 함께 추정합니다. 모든 위성에 같은 거리 증가분이 들어오면 위치를 크게 옮기는 대신 시계오차를 증가시켜 관측값을 설명할 수 있습니다. 이 시험은 그 증가량이 측정한 공통 지연과 얼마나 일치하는지 확인합니다.</p><table><thead><tr><th>결과</th><th>해석 시 확인할 사항</th></tr></thead><tbody><tr><td>위치 차이가 작고 Clock Bias 증가량 ≈ Δt</td><td>공통 오차가 주로 시계오차 항으로 추정되는 결과와 부합합니다. 잔차·유효성·사용 위성을 함께 확인합니다.</td></tr><tr><td>속도 차이가 작음</td><td>원본 Doppler를 유지하므로 대체로 기대할 수 있습니다. 정확히 0이라는 조건은 아닙니다.</td></tr><tr><td>위치 차이 또는 잔차가 큼</td><td>관측·항법정보·동일 Epoch 여부·시각 보정·계산 유효성을 먼저 확인합니다.</td></tr><tr><td>비교 불가</td><td>실패 또는 이상 결과와 구분합니다. 시계 변경·음수 지연·입력 부족 등 사유를 확인합니다.</td></tr></tbody></table><aside class="note">실제 위성이 Δt 동안 이동한 미래의 관측을 재현하는 시험은 아닙니다. Reference와 가까운 위치가 나왔다고 실제 신호 전파 지연이 없었다거나 RF 수신기가 그 시간만큼 늦게 관측했다고 해석하지 않습니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>37 / 58</span></div></section>
-<section aria-labelledby="title-iq-integrity" class="sheet" id="iq-integrity"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">결과 해석 · 38</p><h1 id="title-iq-integrity">I/Q 파일 일치와 처리 시간</h1></div><figure class="wide"><a aria-label="I/Q 파일 일치·PVT 상태를 함께 표시하는 현재 화면 확대" href="assets/iq-integrity.png" target="_blank"><img alt="I/Q 파일 일치·PVT 상태를 함께 표시하는 현재 화면" src="assets/iq-integrity.png"/></a><figcaption>I/Q 파일 일치·PVT 상태를 함께 표시하는 현재 화면</figcaption></figure><table><thead><tr><th>단계</th><th>현재 확인 방식</th><th>시간에 영향을 주는 항목</th></tr></thead><tbody><tr><td>수신 검증</td><td>파일 크기와 기대 SHA-256을 대조합니다. 전체 해시는 수신 전처리에서 한 번 계산합니다.</td><td>파일 크기, 공유 폴더·디스크 읽기 속도</td></tr><tr><td>RF 추적·프레임 복호</td><td>검증한 공유 파일을 읽어 위성별 프레임을 복원합니다.</td><td>90초 신호 길이, CPU, 추적 위성 수, 파일 접근 속도</td></tr><tr><td>복호 후 확인</td><td>파일 크기·수정 시각·파일 식별 정보의 변화를 확인합니다. 전체 SHA-256을 다시 읽지 않습니다.</td><td>공유 파일의 변경 여부</td></tr><tr><td>최종 표시</td><td>파일 일치와 PVT 비교 상태를 별도로 표시합니다. 새 I/Q의 주 비교는 동일 RF Epoch의 지연 적용 전후 결과입니다. 송신 Reference는 별도 참고자료입니다.</td><td>Reference 확보 및 PVT 계산 조건</td></tr></tbody></table><p>본문 수신 시간과 수신 후 처리 시간은 다릅니다. 파일이 도착한 뒤 복호가 오래 걸려도 그 전체 시간을 공통 지연 Δt에 더하지 않습니다. 진행 메시지에서 검증 중인지 추적·계산 중인지 먼저 확인합니다.</p><aside class="note">과거 이력의 로그에는 이전 처리 방식의 메시지가 남을 수 있습니다. 현재 방식은 처리 중 파일을 변경하지 않는 운용을 전제로 합니다. 파일 일치는 GNSS 관측 원문 전체가 동일하다는 판정과 구분합니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>38 / 58</span></div></section>
-<section aria-labelledby="title-history" class="sheet" id="history"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">시험 관리 · 39</p><h1 id="title-history">여러 시험 전송과 이력 조회</h1></div><figure class="wide"><a aria-label="시험 기록 선택과 대기 전체 종료 · 수신 화면 확대" href="assets/receiver-status.png" target="_blank"><img alt="시험 기록 선택과 대기 전체 종료 · 수신 화면" src="assets/receiver-status.png"/></a><figcaption>시험 기록 선택과 대기 전체 종료 · 수신 화면</figcaption></figure><ol class="steps"><li>첫 시험을 전송하고 어댑터 접수 상태를 확인합니다.</li><li>수신 대기 상태만 남으면 다음 시험 조건을 준비하고 <b>전송시험 시작</b>을 다시 누릅니다. 각 요청은 별도의 시험 ID를 사용합니다.</li><li>이력의 [RAW] / [AFS] / [I/Q], 시작 시각, 상태와 ID 앞부분으로 구분합니다.</li><li>과거 시험은 목록에서 선택합니다. 이전·다음으로 페이지를 이동하고 필요하면 수신 대기 필터를 사용합니다.</li><li>어댑터가 묶어서 또는 순서가 바뀌어 전달해도 testId가 같은 시험에 결과를 연결합니다.</li></ol><table><thead><tr><th>상태</th><th>운영 의미</th></tr></thead><tbody><tr><td>수신 대기</td><td>도착을 기다리는 상태입니다. 단순 대기에 10분 만료를 적용하지 않습니다. 장시간 지연 시 수신돼도 항법정보·계산 조건에 따라 PVT 비교가 불가능할 수 있습니다.</td></tr><tr><td>준비 / 계산 중</td><td>한 시험의 실제 처리 단계입니다. RAW·AFS 10분, I/Q 20분 등 처리 제한은 수신 대기 제한과 별개입니다.</td></tr><tr><td>완료 / 비교 불가 / 실패 / 종료</td><td>상태와 상세 메시지를 함께 확인합니다. “완료 · 불일치” 표시가 있으면 불일치 내용을 확인합니다.</td></tr></tbody></table><aside class="note">LNIS는 전송 결과를 testId로 묶습니다. 다회 전송·순서 변경 수신은 라우팅 시나리오 관찰에 활용할 수 있지만, 라우터 경로 선택·중계 정책 자체의 검증은 어댑터·라우터 증거가 별도로 필요합니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>39 / 58</span></div></section>
-<section aria-labelledby="title-cancel" class="sheet" id="cancel"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">시험 관리 · 40</p><h1 id="title-cancel">시험별 중지와 대기 전체 종료</h1></div><figure class="wide"><a aria-label="사용자가 종료한 기존 시험 · 등록 후 데이터 미수신 예시 확대" href="assets/cancelled.png" target="_blank"><img alt="사용자가 종료한 기존 시험 · 등록 후 데이터 미수신 예시" src="assets/cancelled.png"/></a><figcaption>사용자가 종료한 기존 시험 · 등록 후 데이터 미수신 예시</figcaption></figure><table><thead><tr><th>기능</th><th>대상 / 조작</th><th>처리 결과</th></tr></thead><tbody><tr><td>시험 중지 / 대기 종료</td><td>이력에서 시험을 선택 → 버튼 → 확인</td><td>해당 시험의 대기·처리를 종료합니다. 기록은 유지합니다.</td></tr><tr><td>대기 전체 종료</td><td>수신 대기 시험 확인 → 버튼 → 대상 수 검토 → 확인</td><td>목록 페이지와 관계없이 확인 시점의 미수신 대기 시험을 대상으로 합니다.</td></tr><tr><td>종료 확인 중</td><td>상대 LNIS에 미수신 여부·종료 상태 확인이 필요한 상태</td><td>응답이 안 오면 종료 확인 대기가 남을 수 있습니다. 상세 메시지와 연결 상태를 확인합니다.</td></tr><tr><td>경합 시 제외</td><td>확인 이후 이미 수신·계산 단계로 넘어간 시험</td><td>전체 종료 대상에서 제외될 수 있습니다. 완료 후 취소·제외·대기 건수를 확인합니다.</td></tr></tbody></table><p>중지 버튼은 LNIS 시험 상태에 대한 동작입니다. 어댑터가 이미 접수한 번들을 네트워크에서 회수한다고 보장하지 않습니다. 종료 후 늦게 도착한 데이터는 해당 종료 시험의 기록으로 취급하고 정상 완료로 다시 시작하지 않습니다.</p><aside class="note">대기 전체 종료는 이력 삭제가 아닙니다. 사용자가 중지한 시험의 JSON·로그·결과를 지우려면 관리자 데이터 관리 절차를 별도로 사용합니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>40 / 58</span></div></section>
-<section aria-labelledby="title-json" class="sheet" id="json"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">원문과 로그 · 41</p><h1 id="title-json">송신·수신 JSON 원문 확인</h1></div><div class="split"><div><figure class=""><a aria-label="송신 JSON 원문 · AFS 기존 시험 확대" href="assets/sender-json.png" target="_blank"><img alt="송신 JSON 원문 · AFS 기존 시험" src="assets/sender-json.png"/></a><figcaption>격리된 송수신 서비스에서 확인한 신규 v1 AFS 시험 JSON 원문 · 2026. 11. 4.</figcaption></figure></div><div><figure class=""><a aria-label="수신 JSON 원문 · 같은 AFS 시험 확대" href="assets/receiver-json.png" target="_blank"><img alt="수신 JSON 원문 · 같은 AFS 시험" src="assets/receiver-json.png"/></a><figcaption>격리된 송수신 서비스에서 확인한 신규 v1 AFS 시험 JSON 원문 · 2026. 11. 4.</figcaption></figure></div></div><table><thead><tr><th>기능</th><th>사용 방법</th></tr></thead><tbody><tr><td>원문 창</td><td>시험 기록을 선택하면 사용 가능한 송신·수신 본문을 해당 화면에 자동 표시합니다.</td></tr><tr><td>정렬 보기</td><td>들여쓰기로 읽기 쉽게 표시합니다. 실제 다운로드 본문을 변경하지 않습니다.</td></tr><tr><td>JSON 다운로드</td><td>송신 요청 본문 또는 접수 당시 수신 본문을 내려받습니다. 과거 정규화 저장본이면 안내 문구를 확인합니다.</td></tr><tr><td>검증 실패 수신</td><td>수신 원문을 보관해 거절 사유를 확인할 수 있습니다. 시험 식별이 안 되는 요청은 관리자 수신 원문 목록에서 확인합니다.</td></tr></tbody></table><aside class="note">어댑터가 추가한 로그 필드 등과 계산 입력을 구분합니다. 신규 RAW·AFS·I/Q 전송은 schemaVersion 1을 사용합니다. format과 testType으로 데이터 구조를 구분합니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>41 / 58</span></div></section>
-<section aria-labelledby="title-logs" class="sheet" id="logs"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">원문과 로그 · 42</p><h1 id="title-logs">로그 상세·다운로드·전체화면</h1></div><figure class="medium"><a aria-label="송신 상세 로그 · 기존 시험의 계산 근거와 전송 상태 확대" href="assets/sender-log.png" target="_blank"><img alt="송신 상세 로그 · 기존 시험의 계산 근거와 전송 상태" src="assets/sender-log.png"/></a><figcaption>송신 상세 로그 · 기존 시험의 계산 근거와 전송 상태</figcaption></figure><table><thead><tr><th>조작</th><th>동작</th></tr></thead><tbody><tr><td>상세 로그</td><td>일반 상태 메시지와 계산 근거·단계별 상세 기록의 표시를 전환합니다.</td></tr><tr><td>다운로드</td><td>선택한 시험의 저장 로그를 내려받습니다.</td></tr><tr><td>화면 지우기</td><td>브라우저 표시를 지웁니다. DB에 보관된 시험 로그를 삭제하지 않습니다.</td></tr><tr><td>전체화면 아이콘</td><td>JSON 창과 분리해 로그 영역을 화면 전체로 확대합니다. 버튼 또는 Esc로 복귀합니다.</td></tr><tr><td>송신 / 수신 구분</td><td>송신은 입력·Reference·전송 준비·접수, 수신은 접수·복원·지연·PVT 근거를 확인합니다.</td></tr></tbody></table><aside class="note">로그 시간은 표시 기준을 확인합니다. 어댑터 로그가 함께 있으면 원천과 날짜·시각대를 확인합니다. 화면에 뒤늦게 합쳐진 로그의 출력 순서만으로 네트워크 도착 순서를 단정하지 않습니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>42 / 58</span></div></section>
-<section aria-labelledby="title-log-evidence" class="sheet" id="log-evidence"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">원문과 로그 · 43</p><h1 id="title-log-evidence">로그를 이용한 장애 전달</h1></div><figure class="wide"><a aria-label="로그 전체화면 · 기존 송신 상세 기록 일부 확대 확대" href="assets/log-excerpt.png" target="_blank"><img alt="로그 전체화면 · 기존 송신 상세 기록" src="assets/log-excerpt.png"/></a><figcaption>로그 전체화면 · 기존 송신 상세 기록</figcaption></figure><p>담당자에게는 시험 ID, 시험 유형, 경로, 시작 시각, 실패 단계, 마지막 INFO와 첫 WARN/ERROR, 관련 JSON을 함께 전달합니다. 화면 캡처만 보내기보다 원문과 로그 다운로드를 사용합니다.</p><table><thead><tr><th>증거</th><th>확인 목적</th></tr></thead><tbody><tr><td>S / R / T*ᵢ / P′ᵢ</td><td>공통 지연과 의사거리 계산의 시각·단위·수식을 확인합니다.</td></tr><tr><td>HTTP 메서드·URL·상태</td><td>어느 IP·포트·API에서 오류가 발생했는지 확인합니다. 상대 응답 본문도 함께 봅니다.</td></tr><tr><td>파일 경로·크기·SHA-256</td><td>I/Q 파일 접근 및 일치 여부를 확인합니다.</td></tr><tr><td>Reference / 수신 해 / 비교 사유</td><td>입력 준비 실패, 수신 처리 실패, 비교 자료 부족을 구분합니다.</td></tr></tbody></table><aside class="note">고객 환경의 로그·JSON에는 주소·식별자·위치 정보가 포함될 수 있습니다. 외부 전달 시 내부 보안 기준에 따라 취급합니다. Authorization·비밀번호는 전달 자료에서 제외합니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>43 / 58</span></div></section>
-<section aria-labelledby="title-errors" class="sheet" id="errors"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">장애 대응 · 44</p><h1 id="title-errors">문제 발생 시 확인 순서</h1></div><table><thead><tr><th>증상</th><th>우선 확인</th><th>후속 담당</th></tr></thead><tbody><tr><td>화면 접속 불가</td><td>서비스 기동, IP·포트, Docker 상태, 브라우저 주소</td><td>설치·운영 담당</td></tr><tr><td>COM 포트 없음 / 연결 실패</td><td>장치 인식, u-center 점유, 속도, Windows 브릿지 상태</td><td>운영자 → 설치 담당</td></tr><tr><td>파일 적용 실패</td><td>UBX/GRAW 형식, 입력 메시지, 화면 오류 사유</td><td>운영자 → LNIS 담당</td></tr><tr><td>PVT 비교 불가</td><td>GPS L1 관측·SF1~3, 사용 위성, Reference, 음수 지연·시계 변경</td><td>운영자 → LNIS 담당</td></tr><tr><td>어댑터 400 / 401 / 405</td><td>요청 본문·응답 내용, 인증 설정, 메서드·전송 API 경로</td><td>LNIS·어댑터 담당 공동</td></tr><tr><td>등록됐으나 본문 미수신</td><td>어댑터 접수, 라우터·중계·공유 파일 전달, 상대 callback 주소</td><td>어댑터·망 담당</td></tr><tr><td>I/Q 파일 접근 실패</td><td>수신 경로에서 파일 존재·권한·마운트·크기</td><td>운영자 → 설치·어댑터 담당</td></tr><tr><td>I/Q 처리 지연</td><td>검증 / RF 추적 / PVT 중 현재 단계와 CPU·디스크</td><td>운영자 → 설치·LNIS 담당</td></tr></tbody></table><aside class="note">브라우저의 LNIS API 응답 코드와 외부 어댑터의 응답 코드는 다른 요청의 결과일 수 있습니다. 오류 메시지에 기록된 실제 대상 URL·응답을 기준으로 구분합니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>44 / 58</span></div></section>
-<section aria-labelledby="title-actual-errors" class="sheet" id="actual-errors"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">장애 대응 · 45</p><h1 id="title-actual-errors">실제 이력으로 보는 비교 불가와 실패</h1></div><figure class="wide"><a aria-label="AFS 비교 불가 · 음수 지연 및 시계 변경 관련 기존 기록 확대" href="assets/incomparable.png" target="_blank"><img alt="AFS 비교 불가 · 음수 지연 및 시계 변경 관련 기존 기록" src="assets/incomparable.png"/></a><figcaption>AFS 비교 불가 · 음수 지연 및 시계 변경 관련 기존 기록</figcaption></figure><figure class="wide"><a aria-label="I/Q 실패 · 파일 경로 접근에 실패한 기존 기록 확대" href="assets/failed.png" target="_blank"><img alt="I/Q 실패 · 파일 경로 접근에 실패한 기존 기록" src="assets/failed.png"/></a><figcaption>I/Q 실패 · 파일 경로 접근에 실패한 기존 기록</figcaption></figure><table><thead><tr><th>사례</th><th>해석 / 조치</th></tr></thead><tbody><tr><td>AFS 음수 지연</td><td>기존 이력에서 R − S가 약 −1.019초였습니다. 전송이 음의 시간에 이뤄졌다는 의미가 아니며 양쪽 기준시각·보정 변경을 확인합니다.</td></tr><tr><td>I/Q 파일 없음</td><td>이력의 수신 경로 파일에 접근하지 못했습니다. manifest 수신만으로 .bin 전달이 완료된 것은 아닙니다.</td></tr><tr><td>사용자 종료</td><td>종료는 실패 원인 자동 판정이 아닙니다. 종료 시점까지의 접수·수신 기록으로 구분합니다.</td></tr></tbody></table><aside class="note">여기에 표시된 과거 오류를 새 시험에 그대로 적용하지 않습니다. 새 시험 ID에 대응하는 로그와 파일 상태를 확인합니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>45 / 58</span></div></section>
-<section aria-labelledby="title-management" class="sheet" id="management"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">관리자 부록 · 46</p><h1 id="title-management">데이터 관리 접속과 조회</h1></div><figure class="wide"><a aria-label="수신 PC의 저장 현황 · 촬영 당시 값 확대" href="assets/management-summary.png" target="_blank"><img alt="수신 PC의 저장 현황 · 촬영 당시 값" src="assets/management-summary.png"/></a><figcaption>수신 PC의 저장 현황 · 촬영 당시 값</figcaption></figure><ol class="steps"><li>관리할 PC의 <b>/lnis/data-manager</b>에 접속합니다. 상단 데이터 관리 아이콘은 같은 창에서 이동합니다. imtplus 로고를 누르면 시험 화면으로 돌아갑니다.</li><li>페이지 상단이 송신 PC인지 수신 PC인지 확인합니다. 이 화면은 접속한 PC의 자료만 관리합니다.</li><li><b>시험 기록</b>에서 날짜·상태·시험 ID 일부로 조회합니다.</li><li><b>수신 원문·파일</b>에서는 자료 종류를 선택해 수신 기록·입력·I/Q 파일을 조회합니다.</li><li>이전·다음으로 페이지를 이동하고 필요한 자료의 <b>상세</b>를 엽니다.</li></ol><table><thead><tr><th>저장 현황</th><th>의미</th></tr></thead><tbody><tr><td>시험 기록 / 수신 원문</td><td>로컬 DB에 저장된 해당 자료 건수</td></tr><tr><td>DB 파일</td><td>DB의 물리 파일 크기. 자료 삭제 직후 줄어들지 않을 수 있습니다.</td></tr><tr><td>입력 / I/Q 파일</td><td>관리 대상 파일의 보관 용량. 시험 건수와 일대일 대응하지 않을 수 있습니다.</td></tr><tr><td>초기화</td><td>별도 탭에서 범위를 선택합니다. <b>시험 데이터 초기화</b>는 입력·I/Q·설정을 유지합니다. <b>서비스 초기화</b>는 서비스 소유 파일·프리셋도 정리하고 사용자 설정을 배포 기본값으로 복원합니다.</td></tr></tbody></table><aside class="note">초기화는 대상 확인과 범위 이름 입력 후 실행하며 보관 고정 자료도 포함합니다. 공유·소유 미확인 I/Q와 설치·인증 설정은 유지합니다. 현재 서비스의 대기만 종료하며 다른 PC는 별도로 관리합니다. 파일 정리 실패 시 남은 항목을 다시 실행할 수 있습니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>46 / 58</span></div></section>
-<section aria-labelledby="title-management-detail" class="sheet" id="management-detail"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">관리자 부록 · 47</p><h1 id="title-management-detail">시험·수신 원문·파일 상세</h1></div><figure class="wide"><a aria-label="선택한 자료 상세 · 조회용 링크와 저장 정보 확대" href="assets/management-detail.png" target="_blank"><img alt="선택한 자료 상세 · 조회용 링크와 저장 정보" src="assets/management-detail.png"/></a><figcaption>선택한 자료 상세 · 조회용 링크와 저장 정보</figcaption></figure><table><thead><tr><th>기능</th><th>사용 방법 / 확인 내용</th></tr></thead><tbody><tr><td>상세</td><td>ID, 상태, 생성·갱신 시각, 메시지, 연관 자료와 다운로드 링크를 확인합니다.</td></tr><tr><td>보관 고정</td><td>삭제·자동 정리에서 보호할 자료를 고정합니다. 해제 전 연관 자료와 보관 목적을 확인합니다.</td></tr><tr><td>수신 원문</td><td>시험과 연결되지 않거나 검증 실패한 요청도 상태·메시지와 함께 확인합니다.</td></tr><tr><td>입력 / I/Q 파일</td><td>생성 시각·용량·사용 여부를 확인합니다. I/Q 파일 다운로드는 대용량이므로 저장 공간을 확인합니다.</td></tr><tr><td>파일 사용 관계</td><td>진행 중이거나 다른 시험에서 공유하는 자료는 삭제 제한 대상일 수 있습니다.</td></tr></tbody></table><aside class="note">상세 조회는 삭제 동작이 아닙니다. 화면 로그 지우기와 관리 화면의 선택 삭제는 효과가 다릅니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>47 / 58</span></div></section>
-<section aria-labelledby="title-delete" class="sheet" id="delete"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">관리자 부록 · 48</p><h1 id="title-delete">자료 선택 삭제</h1></div><figure class="wide"><a aria-label="시험 기록 조회 · 선택 삭제 버튼과 보관 고정 확대" href="assets/management-records.png" target="_blank"><img alt="시험 기록 조회 · 선택 삭제 버튼과 보관 고정" src="assets/management-records.png"/></a><figcaption>시험 기록 조회 · 선택 삭제 버튼과 보관 고정</figcaption></figure><ol class="steps"><li>종류·기간·상태·ID로 삭제 범위를 먼저 좁힙니다.</li><li>행을 선택합니다. <b>이 페이지 선택</b>은 현재 페이지에 적용합니다. <b>검색 결과 전체 선택</b>은 페이지와 관계없이 현재 조회 조건의 자료를 선택하며, <b>선택 해제</b>로 취소합니다.</li><li><b>선택 삭제</b>를 눌러 연관 자료·삭제 파일 용량·제외 사유를 확인합니다.</li><li>ID·건수·연관 자료·보관 고정 여부를 검토한 뒤 확인합니다. 취소하면 삭제하지 않습니다.</li><li>처리 후 삭제·실패·제외 건수를 확인하고 필요한 경우 다시 조회합니다.</li></ol><aside class="note">삭제한 자료는 이 화면에서 복원할 수 없습니다. 진행 중·보관 고정·공유 자료는 서버가 다시 확인하며 대상에서 제외될 수 있습니다. 삭제 확인은 유효 시간이 있으므로 오래된 확인 창에서는 대상을 다시 조회합니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>48 / 58</span></div></section>
-<section aria-labelledby="title-retention" class="sheet" id="retention"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">관리자 부록 · 49</p><h1 id="title-retention">보관 기간과 자동 정리</h1></div><figure class="wide"><a aria-label="보관 설정 · 촬영 당시 활성 상태가 표시된 예시 확대" href="assets/management-retention.png" target="_blank"><img alt="보관 설정 · 촬영 당시 활성 상태가 표시된 예시" src="assets/management-retention.png"/></a><figcaption>보관 설정 · 촬영 당시 활성 상태가 표시된 예시</figcaption></figure><table><thead><tr><th>대상</th><th>기간 계산 기준</th><th>자동 제외</th></tr></thead><tbody><tr><td>종료된 DTN 시험</td><td>시험 최종 갱신 시점</td><td>진행 중·보관 고정 등 보호 자료</td></tr><tr><td>시험과 연결되지 않은 수신 원문</td><td>수신 시점</td><td>시험 연결·보관 고정 등 보호 자료</td></tr><tr><td>사용하지 않는 입력·I/Q 파일</td><td>파일 생성 시점</td><td>사용 중·공유·보관 고정 등 보호 파일</td></tr></tbody></table><p>대상별 자동 삭제 사용 여부와 7일 / 30일 / 90일 / 직접 입력(1~3,650일)을 정합니다. <b>설정 저장</b>에서 대상을 검토한 후 적용합니다. <b>지금 정리</b>도 예정 대상을 확인하고 실행합니다.</p><aside class="note">설치 초기 자동 삭제는 꺼져 있습니다. 촬영 환경의 현재 설정은 이미 켜져 있을 수 있습니다. 자동 정리는 약 10분마다 최대 500건을 처리하며 시험·수집·파일 처리 중에는 미룹니다. 최근 정리 내역에서 실패 항목을 확인합니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>49 / 58</span></div></section>
-<section aria-labelledby="title-install-prepare" class="sheet" id="install-prepare"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">설치 및 실행 · 50</p><h1 id="title-install-prepare">Windows PC 설치 준비</h1></div><div class="split"><div><figure><a aria-label="오프라인 배포 묶음의 실제 파일 목록 · INSTALL.cmd로 설치 시작" href="assets/install-package.png" target="_blank"><img alt="오프라인 배포 묶음의 실제 파일 목록 · INSTALL.cmd로 설치 시작" src="assets/install-package.png"/></a><figcaption>오프라인 배포 묶음의 실제 파일 목록 · INSTALL.cmd로 설치 시작</figcaption></figure></div><div><ol class="steps"><li>송신·수신 PC 각각에 Windows 11 x64와 CPU 가상화 지원을 준비합니다.</li><li>배포 ZIP을 로컬 폴더에 모두 풉니다. ZIP 안에서 INSTALL.cmd를 직접 실행하지 않습니다.</li><li>실제로 사용할 Windows 계정으로 INSTALL.cmd를 실행합니다. Windows 기능과 네트워크 설정 때 관리자 승인이 표시됩니다.</li><li>재부팅 안내가 나오면 재부팅한 뒤 같은 INSTALL.cmd를 다시 실행합니다.</li></ol></div></div><table><tr><th>준비 항목</th><th>확인 사항</th></tr><tr><td>여유 공간</td><td>설치용 12 GB 이상과 DB 백업 공간. I/Q 파일은 1개당 2.16 GB가 추가됩니다.</td></tr><tr><td>네트워크</td><td>두 PC의 고정 IPv4·서비스 포트, 각 PC가 연결할 어댑터 주소와 인증값을 준비합니다.</td></tr><tr><td>오프라인 자료</td><td>WSL 설치본·Linux 실행 환경·Docker·서비스 이미지·전용 Java가 포함됩니다. 별도 원본 오픈소스 폴더는 필요하지 않습니다.</td></tr></table><aside class="note">이 묶음은 Windows 11의 WSL2 NAT·localhost 전달을 기준으로 합니다. Windows 구성요소 원본이 없는 PC는 해당 Windows 설치 미디어가 필요할 수 있습니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>50 / 58</span></div></section><section aria-labelledby="title-install-settings" class="sheet" id="install-settings"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">설치 및 실행 · 51</p><h1 id="title-install-settings">송신·수신 PC 설정</h1></div><div class="split"><div><figure><a aria-label="배포용 app/.env.example 실제 내용 · 항목마다 한글 입력 설명 제공" href="assets/install-env.png" target="_blank"><img alt="배포용 app/.env.example 실제 내용 · 항목마다 한글 입력 설명 제공" src="assets/install-env.png"/></a><figcaption>배포용 app/.env.example 실제 내용 · 항목마다 한글 입력 설명 제공</figcaption></figure></div><div><ol class="steps"><li>각 PC의 역할을 sender 또는 receiver로 선택합니다.</li><li>현재 PC와 상대 서비스의 Windows IPv4 주소·포트를 입력합니다. 서로 다른 PC에서는 둘 다 8088을 사용할 수 있습니다.</li><li>현재 PC가 연결할 어댑터 주소를 IP와 포트까지만 입력합니다.</li><li>노드 간 관리 토큰은 양쪽에 동일한 32자 이상 값으로 지정합니다. 어댑터 송신·수신 인증값은 상대 어댑터와 맞춥니다.</li></ol><p>미리 작성한 설정 파일을 사용하려면:</p><pre class="command">INSTALL.cmd -Configuration "C:\준비\sender.env"</pre></div></div><table><tr><th>예시</th><th>송신 PC</th><th>수신 PC</th></tr><tr><td>역할</td><td>sender</td><td>receiver</td></tr><tr><td>현재 서비스</td><td>http://192.168.1.72:8088</td><td>http://192.168.1.73:8088</td></tr><tr><td>상대 서비스</td><td>http://192.168.1.73:8088</td><td>http://192.168.1.72:8088</td></tr></table><aside class="note">주소는 설치 환경에 맞게 변경합니다. WSL 내부의 172.x 주소는 현재 서비스 주소로 입력하지 않습니다. 생성된 설정은 설치 경로의 data/.env에 저장됩니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>51 / 58</span></div></section><section aria-labelledby="title-install-start" class="sheet" id="install-start"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">설치 및 실행 · 52</p><h1 id="title-install-start">설치 완료 확인과 일상 실행</h1></div><div class="split"><div><figure><a aria-label="실행 중인 송신 서비스 화면 · 서비스 준비와 상대 연결 상태는 별도 확인" href="assets/sender-status.png" target="_blank"><img alt="실행 중인 송신 서비스 화면 · 서비스 준비와 상대 연결 상태는 별도 확인" src="assets/sender-status.png"/></a><figcaption>실행 중인 송신 서비스 화면 · 서비스 준비와 상대 연결 상태는 별도 확인</figcaption></figure></div><div><ol class="steps"><li>INSTALL이 전용 실행 환경과 서비스 이미지를 설치하고 서비스 준비 상태를 확인합니다.</li><li>Windows 서비스 포트와 Docker 포트를 같은 번호로 연결합니다. 다른 프로그램의 전달 규칙은 덮어쓰지 않습니다.</li><li>설치 완료 후 바탕화면의 DTN START로 실행하고 DTN STOP으로 종료합니다.</li><li>다른 PC에서 현재 PC 주소로 접속하고, 화면에서 상대 서비스·어댑터 연결을 확인합니다.</li></ol></div></div><table><tr><th>사용 상황</th><th>동작</th></tr><tr><td>매일 실행</td><td>DTN START 한 번 실행. WSL 터미널이나 별도 백그라운드 명령이 필요하지 않습니다.</td></tr><tr><td>창 닫기 / PC 재부팅</td><td>브라우저·CMD를 닫아도 서비스는 유지됩니다. PC를 재부팅하면 START를 다시 실행합니다.</td></tr><tr><td>GNSS 수집</td><td>장비를 연결하고 웹 화면에서 COM·baud를 선택합니다. u-center가 같은 포트를 사용 중이면 먼저 연결 해제합니다.</td></tr><tr><td>종료 / 갱신</td><td>STOP은 DB·입력·I/Q를 삭제하지 않습니다. 갱신은 새 INSTALL을 기존 설치 경로에 실행합니다.</td></tr></table><aside class="note">I/Q 시험은 각 PC의 data/exchange를 해당 어댑터와 공유해야 합니다. 서비스는 I/Q 파일을 상대 PC로 직접 복사하지 않습니다. 주소·포트 변경 시 INSTALL로 네트워크 설정도 갱신합니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>52 / 58</span></div></section><section aria-labelledby="title-operations" class="sheet" id="operations"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">관리자 부록 · 53</p><h1 id="title-operations">기동·종료·업데이트와 백업</h1></div><table><thead><tr><th>환경 / 작업</th><th>절차</th></tr></thead><tbody><tr><td>Windows 기동</td><td>설치 후 바탕화면의 DTN START를 실행합니다. WSL·Docker·COM 중계와 서비스 준비 확인 후 브라우저가 열립니다. 별도 WSL 창은 필요하지 않습니다.</td></tr><tr><td>Windows 종료</td><td>배포 폴더의 STOP.cmd를 사용합니다. 수신 대기·진행 시험을 종료할지 먼저 결정합니다.</td></tr><tr><td>Linux 기동 / 종료</td><td>배포 폴더에서 docker compose up -d / docker compose down을 사용합니다. 볼륨 삭제 옵션은 사용하지 않습니다.</td></tr><tr><td>설정 변경</td><td>노드 역할·주소·인증·I/Q·브릿지 설정을 검토한 뒤 재기동 적용이 필요한 항목을 반영합니다.</td></tr><tr><td>업데이트</td><td>새 묶음의 INSTALL.cmd를 기존 설치 경로에 실행합니다. 준비·송신·계산·수집 중에는 갱신하지 않습니다. 설정·자료를 보존하며 실패 시 이전 버전을 복원합니다.</td></tr><tr><td>백업</td><td>설정 파일과 DB·입력·I/Q 등 필요한 데이터를 함께 보관합니다. DB 파일 복사는 서비스를 정상 종료한 상태에서 수행합니다.</td></tr><tr><td>복구</td><td>같은 배포 버전·설정·파일 경로 관계를 확인한 뒤 복구합니다. DB만 복원하고 연결 파일을 누락하지 않도록 합니다.</td></tr></tbody></table><aside class="note">최초 INSTALL에는 관리자 승인과 재부팅이 필요할 수 있습니다. 이후 START·STOP은 일반 권한으로 사용합니다. Windows 11 오프라인 설치 자료는 납품 묶음에 포함됩니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>53 / 58</span></div></section>
-<section aria-labelledby="title-environment" class="sheet" id="environment"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">관리자 부록 · 54</p><h1 id="title-environment">다른 PC 설치 시 확인할 설정</h1></div><table><thead><tr><th>환경 변수</th><th>용도 / 확인 사항</th></tr></thead><tbody><tr><td>LNIS_NODE_ROLE / LNIS_SERVER_PORT</td><td>sender 또는 receiver / Windows 게시·Docker 서비스에 동일한 포트 사용</td></tr><tr><td>LNIS_NODE_BASE_URL / LNIS_NODE_PEER_URL</td><td>현재·상대 Windows PC의 고정 IPv4 주소와 포트. WSL 내부 주소가 아님</td></tr><tr><td>dtn_adapter</td><td>이 PC가 연결할 어댑터 기본 주소. http://IP:포트 형식</td></tr><tr><td>LNIS_NODE_MANAGEMENT_TOKEN</td><td>LNIS 노드 간 관리 요청 인증. 양쪽의 합의된 값 사용</td></tr><tr><td>LNIS_DTN_SEND_TOKEN / LNIS_DTN_RECEIVE_TOKEN</td><td>외부 어댑터 요청 인증 / 수신 API 인증. 실제 값은 문서에 기록하지 않음</td></tr><tr><td>LNIS_IQ_ENABLED</td><td>송신 I/Q 생성 사용 여부. 새 Windows 설치에서는 송신 true, 수신 false</td></tr><tr><td>LNIS_IQ_HOST_PATH</td><td>어댑터에서 읽는 호스트 파일 경로. 컨테이너 공유 폴더와 같은 파일인지 확인</td></tr><tr><td>LNIS_SERIAL_BRIDGE_PORT / BIND / HOST</td><td>Windows 직렬 브릿지 연결. 설치 환경에서 포트 충돌·WSL 접근 경로 확인</td></tr><tr><td>LNIS_DB_PASSWORD</td><td>DB 인증 설정. 기존 DB와 일치 여부 확인</td></tr><tr><td>LNIS_HTTP_LOG_LEVEL</td><td>HTTP 로그 상세 수준. 반복 조회·본문 상세가 필요한 기간에만 조정</td></tr></tbody></table><aside class="note">설치 설정은 data/.env에 저장되며 각 항목에 한글 설명이 있습니다. 주소·포트 변경 후 INSTALL로 전달 규칙도 갱신합니다. 기존 운영 .env를 예제로 덮어쓰지 않습니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>54 / 58</span></div></section>
-<section aria-labelledby="title-docker-logs" class="sheet" id="docker-logs"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">관리자 부록 · 55</p><h1 id="title-docker-logs">Docker 로그 확인</h1></div><pre class="command"># 배포 폴더에서 실행
+<table>
+<thead>
+<tr>
+<th>저장 대상
+</th>
+<th>포함 여부
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>시험 유형 / 송수신 엔진 / GPS 계산 대상 / DTN·HDTN 파라미터
+</td>
+<td>포함
+</td>
+</tr>
+<tr>
+<td>GNSS 입력 파일 / 저장된 I/Q 선택 / COM 연결 상태
+</td>
+<td>미포함 · 사용 시 별도 준비
+</td>
+</tr>
+<tr>
+<td>상대 서비스·어댑터 주소 / 인증 토큰 / 시험 이력
+</td>
+<td>미포함
+</td>
+</tr>
+</tbody>
+</table>
+<p>프리셋은 송신 서비스에 저장됩니다. 브라우저에 남는 최근 입력값과는 별도로 관리합니다.
+</p><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>12 / 58</span></div>
+</section>
+<section aria-labelledby="title-hdtn" class="sheet" id="hdtn"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">송신 설정 · 13
+</p>
+<h1 id="title-hdtn">HDTN 파라미터
+</h1></div>
+<figure class="medium"><a aria-label="HDTN 설정 · 촬영 화면의 현재 입력값 확대" href="assets/settings-hdtn.png" target="_blank"><img alt="HDTN 설정 · 촬영 화면의 현재 입력값" src="assets/settings-hdtn.png"/></a>
+<figcaption>HDTN 설정 · 촬영 화면의 현재 입력값
+</figcaption>
+</figure>
+<table>
+<thead>
+<tr>
+<th>입력 항목 / JSON 키
+</th>
+<th>초기 기본값
+</th>
+<th>의미
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>최대 동시 번들 수 / maxNumberOfBundlesInPipeline
+</td>
+<td>50 개
+</td>
+<td>동시에 유지할 번들 수의 요청 한도
+</td>
+</tr>
+<tr>
+<td>최대 동시 번들 용량 / maxSumOfBundleBytesInPipeline
+</td>
+<td>3,000,000,000 Bytes
+</td>
+<td>파이프라인 누적 바이트 한도
+</td>
+</tr>
+<tr>
+<td>최대 번들 크기 / maxBundleSizeBytes
+</td>
+<td>3,000,000,000 Bytes
+</td>
+<td>단일 번들 크기 관련 요청값
+</td>
+</tr>
+<tr>
+<td>TCPCL 세그먼트 크기 / tcpclMaxSegmentSizeBytes
+</td>
+<td>200,000 Bytes
+</td>
+<td>TCPCL 세그먼트 크기
+</td>
+</tr>
+<tr>
+<td>저장 공간 부족 시 대기 / neighborDepletedStorageDelaySeconds
+</td>
+<td>10 초
+</td>
+<td>상대 저장 공간 부족 시 대기 요청
+</td>
+</tr>
+<tr>
+<td>우선순위 / enforceBundlePriority
+</td>
+<td>사용 안 함 · false
+</td>
+<td>번들 우선순위 적용 요청
+</td>
+</tr>
+<tr>
+<td>삭제 정책 / storageDeletionPolicy
+</td>
+<td>never
+</td>
+<td>자동 삭제 안 함 요청
+</td>
+</tr>
+</tbody>
+</table>
+<p>표는 초기 기본값입니다. 실제 전송에는 화면에서 적용한 설정이 사용됩니다.
+</p><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>13 / 58</span></div>
+</section>
+<section aria-labelledby="title-hdtn-advanced" class="sheet" id="hdtn-advanced"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">송신 설정 · 14
+</p>
+<h1 id="title-hdtn-advanced">HDTN 고급 설정과 입력 제한
+</h1></div>
+<figure class="medium"><a aria-label="고급 설정 · 전체 저장 용량과 ACS 주기 확대" href="assets/settings-hdtn-advanced.png" target="_blank"><img alt="고급 설정 · 전체 저장 용량과 ACS 주기" src="assets/settings-hdtn-advanced.png"/></a>
+<figcaption>고급 설정 · 전체 저장 용량과 ACS 주기
+</figcaption>
+</figure>
+<table>
+<thead>
+<tr>
+<th>항목
+</th>
+<th>초기 기본값
+</th>
+<th>용도
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>전체 저장 용량 / totalStorageCapacityBytes
+</td>
+<td>8,589,934,592 Bytes
+</td>
+<td>라우터 저장 용량 요청
+</td>
+</tr>
+<tr>
+<td>ACS 전송 주기 / acsSendPeriodMilliseconds
+</td>
+<td>1,000 ms
+</td>
+<td>집계 보관 신호의 전송 주기 요청
+</td>
+</tr>
+</tbody>
+</table>
+<ol class="steps">
+<li>경로에 HDTN이 포함되는지 확인하고 <b>HDTN 설정</b> 탭을 엽니다.
+</li>
+<li>항목의 ⓘ에 마우스를 올려 설명을 확인합니다. 값은 정수로 입력합니다.
+</li>
+<li>기본 상태로 복원하려면 <b>전체 기본값</b>을 누릅니다. 고급 항목도 함께 초기화됩니다.
+</li>
+<li>전송 후 <b>어댑터 설정 상세</b>에서 실제 요청에 포함된 값을 확인합니다.
+</li>
+</ol>
+<p>숫자는 양의 정수, 혼잡 대기 시간은 0 이상으로 입력합니다. 메모리·저장 용량은 라우터 PC의 사양에 맞추세요.
+</p>
+<p>삭제 정책은 never / on_forward / on_delivery / DELETE_AFTER_FORWARDING 중에서 선택합니다. 적용 결과는 어댑터·라우터에서 확인합니다.
+</p><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>14 / 58</span></div>
+</section>
+<section aria-labelledby="title-dtn" class="sheet" id="dtn"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">송신 설정 · 15
+</p>
+<h1 id="title-dtn">DTN(ION) 파라미터
+</h1></div>
+<figure class="medium"><a aria-label="DTN 설정 · 경로에 DTN이 포함될 때 사용 확대" href="assets/settings-dtn.png" target="_blank"><img alt="DTN 설정 · 경로에 DTN이 포함될 때 사용" src="assets/settings-dtn.png"/></a>
+<figcaption>DTN 설정 · 경로에 DTN이 포함될 때 사용
+</figcaption>
+</figure>
+<table>
+<thead>
+<tr>
+<th>입력 항목 / JSON 키
+</th>
+<th>초기 기본값
+</th>
+<th>용도
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SDR 힙 / sdrHeapSizeBytes
+</td>
+<td>3,500,000,000 Bytes
+</td>
+<td>SDR 저장 영역 크기 요청
+</td>
+</tr>
+<tr>
+<td>SDR 작업 메모리 / sdrWorkingMemorySizeBytes
+</td>
+<td>350,000,000 Bytes
+</td>
+<td>작업 메모리 크기 요청
+</td>
+</tr>
+<tr>
+<td>SDR 임시 모드 / sdrTransientMode
+</td>
+<td>디스크 기반 · false
+</td>
+<td>일시적 메모리 운용 여부
+</td>
+</tr>
+<tr>
+<td>최대 번들 / maxBundleSizeBytes
+</td>
+<td>3,000,000,000 Bytes
+</td>
+<td>번들 크기 관련 요청값
+</td>
+</tr>
+<tr>
+<td>접촉 전송 속도 / contactRateBytesPerSec
+</td>
+<td>125,000,000 Bytes/s
+</td>
+<td>접촉 구간의 전송률 요청
+</td>
+</tr>
+<tr>
+<td>최대 생성 / 최대 소비 속도
+</td>
+<td>각 100,000,000 Bytes/s
+</td>
+<td>생성·소비 전송률 요청
+</td>
+</tr>
+<tr>
+<td>TCPCL 세그먼트 / tcpclMaxSegmentSizeBytes
+</td>
+<td>20,000 Bytes
+</td>
+<td>세그먼트 크기
+</td>
+</tr>
+<tr>
+<td>라우팅 모드 / routingMode
+</td>
+<td>StaticPlan
+</td>
+<td>라우팅 모드 문자열
+</td>
+</tr>
+</tbody>
+</table>
+<p>정수 항목에는 양수를 입력합니다. 해당 경로에서 사용하는 엔진의 설정만 전송합니다.
+</p><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>15 / 58</span></div>
+</section>
+<section aria-labelledby="title-upload" class="sheet" id="upload"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">GNSS 입력 · 16
+</p>
+<h1 id="title-upload">UBX / GRAW 파일 적용
+</h1></div><div class="split"><div>
+<figure class=""><a aria-label="GNSS 입력 · 파일 선택과 파일 적용 확대" href="assets/input-upload.png" target="_blank"><img alt="GNSS 입력 · 파일 선택과 파일 적용" src="assets/input-upload.png"/></a>
+<figcaption>GNSS 입력 · 파일 선택과 파일 적용
+</figcaption>
+</figure></div><div>
+<ol class="steps">
+<li>송신 설정에서 <b>UBX / GRAW 파일</b>을 선택합니다.
+</li>
+<li><b>GNSS 파일</b>에서 .ubx 또는 .graw 파일을 선택합니다.
+</li>
+<li><b>파일 적용</b>을 누르고 적용 상태가 완료될 때까지 기다립니다.
+</li>
+<li>설정을 닫고 관측 시점, PVT 계산 상태, GPS L1 관측·항법정보 수를 확인합니다.
+</li>
+</ol></div></div>
+<table>
+<thead>
+<tr>
+<th>표시
+</th>
+<th>의미
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>파일 적용 상태
+</td>
+<td>파일 업로드와 입력 검증 진행률입니다.
+</td>
+</tr>
+<tr>
+<td>GNSS 기준시간
+</td>
+<td>선택한 RAWX Epoch의 GPS Week / TOW입니다. 파일 생성 시각·PC 시각과 다릅니다.
+</td>
+</tr>
+<tr>
+<td>관측 시점
+</td>
+<td>지연 시험에 사용할 유효한 첫 Epoch를 자동 선택합니다. 화면의 시점 선택으로 관측 자료를 확인합니다.
+</td>
+</tr>
+<tr>
+<td>파일 수집 범위
+</td>
+<td>입력 파일에는 여러 Epoch와 여러 위성군이 있을 수 있습니다. 시험 계산 입력은 선택된 1 Epoch와 필요한 선행 정보로 구성됩니다.
+</td>
+</tr>
+</tbody>
+</table>
+<aside class="note">PVT 계산에는 관측값과 항법정보가 모두 필요합니다. 계산이 안 되면 입력 상태의 사유를 확인하세요.
+</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>16 / 58</span></div>
+</section>
+<section aria-labelledby="title-serial" class="sheet" id="serial"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">GNSS 입력 · 17
+</p>
+<h1 id="title-serial">COM 포트 연결과 장비 설정
+</h1></div><div class="split"><div>
+<figure class=""><a aria-label="COM 입력 · 연결 상태와 수집 개수 확대" href="assets/input-com.png" target="_blank"><img alt="COM 입력 · 연결 상태와 수집 개수" src="assets/input-com.png"/></a>
+<figcaption>COM 입력 · 연결 상태와 수집 개수
+</figcaption>
+</figure></div><div>
+<ol class="steps">
+<li>u-center 등 다른 프로그램이 같은 COM 포트를 점유하고 있으면 연결을 해제합니다.
+</li>
+<li><b>COM 포트 → 포트 조회</b>에서 장비 포트를 선택합니다.
+</li>
+<li>장비 출력 속도에 맞는 <b>통신 속도</b>를 선택합니다. 화면 초기값은 38400 baud입니다.
+</li>
+<li><b>연결</b>을 눌러 선택한 COM 포트를 연결합니다.
+</li>
+<li>연결 상태와 시간 수신 상태를 각각 확인합니다. 수집은 별도 <b>GNSS 수집</b>으로 시작합니다.
+</li>
+</ol></div></div>
+<table>
+<thead>
+<tr>
+<th>항목
+</th>
+<th>의미
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>연결됨 / 시간 미확인
+</td>
+<td>포트는 연결됐지만 유효한 GNSS 시간을 아직 확보하지 못했을 수 있습니다.
+</td>
+</tr>
+<tr>
+<td>포트 없음
+</td>
+<td>장치 인식, Windows 직렬 브릿지, COM 점유 상태 및 설치 설정을 확인합니다.
+</td>
+</tr>
+</tbody>
+</table>
+<aside class="note">COM 연결은 브라우저를 닫아도 유지됩니다. 사용을 마치면 연결을 해제하세요.
+</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>17 / 58</span></div>
+</section>
+<section aria-labelledby="title-capture" class="sheet" id="capture"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">GNSS 입력 · 18
+</p>
+<h1 id="title-capture">GNSS 수집과 UBX 다운로드
+</h1></div><div class="split"><div>
+<ol class="steps">
+<li>송신 설정의 <b>COM 포트</b>에서 연결한 뒤 같은 영역의 <b>유효 Epoch</b> 개수를 입력합니다. 기본 10개, 범위 1~50개입니다.
+</li>
+<li><b>GNSS 수집</b>을 누릅니다. 위치·속도 PVT가 모두 유효한 Epoch만 집계하며, 지정 개수를 모으면 자동 종료합니다.
+</li>
+<li>진행률·경과 시간과 RAWX·항법정보 수신 상태를 확인합니다. 무효·중복 Epoch는 개수에서 제외됩니다.
+</li>
+<li>필요하면 같은 영역의 <b>UBX 다운로드</b>로 수집 원문을 저장합니다. 다운로드·재업로드 없이 수집한 입력으로 바로 시험할 수 있습니다.
+</li>
+<li>수집 완료 후 설정을 닫고 관측 시각에서 Epoch 하나를 선택한 뒤 <b>전송시험 시작</b>을 누릅니다.
+</li>
+</ol></div><div>
+<figure><a aria-label="GNSS 수집 진행 화면 확대" href="assets/com-capture.png" target="_blank"><img alt="유효 Epoch 개수·진행률·경과 시간·수신 상태" src="assets/com-capture.png"/></a>
+<figcaption>COM 설정 내 GNSS 수집 진행 · 화면 동작검사
+</figcaption>
+</figure>
+<table>
+<thead>
+<tr>
+<th>항목
+</th>
+<th>기준
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>수집 제한
+</td>
+<td>최대 120초, GRAW·UBX 각 1 MiB. 미달·용량 초과·연결 오류는 미완료로 표시합니다.
+</td>
+</tr>
+<tr>
+<td>UBX 내용
+</td>
+<td>선택한 RAWX와 선행·중간 SFRBX, 확보한 MON-VER 원문. 해당 입력 삭제 시 함께 삭제됩니다.
+</td>
+</tr>
+<tr>
+<td>관측 간격
+</td>
+<td>수신기 출력 주기에 따릅니다. 무효 Epoch가 제외되므로 개수와 초는 다릅니다.
+</td>
+</tr>
+</tbody>
+</table></div></div><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>18 / 58</span></div>
+</section>
+<section aria-labelledby="title-clock" class="sheet" id="clock"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">시각 준비 · 19
+</p>
+<h1 id="title-clock">기준시각 확인과 시간 맞추기
+</h1></div>
+<figure class="wide"><a aria-label="기준시각 · PC 시각 미보정 예시 확대" href="assets/sender-status.png" target="_blank"><img alt="기준시각 · PC 시각 미보정 예시" src="assets/sender-status.png"/></a>
+<figcaption>기준시각 · PC 시각 미보정 예시
+</figcaption>
+</figure>
+<ol class="steps">
+<li>송신·수신 화면의 <b>기준시각</b>과 보정 상태를 확인합니다.
+</li>
+<li><b>상세</b>에서 시각 원천, 보정량, 보정 시점 및 시계 변경 정보를 확인합니다.
+</li>
+<li>필요하면 <b>시간 맞추기</b>를 눌러 제안된 원천·보정량을 검토합니다.
+</li>
+<li>확인 후 적용하고 양쪽 상태를 다시 확인합니다. 지연 시험 중에는 시각 원천·보정 상태를 바꾸지 않습니다.
+</li>
+</ol>
+<table>
+<thead>
+<tr>
+<th>상태
+</th>
+<th>해석
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PC 시각 · 미보정 (SYSTEM)
+</td>
+<td>현재 PC 시각을 사용하는 상태
+</td>
+</tr>
+<tr>
+<td>GNSS 근사보정 (GNSS_USB)
+</td>
+<td>로컬 GNSS 입력을 이용한 서비스 내부 시각 보정
+</td>
+</tr>
+<tr>
+<td>상대 GNSS 근사보정 (PEER_GNSS)
+</td>
+<td>상대 서비스의 GNSS 기준을 활용한 근사보정
+</td>
+</tr>
+<tr>
+<td>공통 NTP 근사보정 (NTP)
+</td>
+<td>공통 시각 기준을 활용한 근사보정
+</td>
+</tr>
+</tbody>
+</table>
+<aside class="note">시간 맞추기는 서비스의 시험 시각을 보정합니다. 재기동 후 보정 상태를 다시 확인하세요.
+</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>19 / 58</span></div>
+</section>
+<section aria-labelledby="title-sender-data" class="sheet" id="sender-data"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">관측값 확인 · 20
+</p>
+<h1 id="title-sender-data">송신 원본 GNSS 관측값 읽기
+</h1></div>
+<figure class="wide"><a aria-label="기존 AFS 시험의 송신 원본 관측값 · 표 상단과 항법정보 일부 확대" href="assets/sender-observations.png" target="_blank"><img alt="기존 AFS 시험의 송신 원본 관측값 · 표 상단과 항법정보 일부" src="assets/sender-observations.png"/></a>
+<figcaption>기존 AFS 시험의 송신 원본 관측값 · 표 상단과 항법정보 일부
+</figcaption>
+</figure>
+<table>
+<thead>
+<tr>
+<th>영역
+</th>
+<th>확인할 내용
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GNSS 기준시간
+</td>
+<td>현재 표시하는 Epoch의 GPS Week / TOW. 여러 Epoch 입력에서는 시점을 바꾸어 조회합니다.
+</td>
+</tr>
+<tr>
+<td>계산 상태
+</td>
+<td>PVT 완료 또는 계산 불가 사유. 파일 적용·관측 수신과 별도입니다.
+</td>
+</tr>
+<tr>
+<td>요약 수
+</td>
+<td>전체 관측 신호, GPS L1, 입력 대상, SF1~3 준비, RTKLIB 실제 사용 위성을 구분합니다.
+</td>
+</tr>
+<tr>
+<td>RAWX / 항법정보
+</td>
+<td>위성·신호별 측정값과 방송 항법 메시지를 함께 확인합니다. 계산 위성 필터가 있으면 표시 범위를 바꿀 수 있습니다.
+</td>
+</tr>
+</tbody>
+</table>
+<p>관측한 위성과 PVT 계산에 사용한 위성은 다를 수 있습니다. 실제 사용 수는 PVT 결과에서 확인합니다.
+</p><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>20 / 58</span></div>
+</section>
+<section aria-labelledby="title-rawx" class="sheet" id="rawx"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">관측값 확인 · 21
+</p>
+<h1 id="title-rawx">RAWX 필드와 PRN
+</h1></div>
+<table>
+<thead>
+<tr>
+<th>표시
+</th>
+<th>단위 / 의미
+</th>
+<th>사용 목적
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GNSS / 위성 / 신호
+</td>
+<td>위성군 + 위성번호 + 신호 ID
+</td>
+<td>GPS 03은 GPS PRN 3입니다. 다른 위성군의 같은 숫자와 구분합니다.
+</td>
+</tr>
+<tr>
+<td>의사거리
+</td>
+<td>m · 수신 시각과 신호 전파시간을 포함한 거리 관측
+</td>
+<td>송신부 가상 송신 시각 산출의 원본 입력
+</td>
+</tr>
+<tr>
+<td>반송파 위상
+</td>
+<td>cycle
+</td>
+<td>수신 측정 정보 표시. 현재 SPP 위치 계산의 의사거리와 구분
+</td>
+</tr>
+<tr>
+<td>Doppler
+</td>
+<td>Hz · 주파수 변화 측정
+</td>
+<td>속도 계산 입력. 공통 지연 계산에서도 원본값 유지
+</td>
+</tr>
+<tr>
+<td>C/N₀
+</td>
+<td>dB-Hz · 신호 품질 지표
+</td>
+<td>신호 품질을 비교할 때 사용합니다.
+</td>
+</tr>
+<tr>
+<td>추적 유지 / Lock
+</td>
+<td>초 · 연속 추적 시간
+</td>
+<td>추적 안정 상태 확인. 포화 표시는 최소 지속시간 의미
+</td>
+</tr>
+<tr>
+<td>표준편차 코드 PR / CP / D
+</td>
+<td>의사거리 / 반송파 / Doppler 오차등급 코드
+</td>
+<td>m 또는 Hz 실수 오차값과 구분
+</td>
+</tr>
+<tr>
+<td>측정 유효성 / PVT 입력
+</td>
+<td>PR 유효, CP 유효 등 / 입력 대상 여부
+</td>
+<td>관측 상태와 계산 대상 여부를 따로 확인
+</td>
+</tr>
+</tbody>
+</table>
+<p>RAWX는 한 Epoch 안에 여러 위성·여러 신호가 들어옵니다. 위성 하나가 여러 신호 행을 만들 수 있으므로 “행 수 = 서로 다른 위성 수”로 계산하지 않습니다.
+</p>
+<p>PVT 입력 후보 중 유효성과 항법정보 조건을 통과한 위성이 최종 계산에 사용됩니다.
+</p><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>21 / 58</span></div>
+</section>
+<section aria-labelledby="title-navigation" class="sheet" id="navigation"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">관측값 확인 · 22
+</p>
+<h1 id="title-navigation">항법정보와 RAWX의 관계
+</h1></div>
+<table>
+<thead>
+<tr>
+<th>항법정보 표시
+</th>
+<th>역할 / RAWX와의 관계
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GPS SF1
+</td>
+<td>해당 위성의 시계 보정·상태 관련 정보
+</td>
+</tr>
+<tr>
+<td>GPS SF2 / SF3
+</td>
+<td>해당 위성의 궤도정보. 일관된 세트를 사용해 위치·속도·시계 보정값을 산출
+</td>
+</tr>
+<tr>
+<td>SF4 Page 18 등
+</td>
+<td>전리층 보정 등 보충 정보. 메시지별 유효성과 수집 시점을 확인
+</td>
+</tr>
+<tr>
+<td>선택 Epoch PVT 계산 활성
+</td>
+<td>선택 관측 시점의 계산에 채택한 항법정보 세트
+</td>
+</tr>
+<tr>
+<td>원문 HEX 32 bit
+</td>
+<td>수신한 navigation word. RAWX 거리 측정값과 다른 종류의 자료
+</td>
+</tr>
+<tr>
+<td>프레임 복원
+</td>
+<td>AFS에서 복원한 항법정보. 원본 UBX의 수집 순번·수신 시각이 없을 수 있음
+</td>
+</tr>
+</tbody>
+</table>
+<p>RAWX는 “위성이 어떻게 측정됐는가”, 항법정보는 “그 위성이 어디에 있고 시계가 어떻게 보정되는가”를 제공합니다. 같은 GPS PRN을 기준으로 대응시킵니다. SF1~3이 서로 다른 시점·세트로 불완전하면 관측이 있어도 계산에 쓰이지 않을 수 있습니다.
+</p>
+<p>SFRBX는 위성별 메시지가 도착할 때마다 누적되며 RAWX는 관측 Epoch마다 여러 신호를 묶습니다. 수집 주기와 자료 단위가 달라 RAWX와 SFRBX 행 수가 다른 것이 일반적입니다.
+</p>
+<p>현재 PVT 계산은 GPS L1 C/A를 사용합니다. 다른 위성군의 항법정보는 조회용으로 표시합니다.
+</p><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>22 / 58</span></div>
+</section>
+<section aria-labelledby="title-receiver-info" class="sheet" id="receiver-info"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">관측값 확인 · 23
+</p>
+<h1 id="title-receiver-info">수신기 정보와 입력 상태
+</h1></div>
+<table>
+<thead>
+<tr>
+<th>정보
+</th>
+<th>확인 내용
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>수신기 정보
+</td>
+<td>송신 원본 관측값 제목 줄 우측의 수신기 정보에서 입력에 포함된 모델·펌웨어·프로토콜 등을 확인합니다.
+</td>
+</tr>
+<tr>
+<td>MON-VER
+</td>
+<td>UBX에 기록된 장치 식별 정보의 출처입니다. 해당 메시지가 없으면 정보를 표시하지 못할 수 있습니다.
+</td>
+</tr>
+<tr>
+<td>Epoch / 수집 기간
+</td>
+<td>입력에 포함된 관측 시점의 개수와 시간 범위입니다.
+</td>
+</tr>
+<tr>
+<td>지원 위성군
+</td>
+<td>장비가 보고한 지원 정보입니다. 실제 관측한 위성군이나 현재 PVT 계산 지원 범위와 다릅니다.
+</td>
+</tr>
+<tr>
+<td>파일과 장비
+</td>
+<td>UBX 파일에는 파일을 기록한 장비의 정보가 표시됩니다.
+</td>
+</tr>
+</tbody>
+</table>
+<p>실제 입력 예시 real-gnss-source.ubx에는 ZED-F9T-20B, TIM 2.25, Protocol 29.25 정보가 포함됩니다. 장비·파일을 바꾸면 값도 달라집니다.
+</p>
+<p>수신기 정보가 없으면 입력 파일에 MON-VER 메시지가 포함되어 있는지 확인하세요.
+</p>
+<p>관측값 표와 항법정보의 펼쳐진 원문을 함께 확인합니다. 실제 전달 본문은 송신·수신 JSON 원문 영역의 정렬 보기와 JSON 다운로드로 확인합니다.
+</p><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>23 / 58</span></div>
+</section>
+<section aria-labelledby="title-run-raw" class="sheet" id="run-raw"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">유형별 실행 · 24
+</p>
+<h1 id="title-run-raw">GNSS RAW 시험 실행
+</h1></div>
+<ol class="steps">
+<li>설정에서 <b>GNSS RAW</b>와 전송 경로를 선택합니다.
+</li>
+<li>GNSS 파일 적용 또는 COM 수집을 완료하고 선택 Epoch와 Reference 계산 상태를 확인합니다.
+</li>
+<li>설정을 닫고 <b>다음 전송 · RAW</b>를 확인합니다.
+</li>
+<li><b>전송시험 시작</b>을 누른 후 시험 ID와 어댑터 응답을 확인합니다.
+</li>
+<li>수신 화면에서 같은 ID를 선택하고 RAW 해석·지연 반영 결과 및 비교 자료 수신 상태를 확인합니다.
+</li>
+</ol>
+<table>
+<thead>
+<tr>
+<th>단계
+</th>
+<th>현재 처리
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>송신
+</td>
+<td>원본 의사거리 Pᵢ로 T*ᵢ = S − Pᵢ/c를 계산합니다. RAW 관측의 pseudorangeMeters 대신 transmitAt을 전달합니다.
+</td>
+</tr>
+<tr>
+<td>전송
+</td>
+<td>변환한 관측과 항법정보를 JSON으로 전달합니다. 원본 UBX 전체·원본 의사거리·Reference를 이 경로의 계산 입력으로 보내지 않습니다.
+</td>
+</tr>
+<tr>
+<td>수신
+</td>
+<td>T*ᵢ와 본문 수신 완료 시각 R로 P′ᵢ를 계산합니다. 원본 Doppler 등 유지된 입력으로 PVT를 계산합니다.
+</td>
+</tr>
+<tr>
+<td>비교
+</td>
+<td>수신 계산이 끝나면 송신 서비스에서 비교 자료를 조회해 대조합니다.
+</td>
+</tr>
+</tbody>
+</table>
+<div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>24 / 58</span></div>
+</section>
+<section aria-labelledby="title-run-afs" class="sheet" id="run-afs"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">유형별 실행 · 25
+</p>
+<h1 id="title-run-afs">AFS Frame 시험 실행
+</h1></div>
+<ol class="steps">
+<li>설정에서 <b>AFS Frame</b>과 전송 경로를 선택합니다.
+</li>
+<li>GNSS 입력의 GPS L1 관측과 선행 항법정보, Reference 상태를 확인합니다.
+</li>
+<li><b>전송시험 시작</b>을 누릅니다. 송신에서 가상 송신 시각을 구성하고 위성별 AFS를 생성합니다.
+</li>
+<li>수신에서 프레임 복원·검증 후 PVT 계산이 완료되는지 확인합니다.
+</li>
+<li>관측값의 보정 송신 시각·변환 후 의사거리와 Reference 비교 결과를 확인합니다.
+</li>
+</ol><div class="frame-bar"><span style="flex:68">동기<br/>68</span><span style="flex:52">SB1<br/>52</span><span style="flex:2400">SB2 · 2,400 bits</span><span style="flex:1740">SB3 · 1,740 bits</span><span style="flex:1740">SB4 · 1,740 bits</span></div>
+<table>
+<thead>
+<tr>
+<th>AFS 물리 프레임
+</th>
+<th>서비스의 현재 사용
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>6,000 bits / 750 bytes
+</td>
+<td>동기와 부호화·인터리빙된 SB1~4로 구성됩니다.
+</td>
+</tr>
+<tr>
+<td>SB2
+</td>
+<td>통합 항법정보와 보충 데이터를 구성합니다.
+</td>
+</tr>
+<tr>
+<td>SB3
+</td>
+<td>미사용 영역은 0101 패턴으로 채웁니다.
+</td>
+</tr>
+<tr>
+<td>SB4
+</td>
+<td>선택 Epoch의 가상 송신 시각·관측 시각·Doppler·C/N₀·유효성 등 계산 입력을 구성합니다. 원본 의사거리는 넣지 않습니다.
+</td>
+</tr>
+</tbody>
+</table>
+<aside class="note">SB2·SB4에는 시험용 필드 배치에 따라 항법정보와 관측값을 저장합니다.
+</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>25 / 58</span></div>
+</section>
+<section aria-labelledby="title-iq-generate" class="sheet" id="iq-generate"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">유형별 실행 · 26
+</p>
+<h1 id="title-iq-generate">I/Q Sample 생성과 저장 파일 선택
+</h1></div><div class="split"><div>
+<figure class=""><a aria-label="I/Q 유형에서 표시되는 저장 파일 선택 · 미선택 상태 확대" href="assets/settings-iq.png" target="_blank"><img alt="I/Q 유형에서 표시되는 저장 파일 선택 · 미선택 상태" src="assets/settings-iq.png"/></a>
+<figcaption>I/Q 유형에서 표시되는 저장 파일 선택 · 미선택 상태
+</figcaption>
+</figure></div><div>
+<ol class="steps">
+<li>설정에서 <b>I/Q Sample</b>을 선택하고 GNSS 입력을 준비합니다.
+</li>
+<li>새 파일을 만들려면 설정을 닫고 <b>90초 I/Q 생성</b>을 실행합니다.
+</li>
+<li>생성 상태·진행률·결과 경로를 확인합니다. 필요하면 <b>생성 취소</b>를 사용합니다.
+</li>
+<li>기존 파일은 설정의 <b>저장된 I/Q</b>에서 선택합니다. 파일에 연결된 기준 PVT·원본 정보가 있는지 확인합니다.
+</li>
+<li>선택 파일과 다음 전송 유형이 I/Q인지 확인하고 전송합니다.
+</li>
+</ol></div></div>
+<table>
+<thead>
+<tr>
+<th>항목
+</th>
+<th>내용
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>파일 규모
+</td>
+<td>90초 · 12 MHz · 약 2.16 GB. 공유 폴더와 생성 공간을 확보합니다.
+</td>
+</tr>
+<tr>
+<td>생성 입력
+</td>
+<td>항법정보가 준비된 GPS 위성별 AFS를 생성합니다. 생성 가능한 위성이 4개 미만이면 사유를 확인합니다. SB4와 같은 시작 의사거리·Doppler로 파형을 보정하고 이후 궤도·이동 변화를 유지합니다.
+</td>
+</tr>
+<tr>
+<td>프레임
+</td>
+<td>AFS 시험과 같은 구성기를 사용하며 위성별 PRN 채널을 유지합니다.
+</td>
+</tr>
+<tr>
+<td>선택 파일 삭제
+</td>
+<td>저장 파일을 실제로 삭제하는 동작입니다. 사용 중·시험 참조 보호 여부와 메시지를 확인합니다.
+</td>
+</tr>
+</tbody>
+</table>
+<p>I/Q 생성이 비활성화되어 있으면 설치 담당자에게 LNIS_IQ_ENABLED 설정과 생성기 설치 상태를 확인하세요.
+</p><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>26 / 58</span></div>
+</section>
+<section aria-labelledby="title-iq-files" class="sheet" id="iq-files"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">유형별 실행 · 27
+</p>
+<h1 id="title-iq-files">I/Q 공유 폴더와 파일 전달
+</h1></div><div class="flow"><div><b>송신 서비스</b><span>.bin 생성·보관<br/>경로·크기·해시 JSON</span></div><i>→</i><div><b>송신 어댑터</b><span>공유 경로에서 파일 읽기<br/>DTN/HDTN 파일 전달</span></div><i>→</i><div><b>수신 어댑터 → 서비스</b><span>수신 파일 경로 통보<br/>검증 후 RF 추적</span></div></div>
+<table>
+<thead>
+<tr>
+<th>확인 위치
+</th>
+<th>확인할 내용
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>송신 저장 위치
+</td>
+<td>서비스가 생성하는 파일과 어댑터가 읽는 경로가 같은 실제 파일을 가리켜야 합니다.
+</td>
+</tr>
+<tr>
+<td>수신 저장 위치
+</td>
+<td>수신 PC에서 읽을 수 있는 파일 경로를 전달해야 합니다.
+</td>
+</tr>
+<tr>
+<td>경로와 권한
+</td>
+<td>컨테이너 /exchange 경로와 호스트·어댑터의 Windows 경로는 다를 수 있습니다. 마운트와 공유 권한을 확인합니다.
+</td>
+</tr>
+<tr>
+<td>전송 본문
+</td>
+<td>REST에는 파일 정보를 전달합니다. 대용량 .bin 내용을 JSON 문자열로 넣지 않습니다.
+</td>
+</tr>
+<tr>
+<td>검증 중 파일
+</td>
+<td>복호가 끝날 때까지 공유 파일을 이동·덮어쓰기·삭제하지 마세요.
+</td>
+</tr>
+</tbody>
+</table>
+<aside class="note">전송 시 파일 전체를 다시 읽지는 않습니다. 수신에서 SHA-256을 확인하므로 생성 후 파일을 변경하지 마세요.
+</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>27 / 58</span></div>
+</section>
+<section aria-labelledby="title-sender-reference" class="sheet" id="sender-reference"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">송신 결과 확인 · 28
+</p>
+<h1 id="title-sender-reference">송신 Reference PVT와 시험 이력
+</h1></div>
+<figure class="wide"><a aria-label="AFS 시험의 송신 기준 지구 PVT · 실제 저장 결과 확대" href="assets/sender-pvt.png" target="_blank"><img alt="AFS 시험의 송신 기준 지구 PVT · 실제 저장 결과" src="assets/sender-pvt.png"/></a>
+<figcaption>AFS 시험의 송신 기준 지구 PVT · 실제 저장 결과
+</figcaption>
+</figure>
+<table>
+<thead>
+<tr>
+<th>표시
+</th>
+<th>해석
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>지구 중심 X/Y/Z
+</td>
+<td>지구 중심 기준의 X·Y·Z 좌표(m)입니다.
+</td>
+</tr>
+<tr>
+<td>속도 X/Y/Z
+</td>
+<td>ECEF 축 방향 속도(m/s). 원본 Doppler 기반 계산 결과입니다.
+</td>
+</tr>
+<tr>
+<td>사용 위성
+</td>
+<td>해당 해에 실제 사용된 위성 수
+</td>
+</tr>
+<tr>
+<td>수신기 시계오차
+</td>
+<td>PVT 계산기가 추정한 수신기 시계오차(s)입니다.
+</td>
+</tr>
+<tr>
+<td>시험 기록 선택
+</td>
+<td>선택한 시험의 원본 관측값과 기준 PVT를 확인합니다.
+</td>
+</tr>
+</tbody>
+</table>
+<p>Reference는 장비의 UBX-NAV-PVT 값을 그대로 표시한 것이 아니라 서비스가 원본 관측으로 계산한 기준 해입니다. 송신 상세 로그의 Reference와 화면의 Reference는 같은 시험 ID·같은 관측 Epoch·같은 유효 결과를 기준으로 비교합니다. 매우 작은 수는 과학 표기와 소수 표기로 다르게 보일 수 있습니다.
+</p>
+<p>복호·PVT 계산 과정은 수신 로그에서 확인합니다. 송신 로그에는 전송 준비와 어댑터 접수 결과를 기록합니다.
+</p><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>28 / 58</span></div>
+</section>
+<section aria-labelledby="title-receiver-map" class="sheet" id="receiver-map"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">수신 화면 · 29
+</p>
+<h1 id="title-receiver-map">수신 화면과 처리 단계
+</h1></div>
+<figure class="wide"><a aria-label="AFS 완료 시험을 선택한 수신 화면 상단 확대" href="assets/receiver-header.png" target="_blank"><img alt="AFS 완료 시험을 선택한 수신 화면 상단" src="assets/receiver-header.png"/></a>
+<figcaption>AFS 완료 시험을 선택한 수신 화면 상단
+</figcaption>
+</figure>
+<table>
+<thead>
+<tr>
+<th>영역
+</th>
+<th>조작 / 확인
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>수신 시험 / 전송 경로
+</td>
+<td>선택한 시험의 유형과 실제 기록된 송수신 엔진입니다.
+</td>
+</tr>
+<tr>
+<td>상대 송신 서비스
+</td>
+<td>송신 서비스 주소를 저장·적용하고 연결 확인합니다. 비교 자료·상태 교환에 사용합니다.
+</td>
+</tr>
+<tr>
+<td>수신 어댑터 서버 주소
+</td>
+<td>이 PC의 어댑터 health 확인 주소입니다. 상대 서비스 주소와 다릅니다.
+</td>
+</tr>
+<tr>
+<td>GNSS 시간 입력
+</td>
+<td>수신 서비스의 시험 시각을 맞출 GNSS 장비를 연결합니다.
+</td>
+</tr>
+<tr>
+<td>시험 등록 → 번들 수신 → 복원·PVT 계산
+</td>
+<td>등록, 본문 수신, 계산 단계를 따로 확인합니다. 처리 시간은 단계별 기록입니다.
+</td>
+</tr>
+</tbody>
+</table>
+<div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>29 / 58</span></div>
+</section>
+<section aria-labelledby="title-received-values" class="sheet" id="received-values"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">수신 결과 확인 · 30
+</p>
+<h1 id="title-received-values">수신 원본 GNSS 관측값
+</h1></div>
+<figure class="wide"><a aria-label="AFS 프레임에서 복원한 계산 입력과 지연 반영 값 · 상단 일부 확대" href="assets/receiver-observations.png" target="_blank"><img alt="AFS 프레임에서 복원한 계산 입력과 지연 반영 값 · 상단 일부" src="assets/receiver-observations.png"/></a>
+<figcaption>AFS 프레임에서 복원한 계산 입력과 지연 반영 값 · 상단 일부
+</figcaption>
+</figure>
+<table>
+<thead>
+<tr>
+<th>표시
+</th>
+<th>출처와 의미
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>수신 원본 관측값
+</td>
+<td>DTN/HDTN 경로로 받은 계산 입력을 표시합니다.
+</td>
+</tr>
+<tr>
+<td>보정 송신 시각 · Unix s
+</td>
+<td>송신이 원본 의사거리로 계산한 가상 시각. 변경된 계산 입력이므로 빨간색으로 구분합니다.
+</td>
+</tr>
+<tr>
+<td>원본 / 변환 후 의사거리
+</td>
+<td>원본과 변환 후 값을 나란히 표시합니다. 변환 후 의사거리는 빨간색으로 구분합니다.
+</td>
+</tr>
+<tr>
+<td>Doppler / C/N₀
+</td>
+<td>프레임 또는 RAW JSON으로 전달받은 관측값입니다.
+</td>
+</tr>
+<tr>
+<td>데이터 일치 / PVT 상태
+</td>
+<td>의도적 치환·생략을 제외하고 비교 가능한 필드를 확인합니다. PVT 측정 완료와 별도 상태입니다.
+</td>
+</tr>
+</tbody>
+</table>
+<p>AFS에 포함하지 않은 반송파 위상·수집 순번 등의 값은 원본 일치 비교에서 제외합니다.
+</p><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>30 / 58</span></div>
+</section>
+<section aria-labelledby="title-iq-observations" class="sheet" id="iq-observations"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">수신 결과 확인 · 31
+</p>
+<h1 id="title-iq-observations">I/Q RF 관측값과 지연 비교
+</h1></div>
+<figure class="wide"><a aria-label="90초 I/Q의 실제 RF 추적 결과 · 오프라인 수신 검증 확대" href="assets/iq-observations.png" target="_blank"><img alt="90초 I/Q의 실제 RF 추적 결과 · 오프라인 수신 검증" src="assets/iq-observations.png"/></a>
+<figcaption>90초 I/Q의 실제 RF 추적 결과 · 오프라인 수신 검증
+</figcaption>
+</figure>
+<table>
+<thead>
+<tr>
+<th>표시 묶음
+</th>
+<th>계산·진단 역할
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>RF 추적 관측값 · PVT 계산 입력
+</td>
+<td>I/Q 시험은 RF 추적 의사거리·Doppler·C/N₀와 CRC 통과 프레임의 항법정보를 계산 입력으로 사용합니다.
+</td>
+</tr>
+<tr>
+<td>지연 반영 의사거리
+</td>
+<td>RF 의사거리에 c×송수신 지연을 더한 값입니다. RAW·AFS는 전달된 보정 송신 시각으로 재계산합니다.
+</td>
+</tr>
+<tr>
+<td>RF 추적 의사거리 / Doppler / C/N₀ / 반송파
+</td>
+<td>신호 추적기가 파일에서 얻은 값입니다. 계산 가능한 첫 RF Epoch를 사용하며 같은 관측으로 지연 미적용·적용 PVT를 계산합니다.
+</td>
+</tr>
+<tr>
+<td>RF 시점
+</td>
+<td>파일 내 초(s) 단위입니다. 선택된 계산 시점을 표시하고 전체 RF 관측은 보고서 JSON에 보관합니다. 과거 이력의 RF 시점 선택은 기존 진단 표시입니다.
+</td>
+</tr>
+</tbody>
+</table>
+<div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>31 / 58</span></div>
+</section>
+<section aria-labelledby="title-reference" class="sheet" id="reference"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">수신 결과 확인 · 32
+</p>
+<h1 id="title-reference">송신 비교 자료 확인
+</h1></div>
+<figure class="wide"><a aria-label="송신 원본 · 비교 기준을 펼친 예시 · 표 일부 확대" href="assets/receiver-reference.png" target="_blank"><img alt="송신 원본 · 비교 기준을 펼친 예시 · 표 일부" src="assets/receiver-reference.png"/></a>
+<figcaption>송신 원본 · 비교 기준을 펼친 예시 · 표 일부
+</figcaption>
+</figure>
+<ol class="steps">
+<li>수신 시험 ID와 결과 상태를 확인합니다.
+</li>
+<li><b>송신 원본 · 비교 기준</b>을 펼쳐 비교자료 수신 상태를 확인합니다.
+</li>
+<li>원본 GNSS 관측값과 Reference PVT가 같은 시험·Epoch인지 확인합니다.
+</li>
+<li>자료 조회가 실패하면 <b>다시 받기</b>를 사용하고 상대 송신 서비스 연결·기록 보존 상태를 확인합니다.
+</li>
+</ol>
+<p>RAW·AFS는 수신 계산 후 송신 서비스에서 비교 자료를 가져옵니다. I/Q는 파일 정보에 담긴 송신 Reference와 RF 기준 PVT를 확인할 수 있습니다.
+</p>
+<div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>32 / 58</span></div>
+</section>
+<section aria-labelledby="title-pvt-result" class="sheet" id="pvt-result"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">수신 결과 확인 · 33
+</p>
+<h1 id="title-pvt-result">PVT 결과에서 확인할 순서
+</h1></div>
+<figure class="wide"><a aria-label="AFS 완료 예시 · 지연, 시계오차 및 위치·속도 비교 확대" href="assets/receiver-pvt.png" target="_blank"><img alt="AFS 완료 예시 · 지연, 시계오차 및 위치·속도 비교" src="assets/receiver-pvt.png"/></a>
+<figcaption>AFS 완료 예시 · 지연, 시계오차 및 위치·속도 비교
+</figcaption>
+</figure><div class="three"><div><b>1 · 비교 가능 여부</b>
+<p>위치·속도 유효성, 비교 기준 확보, 시간 조건과 오류 사유를 확인합니다. RAW·AFS는 송신 Reference, I/Q는 RF 기준 PVT를 사용합니다.
+</p></div><div><b>2 · 지연과 시계오차</b>
+<p>측정 지연, Clock Bias 증가량, 두 값의 잔차를 함께 확인합니다.
+</p></div><div><b>3 · 위치·속도 차이</b>
+<p>Reference 대비 위치·속도 차이와 사용 위성을 기록합니다.
+</p></div></div>
+<div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>33 / 58</span></div>
+</section>
+<section aria-labelledby="title-pvt-views" class="sheet" id="pvt-views">
+<div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">수신 결과 확인 · 34
+</p>
+<h1 id="title-pvt-views">반복 시험 위치 편차
+</h1></div>
+<div class="split"><div>
+<figure><a aria-label="전체 분포 화면 확대" href="assets/pvt-history.png" target="_blank"><img alt="전체화면 사각 좌표판과 드래그·휠 조작" src="assets/pvt-history.png"/></a>
+<figcaption>전체화면 HUD · 화면 동작검사 자료(예시 좌표)
+</figcaption>
+</figure></div>
+<div>
+<ol class="steps">
+<li>같은 입력·Epoch·RAW/AFS 유형으로 <b>전송시험 시작</b>을 반복합니다. 전송 준비·어댑터 요청 중에는 다음 요청을 제한합니다.
+</li>
+<li>수신부에서 시험을 선택합니다. 같은 조건의 위치 결과를 누적하고 전송 경로는 색으로 구분합니다.
+</li>
+<li>점을 누르면 해당 시험의 PVT·관측값·JSON·로그로 전환합니다. 겹친 점은 표시되는 시험 목록에서 선택합니다.
+</li>
+<li>원형 HUD와 <b>크게 보기</b>에서 드래그로 이동하고 휠로 확대·축소합니다. 휠은 마우스 위치를 기준으로 동작합니다. <b>− / ＋</b>도 사용할 수 있으며 <b>자동</b>으로 전체 점을 다시 표시합니다. 닫기·Esc로 전체화면을 종료합니다. 원형 점선은 Reference 기준 거리 눈금입니다. 드래그하면 Reference와 함께 이동하고 확대 비율에 맞춰 간격이 바뀝니다. Reference가 화면 밖에 있어도 화면에 걸치는 눈금을 표시합니다.
+</li>
+</ol></div></div>
+<table>
+<thead>
+<tr>
+<th>항목
+</th>
+<th>표시 기준
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>비교 묶음
+</td>
+<td>같은 입력·Epoch·유형·송수신 노드·Reference 위치. 전송 경로와 어댑터 설정은 달라도 함께 표시합니다.
+</td>
+</tr>
+<tr>
+<td>좌표와 축척
+</td>
+<td>E(동)·N(북)은 같은 거리 축척이며 수치는 Reference 대비 편차입니다. 이동·확대는 표시 범위만 바꿉니다. U는 수직 편차입니다. 유효한 위치 결과만 표시합니다.
+</td>
+</tr>
+<tr>
+<td>표시와 이력
+</td>
+<td>일반 원형 HUD와 축척은 유지합니다. 새로고침·재기동 후 이력을 복원하며 삭제한 시험의 점은 제거됩니다. 적용 전 이력과 I/Q는 개별 표시입니다.
+</td>
+</tr>
+</tbody>
+</table>
+<p>편차는 송신 Reference와의 차이입니다. 실제 기준점에 대한 위치 정확도는 별도 측정이 필요합니다.
+</p>
+<div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>34 / 58</span></div>
+</section>
+<section aria-labelledby="title-pvt-numbers" class="sheet" id="pvt-numbers"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">수신 결과 확인 · 35
+</p>
+<h1 id="title-pvt-numbers">ECEF 상세 수치와 시간 잔차
+</h1></div>
+<figure class="wide"><a aria-label="ECEF 원시 수치 상세 대조표 · 상단 일부 확대" href="assets/receiver-ecef.png" target="_blank"><img alt="ECEF 원시 수치 상세 대조표 · 상단 일부" src="assets/receiver-ecef.png"/></a>
+<figcaption>ECEF 원시 수치 상세 대조표 · 상단 일부
+</figcaption>
+</figure>
+<table>
+<thead>
+<tr>
+<th>수치
+</th>
+<th>비교 방법
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>X/Y/Z · m
+</td>
+<td>RAW·AFS는 송신 Reference와 수신 해, I/Q는 RF 기준과 지연 반영 해를 같은 ECEF 축에서 대조합니다.
+</td>
+</tr>
+<tr>
+<td>Vx/Vy/Vz · m/s
+</td>
+<td>속도 성분과 차이를 확인합니다. Doppler가 같아도 해·위성 방향에 따라 작은 차이가 생길 수 있습니다.
+</td>
+</tr>
+<tr>
+<td>수신기 시계오차 · s
+</td>
+<td>RAW·AFS는 수신 − 송신 Reference, I/Q는 지연 반영 − RF 기준의 증가량을 봅니다. 비교 기준의 시계오차가 0일 필요는 없습니다.
+</td>
+</tr>
+<tr>
+<td>지연 잔차 · s
+</td>
+<td>Clock Bias 증가량과 측정 지연의 차이를 확인합니다. 0에 가까운지와 계산 유효성을 함께 봅니다.
+</td>
+</tr>
+<tr>
+<td>사용 위성 / 관측 시각
+</td>
+<td>서로 다른 위성 집합·Epoch 결과를 섞어 비교하지 않습니다.
+</td>
+</tr>
+</tbody>
+</table>
+<p>작은 시계오차는 반올림되어 0으로 보일 수 있습니다. 상세 수치나 로그에서 정밀 값을 확인하세요.
+</p><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>35 / 58</span></div>
+</section>
+<section aria-labelledby="title-delay-model" class="sheet" id="delay-model"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">결과 해석 · 36
+</p>
+<h1 id="title-delay-model">공통 지연과 의사거리 계산
+</h1></div><div class="formula"><b>송신부</b> T*ᵢ = S − Pᵢ / c<br/><b>수신부</b> P′ᵢ = c × (R − T*ᵢ) = Pᵢ + c × (R − S)<br/><b>측정 지연</b> Δt = R − S · c = 299,792,458 m/s</div>
+<table>
+<thead>
+<tr>
+<th>기호 / 시각
+</th>
+<th>뜻
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Pᵢ / t₀
+</td>
+<td>RAW·AFS는 원본 Epoch, I/Q는 선택 RF Epoch의 의사거리 / GNSS 관측 시각
+</td>
+</tr>
+<tr>
+<td>S
+</td>
+<td>송신 서비스가 시험 시작을 접수한 시각
+</td>
+</tr>
+<tr>
+<td>T*ᵢ
+</td>
+<td>원본 의사거리로 역산한 뒤 시험 시작 시점에 맞춘 가상 위성 송신 시각입니다.
+</td>
+</tr>
+<tr>
+<td>R
+</td>
+<td>수신 서비스가 요청 JSON 본문을 모두 받은 시각입니다.
+</td>
+</tr>
+<tr>
+<td>Δt
+</td>
+<td>시작 접수부터 본문 수신 완료까지. 전송 준비·어댑터 대기 등을 포함하며 수집 후 시작 전 대기와 수신 후 복호·계산 시간은 제외합니다.
+</td>
+</tr>
+</tbody>
+</table>
+<p>수신측 계산의 관측 시각도 GNSS 시간축에서 Δt만큼 이동합니다. 궤도정보·Doppler·C/N₀ 등 유지 대상은 그대로 사용합니다. I/Q는 RF 의사거리로 S 기준 가상 송신 시각을 역산하고 같은 지연 모델을 적용합니다. Doppler는 RF 추적값을 유지합니다.
+</p>
+<div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>36 / 58</span></div>
+</section>
+<section aria-labelledby="title-delay-meaning" class="sheet" id="delay-meaning"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">결과 해석 · 37
+</p>
+<h1 id="title-delay-meaning">지연이 큰데 위치 차이가 작은 이유
+</h1></div><div class="formula">Pᵢ ≈ 위성까지의 거리 + c × 수신기 시계오차<br/>P′ᵢ ≈ 위성까지의 거리 + c × (수신기 시계오차 + Δt)</div>
+<p>위치 계산기는 위치와 수신기 시계오차를 함께 추정합니다. 모든 위성에 같은 거리 증가분이 들어오면 위치를 크게 옮기는 대신 시계오차를 증가시켜 관측값을 설명할 수 있습니다. 이 시험은 그 증가량이 측정한 공통 지연과 얼마나 일치하는지 확인합니다.
+</p>
+<table>
+<thead>
+<tr>
+<th>결과
+</th>
+<th>해석 시 확인할 사항
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>위치 차이가 작고 Clock Bias 증가량 ≈ Δt
+</td>
+<td>공통 오차가 주로 시계오차 항으로 추정되는 결과와 부합합니다. 잔차·유효성·사용 위성을 함께 확인합니다.
+</td>
+</tr>
+<tr>
+<td>속도 차이가 작음
+</td>
+<td>같은 Doppler를 사용하므로 속도 차이는 작을 것으로 예상합니다. 재계산 위치와 위성 방향에 따라 작은 차이가 생길 수 있습니다.
+</td>
+</tr>
+<tr>
+<td>위치 차이 또는 잔차가 큼
+</td>
+<td>관측·항법정보·동일 Epoch 여부·시각 보정·계산 유효성을 먼저 확인합니다.
+</td>
+</tr>
+<tr>
+<td>비교 불가
+</td>
+<td>표시된 사유에 따라 시계 변경, 음수 지연, 입력 부족 여부를 확인합니다.
+</td>
+</tr>
+</tbody>
+</table>
+<div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>37 / 58</span></div>
+</section>
+<section aria-labelledby="title-iq-integrity" class="sheet" id="iq-integrity"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">결과 해석 · 38
+</p>
+<h1 id="title-iq-integrity">I/Q 파일 일치와 처리 시간
+</h1></div>
+<figure class="wide"><a aria-label="I/Q 파일 일치·PVT 상태를 함께 표시하는 현재 화면 확대" href="assets/iq-integrity.png" target="_blank"><img alt="I/Q 파일 일치·PVT 상태를 함께 표시하는 현재 화면" src="assets/iq-integrity.png"/></a>
+<figcaption>I/Q 파일 일치·PVT 상태를 함께 표시하는 현재 화면
+</figcaption>
+</figure>
+<table>
+<thead>
+<tr>
+<th>단계
+</th>
+<th>현재 확인 방식
+</th>
+<th>시간에 영향을 주는 항목
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>수신 검증
+</td>
+<td>파일 크기와 기대 SHA-256을 대조합니다. 전체 해시는 수신 전처리에서 한 번 계산합니다.
+</td>
+<td>파일 크기, 공유 폴더·디스크 읽기 속도
+</td>
+</tr>
+<tr>
+<td>RF 추적·프레임 복호
+</td>
+<td>검증한 공유 파일을 읽어 위성별 프레임을 복원합니다.
+</td>
+<td>90초 신호 길이, CPU, 추적 위성 수, 파일 접근 속도
+</td>
+</tr>
+<tr>
+<td>복호 후 확인
+</td>
+<td>파일 크기·수정 시각·파일 식별 정보의 변화를 확인합니다. 전체 SHA-256을 다시 읽지 않습니다.
+</td>
+<td>공유 파일의 변경 여부
+</td>
+</tr>
+<tr>
+<td>최종 표시
+</td>
+<td>파일 일치와 PVT 비교 상태를 별도로 표시합니다. I/Q의 주 비교는 동일 RF Epoch의 지연 적용 전후 결과입니다. 송신 Reference는 별도 참고자료입니다.
+</td>
+<td>Reference 확보 및 PVT 계산 조건
+</td>
+</tr>
+</tbody>
+</table>
+<p>본문 수신 시간과 수신 후 처리 시간은 다릅니다. 파일이 도착한 뒤 복호가 오래 걸려도 그 전체 시간을 공통 지연 Δt에 더하지 않습니다. 진행 메시지에서 검증 중인지 추적·계산 중인지 먼저 확인합니다.
+</p>
+<div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>38 / 58</span></div>
+</section>
+<section aria-labelledby="title-history" class="sheet" id="history"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">시험 관리 · 39
+</p>
+<h1 id="title-history">여러 시험 전송과 이력 조회
+</h1></div>
+<figure class="wide"><a aria-label="시험 기록 선택과 대기 전체 종료 · 수신 화면 확대" href="assets/receiver-status.png" target="_blank"><img alt="시험 기록 선택과 대기 전체 종료 · 수신 화면" src="assets/receiver-status.png"/></a>
+<figcaption>시험 기록 선택과 대기 전체 종료 · 수신 화면
+</figcaption>
+</figure>
+<ol class="steps">
+<li>첫 시험을 전송하고 어댑터 접수 상태를 확인합니다.
+</li>
+<li>수신 대기 상태만 남으면 다음 시험 조건을 준비하고 <b>전송시험 시작</b>을 다시 누릅니다. 각 요청은 별도의 시험 ID를 사용합니다.
+</li>
+<li>이력의 [RAW] / [AFS] / [I/Q], 시작 시각, 상태와 ID 앞부분으로 구분합니다.
+</li>
+<li>과거 시험은 목록에서 선택합니다. 이전·다음으로 페이지를 이동하고 필요하면 수신 대기 필터를 사용합니다.
+</li>
+<li>어댑터가 묶어서 또는 순서가 바뀌어 전달해도 testId가 같은 시험에 결과를 연결합니다.
+</li>
+</ol>
+<table>
+<thead>
+<tr>
+<th>상태
+</th>
+<th>운영 의미
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>수신 대기
+</td>
+<td>도착을 기다리는 상태입니다. 단순 대기에 10분 만료를 적용하지 않습니다. 장시간 지연 시 수신돼도 항법정보·계산 조건에 따라 PVT 비교가 불가능할 수 있습니다.
+</td>
+</tr>
+<tr>
+<td>준비 / 계산 중
+</td>
+<td>한 시험의 실제 처리 단계입니다. RAW·AFS 10분, I/Q 20분 등 처리 제한은 수신 대기 제한과 별개입니다.
+</td>
+</tr>
+<tr>
+<td>완료 / 비교 불가 / 실패 / 종료
+</td>
+<td>상태와 상세 메시지를 함께 확인합니다. “완료 · 불일치” 표시가 있으면 불일치 내용을 확인합니다.
+</td>
+</tr>
+</tbody>
+</table>
+<p>중계 경로와 라우팅 동작은 어댑터·라우터 로그에서 확인합니다. 시험 결과는 testId로 연결됩니다.
+</p><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>39 / 58</span></div>
+</section>
+<section aria-labelledby="title-cancel" class="sheet" id="cancel"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">시험 관리 · 40
+</p>
+<h1 id="title-cancel">시험별 중지와 대기 전체 종료
+</h1></div>
+<figure class="wide"><a aria-label="사용자가 종료한 기존 시험 · 등록 후 데이터 미수신 예시 확대" href="assets/cancelled.png" target="_blank"><img alt="사용자가 종료한 기존 시험 · 등록 후 데이터 미수신 예시" src="assets/cancelled.png"/></a>
+<figcaption>사용자가 종료한 기존 시험 · 등록 후 데이터 미수신 예시
+</figcaption>
+</figure>
+<table>
+<thead>
+<tr>
+<th>기능
+</th>
+<th>대상 / 조작
+</th>
+<th>처리 결과
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>시험 중지 / 대기 종료
+</td>
+<td>이력에서 시험을 선택 → 버튼 → 확인
+</td>
+<td>해당 시험의 대기·처리를 종료합니다. 기록은 유지합니다.
+</td>
+</tr>
+<tr>
+<td>대기 전체 종료
+</td>
+<td>수신 대기 시험 확인 → 버튼 → 대상 수 검토 → 확인
+</td>
+<td>목록 페이지와 관계없이 확인 시점의 미수신 대기 시험을 대상으로 합니다.
+</td>
+</tr>
+<tr>
+<td>종료 확인 중
+</td>
+<td>상대 서비스에 미수신 여부·종료 상태 확인이 필요한 상태
+</td>
+<td>응답이 안 오면 종료 확인 대기가 남을 수 있습니다. 상세 메시지와 연결 상태를 확인합니다.
+</td>
+</tr>
+<tr>
+<td>경합 시 제외
+</td>
+<td>확인 이후 이미 수신·계산 단계로 넘어간 시험
+</td>
+<td>전체 종료 대상에서 제외될 수 있습니다. 완료 후 취소·제외·대기 건수를 확인합니다.
+</td>
+</tr>
+</tbody>
+</table>
+<p>중지하면 해당 시험의 대기와 계산을 종료합니다. 어댑터에 전달된 번들은 남아 있을 수 있으며, 늦게 도착한 데이터는 종료한 시험의 기록에 연결됩니다.
+</p>
+<p>종료한 시험의 자료는 데이터 관리에서 삭제할 수 있습니다.
+</p><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>40 / 58</span></div>
+</section>
+<section aria-labelledby="title-json" class="sheet" id="json"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">원문과 로그 · 41
+</p>
+<h1 id="title-json">송신·수신 JSON 원문 확인
+</h1></div><div class="split"><div>
+<figure class=""><a aria-label="송신 JSON 원문 · AFS 기존 시험 확대" href="assets/sender-json.png" target="_blank"><img alt="송신 JSON 원문 · AFS 기존 시험" src="assets/sender-json.png"/></a>
+<figcaption>격리된 송수신 서비스에서 확인한 신규 v1 AFS 시험 JSON 원문 · 2026. 11. 4.
+</figcaption>
+</figure></div><div>
+<figure class=""><a aria-label="수신 JSON 원문 · 같은 AFS 시험 확대" href="assets/receiver-json.png" target="_blank"><img alt="수신 JSON 원문 · 같은 AFS 시험" src="assets/receiver-json.png"/></a>
+<figcaption>격리된 송수신 서비스에서 확인한 신규 v1 AFS 시험 JSON 원문 · 2026. 11. 4.
+</figcaption>
+</figure></div></div>
+<table>
+<thead>
+<tr>
+<th>기능
+</th>
+<th>사용 방법
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>원문 창
+</td>
+<td>시험 기록을 선택하면 사용 가능한 송신·수신 본문을 해당 화면에 자동 표시합니다.
+</td>
+</tr>
+<tr>
+<td>정렬 보기
+</td>
+<td>들여쓰기로 읽기 쉽게 표시합니다. 실제 다운로드 본문을 변경하지 않습니다.
+</td>
+</tr>
+<tr>
+<td>JSON 다운로드
+</td>
+<td>송신 요청 본문 또는 접수 당시 수신 본문을 내려받습니다. 과거 정규화 저장본이면 안내 문구를 확인합니다.
+</td>
+</tr>
+<tr>
+<td>검증 실패 수신
+</td>
+<td>수신 원문을 보관해 거절 사유를 확인할 수 있습니다. 시험 식별이 안 되는 요청은 관리자 수신 원문 목록에서 확인합니다.
+</td>
+</tr>
+</tbody>
+</table>
+<p>전송 규격은 schemaVersion 1입니다. format과 testType으로 RAW·AFS·I/Q 구조를 구분합니다.
+</p><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>41 / 58</span></div>
+</section>
+<section aria-labelledby="title-logs" class="sheet" id="logs"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">원문과 로그 · 42
+</p>
+<h1 id="title-logs">로그 상세·다운로드·전체화면
+</h1></div>
+<figure class="medium"><a aria-label="송신 상세 로그 · 기존 시험의 계산 근거와 전송 상태 확대" href="assets/sender-log.png" target="_blank"><img alt="송신 상세 로그 · 기존 시험의 계산 근거와 전송 상태" src="assets/sender-log.png"/></a>
+<figcaption>송신 상세 로그 · 기존 시험의 계산 근거와 전송 상태
+</figcaption>
+</figure>
+<table>
+<thead>
+<tr>
+<th>조작
+</th>
+<th>동작
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>상세 로그
+</td>
+<td>일반 상태 메시지와 계산 근거·단계별 상세 기록의 표시를 전환합니다.
+</td>
+</tr>
+<tr>
+<td>다운로드
+</td>
+<td>선택한 시험의 저장 로그를 내려받습니다.
+</td>
+</tr>
+<tr>
+<td>화면 지우기
+</td>
+<td>브라우저 표시를 지웁니다. DB에 보관된 시험 로그를 삭제하지 않습니다.
+</td>
+</tr>
+<tr>
+<td>전체화면 아이콘
+</td>
+<td>JSON 창과 분리해 로그 영역을 화면 전체로 확대합니다. 버튼 또는 Esc로 복귀합니다.
+</td>
+</tr>
+<tr>
+<td>송신 / 수신 구분
+</td>
+<td>송신은 입력·Reference·전송 준비·접수, 수신은 접수·복원·지연·PVT 근거를 확인합니다.
+</td>
+</tr>
+</tbody>
+</table>
+<p>어댑터 로그를 함께 볼 때는 날짜와 시각대를 확인하세요.
+</p><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>42 / 58</span></div>
+</section>
+<section aria-labelledby="title-log-evidence" class="sheet" id="log-evidence"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">원문과 로그 · 43
+</p>
+<h1 id="title-log-evidence">로그를 이용한 장애 전달
+</h1></div>
+<figure class="wide"><a aria-label="로그 전체화면 · 기존 송신 상세 기록 일부 확대 확대" href="assets/log-excerpt.png" target="_blank"><img alt="로그 전체화면 · 기존 송신 상세 기록" src="assets/log-excerpt.png"/></a>
+<figcaption>로그 전체화면 · 기존 송신 상세 기록
+</figcaption>
+</figure>
+<p>담당자에게는 시험 ID, 시험 유형, 경로, 시작 시각, 실패 단계, 마지막 INFO와 첫 WARN/ERROR, 관련 JSON을 함께 전달합니다. 화면 캡처만 보내기보다 원문과 로그 다운로드를 사용합니다.
+</p>
+<table>
+<thead>
+<tr>
+<th>증거
+</th>
+<th>확인 목적
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>S / R / T*ᵢ / P′ᵢ
+</td>
+<td>공통 지연과 의사거리 계산의 시각·단위·수식을 확인합니다.
+</td>
+</tr>
+<tr>
+<td>HTTP 메서드·URL·상태
+</td>
+<td>어느 IP·포트·API에서 오류가 발생했는지 확인합니다. 상대 응답 본문도 함께 봅니다.
+</td>
+</tr>
+<tr>
+<td>파일 경로·크기·SHA-256
+</td>
+<td>I/Q 파일 접근 및 일치 여부를 확인합니다.
+</td>
+</tr>
+<tr>
+<td>Reference / 수신 해 / 비교 사유
+</td>
+<td>입력 준비 실패, 수신 처리 실패, 비교 자료 부족을 구분합니다.
+</td>
+</tr>
+</tbody>
+</table>
+<p>시험 ID, 양쪽 로그, 요청·응답 JSON을 함께 전달하세요. 인증 토큰과 비밀번호는 제외합니다.
+</p><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>43 / 58</span></div>
+</section>
+<section aria-labelledby="title-errors" class="sheet" id="errors"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">장애 대응 · 44
+</p>
+<h1 id="title-errors">문제 발생 시 확인 순서
+</h1></div>
+<table>
+<thead>
+<tr>
+<th>증상
+</th>
+<th>우선 확인
+</th>
+<th>후속 담당
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>화면 접속 불가
+</td>
+<td>서비스 기동, IP·포트, Docker 상태, 브라우저 주소
+</td>
+<td>설치·운영 담당
+</td>
+</tr>
+<tr>
+<td>COM 포트 없음 / 연결 실패
+</td>
+<td>장치 인식, u-center 점유, 속도, Windows 브릿지 상태
+</td>
+<td>운영자 → 설치 담당
+</td>
+</tr>
+<tr>
+<td>파일 적용 실패
+</td>
+<td>UBX/GRAW 형식, 입력 메시지, 화면 오류 사유
+</td>
+<td>운영자 → 서비스 담당
+</td>
+</tr>
+<tr>
+<td>PVT 비교 불가
+</td>
+<td>GPS L1 관측·SF1~3, 사용 위성, Reference, 음수 지연·시계 변경
+</td>
+<td>운영자 → 서비스 담당
+</td>
+</tr>
+<tr>
+<td>어댑터 400 / 401 / 405
+</td>
+<td>요청 본문·응답 내용, 인증 설정, 메서드·전송 API 경로
+</td>
+<td>서비스·어댑터 담당 공동
+</td>
+</tr>
+<tr>
+<td>등록됐으나 본문 미수신
+</td>
+<td>어댑터 접수, 라우터·중계·공유 파일 전달, 상대 callback 주소
+</td>
+<td>어댑터·망 담당
+</td>
+</tr>
+<tr>
+<td>I/Q 파일 접근 실패
+</td>
+<td>수신 경로에서 파일 존재·권한·마운트·크기
+</td>
+<td>운영자 → 설치·어댑터 담당
+</td>
+</tr>
+<tr>
+<td>I/Q 처리 지연
+</td>
+<td>검증 / RF 추적 / PVT 중 현재 단계와 CPU·디스크
+</td>
+<td>운영자 → 설치·서비스 담당
+</td>
+</tr>
+</tbody>
+</table>
+<p>오류 메시지의 대상 URL과 응답 코드를 확인하세요. 서비스와 어댑터의 응답은 각각 기록됩니다.
+</p><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>44 / 58</span></div>
+</section>
+<section aria-labelledby="title-actual-errors" class="sheet" id="actual-errors"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">장애 대응 · 45
+</p>
+<h1 id="title-actual-errors">실제 이력으로 보는 비교 불가와 실패
+</h1></div>
+<figure class="wide"><a aria-label="AFS 비교 불가 · 음수 지연 및 시계 변경 관련 기존 기록 확대" href="assets/incomparable.png" target="_blank"><img alt="AFS 비교 불가 · 음수 지연 및 시계 변경 관련 기존 기록" src="assets/incomparable.png"/></a>
+<figcaption>AFS 비교 불가 · 음수 지연 및 시계 변경 관련 기존 기록
+</figcaption>
+</figure>
+<figure class="wide"><a aria-label="I/Q 실패 · 파일 경로 접근에 실패한 기존 기록 확대" href="assets/failed.png" target="_blank"><img alt="I/Q 실패 · 파일 경로 접근에 실패한 기존 기록" src="assets/failed.png"/></a>
+<figcaption>I/Q 실패 · 파일 경로 접근에 실패한 기존 기록
+</figcaption>
+</figure>
+<table>
+<thead>
+<tr>
+<th>사례
+</th>
+<th>해석 / 조치
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>AFS 음수 지연
+</td>
+<td>기존 이력에서 R − S가 약 −1.019초였습니다. 전송이 음의 시간에 이뤄졌다는 의미가 아니며 양쪽 기준시각·보정 변경을 확인합니다.
+</td>
+</tr>
+<tr>
+<td>I/Q 파일 없음
+</td>
+<td>수신 경로에서 파일을 열지 못했습니다. .bin 파일의 도착 여부와 경로·읽기 권한을 확인하세요.
+</td>
+</tr>
+<tr>
+<td>사용자 종료
+</td>
+<td>종료 시점까지의 접수·수신 로그를 확인하세요.
+</td>
+</tr>
+</tbody>
+</table>
+<div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>45 / 58</span></div>
+</section>
+<section aria-labelledby="title-management" class="sheet" id="management"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">관리자 부록 · 46
+</p>
+<h1 id="title-management">데이터 관리 접속과 조회
+</h1></div>
+<figure class="wide"><a aria-label="수신 PC의 저장 현황 · 촬영 당시 값 확대" href="assets/management-summary.png" target="_blank"><img alt="수신 PC의 저장 현황 · 촬영 당시 값" src="assets/management-summary.png"/></a>
+<figcaption>수신 PC의 저장 현황 · 촬영 당시 값
+</figcaption>
+</figure>
+<ol class="steps">
+<li>관리할 PC의 <b>/lnis/data-manager</b>에 접속합니다. 상단 데이터 관리 아이콘은 같은 창에서 이동합니다. imtplus 로고를 누르면 시험 화면으로 돌아갑니다.
+</li>
+<li>페이지 상단이 송신 PC인지 수신 PC인지 확인합니다. 이 화면은 접속한 PC의 자료만 관리합니다.
+</li>
+<li><b>시험 기록</b>에서 날짜·상태·시험 ID 일부로 조회합니다.
+</li>
+<li><b>수신 원문·파일</b>에서는 자료 종류를 선택해 수신 기록·입력·I/Q 파일을 조회합니다.
+</li>
+<li>이전·다음으로 페이지를 이동하고 필요한 자료의 <b>상세</b>를 엽니다.
+</li>
+</ol>
+<table>
+<thead>
+<tr>
+<th>저장 현황
+</th>
+<th>의미
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>시험 기록 / 수신 원문
+</td>
+<td>로컬 DB에 저장된 해당 자료 건수
+</td>
+</tr>
+<tr>
+<td>DB 파일
+</td>
+<td>DB의 물리 파일 크기. 자료 삭제 직후 줄어들지 않을 수 있습니다.
+</td>
+</tr>
+<tr>
+<td>입력 / I/Q 파일
+</td>
+<td>관리 대상 파일의 보관 용량. 시험 건수와 일대일 대응하지 않을 수 있습니다.
+</td>
+</tr>
+<tr>
+<td>초기화
+</td>
+<td>별도 탭에서 범위를 선택합니다. <b>시험 데이터 초기화</b>는 입력·I/Q·설정을 유지합니다. <b>서비스 초기화</b>는 서비스 소유 파일·프리셋도 정리하고 사용자 설정을 배포 기본값으로 복원합니다.
+</td>
+</tr>
+</tbody>
+</table>
+<aside class="note">초기화는 보관 고정 자료도 포함합니다. 공유 I/Q와 설치·인증 설정은 유지하며 다른 PC의 자료는 변경하지 않습니다. 파일 삭제가 실패하면 남은 항목을 다시 정리할 수 있습니다.
+</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>46 / 58</span></div>
+</section>
+<section aria-labelledby="title-management-detail" class="sheet" id="management-detail"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">관리자 부록 · 47
+</p>
+<h1 id="title-management-detail">시험·수신 원문·파일 상세
+</h1></div>
+<figure class="wide"><a aria-label="선택한 자료 상세 · 조회용 링크와 저장 정보 확대" href="assets/management-detail.png" target="_blank"><img alt="선택한 자료 상세 · 조회용 링크와 저장 정보" src="assets/management-detail.png"/></a>
+<figcaption>선택한 자료 상세 · 조회용 링크와 저장 정보
+</figcaption>
+</figure>
+<table>
+<thead>
+<tr>
+<th>기능
+</th>
+<th>사용 방법 / 확인 내용
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>상세
+</td>
+<td>ID, 상태, 생성·갱신 시각, 메시지, 연관 자료와 다운로드 링크를 확인합니다.
+</td>
+</tr>
+<tr>
+<td>보관 고정
+</td>
+<td>삭제·자동 정리에서 보호할 자료를 고정합니다. 해제 전 연관 자료와 보관 목적을 확인합니다.
+</td>
+</tr>
+<tr>
+<td>수신 원문
+</td>
+<td>시험과 연결되지 않거나 검증 실패한 요청도 상태·메시지와 함께 확인합니다.
+</td>
+</tr>
+<tr>
+<td>입력 / I/Q 파일
+</td>
+<td>생성 시각·용량·사용 여부를 확인합니다. I/Q 파일 다운로드는 대용량이므로 저장 공간을 확인합니다.
+</td>
+</tr>
+<tr>
+<td>파일 사용 관계
+</td>
+<td>진행 중이거나 다른 시험에서 공유하는 자료는 삭제 제한 대상일 수 있습니다.
+</td>
+</tr>
+</tbody>
+</table>
+<p>상세 조회와 화면 로그 지우기는 저장된 시험 자료를 삭제하지 않습니다.
+</p><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>47 / 58</span></div>
+</section>
+<section aria-labelledby="title-delete" class="sheet" id="delete"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">관리자 부록 · 48
+</p>
+<h1 id="title-delete">자료 선택 삭제
+</h1></div>
+<figure class="wide"><a aria-label="시험 기록 조회 · 선택 삭제 버튼과 보관 고정 확대" href="assets/management-records.png" target="_blank"><img alt="시험 기록 조회 · 선택 삭제 버튼과 보관 고정" src="assets/management-records.png"/></a>
+<figcaption>시험 기록 조회 · 선택 삭제 버튼과 보관 고정
+</figcaption>
+</figure>
+<ol class="steps">
+<li>종류·기간·상태·ID로 삭제 범위를 먼저 좁힙니다.
+</li>
+<li>행을 선택합니다. <b>이 페이지 선택</b>은 현재 페이지에 적용합니다. <b>검색 결과 전체 선택</b>은 페이지와 관계없이 현재 조회 조건의 자료를 선택하며, <b>선택 해제</b>로 취소합니다.
+</li>
+<li><b>선택 삭제</b>를 눌러 연관 자료·삭제 파일 용량·제외 사유를 확인합니다.
+</li>
+<li>ID·건수·연관 자료·보관 고정 여부를 검토한 뒤 확인합니다. 취소하면 삭제하지 않습니다.
+</li>
+<li>처리 후 삭제·실패·제외 건수를 확인하고 필요한 경우 다시 조회합니다.
+</li>
+</ol>
+<aside class="note">삭제한 자료는 복원할 수 없습니다. 진행 중·보관 고정·공유 자료는 삭제 대상에서 제외될 수 있습니다.
+</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>48 / 58</span></div>
+</section>
+<section aria-labelledby="title-retention" class="sheet" id="retention"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">관리자 부록 · 49
+</p>
+<h1 id="title-retention">보관 기간과 자동 정리
+</h1></div>
+<figure class="wide"><a aria-label="보관 설정 · 촬영 당시 활성 상태가 표시된 예시 확대" href="assets/management-retention.png" target="_blank"><img alt="보관 설정 · 촬영 당시 활성 상태가 표시된 예시" src="assets/management-retention.png"/></a>
+<figcaption>보관 설정 · 촬영 당시 활성 상태가 표시된 예시
+</figcaption>
+</figure>
+<table>
+<thead>
+<tr>
+<th>대상
+</th>
+<th>기간 계산 기준
+</th>
+<th>자동 제외
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>종료된 DTN 시험
+</td>
+<td>시험 최종 갱신 시점
+</td>
+<td>진행 중·보관 고정 등 보호 자료
+</td>
+</tr>
+<tr>
+<td>시험과 연결되지 않은 수신 원문
+</td>
+<td>수신 시점
+</td>
+<td>시험 연결·보관 고정 등 보호 자료
+</td>
+</tr>
+<tr>
+<td>사용하지 않는 입력·I/Q 파일
+</td>
+<td>파일 생성 시점
+</td>
+<td>사용 중·공유·보관 고정 등 보호 파일
+</td>
+</tr>
+</tbody>
+</table>
+<p>대상별 자동 삭제 사용 여부와 7일 / 30일 / 90일 / 직접 입력(1~3,650일)을 정합니다. <b>설정 저장</b>에서 대상을 검토한 후 적용합니다. <b>지금 정리</b>도 예정 대상을 확인하고 실행합니다.
+</p>
+<aside class="note">자동 삭제는 기본으로 꺼져 있습니다. 정리는 약 10분마다 최대 500건씩 진행하며, 시험·수집·파일 처리 중에는 미룹니다.
+</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>49 / 58</span></div>
+</section>
+<section aria-labelledby="title-install-prepare" class="sheet" id="install-prepare"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">설치 및 실행 · 50
+</p>
+<h1 id="title-install-prepare">Windows PC 설치 준비
+</h1></div><div class="split"><div>
+<figure><a aria-label="오프라인 배포 묶음의 실제 파일 목록 · INSTALL.cmd로 설치 시작" href="assets/install-package.png" target="_blank"><img alt="오프라인 배포 묶음의 실제 파일 목록 · INSTALL.cmd로 설치 시작" src="assets/install-package.png"/></a>
+<figcaption>오프라인 배포 묶음의 실제 파일 목록 · INSTALL.cmd로 설치 시작
+</figcaption>
+</figure></div><div>
+<ol class="steps">
+<li>송신·수신 PC 각각에 Windows 11 x64와 CPU 가상화 지원을 준비합니다.
+</li>
+<li>배포 ZIP을 로컬 폴더에 모두 풉니다. ZIP 안에서 INSTALL.cmd를 직접 실행하지 않습니다.
+</li>
+<li>실제로 사용할 Windows 계정으로 INSTALL.cmd를 실행합니다. Windows 기능과 네트워크 설정 때 관리자 승인이 표시됩니다.
+</li>
+<li>재부팅 안내가 나오면 재부팅한 뒤 같은 INSTALL.cmd를 다시 실행합니다.
+</li>
+</ol></div></div>
+<table>
+<tr>
+<th>준비 항목
+</th>
+<th>확인 사항
+</th>
+</tr>
+<tr>
+<td>여유 공간
+</td>
+<td>설치용 12 GB 이상과 DB 백업 공간. I/Q 파일은 1개당 2.16 GB가 추가됩니다.
+</td>
+</tr>
+<tr>
+<td>네트워크
+</td>
+<td>두 PC의 고정 IPv4·서비스 포트, 각 PC가 연결할 어댑터 주소와 인증값을 준비합니다.
+</td>
+</tr>
+<tr>
+<td>오프라인 자료
+</td>
+<td>WSL 설치본·Linux 실행 환경·Docker·서비스 이미지·전용 Java가 포함됩니다. 별도 원본 오픈소스 폴더는 필요하지 않습니다.
+</td>
+</tr>
+</table>
+<aside class="note">Windows 기능 설치에 필요한 파일이 없으면 해당 버전의 Windows 설치 미디어를 준비하세요.
+</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>50 / 58</span></div>
+</section>
+<section aria-labelledby="title-install-settings" class="sheet" id="install-settings"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">설치 및 실행 · 51
+</p>
+<h1 id="title-install-settings">송신·수신 PC 설정
+</h1></div><div class="split"><div>
+<figure><a aria-label="배포용 app/.env.example 실제 내용 · 항목마다 한글 입력 설명 제공" href="assets/install-env.png" target="_blank"><img alt="배포용 app/.env.example 실제 내용 · 항목마다 한글 입력 설명 제공" src="assets/install-env.png"/></a>
+<figcaption>배포용 app/.env.example 실제 내용 · 항목마다 한글 입력 설명 제공
+</figcaption>
+</figure></div><div>
+<ol class="steps">
+<li>각 PC의 역할을 sender 또는 receiver로 선택합니다.
+</li>
+<li>현재 PC와 상대 서비스의 Windows IPv4 주소·포트를 입력합니다. 서로 다른 PC에서는 둘 다 8088을 사용할 수 있습니다.
+</li>
+<li>현재 PC가 연결할 어댑터 주소를 IP와 포트까지만 입력합니다.
+</li>
+<li>노드 간 관리 토큰은 양쪽에 동일한 32자 이상 값으로 지정합니다. 어댑터 송신·수신 인증값은 상대 어댑터와 맞춥니다.
+</li>
+</ol>
+<p>미리 작성한 설정 파일을 사용하려면:
+</p><pre class="command">INSTALL.cmd -Configuration "C:\준비\sender.env"</pre></div></div>
+<table>
+<tr>
+<th>예시
+</th>
+<th>송신 PC
+</th>
+<th>수신 PC
+</th>
+</tr>
+<tr>
+<td>역할
+</td>
+<td>sender
+</td>
+<td>receiver
+</td>
+</tr>
+<tr>
+<td>현재 서비스
+</td>
+<td>http://192.168.1.72:8088
+</td>
+<td>http://192.168.1.73:8088
+</td>
+</tr>
+<tr>
+<td>상대 서비스
+</td>
+<td>http://192.168.1.73:8088
+</td>
+<td>http://192.168.1.72:8088
+</td>
+</tr>
+</table>
+<p>현재·상대 서비스 주소에는 Windows PC의 IP를 입력합니다. 설정 파일은 data/.env에 저장됩니다.
+</p><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>51 / 58</span></div>
+</section>
+<section aria-labelledby="title-install-start" class="sheet" id="install-start"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">설치 및 실행 · 52
+</p>
+<h1 id="title-install-start">설치 완료 확인과 일상 실행
+</h1></div><div class="split"><div>
+<figure><a aria-label="실행 중인 송신 서비스 화면 · 서비스 준비와 상대 연결 상태는 별도 확인" href="assets/sender-status.png" target="_blank"><img alt="실행 중인 송신 서비스 화면 · 서비스 준비와 상대 연결 상태는 별도 확인" src="assets/sender-status.png"/></a>
+<figcaption>실행 중인 송신 서비스 화면 · 서비스 준비와 상대 연결 상태는 별도 확인
+</figcaption>
+</figure></div><div>
+<ol class="steps">
+<li>INSTALL이 전용 실행 환경과 서비스 이미지를 설치하고 서비스 준비 상태를 확인합니다.
+</li>
+<li>Windows 서비스 포트와 Docker 포트를 같은 번호로 연결합니다. 다른 프로그램의 전달 규칙은 덮어쓰지 않습니다.
+</li>
+<li>설치 완료 후 바탕화면의 DTN START로 실행하고 DTN STOP으로 종료합니다.
+</li>
+<li>다른 PC에서 현재 PC 주소로 접속하고, 화면에서 상대 서비스·어댑터 연결을 확인합니다.
+</li>
+</ol></div></div>
+<table>
+<tr>
+<th>사용 상황
+</th>
+<th>동작
+</th>
+</tr>
+<tr>
+<td>매일 실행
+</td>
+<td>DTN START 한 번 실행. WSL 터미널이나 별도 백그라운드 명령이 필요하지 않습니다.
+</td>
+</tr>
+<tr>
+<td>창 닫기 / PC 재부팅
+</td>
+<td>브라우저·CMD를 닫아도 서비스는 유지됩니다. PC를 재부팅하면 START를 다시 실행합니다.
+</td>
+</tr>
+<tr>
+<td>GNSS 수집
+</td>
+<td>장비를 연결하고 웹 화면에서 COM·baud를 선택합니다. u-center가 같은 포트를 사용 중이면 먼저 연결 해제합니다.
+</td>
+</tr>
+<tr>
+<td>종료 / 갱신
+</td>
+<td>STOP은 DB·입력·I/Q를 삭제하지 않습니다. 갱신은 새 INSTALL을 기존 설치 경로에 실행합니다.
+</td>
+</tr>
+</table>
+<p>I/Q 시험은 각 PC의 data/exchange를 해당 어댑터와 공유합니다. 주소·포트를 바꾸면 INSTALL로 네트워크 설정도 갱신하세요.
+</p><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>52 / 58</span></div>
+</section>
+<section aria-labelledby="title-operations" class="sheet" id="operations"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">관리자 부록 · 53
+</p>
+<h1 id="title-operations">기동·종료·업데이트와 백업
+</h1></div>
+<table>
+<thead>
+<tr>
+<th>환경 / 작업
+</th>
+<th>절차
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Windows 기동
+</td>
+<td>설치 후 바탕화면의 DTN START를 실행합니다. WSL·Docker·COM 중계와 서비스 준비 확인 후 브라우저가 열립니다. 별도 WSL 창은 필요하지 않습니다.
+</td>
+</tr>
+<tr>
+<td>Windows 종료
+</td>
+<td>배포 폴더의 STOP.cmd를 사용합니다. 수신 대기·진행 시험을 종료할지 먼저 결정합니다.
+</td>
+</tr>
+<tr>
+<td>Linux 기동 / 종료
+</td>
+<td>배포 폴더에서 docker compose up -d / docker compose down을 사용합니다. 볼륨 삭제 옵션은 사용하지 않습니다.
+</td>
+</tr>
+<tr>
+<td>설정 변경
+</td>
+<td>노드 역할·주소·인증·I/Q·브릿지 설정을 검토한 뒤 재기동 적용이 필요한 항목을 반영합니다.
+</td>
+</tr>
+<tr>
+<td>업데이트
+</td>
+<td>새 묶음의 INSTALL.cmd를 기존 설치 경로에 실행합니다. 준비·송신·계산·수집 중에는 갱신하지 않습니다. 설정·자료를 보존하며 실패 시 이전 버전을 복원합니다.
+</td>
+</tr>
+<tr>
+<td>백업
+</td>
+<td>설정 파일과 DB·입력·I/Q 등 필요한 데이터를 함께 보관합니다. DB 파일 복사는 서비스를 정상 종료한 상태에서 수행합니다.
+</td>
+</tr>
+<tr>
+<td>복구
+</td>
+<td>같은 배포 버전·설정·파일 경로 관계를 확인한 뒤 복구합니다. DB만 복원하고 연결 파일을 누락하지 않도록 합니다.
+</td>
+</tr>
+</tbody>
+</table>
+<p>최초 설치에는 관리자 승인과 재부팅이 필요할 수 있습니다. 이후 START·STOP은 일반 권한으로 실행합니다.
+</p><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>53 / 58</span></div>
+</section>
+<section aria-labelledby="title-environment" class="sheet" id="environment"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">관리자 부록 · 54
+</p>
+<h1 id="title-environment">다른 PC 설치 시 확인할 설정
+</h1></div>
+<table>
+<thead>
+<tr>
+<th>환경 변수
+</th>
+<th>용도 / 확인 사항
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LNIS_NODE_ROLE / LNIS_SERVER_PORT
+</td>
+<td>sender 또는 receiver / Windows 게시·Docker 서비스에 동일한 포트 사용
+</td>
+</tr>
+<tr>
+<td>LNIS_NODE_BASE_URL / LNIS_NODE_PEER_URL
+</td>
+<td>현재·상대 Windows PC의 고정 IPv4 주소와 포트. WSL 내부 주소가 아님
+</td>
+</tr>
+<tr>
+<td>dtn_adapter
+</td>
+<td>이 PC가 연결할 어댑터 기본 주소. http://IP:포트 형식
+</td>
+</tr>
+<tr>
+<td>LNIS_NODE_MANAGEMENT_TOKEN
+</td>
+<td>송수신 서비스 간 관리 요청 인증. 양쪽의 합의된 값 사용
+</td>
+</tr>
+<tr>
+<td>LNIS_DTN_SEND_TOKEN / LNIS_DTN_RECEIVE_TOKEN
+</td>
+<td>외부 어댑터 요청 인증 / 수신 API 인증. 실제 값은 문서에 기록하지 않음
+</td>
+</tr>
+<tr>
+<td>LNIS_IQ_ENABLED
+</td>
+<td>송신 I/Q 생성 사용 여부. 새 Windows 설치에서는 송신 true, 수신 false
+</td>
+</tr>
+<tr>
+<td>LNIS_IQ_HOST_PATH
+</td>
+<td>어댑터에서 읽는 호스트 파일 경로. 컨테이너 공유 폴더와 같은 파일인지 확인
+</td>
+</tr>
+<tr>
+<td>LNIS_SERIAL_BRIDGE_PORT / BIND / HOST
+</td>
+<td>Windows 직렬 브릿지 연결. 설치 환경에서 포트 충돌·WSL 접근 경로 확인
+</td>
+</tr>
+<tr>
+<td>LNIS_DB_PASSWORD
+</td>
+<td>DB 인증 설정. 기존 DB와 일치 여부 확인
+</td>
+</tr>
+<tr>
+<td>LNIS_HTTP_LOG_LEVEL
+</td>
+<td>HTTP 로그 상세 수준. 반복 조회·본문 상세가 필요한 기간에만 조정
+</td>
+</tr>
+</tbody>
+</table>
+<aside class="note">환경 설정은 data/.env에서 수정합니다. 기존 운영 설정을 예제 파일로 덮어쓰지 마세요.
+</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>54 / 58</span></div>
+</section>
+<section aria-labelledby="title-docker-logs" class="sheet" id="docker-logs"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">관리자 부록 · 55
+</p>
+<h1 id="title-docker-logs">Docker 로그 확인
+</h1></div><pre class="command"># 배포 폴더에서 실행
 docker compose ps
 docker compose logs --tail 100 -f node
-
 # 컨테이너 이름으로 조회
-docker logs --tail 100 -f &lt;컨테이너-이름&gt;</pre><table><thead><tr><th>로그</th><th>확인 방법</th></tr></thead><tbody><tr><td>INFO</td><td>시험 시작·전송·수신·계산 및 화면 상세 로그의 주요 기록을 확인합니다.</td></tr><tr><td>WARN / ERROR</td><td>실패·비정상 응답·계산 조건 문제를 확인합니다. 수준을 낮추어 숨기지 않습니다.</td></tr><tr><td>DEBUG</td><td>주기 조회와 HTTP 상세 진단이 필요한 경우 관리자가 사용합니다. 평상시 반복 요청 기록과 구분합니다.</td></tr><tr><td>HTTP 기록</td><td>IN/OUT, 요청 ID·추적 ID, 메서드, 상대 IP·포트·URL, 상태, 시간과 필요한 본문을 확인합니다.</td></tr><tr><td>시간 표기</td><td>로그 시각대·PC 시계·서비스 보정 시각을 구분합니다. 브라우저 표시 시각과 UTC 로그 문자열을 숫자만으로 비교하지 않습니다.</td></tr></tbody></table><p>실패한 시험의 ID와 시작 시각을 기준으로 양쪽 노드 및 어댑터 기록을 모읍니다. HTTP 오류를 조사할 때 요청 본문·응답 본문·대상 주소를 함께 확인합니다.</p><aside class="note">로그 회전은 Docker logging 설정에 따릅니다. 오래된 로그는 회전으로 없어질 수 있으므로 필요한 시험 로그·JSON은 결과 확인 후 별도로 내려받아 보관합니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>55 / 58</span></div></section>
-<section aria-labelledby="title-intro" class="sheet" id="intro"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">참고 · 56</p><h1 id="title-intro">구조·동작 안내 화면 사용</h1></div><figure class="wide"><a aria-label="/dtn-intro의 실제 애니메이션 화면 · 상단 일부 확대" href="assets/intro.png" target="_blank"><img alt="/dtn-intro의 실제 애니메이션 화면 · 상단 일부" src="assets/intro.png"/></a><figcaption>/dtn-intro의 실제 애니메이션 화면 · 상단 일부</figcaption></figure><table><thead><tr><th>조작</th><th>동작 / 확인 내용</th></tr></thead><tbody><tr><td>접속</td><td>시험 화면 좌측의 작은 안내 아이콘 또는 /dtn-intro 주소로 엽니다. 로고는 해당 노드의 시험 화면으로 돌아가는 링크입니다.</td></tr><tr><td>데이터 아이콘</td><td>GNSS RAW → AFS Frame → I/Q Sample 경로를 바꿔 확인합니다.</td></tr><tr><td>DTN/HDTN 아이콘</td><td>송신·수신 라우터 엔진 표시를 전환합니다. LNIS 운영 설정을 저장하지 않습니다.</td></tr><tr><td>이전 / 다음 화살표 및 방향키</td><td>단계를 수동 이동합니다. 현재 단계의 애니메이션은 반복 재생됩니다.</td></tr><tr><td>단계 설명 / 하단 참고</td><td>서비스·어댑터 역할, 교환 데이터, 지연·PVT 계산과 결과 확인 위치를 읽습니다.</td></tr></tbody></table><aside class="note">이 화면은 동작 설명용입니다. 실제 장비 연결·전송·PVT 계산·DB 변경을 실행하지 않습니다. 실제 성공·실패 판정은 시험 화면의 결과를 확인합니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>56 / 58</span></div></section>
-<section aria-labelledby="title-glossary" class="sheet" id="glossary"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">참고 · 57</p><h1 id="title-glossary">용어와 단위</h1></div><table><thead><tr><th>용어</th><th>뜻</th></tr></thead><tbody><tr><td>Epoch</td><td>동일 관측 시점의 여러 위성·신호 측정 묶음</td></tr><tr><td>RAWX / SFRBX</td><td>원시 관측 메시지 / 방송 항법 메시지 word를 담은 UBX 메시지</td></tr><tr><td>PRN</td><td>확산 신호 식별 번호. GPS L1 C/A의 위성 표시는 해당 PRN과 대응</td></tr><tr><td>Ephemeris / LNAV</td><td>위성 궤도·시계 정보 / GPS 방송 항법 메시지</td></tr><tr><td>의사거리 / Doppler / C/N₀</td><td>시간 오프셋을 포함한 거리 관측(m) / 주파수 변화(Hz) / 신호 품질(dB-Hz)</td></tr><tr><td>PVT / Reference</td><td>위치·속도·시간 해 / 원본 관측으로 계산한 비교 기준</td></tr><tr><td>ECEF / ENU</td><td>지구 중심 고정 좌표계 / 기준점 주변 동·북·위 방향 좌표</td></tr><tr><td>Clock Bias</td><td>GNSS 계산기가 추정하는 수신기 시간 오프셋(s)</td></tr><tr><td>AFS / SB</td><td>Augmented Forward Signal / 그 프레임의 subframe</td></tr><tr><td>I/Q / RF</td><td>복소 기저대역 신호 샘플 / 신호 추적과 관련된 무선 주파수 처리</td></tr><tr><td>testId / SHA-256</td><td>시험 식별 UUID / 파일·자료 바이트의 해시</td></tr><tr><td>Bytes / MB / GB / ms</td><td>바이트 / 10⁶ Bytes / 10⁹ Bytes / 10⁻³초. MiB·GiB는 2진 단위</td></tr></tbody></table><aside class="note">수신기의 Clock Bias, PC 시계 오차, 서비스 시각 보정량, 측정 지연 Δt는 서로 다른 값입니다. 단위가 모두 초여도 같은 항목으로 취급하지 않습니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>57 / 58</span></div></section>
-<section aria-labelledby="title-record" class="sheet" id="record"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/><p class="eyebrow">참고 · 58</p><h1 id="title-record">시험 결과 기록 항목</h1></div><table><thead><tr><th>분류</th><th>기록할 항목</th></tr></thead><tbody><tr><td>시험 조건</td><td>시험 ID, 유형, 경로, 선택 Epoch(Week/TOW), 입력 파일·I/Q 파일, 어댑터 요청 설정</td></tr><tr><td>시각 조건</td><td>송수신 시각 원천·보정 상태, 시험 중 시계 변경 여부, 시작 S·본문 수신 R</td></tr><tr><td>전송 결과</td><td>어댑터 접수 응답, 수신 여부·시각, 파일/데이터 일치 상태, 실패 사유</td></tr><tr><td>PVT 비교</td><td>Reference·수신 해의 위치·속도·Clock Bias, 유효성, 사용 위성 수</td></tr><tr><td>공통 지연</td><td>Δt, Clock Bias 증가량, 두 값의 잔차, 위치·속도 차이</td></tr><tr><td>보관 자료</td><td>송신 JSON, 수신 JSON, 양쪽 상세 로그, 필요한 결과 화면 캡처</td></tr><tr><td>판정 유의</td><td>합격 기준은 시험 목적에 맞춰 별도로 정합니다. 측정 완료를 자동 합격으로 기록하지 않습니다.</td></tr></tbody></table><h3>문서 확인 기준</h3><p>COM 수집 화면은 2026년 11월 5일 동작검사 자료입니다. 운영 화면은 11월 2일 자료를 사용하며, 관측값·비교자료·수신 설정·동작 안내 화면은 11월 4일 현재 화면으로 갱신했습니다. 설치 묶음·설정 파일·v1 JSON 원문은 11월 4일 자료입니다. 신규 규격의 RAW·AFS·I/Q 처리는 운영 DB와 분리한 환경에서 검증합니다. 주소와 식별자는 촬영 당시 값입니다.</p><aside class="note">GNSS RAW 완료, 새 수집·생성·전송 진행, 실제 삭제·보관 정책 변경은 이번 촬영에서 실행하지 않았습니다. 해당 화면 상태와 성능은 고객 시험 환경에서 별도로 확인합니다.</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 v1.0</span><span>58 / 58</span></div></section></main></div>
-<script>const pages=[...document.querySelectorAll('.sheet')],links=[...document.querySelectorAll('nav a')],search=document.getElementById('search');
-function filter(){const query=search.value.trim().toLocaleLowerCase('ko');let count=0;pages.forEach((page,i)=>{const match=!query||page.textContent.toLocaleLowerCase('ko').includes(query);page.hidden=!match;links[i].hidden=!match;if(match)count++;});document.getElementById('matches').textContent=count+' / '+pages.length+'쪽';document.getElementById('empty').hidden=count!==0;}
-search.addEventListener('input',filter);search.addEventListener('keydown',e=>{if(e.key==='Escape'){search.value='';filter();}});
-document.getElementById('reset').addEventListener('click',()=>{search.value='';filter();search.focus();});
-document.getElementById('print').addEventListener('click',()=>{search.value='';filter();window.print();});
-document.addEventListener('beforeprint',()=>{search.value='';filter();});
-document.addEventListener('click',e=>{const a=e.target.closest('a[href^="#"]');if(a&&a.hash){search.value='';filter();}});
-filter();</script></body></html>
+docker logs --tail 100 -f &lt;컨테이너-이름&gt;</pre>
+<table>
+<thead>
+<tr>
+<th>로그
+</th>
+<th>확인 방법
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>INFO
+</td>
+<td>시험 시작·전송·수신·계산 및 화면 상세 로그의 주요 기록을 확인합니다.
+</td>
+</tr>
+<tr>
+<td>WARN / ERROR
+</td>
+<td>실패·비정상 응답·계산 조건 문제를 확인합니다. 수준을 낮추어 숨기지 않습니다.
+</td>
+</tr>
+<tr>
+<td>DEBUG
+</td>
+<td>주기 조회와 HTTP 상세 진단이 필요한 경우 관리자가 사용합니다. 평상시 반복 요청 기록과 구분합니다.
+</td>
+</tr>
+<tr>
+<td>HTTP 기록
+</td>
+<td>IN/OUT, 요청 ID·추적 ID, 메서드, 상대 IP·포트·URL, 상태, 시간과 필요한 본문을 확인합니다.
+</td>
+</tr>
+<tr>
+<td>시간 표기
+</td>
+<td>날짜와 시각대를 맞춘 뒤 양쪽 PC의 로그를 비교합니다.
+</td>
+</tr>
+</tbody>
+</table>
+<p>실패한 시험의 ID와 시작 시각을 기준으로 양쪽 노드 및 어댑터 기록을 모읍니다. HTTP 오류를 조사할 때 요청 본문·응답 본문·대상 주소를 함께 확인합니다.
+</p>
+<p>필요한 로그는 별도로 내려받으세요. 오래된 Docker 로그는 보관 설정에 따라 삭제됩니다.
+</p><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>55 / 58</span></div>
+</section>
+<section aria-labelledby="title-intro" class="sheet" id="intro"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">참고 · 56
+</p>
+<h1 id="title-intro">구조·동작 안내 화면 사용
+</h1></div>
+<figure class="wide"><a aria-label="/dtn-intro의 실제 애니메이션 화면 · 상단 일부 확대" href="assets/intro.png" target="_blank"><img alt="/dtn-intro의 실제 애니메이션 화면 · 상단 일부" src="assets/intro.png"/></a>
+<figcaption>/dtn-intro의 실제 애니메이션 화면 · 상단 일부
+</figcaption>
+</figure>
+<table>
+<thead>
+<tr>
+<th>조작
+</th>
+<th>동작 / 확인 내용
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>접속
+</td>
+<td>시험 화면 좌측의 작은 안내 아이콘 또는 /dtn-intro 주소로 엽니다. 로고는 해당 노드의 시험 화면으로 돌아가는 링크입니다.
+</td>
+</tr>
+<tr>
+<td>데이터 아이콘
+</td>
+<td>GNSS RAW → AFS Frame → I/Q Sample 경로를 바꿔 확인합니다.
+</td>
+</tr>
+<tr>
+<td>DTN/HDTN 아이콘
+</td>
+<td>송신·수신 라우터 엔진 표시를 전환합니다. 서비스 운영 설정을 저장하지 않습니다.
+</td>
+</tr>
+<tr>
+<td>이전 / 다음 화살표 및 방향키
+</td>
+<td>단계를 수동 이동합니다. 현재 단계의 애니메이션은 반복 재생됩니다.
+</td>
+</tr>
+<tr>
+<td>단계 설명 / 하단 참고
+</td>
+<td>서비스·어댑터 역할, 교환 데이터, 지연·PVT 계산과 결과 확인 위치를 읽습니다.
+</td>
+</tr>
+</tbody>
+</table>
+<div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>56 / 58</span></div>
+</section>
+<section aria-labelledby="title-glossary" class="sheet" id="glossary"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">참고 · 57
+</p>
+<h1 id="title-glossary">용어와 단위
+</h1></div>
+<table>
+<thead>
+<tr>
+<th>용어
+</th>
+<th>뜻
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Epoch
+</td>
+<td>동일 관측 시점의 여러 위성·신호 측정 묶음
+</td>
+</tr>
+<tr>
+<td>RAWX / SFRBX
+</td>
+<td>원시 관측 메시지 / 방송 항법 메시지 word를 담은 UBX 메시지
+</td>
+</tr>
+<tr>
+<td>PRN
+</td>
+<td>확산 신호 식별 번호. GPS L1 C/A의 위성 표시는 해당 PRN과 대응
+</td>
+</tr>
+<tr>
+<td>Ephemeris / LNAV
+</td>
+<td>위성 궤도·시계 정보 / GPS 방송 항법 메시지
+</td>
+</tr>
+<tr>
+<td>의사거리 / Doppler / C/N₀
+</td>
+<td>시간 오프셋을 포함한 거리 관측(m) / 주파수 변화(Hz) / 신호 품질(dB-Hz)
+</td>
+</tr>
+<tr>
+<td>PVT / Reference
+</td>
+<td>위치·속도·시간 해 / 원본 관측으로 계산한 비교 기준
+</td>
+</tr>
+<tr>
+<td>ECEF / ENU
+</td>
+<td>지구 중심 고정 좌표계 / 기준점 주변 동·북·위 방향 좌표
+</td>
+</tr>
+<tr>
+<td>Clock Bias
+</td>
+<td>GNSS 계산기가 추정하는 수신기 시간 오프셋(s)
+</td>
+</tr>
+<tr>
+<td>AFS / SB
+</td>
+<td>Augmented Forward Signal / 그 프레임의 subframe
+</td>
+</tr>
+<tr>
+<td>I/Q / RF
+</td>
+<td>복소 기저대역 신호 샘플 / 신호 추적과 관련된 무선 주파수 처리
+</td>
+</tr>
+<tr>
+<td>testId / SHA-256
+</td>
+<td>시험 식별 UUID / 파일·자료 바이트의 해시
+</td>
+</tr>
+<tr>
+<td>Bytes / MB / GB / ms
+</td>
+<td>바이트 / 10⁶ Bytes / 10⁹ Bytes / 10⁻³초. MiB·GiB는 2진 단위
+</td>
+</tr>
+</tbody>
+</table>
+<p>Clock Bias, PC 시계 오차, 서비스 보정량, 전송 지연은 각각 다른 값입니다.
+</p><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>57 / 58</span></div>
+</section>
+<section aria-labelledby="title-record" class="sheet" id="record"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
+<p class="eyebrow">참고 · 58
+</p>
+<h1 id="title-record">시험 결과 기록 항목
+</h1></div>
+<table>
+<thead>
+<tr>
+<th>분류
+</th>
+<th>기록할 항목
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>시험 조건
+</td>
+<td>시험 ID, 유형, 경로, 선택 Epoch(Week/TOW), 입력 파일·I/Q 파일, 어댑터 요청 설정
+</td>
+</tr>
+<tr>
+<td>시각 조건
+</td>
+<td>송수신 시각 원천·보정 상태, 시험 중 시계 변경 여부, 시작 S·본문 수신 R
+</td>
+</tr>
+<tr>
+<td>전송 결과
+</td>
+<td>어댑터 접수 응답, 수신 여부·시각, 파일/데이터 일치 상태, 실패 사유
+</td>
+</tr>
+<tr>
+<td>PVT 비교
+</td>
+<td>Reference·수신 해의 위치·속도·Clock Bias, 유효성, 사용 위성 수
+</td>
+</tr>
+<tr>
+<td>공통 지연
+</td>
+<td>Δt, Clock Bias 증가량, 두 값의 잔차, 위치·속도 차이
+</td>
+</tr>
+<tr>
+<td>보관 자료
+</td>
+<td>송신 JSON, 수신 JSON, 양쪽 상세 로그, 필요한 결과 화면 캡처
+</td>
+</tr>
+<tr>
+<td>시험 판정
+</td>
+<td>시험 기준과 측정값을 비교합니다.
+</td>
+</tr>
+</tbody>
+</table>
+<h3>설명서 수정·배포
+</h3>
+<ol class="steps">
+<li>개발 PC에서 manual/index.html의 본문과 manual-updated 날짜를 수정합니다. 문서 버전은 1.0으로 유지합니다.
+</li>
+<li>아래 명령으로 설명서와 프로그램을 빌드합니다.
+</li>
+<li>기존 배포 절차로 프로그램을 갱신하고 송수신 서비스를 재기동합니다.
+</li>
+<li>설명서를 새로고침해 수정한 내용을 확인합니다.
+</li>
+</ol><pre class="command">.\gradlew.bat userManualDistZip bootJar</pre>
+<p>설명서 묶음: build/distributions/user-manual.zip · 프로그램: build/libs/lnis.jar. Word 수정 내용은 HTML 원본에도 반영합니다.
+</p>
+<div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>58 / 58</span></div>
+</section>
+</main></div>
+<script>
+(() => {
+  const embedded = new URLSearchParams(location.search).get('embed') === '1';
+  if (embedded) {
+    document.documentElement.classList.add('manual-embedded');
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape') parent.postMessage('manual-help-close', location.origin);
+    });
+  }
+  const pages = [...document.querySelectorAll('.sheet')];
+  const byId = new Map(pages.map(page => [page.id,page]));
+  const navLinks = [...document.querySelectorAll('#contents-panel a')];
+  const search = document.getElementById('search');
+  const counter = document.getElementById('matches');
+  const sidebar = document.getElementById('manual-sidebar');
+  const results = document.getElementById('result-list');
+  const empty = document.getElementById('empty');
+  const previous = document.getElementById('match-prev');
+  const next = document.getElementById('match-next');
+  const toggle = document.getElementById('contents-toggle');
+  const mobile = () => matchMedia('(max-width:980px)').matches;
+  let current = null, hits = [], active = -1, timer = null, query = '';
+  const version = document.querySelector('meta[name="manual-version"]').content;
+  const updated = document.querySelector('meta[name="manual-updated"]').content;
+  document.querySelectorAll('[data-doc-version]').forEach(node => { node.textContent = version; });
+  document.querySelectorAll('[data-doc-date]').forEach(node => { node.textContent = updated; });
+  function panel(name) {
+    for (const id of ['contents','results']) {
+      const selected = id === name;
+      document.getElementById(id + '-panel').hidden = !selected;
+      document.getElementById(id + '-tab').setAttribute('aria-selected',String(selected));
+    }
+  }
+  function closeSidebar() {
+    if (!mobile()) return;
+    sidebar.classList.remove('is-open');
+    toggle.setAttribute('aria-expanded','false');
+  }
+  function show(id, scroll = true) {
+    const page = byId.get(id) || byId.get('quick') || pages[0];
+    current = page;
+    pages.forEach(item => { item.hidden = item !== page; });
+    navLinks.forEach(link => {
+      const selected = link.hash === '#' + page.id;
+      if (selected) {
+        link.setAttribute('aria-current','page');
+        link.closest('details').open = true;
+      } else link.removeAttribute('aria-current');
+    });
+    const index = pages.indexOf(page);
+    for (const [id,offset] of [['topic-prev',-1],['topic-next',1]]) {
+      const link = document.getElementById(id), target = pages[index+offset];
+      link.hidden = !target;
+      if (target) {
+        link.href = '#' + target.id;
+        link.querySelector('strong').textContent = target.querySelector('h1').textContent;
+      }
+    }
+    if (scroll) window.scrollTo({top:0,behavior:'instant'});
+  }
+  function navigate(id, scroll = true) {
+    if (!byId.has(id)) return;
+    if (location.hash !== '#' + id) history.pushState(null,'','#' + id);
+    show(id,scroll);
+  }
+  function readHash() {
+    let id;
+    try { id = decodeURIComponent(location.hash.slice(1)); } catch { id = 'quick'; }
+    show(id || 'quick',false);
+    if (query) {
+      active = hits.findIndex(hit => hit.page === current);
+      highlightCurrent();
+    }
+  }
+  function updateCounter() {
+    const topics = new Set(hits.map(hit => hit.page)).size;
+    counter.textContent = query ? (hits.length
+      ? (active >= 0 ? (active+1) + ' / ' : '') + hits.length + '곳 · ' + topics + '개 항목'
+      : '0곳') : '';
+    previous.disabled = next.disabled = hits.length === 0;
+  }
+  function highlightCurrent() {
+    hits.forEach((hit,index) => hit.marks.forEach(mark => {
+      mark.classList.toggle('current-match',index === active);
+    }));
+    [...results.children].forEach(button => {
+      button.setAttribute('aria-current',String(active >= 0 && button.dataset.page === hits[active].page.id));
+    });
+    updateCounter();
+  }
+  function activate(index, scroll = true) {
+    if (!hits.length) return;
+    active = (index + hits.length) % hits.length;
+    navigate(hits[active].page.id,false);
+    highlightCurrent();
+    if (scroll) {
+      closeSidebar();
+      hits[active].marks[0]?.scrollIntoView({block:'center'});
+    }
+  }
+  function clearMarks() {
+    const parents = new Set();
+    document.querySelectorAll('#manual mark[data-manual-hit]').forEach(mark => {
+      parents.add(mark.parentNode);
+      mark.replaceWith(...mark.childNodes);
+    });
+    parents.forEach(parent => parent.normalize());
+  }
+  function expression(value) {
+    return value.split(/\s+/).map(word => word.replace(/[.*+?^$(){}|[\]\\]/g,'\\$&')).join('\\s+');
+  }
+  function appendExcerpt(target, text, pattern) {
+    let from = 0;
+    for (const match of text.matchAll(new RegExp(pattern,'giu'))) {
+      target.append(document.createTextNode(text.slice(from,match.index)));
+      const mark = document.createElement('mark');
+      mark.textContent = match[0];
+      target.append(mark);
+      from = match.index + match[0].length;
+    }
+    target.append(document.createTextNode(text.slice(from)));
+  }
+  function findMatches(pattern) {
+    const pieces = new Map();
+    pages.forEach((page,pageIndex) => {
+      const blocks = new Map(), walker = document.createTreeWalker(page,NodeFilter.SHOW_TEXT);
+      while (walker.nextNode()) {
+        const node = walker.currentNode, parent = node.parentElement;
+        if (parent.closest('.page-foot,.eyebrow,#printed-toc,[data-doc-version],[data-doc-date],script,style')) continue;
+        const block = parent.closest('h1,h2,h3,p,li,th,td,figcaption,pre,aside,.formula,.flow>div,.frame-bar>span') || page;
+        if (!blocks.has(block)) blocks.set(block,[]);
+        blocks.get(block).push(node);
+      }
+      const title = page.querySelector('h1').textContent;
+      const titleMatch = new RegExp(pattern,'iu').test(title);
+      for (const nodes of blocks.values()) {
+        const text = nodes.map(node => node.nodeValue).join('');
+        for (const match of text.matchAll(new RegExp(pattern,'giu'))) {
+          const start = match.index, end = start + match[0].length;
+          const hit = {page,pageIndex,title,titleMatch,order:hits.length,marks:[],text,start,length:match[0].length};
+          hits.push(hit);
+          let position = 0;
+          for (const node of nodes) {
+            const length = node.nodeValue.length;
+            if (position < end && position + length > start) {
+              if (!pieces.has(node)) pieces.set(node,[]);
+              pieces.get(node).push({start:Math.max(0,start-position),end:Math.min(length,end-position),hit});
+            }
+            position += length;
+          }
+        }
+      }
+    });
+    hits.sort((a,b) => Number(b.titleMatch)-Number(a.titleMatch) || a.pageIndex-b.pageIndex || a.order-b.order);
+    hits.forEach((hit,index) => { hit.index = index; });
+    for (const [node,parts] of pieces) {
+      const fragment = document.createDocumentFragment(), text = node.nodeValue;
+      let from = 0;
+      for (const part of parts) {
+        fragment.append(document.createTextNode(text.slice(from,part.start)));
+        const mark = document.createElement('mark');
+        mark.dataset.manualHit = String(part.hit.index);
+        mark.textContent = text.slice(part.start,part.end);
+        part.hit.marks.push(mark);
+        fragment.append(mark);
+        from = part.end;
+      }
+      fragment.append(document.createTextNode(text.slice(from)));
+      node.replaceWith(fragment);
+    }
+  }
+  function drawResults(pattern) {
+    const groups = new Map();
+    hits.forEach(hit => {
+      if (!groups.has(hit.page)) groups.set(hit.page,[]);
+      groups.get(hit.page).push(hit);
+    });
+    const fragment = document.createDocumentFragment();
+    groups.forEach(items => {
+      const hit = items[0], button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'result-link';
+      button.dataset.page = hit.page.id;
+      const title = document.createElement('strong'), count = document.createElement('small');
+      title.textContent = hit.title;
+      count.textContent = items.length + '곳';
+      const excerpt = document.createElement('span');
+      const start = Math.max(0,hit.start-32), end = Math.min(hit.text.length,hit.start+hit.length+48);
+      const text = (start ? '…' : '') + hit.text.slice(start,end).replace(/\s+/g,' ').trim() + (end<hit.text.length ? '…' : '');
+      appendExcerpt(excerpt,text,pattern);
+      button.append(title,count,excerpt);
+      button.addEventListener('click',() => activate(hit.index));
+      fragment.append(button);
+    });
+    results.replaceChildren(fragment);
+    empty.hidden = hits.length > 0;
+  }
+  function filter() {
+    clearTimeout(timer);
+    clearMarks();
+    hits = []; active = -1;
+    query = search.value.trim();
+    document.getElementById('results-tab').disabled = !query;
+    if (!query) {
+      results.replaceChildren();
+      empty.hidden = true;
+      panel('contents');
+      updateCounter();
+      return;
+    }
+    const pattern = expression(query);
+    findMatches(pattern);
+    drawResults(pattern);
+    panel('results');
+    if (mobile()) {
+      sidebar.classList.add('is-open');
+      toggle.setAttribute('aria-expanded','true');
+    }
+    if (hits.length) activate(0,!mobile());
+    else updateCounter();
+  }
+  document.addEventListener('click',event => {
+    const link = event.target.closest('a[href^="#"]');
+    if (!link) return;
+    const id = link.hash.slice(1);
+    if (!byId.has(id)) return;
+    event.preventDefault();
+    closeSidebar();
+    navigate(id);
+    if (query) {
+      active = hits.findIndex(hit => hit.page === current);
+      highlightCurrent();
+    }
+  });
+  search.addEventListener('input',() => {
+    clearTimeout(timer);
+    timer = setTimeout(filter,120);
+  });
+  search.addEventListener('keydown',event => {
+    if (event.key === 'Escape') {
+      search.value = '';
+      filter();
+    } else if (event.key === 'Enter') {
+      event.preventDefault();
+      if (query !== search.value.trim()) filter();
+      else activate(active + (event.shiftKey ? -1 : 1));
+    }
+  });
+  document.getElementById('reset').onclick = () => { search.value = ''; filter(); search.focus(); };
+  previous.onclick = () => { if (query !== search.value.trim()) filter(); else activate(active-1); };
+  next.onclick = () => { if (query !== search.value.trim()) filter(); else activate(active+1); };
+  document.getElementById('contents-tab').onclick = () => panel('contents');
+  document.getElementById('results-tab').onclick = () => panel('results');
+  toggle.onclick = () => {
+    const open = sidebar.classList.toggle('is-open');
+    toggle.setAttribute('aria-expanded',String(open));
+  };
+  document.getElementById('print').onclick = () => window.print();
+  if (!embedded) {
+    let wheelAt = 0, wheelSum = 0, wheelDirection = 0, canTurn = false, turnedAt = -Infinity;
+    window.addEventListener('wheel',event => {
+      const now = performance.now(), direction = Math.sign(event.deltaY);
+      const fresh = now - wheelAt > 220 || direction !== wheelDirection;
+      wheelAt = now;
+      wheelDirection = direction;
+      if (!direction || event.ctrlKey || event.metaKey
+          || event.target.closest('.toolbar,.sidebar,input,textarea,select,[contenteditable="true"]')) return;
+      for (let node = event.target; node && node !== document.body; node = node.parentElement) {
+        if (node.scrollHeight > node.clientHeight + 2 && /auto|scroll/.test(getComputedStyle(node).overflowY)) return;
+      }
+      const scroll = document.scrollingElement;
+      const edge = direction < 0 ? scroll.scrollTop <= 2
+        : scroll.scrollTop + scroll.clientHeight >= scroll.scrollHeight - 2;
+      // A fresh gesture at the edge prevents trackpad momentum from skipping topics.
+      if (!edge || now - turnedAt < 800) { canTurn = false; wheelSum = 0; return; }
+      if (fresh) { canTurn = true; wheelSum = 0; }
+      if (!canTurn) return;
+      wheelSum += event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? innerHeight : 1);
+      if (Math.abs(wheelSum) < 90) return;
+      const link = document.getElementById(direction > 0 ? 'topic-next' : 'topic-prev');
+      if (link.hidden) return;
+      event.preventDefault();
+      canTurn = false;
+      turnedAt = now;
+      link.click();
+      window.scrollTo({top:0,behavior:'instant'});
+    },{passive:false});
+  }
+  window.addEventListener('popstate',readHash);
+  window.addEventListener('hashchange',readHash);
+  const resize = new ResizeObserver(() => {
+    document.documentElement.style.setProperty('--toolbar-height',document.querySelector('.toolbar').getBoundingClientRect().height + 'px');
+  });
+  resize.observe(document.querySelector('.toolbar'));
+  readHash();
+  filter();
+})();
+</script></body></html>

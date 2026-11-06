@@ -137,7 +137,14 @@ class WebPageControllerTest {
         mvc.perform(get("/user-manual/assets/Kari_logo.png"))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith("image/png"));
-        byte[] pdf = mvc.perform(get("/user-manual/lnis-user-manual.pdf"))
+        mvc.perform(get("/user-manual/lnis-user-manual.pdf"))
+                .andExpect(status().isFound())
+                .andExpect(redirectedUrl("/user-manual/user-manual.pdf"));
+        mvc.perform(get("/user-manual/user-manual.docx"))
+                .andExpect(status().isOk());
+        mvc.perform(get("/lnis/assets/common/transfer-mark.svg"))
+                .andExpect(status().isOk());
+        byte[] pdf = mvc.perform(get("/user-manual/user-manual.pdf"))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith("application/pdf"))
                 .andReturn().getResponse().getContentAsByteArray();

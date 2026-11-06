@@ -100,7 +100,7 @@ const server=createServer((req,res)=>{
   const file=resolve(root, (['/sender','/lnis/dtntest/sender'].includes(path)?'dtn-sender.html':['/receiver','/lnis/dtntest/receiver'].includes(path)?'dtn-receiver.html':path==='/lnis/data-manager'?'data-management.html':path==='/dtn-intro'?'dtn-intro.html':path==='/user-manual/'?'user-manual/index.html':path.replace(/^\/lnis\//,'')).replace(/^\//,''));
   if(!file.startsWith(root+require('node:path').sep))throw Error('path');
   const content=readFileSync(file);
-  res.writeHead(200,{'Content-Type':{'.js':'text/javascript','.html':'text/html','.css':'text/css','.png':'image/png','.pdf':'application/pdf'}[extname(file)]||'text/plain'});res.end(content);
+  res.writeHead(200,{'Content-Type':{'.js':'text/javascript','.html':'text/html','.css':'text/css','.png':'image/png','.pdf':'application/pdf','.svg':'image/svg+xml'}[extname(file)]||'text/plain'});res.end(content);
  }catch{res.writeHead(404);res.end();}
 });
 (async()=>{
@@ -108,6 +108,73 @@ const server=createServer((req,res)=>{
  browser=await chromium.launch();const context=await browser.newContext();
  await context.addInitScript(()=>{window.WebSocket=class {};});
  const page=await context.newPage();page.setDefaultTimeout(15000);const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ // Context help uses read-only embedded topics and leaves the current trial unchanged.
+ for (const role of ['sender','receiver']) {
+   const help = await context.newPage();
+   help.on('pageerror', error => errors.push(error.message));
+   await help.goto(base + '/' + role);
+   await help.waitForSelector('#dtn-payload .manual-help');
+   const beforeStarts = starts;
+   const before = await help.locator('#dtn-tests').inputValue();
+   for (const topic of ['json', role === 'sender' ? 'sender-reference' : 'pvt-result']) {
+     const trigger = help.locator('.manual-help[data-manual-topic="' + topic + '"]').first();
+     assert.equal(await trigger.getAttribute('type'), 'button');
+     await trigger.click();
+     const dialog = help.locator('.manual-help-dialog');
+     const frame = help.frameLocator('.manual-help-dialog iframe');
+     await frame.locator('.sheet:not([hidden]) h1').waitFor();
+     assert.equal(await frame.locator('.sheet:not([hidden])').getAttribute('id'), topic);
+     assert.equal(await frame.locator('.toolbar').isVisible(), false);
+     assert.equal(await frame.locator('#manual-sidebar').isVisible(), false);
+     assert.equal(await frame.locator('.topic-pagination').isVisible(), false);
+     assert.ok((await dialog.locator('.manual-help-heading').boundingBox()).height < 60, 'compact popup heading');
+     const box = await dialog.boundingBox();
+     const viewport = help.viewportSize();
+     assert.ok(box.width < viewport.width * .95 && box.height < viewport.height * .9, 'popup leaves the screen visible');
+     const imageName = 'build/manual-help-' + role + '.png';
+     await help.screenshot({path: imageName});
+     await dialog.getByRole('button', {name:'설명서 닫기',exact:true}).click();
+     assert.equal(await dialog.isVisible(), false);
+     assert.equal(await trigger.evaluate(node => node === document.activeElement), true);
+     await trigger.click();
+     await frame.locator('.sheet:not([hidden]) h1').click();
+     await help.keyboard.press('Escape');
+     await help.waitForFunction(() => !document.querySelector('.manual-help-dialog').open);
+   }
+   if (role === 'sender') {
+     await help.locator('#dtn-settings-open').click();
+     const addressRows = await help.locator('.adapter-url-controls:has(> .manual-help)').evaluateAll(rows => rows.map(row => {
+       const height = row.getBoundingClientRect().height;
+       const button = row.querySelector('.manual-help');
+       button.style.display = 'none';
+       const without = row.getBoundingClientRect().height;
+       button.style.removeProperty('display');
+       return {height,without};
+     }));
+     assert.equal(addressRows.length,2);
+     assert.ok(addressRows.every(row => row.height <= row.without + 1), 'help does not add an address row');
+     await help.locator('#dtn-settings-title .manual-help').click();
+     await help.keyboard.press('Escape');
+     await help.waitForFunction(() => !document.querySelector('.manual-help-dialog').open);
+     assert.equal(await help.locator('#dtn-settings-view').isVisible(), true, 'closing help keeps the settings open');
+     await help.locator('#dtn-settings-close').click();
+   }
+   const topics = await help.locator('.manual-help').evaluateAll(nodes => nodes.map(node => node.dataset.manualTopic));
+   const manual = await context.newPage();
+   await manual.goto(base + '/user-manual/');
+   for (const topic of topics) assert.equal(await manual.locator('.sheet[id="' + topic + '"]').count(),1, topic);
+   await manual.close();
+   await help.setViewportSize({width:390,height:844});
+   await help.locator('#dtn-payload .manual-help').click();
+   const frame = help.frameLocator('.manual-help-dialog iframe');
+   await frame.locator('.sheet:not([hidden]) h1').waitFor();
+   assert.ok(await frame.locator('html').evaluate(node => node.scrollWidth <= innerWidth + 1), 'embedded topic fits mobile');
+   await help.screenshot({path:'build/manual-help-mobile-' + role + '.png'});
+   await help.locator('.manual-help-dialog').getByRole('button',{name:'설명서 닫기',exact:true}).click();
+   assert.equal(await help.locator('#dtn-tests').inputValue(), before);
+   assert.equal(starts, beforeStarts);
+   await help.close();
+ }
  async function selectTrial(){await page.waitForFunction(()=>[...document.getElementById('dtn-tests').options].some(o=>o.value==='test1'));await page.locator('#dtn-tests').selectOption('test1');}
  await page.goto(base+'/sender');
  await page.waitForFunction(()=>!!document.querySelector('#dtn-observations .gnss-data-header #dtn-receiver-info'));
@@ -199,9 +266,10 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
   const manualPage = await popupPromise;
   await manualPage.waitForLoadState();
   assert.match(await manualPage.title(), /사용자 설명서/);
-  assert.equal(await manualPage.getByRole('link', {name:'PDF 다운로드'}).getAttribute('href'), 'lnis-user-manual.pdf');
+  await manualPage.locator('.downloads summary').click();
+  assert.equal(await manualPage.getByRole('link', {name:'PDF 다운로드'}).getAttribute('href'), 'user-manual.pdf');
   await manualPage.close();
-  const pdfResponse = await context.request.get(base+'/user-manual/lnis-user-manual.pdf');
+  const pdfResponse = await context.request.get(base+'/user-manual/user-manual.pdf');
   assert.equal(pdfResponse.status(), 200);
   assert.ok((await pdfResponse.body()).subarray(0,5).equals(Buffer.from('%PDF-')));
 
