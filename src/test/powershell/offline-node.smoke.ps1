@@ -40,6 +40,7 @@ try {
     $bad=$values.Clone();$bad.LNIS_SERVER_PORT='65536';Assert-Throws { Assert-InstallSettings $bad }
     $bad=$values.Clone();$bad.LNIS_NODE_BASE_URL='http://192.0.2.10:8088';Assert-Throws { Assert-InstallSettings $bad }
     $bad=$values.Clone();$bad.LNIS_NODE_ROLE='receiver';Assert-Throws { Assert-InstallSettings $bad }
+    $bad=$values.Clone();$bad.LNIS_NODE_PEER_URL=$bad.LNIS_NODE_BASE_URL;Assert-Throws { Assert-InstallSettings $bad }
     $bad=$values.Clone();$bad.LNIS_NODE_MANAGEMENT_TOKEN=('bad'+[char]10+'value');Assert-Throws { Write-InstallEnvironment (Join-Path $repo 'deployment\node\.env.example') $file $bad }
     Assert-Throws { ConvertTo-NodeLinuxPath '\\server\share' }
     Assert-Throws { Assert-InstallLocation 'C:\' }
@@ -186,7 +187,9 @@ if (Test-Path (Join-Path $fixtureData 'fail-once')) {
     throw 'Injected startup failure'
 }
 '@
-    Set-Content (Join-Path $bundleApp 'stop.ps1') ''
+    Set-Content (Join-Path $bundleApp 'stop.ps1') @'
+Set-Content (Join-Path (Split-Path $PSScriptRoot) 'data\stopped-marker') 'stopped'
+'@
     Set-Content (Join-Path $bundleApp 'START.cmd') ''
     Set-Content (Join-Path $bundleApp 'STOP.cmd') ''
     function Invoke-InstallerAdmin { param($Arguments) $script:adminCalls+=($Arguments -join ' ') }
@@ -229,6 +232,22 @@ if (Test-Path (Join-Path $fixtureData 'fail-once')) {
     if ((Get-Content (Join-Path $script:installData 'DB\marker')) -ne 'original-db') { throw 'Failed upgrade did not restore the DB.' }
     if (!(Test-Path (Join-Path $Destination 'app\installation.json'))) { throw 'Failed upgrade did not restore the app.' }
     Write-Host 'PASS: actual installer fresh install, offline image load, idle upgrade, and failed-upgrade app/env/DB restoration'
+
+    $Destination=Join-Path $case 'interrupted-first-install'
+    $retryData=Join-Path $Destination 'data'
+    New-Item -ItemType Directory -Path $retryData -Force|Out-Null
+    @{location=(Join-Path $Destination 'runtime');owner=[Security.Principal.WindowsIdentity]::GetCurrent().User.Value}|
+        ConvertTo-Json|Set-Content (Join-Path $retryData 'runtime-registration.json') -Encoding UTF8
+    Set-Content (Join-Path $retryData 'fail-once') ''
+    $Configuration=$file
+    Assert-Throws { & ([ScriptBlock]::Create($transaction)) }
+    if (!(Test-Path (Join-Path $retryData 'stopped-marker'))) { throw 'Failed first installation did not stop its new service.' }
+    $marker=Get-Content (Join-Path $retryData 'DB\marker') -Raw
+    & ([ScriptBlock]::Create($transaction))
+    if ((Get-Content (Join-Path $retryData 'DB\marker') -Raw) -ne $marker) { throw 'First-install retry removed data.' }
+    if (!(Test-Path (Join-Path $Destination 'app\installation.json'))) { throw 'First-install retry did not complete.' }
+    Write-Host 'PASS: first installation interrupted after app deployment can be retried without deleting data'
+
 
 } finally {
     $root=[IO.Path]::GetFullPath((Join-Path $repo 'build')).TrimEnd('\')+'\'

@@ -397,3 +397,21 @@ tasks.register('windowsNodeDistZip', Zip) {
     preserveFileTimestamps = false
     reproducibleFileOrder = true
 }
+
+tasks.register('windowsNodeSetup', Exec) {
+    group = 'distribution'
+    description = '설정 마법사와 오프라인 실행 자료를 포함한 단일 Setup.exe를 생성한다.'
+    dependsOn tasks.named('prepareWindowsNode')
+    commandLine 'powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass',
+            '-File', 'scripts/package-setup.ps1',
+            '-SourceDirectory', projectDir.absolutePath
+}
+
+tasks.register('setupTest', Exec) {
+    group = 'verification'
+    description = '설치 마법사의 입력·중단 복구·기존 설정 보존을 검사한다.'
+    onlyIf { System.getProperty('os.name').toLowerCase().contains('windows') }
+    commandLine 'powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass',
+            '-File', 'src/test/powershell/setup.smoke.ps1'
+}
+tasks.named('check') { dependsOn tasks.named('setupTest') }

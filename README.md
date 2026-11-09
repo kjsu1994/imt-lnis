@@ -225,7 +225,11 @@ Unpack `build/distributions/lnis-node-linux.zip` on each target machine, copy `.
 
 ### 5.2 Windows 11 오프라인 납품
 
-`gradlew.bat windowsNodeDistZip`으로 검증된 설치 묶음을 만듭니다. 설치 담당자가 `INSTALL.cmd`로 두 PC의 역할·주소·토큰·I/Q 공유 경로를 각각 준비합니다. 이후 사용자는 `START.cmd`와 `STOP.cmd`만 사용합니다. WSL 유지·COM 중계·Docker 기동은 실행기가 관리하며, 현장에서 이미지를 빌드하거나 외부 인터넷을 사용하지 않습니다. 설정 항목은 배포용 `.env.example`의 한글 주석을 참고하세요. 자세한 절차는 [설치·실행 안내](deployment/node/README.md)에 있습니다.
+`gradlew.bat windowsNodeSetup`으로 프로젝트 최상위의 `Setup.exe`를 만듭니다. 각 PC에서 EXE 하나를 실행해 역할·주소·기존 인증값을 설정합니다. 현재 PC IP는 자동 선택하고 상대 PC·어댑터 주소는 비워 둘 수 있습니다. `.env`, Windows·WSL·Docker 접속 포트, 역할별 바탕화면 바로가기는 설치 프로그램이 준비합니다. Windows 구성요소 설치 후 재부팅이 필요하면 같은 EXE를 다시 실행합니다. 설치 대상 PC에서는 외부 다운로드가 필요하지 않습니다.
+
+기존 ZIP은 `gradlew.bat windowsNodeDistZip`으로 생성하며 `INSTALL.cmd` 방식도 유지합니다. 이후 실행은 바탕화면의 송신·수신 바로가기, 종료는 `DTN STOP`을 사용합니다. 설치 기록은 `%LOCALAPPDATA%\imtplus\Setup\install.log`입니다. 자세한 절차는 [설치·실행 안내](deployment/node/README.md)에 있습니다.
+
+`Setup.exe`는 ignore 항목에 추가하지 않습니다. 100MiB를 넘는 배포 파일은 GitHub 일반 Git 업로드 제한이 있으므로 Releases 첨부파일로 전달합니다.
 
 ### 5.3 Linux 개발 환경 시작
 

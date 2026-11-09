@@ -5,30 +5,31 @@ param(
     [string]$Configuration,
     [switch]$SystemSetup,
     [string]$NetworkSetup,
-    [switch]$NoBrowser
+    [switch]$NoBrowser,
+    [string]$LogFile
 )
 $ErrorActionPreference = 'Stop'
 
-function Assert-InstallLocation([string]$Path) {
-    $full = [IO.Path]::GetFullPath($Path).TrimEnd('\')
-    if ($full -notmatch '^[A-Za-z]:\\.+\\.+$' -or $full.StartsWith($env:WINDIR, [StringComparison]::OrdinalIgnoreCase)) {
-        throw 'Windows 시스템 폴더가 아닌 로컬 설치 경로를 지정하세요.'
-    }
-    $part = $full
-    while ($part) {
-        if ((Test-Path -LiteralPath $part) -and ((Get-Item -LiteralPath $part).Attributes -band [IO.FileAttributes]::ReparsePoint)) {
-            throw "연결된 폴더에는 설치할 수 없습니다: $part"
-        }
-        $part = Split-Path $part
-    }
-    return $full
-}
 
 function Invoke-InstallerAdmin([string[]]$Arguments) {
     $args = @('-NoProfile','-ExecutionPolicy','Bypass','-File',('"' + $PSCommandPath + '"'),'-BundleRoot',('"' + $script:bundle + '"')) + $Arguments
+    if ($LogFile) { $args += @('-LogFile', ('"' + $LogFile + '.admin.log"')) }
     $child = Start-Process powershell.exe -ArgumentList $args -Verb RunAs -WindowStyle Hidden -Wait -PassThru
-    if ($child.ExitCode -eq 3010) { throw 'Windows 구성요소를 준비했습니다. PC를 재부팅한 뒤 INSTALL.cmd를 다시 실행하세요.' }
+    if ($child.ExitCode -eq 3010) {
+        Write-Host 'Windows 구성요소를 준비했습니다. PC를 재부팅한 뒤 설치 프로그램을 다시 실행하세요.'
+        exit 3010
+    }
     if ($child.ExitCode -ne 0) { throw "설치 권한 작업에 실패했습니다 (종료 코드 $($child.ExitCode)). 설치 기록을 확인하세요." }
+}
+
+function Get-InstalledWslVersion {
+    try {
+        $text = (& wsl.exe --version 2>$null) -join ' '
+        if ($LASTEXITCODE -eq 0 -and ($text -replace [char]0, '') -match '(\d+\.\d+\.\d+(?:\.\d+)?)') {
+            return [version]$Matches[1]
+        }
+    } catch {}
+    return $null
 }
 
 function Install-WslPrerequisites([string]$Offline) {
@@ -39,9 +40,17 @@ function Install-WslPrerequisites([string]$Offline) {
     $restart = $false
     foreach ($name in @('Microsoft-Windows-Subsystem-Linux','VirtualMachinePlatform')) {
         if ((Get-WindowsOptionalFeature -Online -FeatureName $name).State -ne 'Enabled') {
-            $result = Enable-WindowsOptionalFeature -Online -FeatureName $name -All -NoRestart
+            $result = Enable-WindowsOptionalFeature -Online -FeatureName $name -All -NoRestart -LimitAccess
             $restart = $restart -or $result.RestartNeeded
         }
+    }
+    $installedVersion = Get-InstalledWslVersion
+    $requiredVersion = $null
+    if ($release -and $release.wslVersion) {
+        [version]::TryParse($release.wslVersion.TrimStart('v'), [ref]$requiredVersion) | Out-Null
+    }
+    if ($installedVersion -and $requiredVersion -and $installedVersion -ge $requiredVersion) {
+        return $restart
     }
     $msi = Join-Path $Offline 'wsl.msi'
     $process = Start-Process msiexec.exe -ArgumentList @('/i',('"' + $msi + '"'),'/qn','/norestart') -Wait -WindowStyle Hidden -PassThru
@@ -118,31 +127,6 @@ function Read-InstallSecret([string]$Prompt) {
     finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($handle) }
 }
 
-function Write-InstallEnvironment([string]$Example, [string]$Output, $Values) {
-    $known = @{}
-    $lines = foreach ($line in Get-Content -LiteralPath $Example -Encoding UTF8) {
-        if ($line -match '^([A-Za-z_][A-Za-z0-9_]*)=') {
-            $key = $Matches[1]
-            $known[$key] = $true
-            if ($Values.ContainsKey($key)) {
-                $value = [string]$Values[$key]
-                if ($value.Contains([char]10) -or $value.Contains([char]13) -or $value.Contains('#') -or $value.Contains('$')) {
-                    throw "설정값에 줄바꿈 또는 #, $ 문자를 사용할 수 없습니다: $key"
-                }
-                $key + '=' + $value
-            } else { $line }
-        } else { $line }
-    }
-    foreach ($key in $Values.Keys | Sort-Object) {
-        if (!$known.ContainsKey($key)) {
-            if ($key -notmatch '^[A-Za-z_][A-Za-z0-9_]*$' -or [string]$Values[$key] -match '[\r\n#$]') {
-                throw "추가 설정의 이름과 값을 확인하세요: $key"
-            }
-            $lines += @('# 기존 설치에서 유지한 추가 설정입니다.', ($key + '=' + $Values[$key]))
-        }
-    }
-    [IO.File]::WriteAllLines($Output, $lines, (New-Object Text.UTF8Encoding $false))
-}
 
 function Get-InstallSettings([string]$Existing, [string]$Provided) {
     if ($Provided) { return Read-NodeEnvironment $Provided }
@@ -164,21 +148,6 @@ function Get-InstallSettings([string]$Existing, [string]$Provided) {
     return $settings
 }
 
-function Assert-InstallSettings($Values) {
-    if ($Values.LNIS_NODE_ROLE -notin @('sender','receiver')) { throw '역할은 sender 또는 receiver여야 합니다.' }
-    $port = 0
-    if (![int]::TryParse($Values.LNIS_SERVER_PORT,[ref]$port) -or $port -lt 1 -or $port -gt 65535) { throw '서비스 포트는 1~65535여야 합니다.' }
-    foreach ($key in @('LNIS_NODE_BASE_URL','LNIS_NODE_PEER_URL','dtn_adapter')) {
-        $uri = $null
-        if (![Uri]::TryCreate($Values[$key],[UriKind]::Absolute,[ref]$uri) -or $uri.Scheme -ne 'http' -or $uri.UserInfo -or
-            $uri.Query -or $uri.Fragment -or $uri.AbsolutePath -ne '/') { throw "IP와 포트까지의 http 주소를 입력하세요: $key" }
-        if ($key -eq 'LNIS_NODE_BASE_URL' -and ($uri.HostNameType -ne 'IPv4' -or $uri.Port -ne $port)) {
-            throw '현재 PC 주소에는 IPv4와 서비스 포트를 일치시켜 입력하세요.'
-        }
-    }
-    if ($Values.LNIS_NODE_MANAGEMENT_TOKEN.Length -lt 32) { throw '공통 관리 토큰은 32자 이상이어야 합니다.' }
-    if ($Values.LNIS_NODE_ROLE -eq 'receiver' -and !$Values.LNIS_DTN_RECEIVE_TOKEN) { throw '수신 인증 토큰을 입력하세요.' }
-}
 
 if (!$BundleRoot) { $BundleRoot = Split-Path $PSScriptRoot }
 $script:bundle = [IO.Path]::GetFullPath($BundleRoot)
@@ -186,18 +155,23 @@ $script:bundle = [IO.Path]::GetFullPath($BundleRoot)
 $release = Assert-NodeFiles $script:bundle
 if ($SystemSetup) {
     try {
-        Start-Transcript -Path (Join-Path $script:bundle 'installer\install.log') -Append -Force | Out-Null
+        Start-Transcript -Path $(if ($LogFile) { $LogFile } else { Join-Path $script:bundle 'installer\install.log' }) -Append -Force | Out-Null
         if (Install-WslPrerequisites (Join-Path $script:bundle 'offline')) { exit 3010 }
         exit 0
     } catch { Write-Error $_; exit 1 }
 }
 if ($NetworkSetup) {
     try {
-        Start-Transcript -Path (Join-Path $script:bundle 'installer\install.log') -Append -Force | Out-Null
+        Start-Transcript -Path $(if ($LogFile) { $LogFile } else { Join-Path $script:bundle 'installer\install.log' }) -Append -Force | Out-Null
         Set-NodeNetwork (Get-Content -Raw -LiteralPath $NetworkSetup -Encoding UTF8 | ConvertFrom-Json)
         exit 0
     } catch { Write-Error $_; exit 1 }
 }
+if ($LogFile) {
+    New-Item -ItemType Directory -Path (Split-Path $LogFile) -Force | Out-Null
+    Start-Transcript -Path $LogFile -Append -Force | Out-Null
+}
+Write-Host '[1/7] 설치 경로와 설정 확인'
 $destinationRoot = Assert-InstallLocation $Destination
 $app = Join-Path $destinationRoot 'app'
 $data = Join-Path $destinationRoot 'data'
@@ -216,6 +190,7 @@ if (Test-Path -LiteralPath (Join-Path $data 'DB')) {
     $required += (Get-ChildItem -LiteralPath (Join-Path $data 'DB') -File -Recurse | Measure-Object Length -Sum).Sum
 }
 if ($drive.AvailableFreeSpace -lt $required) { throw '설치·복원에 필요한 여유 공간이 부족합니다. 최소 12 GB와 기존 DB 크기만큼 확보하세요.' }
+Write-Host '[2/7] Windows 및 WSL 구성요소 확인'
 Invoke-InstallerAdmin @('-SystemSetup')
 New-Item -ItemType Directory -Path $destinationRoot,$data,(Join-Path $data 'DB'),(Join-Path $data 'exchange') -Force | Out-Null
 $stage = Join-Path $destinationRoot ('app.staging-' + [Guid]::NewGuid().ToString('N'))
@@ -224,6 +199,7 @@ Assert-NodeFiles $stage | Out-Null
 $backup = $null
 $context = $null
 $lock = $null
+$firstInstall = !(Test-Path -LiteralPath (Join-Path $app 'installation.json'))
 try {
     if (Test-Path -LiteralPath (Join-Path $app 'installation.json')) {
         $context = Get-NodeContext $app
@@ -244,6 +220,7 @@ try {
             Copy-Item -LiteralPath (Join-Path $data 'network.json') -Destination $backup
         }
     }
+    Write-Host '[3/7] 오프라인 WSL 실행 환경 준비'
     $distributions = (& wsl.exe --list --quiet) -replace [char]0, ''
     $registrationFile = Join-Path $data 'runtime-registration.json'
     if ($distributions -notcontains 'LNIS-Runtime') {
@@ -267,8 +244,10 @@ try {
     Write-InstallEnvironment (Join-Path $app '.env.example') $existing $values
     $context = Get-NodeContext $app
     $imageArchive = ConvertTo-NodeLinuxPath (Join-Path $script:bundle 'offline\service-image.tar')
+    Write-Host '[4/7] Docker 및 서비스 이미지 준비'
     Invoke-NodeWsl $context @('sudo','-n','systemctl','start','docker') | Out-Null
     Invoke-NodeWsl $context @('docker','load','--input',$imageArchive) | Out-Host
+    Write-Host '[5/7] 서비스 실행 및 준비 상태 확인'
     & (Join-Path $app 'start.ps1') -NoBrowser
     $localUrl = Wait-NodeReady $context
     $network = @{
@@ -279,18 +258,26 @@ try {
     }
     $networkFile = Join-Path $data 'network-install.json'
     $network | ConvertTo-Json | Set-Content -LiteralPath $networkFile -Encoding UTF8
+    Write-Host '[6/7] Windows·WSL 접속 포트 적용'
     Invoke-InstallerAdmin @('-NetworkSetup',('"' + $networkFile + '"'))
     Remove-Item -LiteralPath $networkFile
     $public = Invoke-RestMethod ($values.LNIS_NODE_BASE_URL + '/lnis/api/v1/node') -TimeoutSec 5
     if (!$public.online -or $public.role -ine $values.LNIS_NODE_ROLE) { throw 'Windows PC 주소와 WSL 서비스 연결을 확인하지 못했습니다.' }
+    Write-Host '[7/7] 바탕화면 바로가기 생성'
     $shell = New-Object -ComObject WScript.Shell
     foreach ($name in @('START','STOP')) {
-        $link = $shell.CreateShortcut((Join-Path ([Environment]::GetFolderPath('Desktop')) ("DTN " + $name + '.lnk')))
+        $link = $shell.CreateShortcut((Join-Path ([Environment]::GetFolderPath('Desktop')) ($(if ($name -eq 'START') { Get-NodeShortcutName $values.LNIS_NODE_ROLE } else { 'DTN STOP' }) + '.lnk')))
         $link.TargetPath = Join-Path $app ($name + '.cmd')
         $link.WorkingDirectory = $app
+        if (Test-Path -LiteralPath (Join-Path $app 'program.ico')) { $link.IconLocation = Join-Path $app 'program.ico' }
         $link.Save()
     }
-    Write-Host '설치 확인 완료. 이후에는 바탕화면의 DTN START / STOP을 사용하세요.'
+    $oldLinkPath = Join-Path ([Environment]::GetFolderPath('Desktop')) 'DTN START.lnk'
+    if (Test-Path -LiteralPath $oldLinkPath) {
+        $oldLink = $shell.CreateShortcut($oldLinkPath)
+        if ($oldLink.TargetPath -ieq (Join-Path $app 'START.cmd')) { Remove-Item -LiteralPath $oldLinkPath }
+    }
+    Write-Host '설치 확인 완료. 이후에는 바탕화면의 송신·수신 바로가기로 실행하세요.'
     if (!$NoBrowser) { Start-Process $localUrl }
 } catch {
     $failure = $_
@@ -311,6 +298,9 @@ try {
             }
             Write-Warning '갱신에 실패하여 이전 서비스와 DB를 복원했습니다.'
         } catch { Write-Warning "자동 복원 실패. 백업 위치: $backup" }
+    } elseif ($firstInstall -and $context -and $context.Installed) {
+        try { & (Join-Path $app 'stop.ps1') }
+        catch { Write-Warning '새 서비스 정리가 완료되지 않았습니다. 설치 기록을 확인하세요.' }
     }
     throw $failure
 } finally {

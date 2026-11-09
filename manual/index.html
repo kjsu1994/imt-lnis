@@ -148,7 +148,7 @@ html.manual-embedded { scroll-behavior: auto; }
 .manual-embedded .sheet { width: auto; min-height: 0; margin: 0; padding: 24px; border: 0; border-radius: 0; box-shadow: none; }
 @media (max-width: 600px) { .manual-embedded .sheet { padding: 16px; } }
 #search::-webkit-search-cancel-button { -webkit-appearance: none; }
-</style><meta content="1.0" name="manual-version"/><meta content="2026-11-06" name="manual-updated"/></head><body>
+</style><meta content="1.0" name="manual-version"/><meta content="2026-11-09" name="manual-updated"/></head><body>
 <a class="skip" href="#manual">본문으로 이동</a>
 <header class="toolbar">
 <button aria-controls="manual-sidebar" aria-expanded="false" id="contents-toggle" type="button">목차</button>
@@ -2745,18 +2745,18 @@ html.manual-embedded { scroll-behavior: auto; }
 </p>
 <h1 id="title-install-prepare">Windows PC 설치 준비
 </h1></div><div class="split"><div>
-<figure><a aria-label="오프라인 배포 묶음의 실제 파일 목록 · INSTALL.cmd로 설치 시작" href="assets/install-package.png" target="_blank"><img alt="오프라인 배포 묶음의 실제 파일 목록 · INSTALL.cmd로 설치 시작" src="assets/install-package.png"/></a>
-<figcaption>오프라인 배포 묶음의 실제 파일 목록 · INSTALL.cmd로 설치 시작
+<figure><a aria-label="설치 마법사 · 송신·수신 역할과 설치 위치" href="assets/install-package.png" target="_blank"><img alt="설치 마법사 · 송신·수신 역할과 설치 위치" src="assets/install-package.png"/></a>
+<figcaption>설치 마법사 · 송신·수신 역할과 설치 위치
 </figcaption>
 </figure></div><div>
 <ol class="steps">
 <li>송신·수신 PC 각각에 Windows 11 x64와 CPU 가상화 지원을 준비합니다.
 </li>
-<li>배포 ZIP을 로컬 폴더에 모두 풉니다. ZIP 안에서 INSTALL.cmd를 직접 실행하지 않습니다.
+<li>Setup.exe를 각 PC의 로컬 폴더에 복사합니다. 별도 압축 해제는 필요하지 않습니다.
 </li>
-<li>실제로 사용할 Windows 계정으로 INSTALL.cmd를 실행합니다. Windows 기능과 네트워크 설정 때 관리자 승인이 표시됩니다.
+<li>실제로 사용할 Windows 계정으로 Setup.exe를 실행합니다. Windows 기능과 접속 포트 설정 때 관리자 승인이 표시됩니다.
 </li>
-<li>재부팅 안내가 나오면 재부팅한 뒤 같은 INSTALL.cmd를 다시 실행합니다.
+<li>재부팅 안내가 나오면 재부팅한 뒤 같은 Setup.exe를 다시 실행합니다. 입력한 설정은 복원됩니다.
 </li>
 </ol></div></div>
 <table>
@@ -2775,7 +2775,7 @@ html.manual-embedded { scroll-behavior: auto; }
 <tr>
 <td>네트워크
 </td>
-<td>두 PC의 고정 IPv4·서비스 포트, 각 PC가 연결할 어댑터 주소와 인증값을 준비합니다.
+<td>현재 PC의 네트워크 주소를 확인합니다. 상대 PC·어댑터 주소는 모르면 비워 두고 나중에 설정합니다.
 </td>
 </tr>
 <tr>
@@ -2793,22 +2793,21 @@ html.manual-embedded { scroll-behavior: auto; }
 </p>
 <h1 id="title-install-settings">송신·수신 PC 설정
 </h1></div><div class="split"><div>
-<figure><a aria-label="배포용 app/.env.example 실제 내용 · 항목마다 한글 입력 설명 제공" href="assets/install-env.png" target="_blank"><img alt="배포용 app/.env.example 실제 내용 · 항목마다 한글 입력 설명 제공" src="assets/install-env.png"/></a>
-<figcaption>배포용 app/.env.example 실제 내용 · 항목마다 한글 입력 설명 제공
+<figure><a aria-label="설치 마법사 · 현재 PC 주소와 접속 포트" href="assets/install-env.png" target="_blank"><img alt="설치 마법사 · 현재 PC 주소와 접속 포트" src="assets/install-env.png"/></a>
+<figcaption>설치 마법사 · 현재 PC 주소와 접속 포트
 </figcaption>
 </figure></div><div>
 <ol class="steps">
-<li>각 PC의 역할을 sender 또는 receiver로 선택합니다.
+<li>각 PC의 역할을 송신 PC 또는 수신 PC로 선택합니다.
 </li>
-<li>현재 PC와 상대 서비스의 Windows IPv4 주소·포트를 입력합니다. 서로 다른 PC에서는 둘 다 8088을 사용할 수 있습니다.
+<li>자동 선택된 내 PC 주소를 확인합니다. 주소가 여러 개면 사용할 네트워크를 선택합니다. 기본 포트는 양쪽 모두 8088입니다.
 </li>
-<li>현재 PC가 연결할 어댑터 주소를 IP와 포트까지만 입력합니다.
+<li>상대 PC·어댑터 주소는 선택 항목입니다. 모르면 비워 두고 설치 후 시험 화면에서 설정합니다.
 </li>
-<li>노드 간 관리 토큰은 양쪽에 동일한 32자 이상 값으로 지정합니다. 어댑터 송신·수신 인증값은 상대 어댑터와 맞춥니다.
+<li>서비스 연결 인증값은 양쪽 PC에 같은 값을 사용합니다. 어댑터 인증값은 해당 어댑터 설정과 맞춥니다.
 </li>
 </ol>
-<p>미리 작성한 설정 파일을 사용하려면:
-</p><pre class="command">INSTALL.cmd -Configuration "C:\준비\sender.env"</pre></div></div>
+<p>연결 인증값은 새 설치에서 자동 생성됩니다. 상대 PC를 설치할 때 첫 PC와 같은 값을 입력하세요.</p></div></div>
 <table>
 <tr>
 <th>예시
@@ -2856,11 +2855,11 @@ html.manual-embedded { scroll-behavior: auto; }
 </figcaption>
 </figure></div><div>
 <ol class="steps">
-<li>INSTALL이 전용 실행 환경과 서비스 이미지를 설치하고 서비스 준비 상태를 확인합니다.
+<li>Setup이 실행 환경과 서비스를 설치하고 준비 상태를 확인합니다.
 </li>
 <li>Windows 서비스 포트와 Docker 포트를 같은 번호로 연결합니다. 다른 프로그램의 전달 규칙은 덮어쓰지 않습니다.
 </li>
-<li>설치 완료 후 바탕화면의 DTN START로 실행하고 DTN STOP으로 종료합니다.
+<li>바탕화면의 GNSS 전송 시험 · 송신 또는 GNSS 전송 시험 · 수신으로 실행하고 DTN STOP으로 종료합니다.
 </li>
 <li>다른 PC에서 현재 PC 주소로 접속하고, 화면에서 상대 서비스·어댑터 연결을 확인합니다.
 </li>
@@ -2875,7 +2874,7 @@ html.manual-embedded { scroll-behavior: auto; }
 <tr>
 <td>매일 실행
 </td>
-<td>DTN START 한 번 실행. WSL 터미널이나 별도 백그라운드 명령이 필요하지 않습니다.
+<td>송신·수신 바로가기를 실행합니다. 별도 WSL 창이나 백그라운드 명령은 필요하지 않습니다.
 </td>
 </tr>
 <tr>
@@ -2893,11 +2892,11 @@ html.manual-embedded { scroll-behavior: auto; }
 <tr>
 <td>종료 / 갱신
 </td>
-<td>STOP은 DB·입력·I/Q를 삭제하지 않습니다. 갱신은 새 INSTALL을 기존 설치 경로에 실행합니다.
+<td>STOP은 DB·입력·I/Q를 유지합니다. 갱신은 새 Setup.exe에서 기존 설치 경로를 선택합니다.
 </td>
 </tr>
 </table>
-<p>I/Q 시험은 각 PC의 data/exchange를 해당 어댑터와 공유합니다. 주소·포트를 바꾸면 INSTALL로 네트워크 설정도 갱신하세요.
+<p>I/Q 시험은 각 PC의 data/exchange를 해당 어댑터와 공유합니다. 주소·포트를 바꾸면 Setup.exe에서 기존 설치 경로를 선택해 접속 설정도 갱신합니다.
 </p><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>52 / 58</span></div>
 </section>
 <section aria-labelledby="title-operations" class="sheet" id="operations"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
@@ -2918,7 +2917,7 @@ html.manual-embedded { scroll-behavior: auto; }
 <tr>
 <td>Windows 기동
 </td>
-<td>설치 후 바탕화면의 DTN START를 실행합니다. WSL·Docker·COM 중계와 서비스 준비 확인 후 브라우저가 열립니다. 별도 WSL 창은 필요하지 않습니다.
+<td>바탕화면의 송신·수신 바로가기를 실행합니다. WSL·Docker·COM 중계와 서비스 준비 확인 후 브라우저가 열립니다.
 </td>
 </tr>
 <tr>
@@ -2942,7 +2941,7 @@ html.manual-embedded { scroll-behavior: auto; }
 <tr>
 <td>업데이트
 </td>
-<td>새 묶음의 INSTALL.cmd를 기존 설치 경로에 실행합니다. 준비·송신·계산·수집 중에는 갱신하지 않습니다. 설정·자료를 보존하며 실패 시 이전 버전을 복원합니다.
+<td>새 Setup.exe에서 기존 설치 경로를 선택합니다. 준비·송신·계산·수집이 끝난 뒤 진행합니다. 설정·자료를 보존하며 갱신 실패 시 이전 버전을 복원합니다.
 </td>
 </tr>
 <tr>

@@ -107,12 +107,13 @@ RUN useradd -m -s /bin/bash lnis && usermod -aG docker lnis && printf 'lnis ALL=
     $offline = Join-Path $package 'offline'
     $installer = Join-Path $package 'installer'
     New-Item -ItemType Directory -Path $app,$offline,$installer -Force | Out-Null
-    foreach ($file in @('START.cmd','STOP.cmd','start.ps1','stop.ps1','node-runtime.ps1','start-serial-bridge.ps1','stop-serial-bridge.ps1','docker-compose.windows-serial.yml','.env.example','README.md')) {
+    foreach ($file in @('program.ico','START.cmd','STOP.cmd','start.ps1','stop.ps1','node-runtime.ps1','start-serial-bridge.ps1','stop-serial-bridge.ps1','docker-compose.windows-serial.yml','.env.example','README.md')) {
         Copy-Item -LiteralPath (Join-Path $repo ('deployment\node\' + $file)) -Destination $app
     }
     $compose = (Get-Content -LiteralPath (Join-Path $repo 'deployment\node\docker-compose.yml') -Raw) -replace '(?m)^    build:.*\r?\n',''
     [IO.File]::WriteAllText((Join-Path $app 'docker-compose.yml'),$compose,(New-Object Text.UTF8Encoding $false))
     Copy-Item -LiteralPath (Join-Path $repo 'deployment\node\install.ps1') -Destination $installer
+    Copy-Item -LiteralPath (Join-Path $repo 'deployment\node\setup-settings.ps1') -Destination $installer
     Copy-Item -LiteralPath (Join-Path $repo 'deployment\node\INSTALL.cmd') -Destination $package
     Copy-Item -LiteralPath $msi,$rootfs -Destination $offline
     Copy-Item -LiteralPath (Join-Path $repo 'build\windows-serial-bridge') -Destination (Join-Path $app 'serial-bridge') -Recurse

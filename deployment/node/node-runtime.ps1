@@ -180,3 +180,69 @@ function Assert-NodePortMapping($Context) {
         throw "포트 불일치: LNIS_SERVER_PORT=$($Context.Port), Windows 게시 포트·Docker 대상 포트·SERVER_PORT를 같게 설정하세요."
     }
 }
+
+function Assert-InstallLocation([string]$Path) {
+    $full = [IO.Path]::GetFullPath($Path).TrimEnd('\')
+    if ($full -notmatch '^[A-Za-z]:\\.+\\.+$' -or $full.StartsWith($env:WINDIR, [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'Windows 시스템 폴더가 아닌 로컬 설치 경로를 지정하세요.'
+    }
+    $part = $full
+    while ($part) {
+        if ((Test-Path -LiteralPath $part) -and ((Get-Item -LiteralPath $part).Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+            throw "연결된 폴더에는 설치할 수 없습니다: $part"
+        }
+        $part = Split-Path $part
+    }
+    return $full
+}
+
+function Write-InstallEnvironment([string]$Example, [string]$Output, $Values) {
+    $known = @{}
+    $lines = foreach ($line in Get-Content -LiteralPath $Example -Encoding UTF8) {
+        if ($line -match '^([A-Za-z_][A-Za-z0-9_]*)=') {
+            $key = $Matches[1]
+            $known[$key] = $true
+            if ($Values.ContainsKey($key)) {
+                $value = [string]$Values[$key]
+                if ($value.Contains([char]10) -or $value.Contains([char]13) -or $value.Contains('#') -or $value.Contains('$')) {
+                    throw "설정값에 줄바꿈 또는 #, $ 문자를 사용할 수 없습니다: $key"
+                }
+                $key + '=' + $value
+            } else { $line }
+        } else { $line }
+    }
+    foreach ($key in $Values.Keys | Sort-Object) {
+        if (!$known.ContainsKey($key)) {
+            if ($key -notmatch '^[A-Za-z_][A-Za-z0-9_]*$' -or [string]$Values[$key] -match '[\r\n#$]') {
+                throw "추가 설정의 이름과 값을 확인하세요: $key"
+            }
+            $lines += @('# 기존 설치에서 유지한 추가 설정입니다.', ($key + '=' + $Values[$key]))
+        }
+    }
+    [IO.File]::WriteAllLines($Output, $lines, (New-Object Text.UTF8Encoding $false))
+}
+
+function Assert-InstallSettings($Values) {
+    if ($Values.LNIS_NODE_ROLE -notin @('sender','receiver')) { throw '역할은 sender 또는 receiver여야 합니다.' }
+    $port = 0
+    if (![int]::TryParse($Values.LNIS_SERVER_PORT,[ref]$port) -or $port -lt 1 -or $port -gt 65535) { throw '서비스 포트는 1~65535여야 합니다.' }
+    foreach ($key in @('LNIS_NODE_BASE_URL','LNIS_NODE_PEER_URL','dtn_adapter')) {
+        if ($key -ne 'LNIS_NODE_BASE_URL' -and [string]::IsNullOrWhiteSpace($Values[$key])) { continue }
+        $uri = $null
+        if (![Uri]::TryCreate($Values[$key],[UriKind]::Absolute,[ref]$uri) -or $uri.Scheme -ne 'http' -or $uri.UserInfo -or
+            $uri.Query -or $uri.Fragment -or $uri.AbsolutePath -ne '/') { throw "IP와 포트까지의 http 주소를 입력하세요: $key" }
+        if ($key -eq 'LNIS_NODE_BASE_URL' -and ($uri.HostNameType -ne 'IPv4' -or $uri.Port -ne $port)) {
+            throw '현재 PC 주소에는 IPv4와 서비스 포트를 일치시켜 입력하세요.'
+        }
+    }
+    if ($Values.LNIS_NODE_PEER_URL -and ([Uri]$Values.LNIS_NODE_PEER_URL).Equals([Uri]$Values.LNIS_NODE_BASE_URL)) {
+        throw '상대 PC 주소는 내 PC 주소와 다르게 입력하세요.'
+    }
+    if ($Values.LNIS_NODE_MANAGEMENT_TOKEN.Length -lt 32) { throw '공통 관리 토큰은 32자 이상이어야 합니다.' }
+    if ($Values.LNIS_NODE_ROLE -eq 'receiver' -and !$Values.LNIS_DTN_RECEIVE_TOKEN) { throw '수신 인증 토큰을 입력하세요.' }
+}
+
+function Get-NodeShortcutName([string]$Role) {
+    if ($Role -notin @('sender','receiver')) { throw '송신·수신 역할을 확인하세요.' }
+    return 'GNSS 전송 시험 · ' + $(if ($Role -eq 'sender') { '송신' } else { '수신' })
+}
