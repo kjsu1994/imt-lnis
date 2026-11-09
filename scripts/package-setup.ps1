@@ -38,7 +38,13 @@ $pending = $Output + '.pending.exe'
 try {
     & $compiler /INPUTCHARSET UTF8 (('/DBUNDLE=' + [IO.Path]::GetFullPath($BundleRoot))) (('/DOUTPUT=' + [IO.Path]::GetFullPath($pending))) (Join-Path $repo 'deployment\node\setup.nsi')
     if ($LASTEXITCODE -ne 0 -or !(Test-Path -LiteralPath $pending)) { throw 'Setup.exe 생성 실패' }
-    Move-Item -LiteralPath $pending -Destination $Output -Force
+    if (Test-Path -LiteralPath $Output) {
+        $previous = $Output + '.previous-' + [Guid]::NewGuid().ToString('N') + '.exe'
+        [IO.File]::Replace($pending, $Output, $previous)
+        Remove-Item -LiteralPath $previous
+    } else {
+        [IO.File]::Move($pending, $Output)
+    }
     Write-Host ("Setup.exe 생성 완료: " + $Output)
     Write-Host ("SHA-256: " + (Get-FileHash -LiteralPath $Output).Hash)
 } finally { if (Test-Path -LiteralPath $pending) { Remove-Item -LiteralPath $pending } }

@@ -76,7 +76,7 @@ function Get-SetupValues([string]$Path) {
 function Write-SetupHints([string]$Path, [string]$Output) {
     $pending = Read-SetupPending
     if (!$Path) {
-        $Path = if ($pending) { $pending.destination } else { Join-Path $env:ProgramData 'imtplus\DTN' }
+        $Path = if ($pending) { $pending.destination } else { Join-Path $env:SystemDrive 'compose' }
     }
     $values = Get-SetupValues $Path
     $addresses = @(Get-SetupAddresses)

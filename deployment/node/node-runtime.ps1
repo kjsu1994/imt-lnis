@@ -45,9 +45,26 @@ function Get-NodeContext([string]$AppRoot) {
 }
 
 function Invoke-NodeWsl($Context, [string[]]$Arguments) {
-    $result = & wsl.exe -d $Context.Distribution --cd $Context.Linux -- @Arguments
-    if ($LASTEXITCODE -ne 0) { throw "WSL 명령 실패 (종료 코드 $LASTEXITCODE): $($Arguments[0])" }
-    return $result
+    Get-Command wsl.exe -ErrorAction Stop | Out-Null
+    $preference = $ErrorActionPreference
+    $encoding = [Console]::OutputEncoding
+    try {
+        [Console]::OutputEncoding = New-Object Text.UTF8Encoding $false
+        $ErrorActionPreference = 'Continue'
+        $result = @(& wsl.exe -d $Context.Distribution --cd $Context.Linux --exec @Arguments 2>&1)
+        $exitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $preference
+        [Console]::OutputEncoding = $encoding
+    }
+    if ($exitCode -ne 0) {
+        $detail = ($result | Select-Object -Last 8 | ForEach-Object { $_.ToString() }) -join [Environment]::NewLine
+        throw ("WSL 명령 실패 (종료 코드 " + $exitCode + "): " + $Arguments[0] + [Environment]::NewLine + $detail)
+    }
+    foreach ($entry in $result) {
+        if ($entry -is [Management.Automation.ErrorRecord]) { Write-Warning $entry.ToString() }
+        else { $entry }
+    }
 }
 
 function Get-NodeCompose($Context) {
@@ -182,14 +199,27 @@ function Assert-NodePortMapping($Context) {
 }
 
 function Assert-InstallLocation([string]$Path) {
+    if ($Path -notmatch '^[A-Za-z]:\\' -or $Path -match '[\r\n]') {
+        throw '설치 위치는 C:\compose와 같은 로컬 폴더로 지정하세요.'
+    }
     $full = [IO.Path]::GetFullPath($Path).TrimEnd('\')
-    if ($full -notmatch '^[A-Za-z]:\\.+\\.+$' -or $full.StartsWith($env:WINDIR, [StringComparison]::OrdinalIgnoreCase)) {
-        throw 'Windows 시스템 폴더가 아닌 로컬 설치 경로를 지정하세요.'
+    if ($full -eq [IO.Path]::GetPathRoot($full).TrimEnd('\')) {
+        throw '드라이브 바로 아래에 폴더를 지정하세요. 예: C:\compose'
+    }
+    foreach ($protected in @($env:WINDIR, $env:ProgramFiles, ${env:ProgramFiles(x86)})) {
+        if ($protected -and ($full -ieq $protected.TrimEnd('\') -or
+                $full.StartsWith($protected.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase))) {
+            throw 'Windows 또는 Program Files 폴더에는 설치할 수 없습니다. 예: C:\compose'
+        }
     }
     $part = $full
     while ($part) {
-        if ((Test-Path -LiteralPath $part) -and ((Get-Item -LiteralPath $part).Attributes -band [IO.FileAttributes]::ReparsePoint)) {
-            throw "연결된 폴더에는 설치할 수 없습니다: $part"
+        if (Test-Path -LiteralPath $part) {
+            $item = Get-Item -LiteralPath $part
+            if (!$item.PSIsContainer) { throw "폴더가 아닌 경로에는 설치할 수 없습니다: $part" }
+            if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+                throw "연결된 폴더에는 설치할 수 없습니다: $part"
+            }
         }
         $part = Split-Path $part
     }

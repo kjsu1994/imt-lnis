@@ -44,7 +44,43 @@ try {
     $bad=$values.Clone();$bad.LNIS_NODE_MANAGEMENT_TOKEN=('bad'+[char]10+'value');Assert-Throws { Write-InstallEnvironment (Join-Path $repo 'deployment\node\.env.example') $file $bad }
     Assert-Throws { ConvertTo-NodeLinuxPath '\\server\share' }
     Assert-Throws { Assert-InstallLocation 'C:\' }
+    foreach ($path in @('C:\compose', 'C:\compose\sender', 'C:\한글 설치')) {
+        if ((Assert-InstallLocation $path) -ne $path) { throw "Local installation path rejected: $path" }
+    }
+    foreach ($path in @('compose', '\\server\share', $env:WINDIR, (Join-Path $env:WINDIR 'Temp'),
+            $env:ProgramFiles, (Join-Path $env:ProgramFiles 'GNSS'))) {
+        Assert-Throws { Assert-InstallLocation $path }
+    }
+    if ((Assert-InstallLocation ($env:WINDIR + '-GNSS')) -ne ($env:WINDIR + '-GNSS')) {
+        throw 'A folder next to Windows was incorrectly treated as a system folder.'
+    }
+    $notFolder = Join-Path $case 'not-a-folder'
+    Set-Content -LiteralPath $notFolder 'test'
+    Assert-Throws { Assert-InstallLocation $notFolder }
     Write-Host 'PASS: role/token/port validation, Korean env comments, installed paths and Compose arguments'
+
+    $nativeEncoding=[Console]::OutputEncoding
+    [Console]::OutputEncoding=[Text.Encoding]::GetEncoding(949)
+    $script:wslFailure=$false
+    function wsl.exe {
+        if ([Console]::OutputEncoding.CodePage -ne 65001) { throw 'Native WSL output must be decoded as UTF-8.' }
+        $script:receivedWslArguments=@($args)
+        if ($script:wslFailure) {
+            $global:LASTEXITCODE=1
+            Write-Error 'invalid interpolation: missing closing brace'
+        } else { $global:LASTEXITCODE=0; 'fixture-output' }
+    }
+    $output=Invoke-NodeWsl $context @('printf','%s','한글 사용자 & 공백')
+    if ($output -ne 'fixture-output' -or $script:receivedWslArguments -notcontains '--exec' -or
+            $script:receivedWslArguments[-1] -ne '한글 사용자 & 공백') { throw 'WSL argument boundaries were not preserved.' }
+    $script:wslFailure=$true
+    try { Invoke-NodeWsl $context @('docker','compose','config');throw 'WSL failure ignored.' }
+    catch { if (!$_.Exception.Message.Contains('missing closing brace')) { throw 'WSL failure hid the actual Docker diagnostic.' } }
+    if ($ErrorActionPreference -ne 'Stop') { throw 'WSL invocation changed the caller error preference.' }
+    if ([Console]::OutputEncoding.CodePage -ne 949) { throw 'WSL invocation changed the caller codepage.' }
+    [Console]::OutputEncoding=$nativeEncoding
+    Remove-Item Function:\wsl.exe
+    Write-Host 'PASS: direct WSL arguments, Unicode/metacharacters, underlying error and restored preference'
 
     $payload=Join-Path $app 'payload.txt';Set-Content $payload 'valid payload'
     @{image='lnis-node:test';imageId='sha256:test';files=@(@{path='payload.txt';sha256=(Get-FileHash $payload).Hash})} |
@@ -190,6 +226,7 @@ if (Test-Path (Join-Path $fixtureData 'fail-once')) {
     Set-Content (Join-Path $bundleApp 'stop.ps1') @'
 Set-Content (Join-Path (Split-Path $PSScriptRoot) 'data\stopped-marker') 'stopped'
 '@
+    Set-Content (Join-Path $bundleApp 'stop-serial-bridge.ps1') 'param($DataDirectory)'
     Set-Content (Join-Path $bundleApp 'START.cmd') ''
     Set-Content (Join-Path $bundleApp 'STOP.cmd') ''
     function Invoke-InstallerAdmin { param($Arguments) $script:adminCalls+=($Arguments -join ' ') }
@@ -243,7 +280,11 @@ Set-Content (Join-Path (Split-Path $PSScriptRoot) 'data\stopped-marker') 'stoppe
     Assert-Throws { & ([ScriptBlock]::Create($transaction)) }
     if (!(Test-Path (Join-Path $retryData 'stopped-marker'))) { throw 'Failed first installation did not stop its new service.' }
     $marker=Get-Content (Join-Path $retryData 'DB\marker') -Raw
+    Set-Content (Join-Path $Destination 'app\stop.ps1') "throw 'Old Compose cannot be parsed'"
+    function Get-NodeReady { param($Context) return $null }
+    $script:installCalls=@()
     & ([ScriptBlock]::Create($transaction))
+    if (!($script:installCalls | Where-Object { $_ -eq 'docker ps --quiet' })) { throw 'Interrupted install must check running containers without parsing old Compose.' }
     if ((Get-Content (Join-Path $retryData 'DB\marker') -Raw) -ne $marker) { throw 'First-install retry removed data.' }
     if (!(Test-Path (Join-Path $Destination 'app\installation.json'))) { throw 'First-install retry did not complete.' }
     Write-Host 'PASS: first installation interrupted after app deployment can be retried without deleting data'

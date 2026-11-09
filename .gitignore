@@ -12,3 +12,5 @@ agent-data/
 
 .serial-bridge.env
 serial-bridge/
+
+Setup.exe

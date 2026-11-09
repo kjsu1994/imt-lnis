@@ -58,7 +58,7 @@ if (!$bindAddress) {
     if (!$DockerDesktop) {
         Push-Location $env:SystemRoot
         try {
-            $route = (& wsl.exe -d $Distribution --cd / -- sh -c 'ip -4 route show default') -join ' '
+            $route = (& wsl.exe -d $Distribution --cd / --exec sh -c 'ip -4 route show default') -join ' '
             if ($route -match 'default via ([0-9.]+)') { $bindAddress = $Matches[1] }
         } finally { Pop-Location }
     }

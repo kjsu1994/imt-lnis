@@ -16,6 +16,11 @@ try {
     . (Join-Path $bundle 'installer\setup-settings.ps1')
     function Get-SetupAddresses { return @('192.0.2.10','192.0.2.20') }
 
+    $defaultHints = Join-Path $case 'default.ini'
+    Write-SetupHints '' $defaultHints
+    if ((Read-SetupIni $defaultHints 'setup' 'destination') -ne (Join-Path $env:SystemDrive 'compose')) {
+        throw 'Default local installation path is incorrect.'
+    }
     $destination = Join-Path $case '한글 설치'
     $hints = Join-Path $case 'hints.ini'
     Write-SetupHints $destination $hints
@@ -80,16 +85,87 @@ try {
             'Win32_ComputerSystem' { return @{HypervisorPresent=$true} }
         }
     }
-    function Get-InstalledWslVersion { return [version]'9.0.0' }
+    $script:wslVersion=[version]'2.6.3'
+    function Get-InstalledWslVersion { return $script:wslVersion }
     $script:release=@{wslVersion='3.0.0'}
     $script:missingFeature=$false
     function Get-WindowsOptionalFeature { param([switch]$Online,$FeatureName) return @{State=$(if ($script:missingFeature) {'Disabled'} else {'Enabled'})} }
     function Enable-WindowsOptionalFeature { param([switch]$Online,$FeatureName,[switch]$All,[switch]$NoRestart,[switch]$LimitAccess) if (!$LimitAccess) { throw 'Offline setup must not fetch Windows features from Windows Update.' };return @{RestartNeeded=$true} }
-    function Start-Process { param($FilePath,$ArgumentList,[switch]$Wait,$WindowStyle,[switch]$PassThru) return @{ExitCode=1638} }
+    $script:msiRuns=0;$script:msiExit=0
+    function Start-Process {
+        param($FilePath,$ArgumentList,[switch]$Wait,$WindowStyle,[switch]$PassThru)
+        $script:msiRuns++
+        return @{ExitCode=$script:msiExit}
+    }
     if (Install-WslPrerequisites $case) { throw 'Existing WSL incorrectly requires a reboot.' }
     $script:missingFeature=$true
     if (!(Install-WslPrerequisites $case)) { throw 'New Windows features must request a reboot.' }
-    Write-Host 'PASS: installed WSL reuse and first-PC Windows-feature reboot requirement'
+    if ($script:msiRuns -ne 0) { throw 'A supported WSL installation must not be updated just to match the bundled MSI.' }
+    $script:missingFeature=$false
+    $script:wslVersion=[version]'9.0.0'
+    if (Install-WslPrerequisites $case) { throw 'A newer installed WSL incorrectly requires a reboot.' }
+    $script:wslVersion=[version]'0.66.0'
+    Install-WslPrerequisites $case | Out-Null
+    if ($script:msiRuns -ne 1) { throw 'A WSL version without systemd support must be updated.' }
+    $script:wslVersion=$null;$script:msiExit=3010
+    if (!(Install-WslPrerequisites $case)) { throw 'A new WSL installation must propagate the MSI reboot requirement.' }
+    $script:msiExit=1603
+    Assert-Throws { Install-WslPrerequisites $case }
+    Write-Host 'PASS: supported WSL reuse, unsupported/missing WSL install, reboot and MSI failure'
+
+    $packageAst=[Management.Automation.Language.Parser]::ParseFile((Join-Path $repo 'scripts\package-windows.ps1'),[ref]$tokens,[ref]$errors)
+    $assignment=$packageAst.Find({param($node) $node -is [Management.Automation.Language.AssignmentStatementAst] -and $node.Left.Extent.Text -eq '$compose'},$true)
+    if (!$assignment) { throw 'Compose packaging expression not found.' }
+    $packaged=& { param($repo,$expression) Invoke-Expression $expression;return $compose } $repo $assignment.Extent.Text
+    $source=Get-Content -LiteralPath (Join-Path $repo 'deployment\node\docker-compose.yml') -Raw -Encoding UTF8
+    foreach ($line in $source.Split([char]10) | Where-Object { $_ -match 'LNIS_NODE_(ROLE|BASE_URL|MANAGEMENT_TOKEN):' }) {
+        if (!$packaged.Contains($line.TrimEnd([char]13))) { throw 'Packaging damaged Korean text or required Compose interpolation.' }
+    }
+    Write-Host 'PASS: actual packaging expression preserves UTF-8 Compose values and closing braces'
+
+    $setupPackageAst=[Management.Automation.Language.Parser]::ParseFile((Join-Path $repo 'scripts\package-setup.ps1'),[ref]$tokens,[ref]$errors)
+    $replace=$setupPackageAst.Find({param($node) $node -is [Management.Automation.Language.IfStatementAst] -and $node.Extent.Text.Contains('[IO.File]::Replace(')},$true)
+    if (!$replace) { throw 'Atomic package replacement not found.' }
+    $Output=Join-Path $case 'Setup.exe';$pending=$Output+'.pending.exe'
+    foreach ($text in @('first package','replacement package')) {
+        [IO.File]::WriteAllText($pending,$text)
+        Invoke-Expression $replace.Extent.Text
+        if ([IO.File]::ReadAllText($Output) -ne $text -or (Test-Path -LiteralPath $pending)) {
+            throw 'Package replacement failed.'
+        }
+    }
+    if (Get-ChildItem -LiteralPath $case -Filter 'Setup.exe.previous-*') { throw 'Old package backup was not removed.' }
+    Write-Host 'PASS: initial and replacement Setup.exe publication'
+
+    $installer = Join-Path $repo 'deployment\node\install.ps1'
+    $payload = Join-Path $bundle 'app\node-runtime.ps1'
+    @{image='test';imageId='sha256:test';files=@(@{path='app/node-runtime.ps1';sha256=(Get-FileHash $payload).Hash})} |
+        ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $bundle 'release.json') -Encoding UTF8
+    $failureLog = Join-Path $case 'install.log'
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -BundleRoot $bundle -Destination 'C:\' -LogFile $failureLog 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 1) { throw 'An invalid install path must return a failure exit code.' }
+    $summary = Get-Content -LiteralPath ($failureLog + '.error.txt') -Raw -Encoding Unicode
+    if ($summary -notmatch '\[1/7\]' -or !$summary.Contains('C:\compose')) {
+        throw 'Installer did not report the failing stage and path guidance.'
+    }
+    $missingNetwork = Join-Path $case 'missing-network.json'
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -BundleRoot $bundle -NetworkSetup $missingNetwork -LogFile $failureLog 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 1) { throw 'A failed network setup must return a failure exit code.' }
+    $summary = Get-Content -LiteralPath ($failureLog + '.error.txt') -Raw -Encoding Unicode
+    if ($summary -notmatch '\[6/7\]' -or !$summary.Contains('missing-network.json') -or $summary.Contains('[1/7]')) {
+        throw 'Installer failure summary was stale or omitted the actual cause.'
+    }
+    foreach ($name in @('Invoke-InstallerAdmin','Write-InstallFailure','Set-InstallStage')) {
+        $definition=$installerAst.Find({param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name},$false)
+        Invoke-Expression $definition.Extent.Text
+    }
+    $LogFile=Join-Path $case 'parent.log'
+    $PSCommandPath=$installer
+    [IO.File]::WriteAllText($LogFile+'.admin.log.error.txt',"[2/7] WSL"+[Environment]::NewLine+'MSI failure 1603',(New-Object Text.UnicodeEncoding $false,$false))
+    function Start-Process { param($FilePath,$ArgumentList,$Verb,$WindowStyle,[switch]$Wait,[switch]$PassThru) return @{ExitCode=1} }
+    try { Invoke-InstallerAdmin @('-SystemSetup'); throw 'Admin failure was ignored.' }
+    catch { if (!$_.Exception.Message.Contains('MSI failure 1603')) { throw 'Actual administrator failure was not propagated.' } }
+    Write-Host 'PASS: actual installer stage/exit code, refreshed Unicode error summary, and administrator cause propagation'
 
 } finally {
     $env:LOCALAPPDATA=$oldLocalAppData

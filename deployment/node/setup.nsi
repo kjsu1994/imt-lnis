@@ -380,6 +380,7 @@ Section "설치"
   File /r "${BUNDLE}\*"
   SetDetailsPrint both
   CreateDirectory "$LOCALAPPDATA\imtplus\Setup"
+  Delete "$InstallLog.error.txt"
   ${NSD_AddStyle} $mui.InstFilesPage.ProgressBar 0x8
   SendMessage $mui.InstFilesPage.ProgressBar 0x40A 1 80
   DetailPrint "실행 환경과 서비스를 설치합니다."
@@ -394,7 +395,20 @@ Section "설치"
   ${EndIf}
   ${If} $0 != 0
     SetErrorLevel 1
-    MessageBox MB_ICONSTOP "설치를 완료하지 못했습니다.$\r$\n원인을 확인한 뒤 Setup.exe를 다시 실행하세요.$\r$\n$\r$\n설치 기록: $InstallLog"
+    StrCpy $2 "종료 코드: $0"
+    ClearErrors
+    FileOpen $1 "$InstallLog.error.txt" r
+    ${IfNot} ${Errors}
+      StrCpy $2 ""
+      FileReadUTF16LE $1 $3
+      ${DoUntil} ${Errors}
+        StrCpy $2 "$2$3"
+        FileReadUTF16LE $1 $3
+      ${Loop}
+      FileClose $1
+    ${EndIf}
+    MessageBox MB_ICONSTOP "설치를 완료하지 못했습니다.$\r$\n$\r$\n$2$\r$\n$\r$\n설치 기록: $InstallLog"
+    ExecShell "open" "$LOCALAPPDATA\imtplus\Setup"
     Abort
   ${EndIf}
   nsExec::ExecToStack '"$WINDIR\Sysnative\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "$PLUGINSDIR\bundle\installer\setup-settings.ps1" -Action Clear'

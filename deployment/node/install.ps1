@@ -1,6 +1,6 @@
 ﻿[CmdletBinding()]
 param(
-    [string]$Destination = (Join-Path $env:ProgramData 'imtplus\DTN'),
+    [string]$Destination = (Join-Path $env:SystemDrive 'compose'),
     [string]$BundleRoot,
     [string]$Configuration,
     [switch]$SystemSetup,
@@ -9,6 +9,29 @@ param(
     [string]$LogFile
 )
 $ErrorActionPreference = 'Stop'
+
+$script:installStage = '설치 파일 확인'
+trap {
+    Write-InstallFailure $_
+    exit 1
+}
+
+function Set-InstallStage([string]$Message) {
+    $script:installStage = $Message
+    Write-Host $Message
+}
+
+function Write-InstallFailure($Failure) {
+    $message = $script:installStage + [Environment]::NewLine + $Failure.Exception.Message
+    if ($LogFile) {
+        try {
+            [IO.Directory]::CreateDirectory((Split-Path $LogFile)) | Out-Null
+            [IO.File]::WriteAllText($LogFile + '.error.txt', $message, (New-Object Text.UnicodeEncoding $false,$false))
+        } catch { Write-Warning '설치 오류 요약을 저장하지 못했습니다.' }
+    }
+    Write-Host ('설치 중단: ' + $message)
+    Write-Host $Failure.ScriptStackTrace
+}
 
 
 function Invoke-InstallerAdmin([string[]]$Arguments) {
@@ -19,7 +42,12 @@ function Invoke-InstallerAdmin([string[]]$Arguments) {
         Write-Host 'Windows 구성요소를 준비했습니다. PC를 재부팅한 뒤 설치 프로그램을 다시 실행하세요.'
         exit 3010
     }
-    if ($child.ExitCode -ne 0) { throw "설치 권한 작업에 실패했습니다 (종료 코드 $($child.ExitCode)). 설치 기록을 확인하세요." }
+    if ($child.ExitCode -ne 0) {
+        $detail = if ($LogFile -and (Test-Path -LiteralPath ($LogFile + '.admin.log.error.txt'))) {
+            Get-Content -LiteralPath ($LogFile + '.admin.log.error.txt') -Raw -Encoding Unicode
+        } else { '관리자 승인과 설치 기록을 확인하세요.' }
+        throw "관리자 설정 실패 (종료 코드 $($child.ExitCode)): $detail"
+    }
 }
 
 function Get-InstalledWslVersion {
@@ -40,20 +68,22 @@ function Install-WslPrerequisites([string]$Offline) {
     $restart = $false
     foreach ($name in @('Microsoft-Windows-Subsystem-Linux','VirtualMachinePlatform')) {
         if ((Get-WindowsOptionalFeature -Online -FeatureName $name).State -ne 'Enabled') {
+            Write-Host ("Windows 기능 준비: " + $name)
             $result = Enable-WindowsOptionalFeature -Online -FeatureName $name -All -NoRestart -LimitAccess
             $restart = $restart -or $result.RestartNeeded
         }
     }
     $installedVersion = Get-InstalledWslVersion
-    $requiredVersion = $null
-    if ($release -and $release.wslVersion) {
-        [version]::TryParse($release.wslVersion.TrimStart('v'), [ref]$requiredVersion) | Out-Null
-    }
-    if ($installedVersion -and $requiredVersion -and $installedVersion -ge $requiredVersion) {
+    # systemd requires WSL 0.67.6; a newer bundled MSI alone does not require a global update.
+    if ($installedVersion -and $installedVersion -ge [version]'0.67.6') {
+        Write-Host ("기존 WSL 재사용: " + $installedVersion)
         return $restart
     }
     $msi = Join-Path $Offline 'wsl.msi'
-    $process = Start-Process msiexec.exe -ArgumentList @('/i',('"' + $msi + '"'),'/qn','/norestart') -Wait -WindowStyle Hidden -PassThru
+    Write-Host '오프라인 WSL 설치 중'
+    $msiArguments = @('/i',('"' + $msi + '"'),'/qn','/norestart')
+    if ($LogFile) { $msiArguments += @('/l*v',('"' + $LogFile + '.wsl-msi.log"')) }
+    $process = Start-Process msiexec.exe -ArgumentList $msiArguments -Wait -WindowStyle Hidden -PassThru
     if ($process.ExitCode -notin @(0,1638,3010)) { throw "오프라인 WSL 설치 실패: $($process.ExitCode)" }
     return ($restart -or $process.ExitCode -eq 3010)
 }
@@ -149,29 +179,32 @@ function Get-InstallSettings([string]$Existing, [string]$Provided) {
 }
 
 
+if ($LogFile) {
+    New-Item -ItemType Directory -Path (Split-Path $LogFile) -Force | Out-Null
+    if (Test-Path -LiteralPath ($LogFile + '.error.txt')) { Remove-Item -LiteralPath ($LogFile + '.error.txt') }
+    Start-Transcript -Path $LogFile -Append -Force | Out-Null
+}
 if (!$BundleRoot) { $BundleRoot = Split-Path $PSScriptRoot }
 $script:bundle = [IO.Path]::GetFullPath($BundleRoot)
 . (Join-Path $script:bundle 'app\node-runtime.ps1')
 $release = Assert-NodeFiles $script:bundle
 if ($SystemSetup) {
     try {
-        Start-Transcript -Path $(if ($LogFile) { $LogFile } else { Join-Path $script:bundle 'installer\install.log' }) -Append -Force | Out-Null
+        if (!$LogFile) { Start-Transcript -Path (Join-Path $script:bundle 'installer\install.log') -Append -Force | Out-Null }
+        Set-InstallStage '[2/7] Windows 및 WSL 구성요소 확인'
         if (Install-WslPrerequisites (Join-Path $script:bundle 'offline')) { exit 3010 }
         exit 0
-    } catch { Write-Error $_; exit 1 }
+    } catch { throw }
 }
 if ($NetworkSetup) {
     try {
-        Start-Transcript -Path $(if ($LogFile) { $LogFile } else { Join-Path $script:bundle 'installer\install.log' }) -Append -Force | Out-Null
+        if (!$LogFile) { Start-Transcript -Path (Join-Path $script:bundle 'installer\install.log') -Append -Force | Out-Null }
+        Set-InstallStage '[6/7] Windows·WSL 접속 포트 적용'
         Set-NodeNetwork (Get-Content -Raw -LiteralPath $NetworkSetup -Encoding UTF8 | ConvertFrom-Json)
         exit 0
-    } catch { Write-Error $_; exit 1 }
+    } catch { throw }
 }
-if ($LogFile) {
-    New-Item -ItemType Directory -Path (Split-Path $LogFile) -Force | Out-Null
-    Start-Transcript -Path $LogFile -Append -Force | Out-Null
-}
-Write-Host '[1/7] 설치 경로와 설정 확인'
+Set-InstallStage '[1/7] 설치 경로와 설정 확인'
 $destinationRoot = Assert-InstallLocation $Destination
 $app = Join-Path $destinationRoot 'app'
 $data = Join-Path $destinationRoot 'data'
@@ -190,7 +223,7 @@ if (Test-Path -LiteralPath (Join-Path $data 'DB')) {
     $required += (Get-ChildItem -LiteralPath (Join-Path $data 'DB') -File -Recurse | Measure-Object Length -Sum).Sum
 }
 if ($drive.AvailableFreeSpace -lt $required) { throw '설치·복원에 필요한 여유 공간이 부족합니다. 최소 12 GB와 기존 DB 크기만큼 확보하세요.' }
-Write-Host '[2/7] Windows 및 WSL 구성요소 확인'
+Set-InstallStage '[2/7] Windows 및 WSL 구성요소 확인'
 Invoke-InstallerAdmin @('-SystemSetup')
 New-Item -ItemType Directory -Path $destinationRoot,$data,(Join-Path $data 'DB'),(Join-Path $data 'exchange') -Force | Out-Null
 $stage = Join-Path $destinationRoot ('app.staging-' + [Guid]::NewGuid().ToString('N'))
@@ -206,12 +239,15 @@ try {
         $lock = Enter-NodeLock $context
         $url = Get-NodeReady $context
         if ($context.Settings.LNIS_NODE_ROLE -ne $values.LNIS_NODE_ROLE) { throw '기존 DB의 송신·수신 역할은 변경할 수 없습니다. 별도 경로에 새로 설치하세요.' }
-        if ($url) { Assert-NodeIdle $context $url }
-        else {
-            $running = Invoke-NodeWsl $context (@('docker') + (Get-NodeCompose $context) + @('ps','--status','running','-q'))
+        if ($url) {
+            Assert-NodeIdle $context $url
+            & (Join-Path $app 'stop.ps1')
+        } else {
+            $running = Invoke-NodeWsl $context @('docker','ps','--quiet')
             if ($running) { throw '실행 중인 기존 서비스의 상태를 확인할 수 없습니다. 로그를 확인한 뒤 다시 설치하세요.' }
+            & (Join-Path $app 'stop-serial-bridge.ps1') -DataDirectory $context.Data
+            Stop-NodeKeepAlive $context
         }
-        & (Join-Path $app 'stop.ps1')
         $backup = Join-Path $destinationRoot ('backups\' + (Get-Date -Format 'yyyyMMdd-HHmmss-fff'))
         New-Item -ItemType Directory -Path $backup -Force | Out-Null
         Copy-Item -LiteralPath (Join-Path $data 'DB') -Destination $backup -Recurse
@@ -220,7 +256,7 @@ try {
             Copy-Item -LiteralPath (Join-Path $data 'network.json') -Destination $backup
         }
     }
-    Write-Host '[3/7] 오프라인 WSL 실행 환경 준비'
+    Set-InstallStage '[3/7] 오프라인 WSL 실행 환경 준비'
     $distributions = (& wsl.exe --list --quiet) -replace [char]0, ''
     $registrationFile = Join-Path $data 'runtime-registration.json'
     if ($distributions -notcontains 'LNIS-Runtime') {
@@ -244,10 +280,10 @@ try {
     Write-InstallEnvironment (Join-Path $app '.env.example') $existing $values
     $context = Get-NodeContext $app
     $imageArchive = ConvertTo-NodeLinuxPath (Join-Path $script:bundle 'offline\service-image.tar')
-    Write-Host '[4/7] Docker 및 서비스 이미지 준비'
+    Set-InstallStage '[4/7] Docker 및 서비스 이미지 준비'
     Invoke-NodeWsl $context @('sudo','-n','systemctl','start','docker') | Out-Null
     Invoke-NodeWsl $context @('docker','load','--input',$imageArchive) | Out-Host
-    Write-Host '[5/7] 서비스 실행 및 준비 상태 확인'
+    Set-InstallStage '[5/7] 서비스 실행 및 준비 상태 확인'
     & (Join-Path $app 'start.ps1') -NoBrowser
     $localUrl = Wait-NodeReady $context
     $network = @{
@@ -258,12 +294,12 @@ try {
     }
     $networkFile = Join-Path $data 'network-install.json'
     $network | ConvertTo-Json | Set-Content -LiteralPath $networkFile -Encoding UTF8
-    Write-Host '[6/7] Windows·WSL 접속 포트 적용'
+    Set-InstallStage '[6/7] Windows·WSL 접속 포트 적용'
     Invoke-InstallerAdmin @('-NetworkSetup',('"' + $networkFile + '"'))
     Remove-Item -LiteralPath $networkFile
     $public = Invoke-RestMethod ($values.LNIS_NODE_BASE_URL + '/lnis/api/v1/node') -TimeoutSec 5
     if (!$public.online -or $public.role -ine $values.LNIS_NODE_ROLE) { throw 'Windows PC 주소와 WSL 서비스 연결을 확인하지 못했습니다.' }
-    Write-Host '[7/7] 바탕화면 바로가기 생성'
+    Set-InstallStage '[7/7] 바탕화면 바로가기 생성'
     $shell = New-Object -ComObject WScript.Shell
     foreach ($name in @('START','STOP')) {
         $link = $shell.CreateShortcut((Join-Path ([Environment]::GetFolderPath('Desktop')) ($(if ($name -eq 'START') { Get-NodeShortcutName $values.LNIS_NODE_ROLE } else { 'DTN STOP' }) + '.lnk')))

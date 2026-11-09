@@ -16,7 +16,7 @@ $package = Join-Path $repo 'build\windows-node'
 New-Item -ItemType Directory -Path $assets -Force | Out-Null
 
 function Invoke-PackageDocker([string[]]$Arguments) {
-    $result = & wsl.exe -d $Distribution --cd / -- docker @Arguments
+    $result = & wsl.exe -d $Distribution --cd / --exec docker @Arguments
     if ($LASTEXITCODE -ne 0) { throw "패키징 Docker 명령 실패: $($Arguments[0])" }
     return $result
 }
@@ -110,7 +110,7 @@ RUN useradd -m -s /bin/bash lnis && usermod -aG docker lnis && printf 'lnis ALL=
     foreach ($file in @('program.ico','START.cmd','STOP.cmd','start.ps1','stop.ps1','node-runtime.ps1','start-serial-bridge.ps1','stop-serial-bridge.ps1','docker-compose.windows-serial.yml','.env.example','README.md')) {
         Copy-Item -LiteralPath (Join-Path $repo ('deployment\node\' + $file)) -Destination $app
     }
-    $compose = (Get-Content -LiteralPath (Join-Path $repo 'deployment\node\docker-compose.yml') -Raw) -replace '(?m)^    build:.*\r?\n',''
+    $compose = (Get-Content -LiteralPath (Join-Path $repo 'deployment\node\docker-compose.yml') -Raw -Encoding UTF8) -replace '(?m)^    build:.*\r?\n',''
     [IO.File]::WriteAllText((Join-Path $app 'docker-compose.yml'),$compose,(New-Object Text.UTF8Encoding $false))
     Copy-Item -LiteralPath (Join-Path $repo 'deployment\node\install.ps1') -Destination $installer
     Copy-Item -LiteralPath (Join-Path $repo 'deployment\node\setup-settings.ps1') -Destination $installer
