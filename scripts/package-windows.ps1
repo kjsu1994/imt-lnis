@@ -138,8 +138,13 @@ RUN useradd -m -s /bin/bash lnis && usermod -aG docker lnis && printf 'lnis ALL=
     $imageId = (Invoke-PackageDocker @('image','inspect','--format','{{.Id}}',$image)) -join ''
     Invoke-PackageDocker @('save','--output',(ConvertTo-NodeLinuxPath (Join-Path $dockerStage 'service-image.tar')),$image) | Out-Host
     Copy-Item -LiteralPath (Join-Path $dockerStage 'service-image.tar') -Destination $offline -Force
+    $archiveManifest = (& tar.exe -xOf (Join-Path $offline 'service-image.tar') manifest.json) -join [Environment]::NewLine | ConvertFrom-Json
+    if ($LASTEXITCODE -ne 0 -or $archiveManifest[0].Config -notmatch '(?:^|/)([a-f0-9]{64})(?:\.json)?$') {
+        throw '서비스 이미지의 설정 해시를 확인하지 못했습니다.'
+    }
+    $imageConfigId = 'sha256:' + $Matches[1]
     $info = [ordered]@{
-        version='1.0.0'; image=$image; imageId=$imageId.Trim()
+        version='1.0.0'; image=$image; imageId=$imageId.Trim(); imageConfigId=$imageConfigId
         wslVersion=$metadata.wslVersion; dockerVersion=$metadata.dockerVersion; composeVersion=$metadata.composeVersion
         createdAt=[DateTime]::UtcNow.ToString('o')
     }

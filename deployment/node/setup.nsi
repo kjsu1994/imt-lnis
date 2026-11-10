@@ -419,7 +419,7 @@ Section "설치"
 SectionEnd
 
 Function OpenProgram
-  ExecShell "open" "http://$LocalIp:$LocalPort"
+  ExecShell "open" "$Destination\START.cmd"
 FunctionEnd
 
 Function SetupAbort

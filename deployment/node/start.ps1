@@ -24,7 +24,7 @@ try {
     if ($context.Installed) {
         $release = Get-Content -Raw -LiteralPath (Join-Path $context.App 'release.json') -Encoding UTF8 | ConvertFrom-Json
         $imageId = (Invoke-NodeWsl $context @('docker','image','inspect','--format','{{.Id}}',$release.image)) -join ''
-        if ($imageId.Trim() -ne $release.imageId) { throw '설치된 서비스 이미지가 배포본과 다릅니다. INSTALL.cmd를 다시 실행하세요.' }
+        if ($imageId.Trim() -ne $release.imageId -and (!$release.imageConfigId -or $imageId.Trim() -ne $release.imageConfigId)) { throw '설치된 서비스 이미지가 배포본과 다릅니다. INSTALL.cmd를 다시 실행하세요.' }
     }
     $compose = Get-NodeCompose $context
     Assert-NodePortMapping $context

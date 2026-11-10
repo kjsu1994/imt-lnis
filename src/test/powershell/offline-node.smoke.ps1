@@ -63,6 +63,8 @@ try {
     [IO.File]::SetAttributes($hiddenParent,([IO.File]::GetAttributes($hiddenParent) -bor [IO.FileAttributes]::Hidden))
     $hiddenInstall=Join-Path $hiddenParent 'installed'
     if ((Assert-InstallLocation $hiddenInstall) -ne $hiddenInstall) { throw 'Hidden parent such as AppData was rejected.' }
+    Set-Content -LiteralPath (Join-Path $data '.serial-bridge.env') 'LNIS_SERIAL_BRIDGE_URL=http://192.0.2.10:18888'
+    if ((Get-NodeBridgePort ([pscustomobject]@{Data=$data;Settings=$values})) -ne 18888) { throw 'Effective custom bridge port was not preserved.' }
     Write-Host 'PASS: role/token/port validation, Korean env comments, installed paths and Compose arguments'
 
     $nativeEncoding=[Console]::OutputEncoding
@@ -286,13 +288,13 @@ try {
     function Invoke-NodeWsl {
         param($Context,[string[]]$Arguments)
         $script:commands.Add(($Arguments -join ' '))
-        if ($Arguments -contains 'inspect') { return 'sha256:fixture' }
+        if ($Arguments -contains 'inspect') { return $script:inspectedImageId }
         if ($Arguments -contains 'info') { return 'linux' }
         if ($Arguments -contains 'config') { return '{"services":{"node":{"ports":[{"published":"18088","target":18088,"protocol":"tcp"}],"environment":{"SERVER_PORT":"18088"}}}}' }
     }
     Set-Content (Join-Path $app 'start-serial-bridge.ps1') 'param($Distribution,$DataDirectory)'
     Set-Content (Join-Path $app 'stop-serial-bridge.ps1') 'param($DataDirectory)'
-    @{image='lnis-node:test';imageId='sha256:fixture'}|ConvertTo-Json|Set-Content (Join-Path $app 'release.json') -Encoding UTF8
+    @{image='lnis-node:test';imageId='sha256:fixture';imageConfigId='sha256:config'}|ConvertTo-Json|Set-Content (Join-Path $app 'release.json') -Encoding UTF8
     $script:fakeProcess=$null;$script:started=0;$script:stopped=0
     $source=(Get-Content -Raw -LiteralPath (Join-Path $repo 'deployment\node\start.ps1') -Encoding UTF8).
         Replace(". (Join-Path "+'$PSScriptRoot'+" 'node-runtime.ps1')",'').
@@ -300,7 +302,9 @@ try {
     function Get-NodeAddresses { return @('192.0.2.10') }
     function Repair-NodeNetwork { param($Context,$LocalUrl) }
     $script:testContext=$context
+    $script:inspectedImageId='sha256:fixture'
     & ([ScriptBlock]::Create($source)) -NoBrowser
+    $script:inspectedImageId='sha256:config'
     & ([ScriptBlock]::Create($source))
     if ($script:browserUrls.Count -ne 1 -or $script:browserUrls[0] -ne $values.LNIS_NODE_BASE_URL) {
         throw 'START opened localhost instead of the configured PC address.'
@@ -377,6 +381,9 @@ Set-Content (Join-Path $fixtureData 'stopped-marker') 'stopped'
     & ([ScriptBlock]::Create($transaction))
     $installedContext=Get-NodeContext $Destination
     if (!$installedContext.Installed -or $installedContext.Data -ne $script:installData) { throw 'Fresh install path mismatch.' }
+    if (!$installedContext.Settings.LNIS_SERIAL_BRIDGE_PORT -or
+        [int]$installedContext.Settings.LNIS_SERIAL_BRIDGE_PORT -eq $installedContext.Port) { throw 'Fresh bridge port not isolated.' }
+
     if (!($script:installCalls|Where-Object {$_ -match 'docker load --input'})) { throw 'Offline image not loaded.' }
     if ($script:installKeeps -lt 1) { throw 'Fresh install did not hold WSL before loading the image.' }
     foreach ($name in @('START','STOP')) {

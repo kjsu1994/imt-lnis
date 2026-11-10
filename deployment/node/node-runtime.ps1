@@ -417,6 +417,17 @@ function Update-NodeAddress($Context) {
     return $url
 }
 
+function Get-NodeBridgePort($Context) {
+    $file = Join-Path $Context.Data '.serial-bridge.env'
+    if (Test-Path -LiteralPath $file) {
+        $settings = Read-NodeEnvironment $file
+        if ($settings.LNIS_SERIAL_BRIDGE_URL) { return ([Uri]$settings.LNIS_SERIAL_BRIDGE_URL).Port }
+    }
+    if ($Context.Settings.LNIS_SERIAL_BRIDGE_PORT) { return [int]$Context.Settings.LNIS_SERIAL_BRIDGE_PORT }
+    if ($Context.Settings.LNIS_NODE_ROLE -eq 'receiver') { return 18766 }
+    return 18765
+}
+
 function Repair-NodeNetwork($Context, [string]$LocalUrl) {
     $record = Join-Path $Context.Data 'network.json'
     $loopback = ([Uri]$LocalUrl).Host.Trim('[',']')
@@ -430,7 +441,7 @@ function Repair-NodeNetwork($Context, [string]$LocalUrl) {
     $javaDirectory = if (Test-Path -LiteralPath (Join-Path $Context.App 'jre\bin\java.exe')) { 'jre' } else { 'runtime' }
     $configuration = @{
         listenAddress='0.0.0.0';port=$Context.Port;loopback=$loopback;record=$record
-        bridgePort=$(if ($Context.Settings.LNIS_SERIAL_BRIDGE_PORT) { [int]$Context.Settings.LNIS_SERIAL_BRIDGE_PORT } elseif ($Context.Settings.LNIS_NODE_ROLE -eq 'receiver') { 18766 } else { 18765 })
+        bridgePort=(Get-NodeBridgePort $Context)
         java=(Join-Path $Context.App ($javaDirectory + '\bin\java.exe'))
     }
     $file = Join-Path ([IO.Path]::GetTempPath()) ('gnss-network-' + [Guid]::NewGuid().ToString('N') + '.json')

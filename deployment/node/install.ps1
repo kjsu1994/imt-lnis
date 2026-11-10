@@ -221,6 +221,14 @@ if (!$values.LNIS_IQ_HOST_PATH -or $values.LNIS_IQ_HOST_PATH -ieq (Join-Path $la
     $values.LNIS_IQ_HOST_PATH = Join-Path $data 'exchange'
 }
 if (!$values.ContainsKey('LNIS_NTP_SERVER')) { $values.LNIS_NTP_SERVER = '' }
+if (!$layout.Existing -and !$values.LNIS_SERIAL_BRIDGE_PORT) {
+    $usedPorts = [Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties().GetActiveTcpListeners().Port
+    $bridgePort = if ($values.LNIS_NODE_ROLE -eq 'receiver') { 18766 } else { 18765 }
+    while ($usedPorts -contains $bridgePort -or $bridgePort -eq [int]$values.LNIS_SERVER_PORT) { $bridgePort++ }
+    if ($bridgePort -gt 65535) { throw 'COM 중계에 사용할 빈 포트를 찾지 못했습니다.' }
+    $values.LNIS_SERIAL_BRIDGE_PORT = [string]$bridgePort
+}
+
 $dbBytes = 0
 if (Test-Path -LiteralPath (Join-Path $layout.Data 'DB')) {
     $dbBytes = (Get-ChildItem -LiteralPath (Join-Path $layout.Data 'DB') -File -Recurse -Force | Measure-Object Length -Sum).Sum
@@ -363,7 +371,7 @@ try {
     $network = @{
         listenAddress='0.0.0.0'; port=$context.Port
         loopback=([Uri]$localUrl).Host.Trim('[',']'); record=(Join-Path $data 'network.json')
-        bridgePort=$(if ($values.LNIS_SERIAL_BRIDGE_PORT) { [int]$values.LNIS_SERIAL_BRIDGE_PORT } elseif ($values.LNIS_NODE_ROLE -eq 'receiver') { 18766 } else { 18765 })
+        bridgePort=(Get-NodeBridgePort $context)
         java=(Join-Path $app ($javaDirectory + '\bin\java.exe'))
     }
     $networkFile = Join-Path $work 'network-install.json'
