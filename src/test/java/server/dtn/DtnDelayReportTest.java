@@ -19,6 +19,36 @@ class DtnDelayReportTest {
     private final ObjectMapper json = new ObjectMapper().findAndRegisterModules();
 
     @Test
+    void systemClockPreservesTimingAndLegacyCalibrationIsNotMixed() throws Exception {
+        var repository = mock(DtnRepository.class);
+        var service = new DtnService(repository, null, null, null, null, json);
+        var system = new server.common.ServiceClock().stamp();
+        var start = system.rawAt().minusSeconds(2);
+        var normal = new DtnJob();
+        normal.setTestStartedAt(start);
+        normal.setReceivedAt(system.rawAt());
+        normal.setState("WAITING_RECEIVER");
+        normal.setSenderClockJson(json.writeValueAsString(system));
+        service.recordClock(normal, system, false);
+        assertEquals("WAITING_RECEIVER", normal.getState());
+        assertNull(normal.getClockWarning());
+        assertEquals(start, normal.getTestStartedAt());
+        assertEquals(system.rawAt(), normal.getReceivedAt());
+
+        var legacy = new server.common.ServiceClock.Stamp(system.rawAt(), system.rawAt().plusSeconds(1),
+                "GNSS_USB", system.rawAt(), 1, 0, null, system.session(), 1, 0);
+        var pending = new DtnJob();
+        pending.setState("WAITING_RECEIVER");
+        pending.setReceivedAt(system.rawAt());
+        pending.setReceivedRawJson("{original}");
+        pending.setSenderClockJson(json.writeValueAsString(legacy));
+        service.recordClock(pending, system, false);
+        assertEquals("INCONCLUSIVE", pending.getState());
+        assertEquals("{original}", pending.getReceivedRawJson());
+        assertEquals("INCONCLUSIVE", json.readTree(pending.getComparisonJson()).path("verdict").asText());
+    }
+
+    @Test
     void referenceNavigationUsesSameClassificationAsSenderWithoutChangingSavedReference() throws Exception {
         var service = mock(DtnService.class);
         var job = new DtnJob();

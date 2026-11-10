@@ -25,7 +25,7 @@ public final class GnssConnection implements AutoCloseable {
     private final Deque<Navigation> navigation = new ArrayDeque<>();
     private final Object writeLock = new Object();
     private volatile boolean requested;
-    private volatile String state = "DISCONNECTED", message = "시스템 시간 사용 · GNSS 시간 미확인";
+    private volatile String state = "DISCONNECTED", message = "GNSS 포트 미연결";
     private volatile SerialConnection physical;
     private volatile Thread reader;
     private SerialCaptureService.Settings settings;
@@ -36,28 +36,6 @@ public final class GnssConnection implements AutoCloseable {
     private long validTick;
     private boolean utcValid;
     private final boolean collectNavigation;
-    private final TimeReference timeReference = new TimeReference();
-
-    /** Windows 중계가 있으면 USB 수신 지점에서 추정하고, 아니면 로컬 직렬 입력을 사용한다. */
-    public Map<String, Object> timeReference() {
-        WindowsSerialClient bridge = WindowsSerialClient.configured();
-        if (bridge != null) {
-            var result = bridge.request("/time", Map.of());
-            return new com.fasterxml.jackson.databind.ObjectMapper().convertValue(result,
-                    new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
-        }
-        Instant received = Instant.now();
-        var reading = timeReference.reading();
-        var result = new LinkedHashMap<String, Object>();
-        result.put("receivedAt", received.toString());
-        result.put("sentAt", Instant.now().toString());
-        result.put("ready", "CONNECTED".equals(state) && reading.ready());
-        result.put("utc", reading.utc() == null ? null : reading.utc().toString());
-        result.put("samples", reading.samples());
-        result.put("spreadSeconds", reading.spreadSeconds());
-        return result;
-    }
-
     public GnssConnection() {
         this(false);
     }
@@ -147,17 +125,9 @@ public final class GnssConnection implements AutoCloseable {
                     }
                     var parser = new UbloxParser();
                     byte[] buffer = new byte[8192];
-                    long lastPoll = 0, connectedTick = System.nanoTime();
+                    long connectedTick = System.nanoTime();
                     while (requested) {
                         long now = System.nanoTime();
-                        if (now - lastPoll >= TimeUnit.SECONDS.toNanos(1)) {
-                            // NAV-TIMEUTC poll만 사용한다. 시간 출력률/영구 설정을 변경하지 않는다.
-                            byte[] poll = UbloxParser.command(1, 0x21, new byte[0]);
-                            if (write(opened, poll, poll.length) != poll.length) {
-                                throw new IllegalStateException("GNSS 시간 조회 실패");
-                            }
-                            lastPoll = now;
-                        }
                         int count = opened.readBytes(buffer, buffer.length);
                         if (count < 0 || !opened.isOpen()) {
                             throw new IllegalStateException("GNSS 연결이 끊겼습니다.");
@@ -217,7 +187,7 @@ public final class GnssConnection implements AutoCloseable {
             synchronized (this) {
                 if (!"ERROR".equals(state)) {
                     state = "DISCONNECTED";
-                    message = "시스템 시간 사용 · GNSS 시간 미확인";
+                    message = "GNSS 포트 미연결";
                 }
                 requested = false;
                 resetInput();
@@ -255,7 +225,6 @@ public final class GnssConnection implements AutoCloseable {
     }
 
     synchronized void observe(UbloxParser.UbxFrame frame, Instant receivedAt, long tick) {
-        timeReference.observe(frame, tick);
         if (frame.messageClass() == 1 && frame.messageId() == 0x21 && frame.payload().length == 20) {
             ByteBuffer data = ByteBuffer.wrap(frame.payload()).order(ByteOrder.LITTLE_ENDIAN);
             updatedAt = receivedAt;
@@ -295,7 +264,6 @@ public final class GnssConnection implements AutoCloseable {
     }
 
     private void resetInput() {
-        timeReference.reset();
         navigation.clear();
         utc = null;
         updatedAt = null;

@@ -41,7 +41,7 @@ try {
             '[setup]',"destination=$destination",'[env]',"LNIS_NODE_ROLE=$Role","LNIS_SERVER_PORT=$Port",
             ('LNIS_NODE_BASE_URL=http://192.0.2.10:'+$Port),'LNIS_NODE_PEER_URL=','dtn_adapter=',
             "LNIS_NODE_MANAGEMENT_TOKEN=$management",'LNIS_DTN_SEND_TOKEN=',"LNIS_DTN_RECEIVE_TOKEN=$receiveToken",
-            ('LNIS_IQ_HOST_PATH='+(Join-Path $destination 'data\exchange')),'LNIS_NTP_SERVER='
+            ('LNIS_IQ_HOST_PATH='+(Join-Path $destination 'data\exchange'))
         ),[Text.Encoding]::Unicode)
     }
     Write-TestRequest

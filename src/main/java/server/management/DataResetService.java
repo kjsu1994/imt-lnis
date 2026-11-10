@@ -17,7 +17,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
-import server.common.ServiceClock;
 import server.config.StorageProperties;
 import server.dtn.DtnService;
 import server.iq.IqService;
@@ -41,7 +40,6 @@ public class DataResetService {
     private final StorageProperties storage;
     private final DtnService dtn;
     private final IqService iq;
-    private final ServiceClock clock;
     private final ObjectProvider<NodeConnectionService> connection;
     private final ObjectProvider<LocalNodeLifecycle> runtime;
 
@@ -228,10 +226,6 @@ public class DataResetService {
                 Long.class).getSingleResult();
         if (active > waiting.count() || dtn.managementBusy() || iq.managementBusy(null))
             blocked.add("시험·수집·파일 처리 완료 후 실행하세요.");
-        if (mode == Mode.SERVICE) {
-            try { clock.requireAvailable(); }
-            catch (IllegalStateException busy) { blocked.add("시각 보정 완료 후 실행하세요."); }
-        }
         files.sort(Comparator.comparing((FileTarget target) -> target.kind().name()).thenComparing(FileTarget::name));
         return new Plan(token, mode, role, expiresAt, trials, receiptTests, inputs, files,
                 counts, retained, blocked, waiting);
@@ -315,7 +309,6 @@ public class DataResetService {
                 if (plan.mode() == Mode.SERVICE) {
                     LocalNodeLifecycle local = runtime.getIfAvailable();
                     if (local != null) local.resetGnssSettings();
-                    clock.reset();
                 }
                 management.transaction(() -> {
                     Set<UUID> ids = new HashSet<>(plan.trials());

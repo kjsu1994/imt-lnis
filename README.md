@@ -95,7 +95,7 @@ The I/Q receiver uses actual RF-tracked pseudorange, Doppler and C/N0, with navi
 
 Sender dispatch checks file existence, size and format, and reuses the generation SHA-256 without re-reading the complete file. The receiver verifies the complete SHA-256 once before decoding, then checks file size, modification time and identity after decoding. The shared file must remain unchanged during processing. Full hash progress includes bytes read, elapsed time and throughput. Changes to the sender file after generation are detected at the receiver, not during dispatch.
 
-Only GPS L1 C/A is used for new PVT calculations. Other constellations remain visible as received data. Receiver waiting has no expiry, but a long delay can exceed ephemeris-selection or solver conditions and yield no valid PVT. Existing results and files are retained; older I/Q layouts must be regenerated for new trials. Sender/receiver PC clocks must be synchronized.
+Only GPS L1 C/A is used for new PVT calculations. Other constellations remain visible as received data. Receiver waiting has no expiry, but a long delay can exceed ephemeris-selection or solver conditions and yield no valid PVT. Existing results and files are retained; older I/Q layouts must be regenerated for new trials. Trial timestamps use the service system clock without GNSS/NTP correction. Measured delay includes any clock offset between the two PCs.
 
 ### Trial Modes Summary
 
@@ -216,7 +216,7 @@ Unpack `build/distributions/lnis-node-linux.zip` on each target machine, copy `.
 | `LNIS_NODE_ROLE` | Operational role of the current node (`sender` or `receiver`) | `sender` |
 | `LNIS_SERVER_PORT` | HTTP/WebSocket listening port for the LNIS web UI and REST APIs | `8088` |
 | `LNIS_NODE_BASE_URL` | Self-reachable base URL of this LNIS instance | `http://192.168.1.101:8088` |
-| `LNIS_NODE_PEER_URL` | Base URL of the counterpart LNIS node (used for clock sync & Reference PVT verification) | `http://192.168.1.102:8089` |
+| `LNIS_NODE_PEER_URL` | Base URL of the counterpart LNIS node (used for Reference PVT verification) | `http://192.168.1.102:8089` |
 | `LNIS_NODE_MANAGEMENT_TOKEN` | Shared secret token for inter-node management REST calls (must match on both nodes) | `replace-with-a-shared-secret-at-least-32-chars` |
 | `dtn_adapter` | Default endpoint URL of the external DTN/HDTN sender adapter | `http://192.168.1.154:8080` |
 | `LNIS_DTN_SEND_TOKEN` | Bearer token sent by LNIS to the external sender adapter | `adapter-send-token` |
@@ -261,9 +261,8 @@ RAW·AFS는 같은 입력·Epoch·유형으로 **전송시험 시작**을 반복
    - **File Upload**: Upload a `.ubx` file (up to 64 MiB / 1,000 epochs) or `.graw` file (up to 1 MiB) and select the target observation epoch.
    - Inspect the computed **Reference PVT** (ECEF position, velocity, receiver clock bias, and per-satellite LNAV SF1–3 readiness).
    - Saved I/Q files retain their stored modification order after restart. The list shows up to 50 entries with the active generation first; older files remain on disk.
-3. **Node Clock Calibration (`Time Sync → Apply`)**:
-   - Before starting delay trials, click **Time Sync → Apply** on **both** Sender and Receiver UIs while no trial is active.
-   - This calibrates the internal trial clock offset against GNSS/peer time without altering the host OS clock, reducing clock-offset effects; approximation error and changes during a trial must still be checked.
+3. **System Time**:
+   - Trial timestamps use the service system clock. The application does not adjust either PC clock.
 4. **Trial Execution (`Start Trial`)**:
    - Each click registers a unique `testId` and dispatches the bundle to the external adapter.
    - Once the adapter accepts the dispatch, subsequent trials can be queued immediately without waiting for prior bundles to arrive.
@@ -337,7 +336,7 @@ LnisServer/
 │   ├── gnss/         # UBX-RXM-RAWX / SFRBX parser, GRAW codec, serial capture & u-blox framing
 │   ├── iq/           # 90-second RF baseband I/Q generator (afs_sim) & tracker (pocket_trk) orchestration
 │   ├── pvt/          # JNA bridge to RTKLIB SPP solver (NativePvtCodec)
-│   └── node/         # Inter-node connection health, GNSS clock offset & management security
+│   └── node/         # Inter-node connection health, system time display & management security
 ├── src/main/resources/static/
 │   ├── dtn-sender.html    # Sender Node operational dashboard
 │   ├── dtn-receiver.html  # Receiver Node operational dashboard
@@ -358,7 +357,7 @@ LnisServer/
 
 | Symptom / Error | Primary Root Cause & Resolution |
 | :--- | :--- |
-| **Negative Delay ($\Delta t < 0$) or Large Time Residual** | Clock skew between Sender and Receiver hosts. Terminate active trials and execute **Time Sync → Apply** on both nodes. |
+| **Negative Delay ($\Delta t < 0$) or Large Time Residual** | Clock skew between Sender and Receiver hosts. Check the system time on both PCs. A negative delay remains unavailable for PVT comparison. |
 | **`INCONCLUSIVE` PVT Verdict** | Insufficient satellites with complete LNAV Subframes 1–3 ($N < 4$), ephemeris out of validity window, or extreme delay causing Gauss-Newton divergence. Click the **PVT Status** pill to inspect the exact RTKLIB rejection reason. |
 | **I/Q generation failure** | Only GPS L1 observations with coherent preceding LNAV Subframes 1–3 are selected. Excluded PRNs are logged; at least four ready satellites are required. Generation failures include the process exit code, output size, and the last 4 KiB of the generator log. |
 | **Reference Comparison Pending / Fetch Failed** | Counterpart node is unreachable or `LNIS_NODE_MANAGEMENT_TOKEN` mismatches between `.env` files. Verify Peer Connection status in the Settings Drawer. |

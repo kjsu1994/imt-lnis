@@ -29,8 +29,6 @@ class WindowsSerialBridgeTest {
             assertEquals("COM5",client.ports().getFirst().name());
             assertFalse(client.request("/health", Map.of()).path("version").asText().isBlank());
             assertFalse(client.request("/health",Map.of()).path("busy").asBoolean());
-            assertFalse(client.request("/time",Map.of()).path("ready").asBoolean());
-            assertTrue(client.request("/time",Map.of()).hasNonNull("sentAt"));
             var connection=client.open(SETTINGS);
             assertThrows(IllegalStateException.class,()->client.open(SETTINGS));
             byte[] binary={0,(byte)255,(byte)181,98,13,10};

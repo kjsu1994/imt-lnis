@@ -294,7 +294,7 @@ public final class AfsPvtFrameCodec {
         if (anchor.femtoseconds() % 1_000_000 != 0) throw invalid("시험 시작 시각 정밀도 오류");
         Instant start = Instant.ofEpochSecond(anchor.seconds(), anchor.femtoseconds() / 1_000_000);
         if (received == null) received = start;
-        if (received.isBefore(start)) throw invalid("음수 지연: PC 시계 동기화를 확인하세요.");
+        if (received.isBefore(start)) throw invalid("음수 지연: 송수신 PC의 시스템 시각을 확인하세요.");
         boolean empty = h2[1] == 0;
         if (empty ? !transmit.equals(anchor) : transmit.until(start) <= 0) {
             throw invalid("가상 송신 시각 오류");

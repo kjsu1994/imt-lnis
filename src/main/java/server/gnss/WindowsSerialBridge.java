@@ -16,8 +16,6 @@ public final class WindowsSerialBridge implements AutoCloseable {
     private final ObjectMapper json = new ObjectMapper();
     private final String token;
     private final String version = System.getProperty("lnis.bridge.version", "development");
-    private final TimeReference time = new TimeReference();
-    private UbloxParser timeParser = new UbloxParser();
     private volatile SerialConnection port;
     private String session;
     private long touched;
@@ -51,7 +49,6 @@ public final class WindowsSerialBridge implements AutoCloseable {
     int portNumber() { return server.getAddress().getPort(); }
 
     private void handle(HttpExchange exchange) throws java.io.IOException {
-        String receivedAt = java.time.Instant.now().toString();
         try (exchange) {
             int code = 200;
             Object result;
@@ -66,19 +63,7 @@ public final class WindowsSerialBridge implements AutoCloseable {
                 if (body.length > 20000) { code = 413; result = Map.of("error", "Request too large"); }
                 else try {
                     String path = exchange.getRequestURI().getPath();
-                    if (path.equals("/time")) {
-                        var reading = time.reading();
-                        var value = new LinkedHashMap<String, Object>();
-                        value.put("receivedAt", receivedAt);
-                        value.put("sentAt", java.time.Instant.now().toString());
-                        value.put("ready", port != null && reading.ready());
-                        value.put("utc", reading.utc() == null ? null : reading.utc().toString());
-                        value.put("samples", reading.samples());
-                        value.put("spreadSeconds", reading.spreadSeconds());
-                        result = value;
-                    } else {
-                        result = dispatch(path, json.readTree(body));
-                    }
+                    result = dispatch(path, json.readTree(body));
                 }
                 catch (IllegalArgumentException e) { code = 400; result = Map.of("error", e.getMessage()); }
                 catch (Exception e) { code = 409; result = Map.of("error", Objects.toString(e.getMessage(), "COM bridge error")); }
@@ -106,8 +91,6 @@ public final class WindowsSerialBridge implements AutoCloseable {
             if (ports.get().stream().noneMatch(p -> p.name().equals(settings.portName())))
                 throw new IllegalStateException("연결된 Windows 포트가 아닙니다: " + settings.portName());
             port = opener.apply(settings);
-            time.reset();
-            timeParser = new UbloxParser();
             session = UUID.randomUUID().toString(); touched = System.nanoTime();
             return Map.of("session", session);
         }
@@ -122,10 +105,6 @@ public final class WindowsSerialBridge implements AutoCloseable {
                     byte[] data = new byte[length];
                     int count = port.readBytes(data, length);
                     if (count < 0) throw new IllegalStateException("COM 연결이 끊겼습니다.");
-                    long receivedTick = System.nanoTime();
-                    for (var frame : timeParser.push(data, count)) {
-                        time.observe(frame, receivedTick);
-                    }
                     yield Map.of("data", Base64.getEncoder().encodeToString(Arrays.copyOf(data, count)));
                 }
                 case "/write" -> {
@@ -146,7 +125,7 @@ public final class WindowsSerialBridge implements AutoCloseable {
     }
     private void release() {
         try { if (port != null) port.closePort(); }
-        finally { port = null; session = null; time.reset(); }
+        finally { port = null; session = null; }
     }
     public synchronized void close() {
         release(); expiry.shutdownNow(); server.stop(0); handlers.shutdownNow();

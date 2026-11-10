@@ -1,7 +1,7 @@
 import {parseNodeAddress, renderTrialSettings, trialTypeLabel, trialOption, colorTrialSelection, initWaitingCancellation, initTrialSettingsDialog} from './dtn-settings.js?v=20261104-peer-address-validation-2';
 import {requestJson} from '../common/http.js?v=20261103-management-reset';
 import {createPvtHistory} from './dtn-pvt-history.js?v=20261106-reference-rings';
-import {initGnssControls} from './dtn-gnss.js?v=20261104-serial-controls';
+import {initSystemClock} from './dtn-gnss.js?v=20261110-system-clock';
 import {createDtnLog} from './dtn-log.js?v=20261103-management-reset';
 import {initAdapterHealth} from './dtn-adapter-health.js?v=20261106-service-time';
 import {createPayloadViewer} from './dtn-payload.js?v=20261026-frame6';
@@ -81,23 +81,11 @@ function get(path, options = {}) {
   return requestJson(path, {cache: 'no-store', ...options}, {errorDetails: false});
 }
 
-function updateClockSkewWarning(connection) {
-  const warning = $('dtn-clock-skew-warning');
-  if (!warning) return;
-  const skew = connection?.peerClockSkewSeconds;
-  if (connection?.peerOnline && typeof skew === 'number' && Math.abs(skew) >= 0.5) {
-    warning.hidden = false;
-    const skewVal = $('clock-skew-val');
-    if (skewVal) skewVal.textContent = (skew > 0 ? '+' : '') + skew.toFixed(2) + 's';
-  } else {
-    warning.hidden = true;
-  }
-}
 
 const logView=createDtnLog($('dtn-log'));
 const waitingCancellation = initWaitingCancellation({isLocked: () => cancelling, refresh: () => poll(true), log});
 function log(message,level='INFO') { logView.write(message,level); }
-const gnss = initGnssControls({port: 'gnss-port', baud: 'gnss-baud', refresh: 'gnss-refresh', log});
+const systemClock = initSystemClock();
 let peerAddressDirty = false, peerSaving = false, lastPeerPort = 8090, lastPeerScheme = 'http';
 $('sender-address').oninput = () => {
   peerAddressDirty = true;
@@ -1173,7 +1161,7 @@ async function poll(force = false) {
   polling = true;
   $('dtn-refresh').disabled = true;
   try {
-    await gnss.poll();
+    await systemClock.poll();
     const query = new URLSearchParams({page: historyPage});
     if ($('dtn-test-filter').value) query.set('state', $('dtn-test-filter').value);
     const [agents, nextTests] = await Promise.all([get('/agents'), get('/dtn/tests?' + query)]);
@@ -1196,8 +1184,6 @@ async function poll(force = false) {
     const connection = await get('/node/connection').catch(() => ({}));
     if (connection.port) lastPeerPort = connection.port;
     if (connection.scheme) lastPeerScheme = connection.scheme;
-    gnss.setPeerTime(connection.peerGnssTimeState);
-    updateClockSkewWarning(connection);
     if (!peerAddressDirty) {
       if (connection.baseUrl != null) $('sender-address').value = connection.baseUrl;
       $('reverse-state').textContent = connection.peerOnline == null ? '미확인' : connection.peerOnline ? '연결됨' : '연결 끊김';
@@ -1244,13 +1230,6 @@ function updateAdapterStripPill(text, tone, className) {
 async function initialize() {
   initCubeInteraction();
   trialDialogHandler = initTrialSettingsDialog(() => tests.find(item => item.testId === $('dtn-tests').value));
-  if ($('dtn-receiver-status')) {
-    if ($('dtn-receiver-status').style) $('dtn-receiver-status').style.cursor = 'pointer';
-    $('dtn-receiver-status').onclick = () => {
-      $('gnss-port')?.focus();
-      $('gnss-port')?.scrollIntoView?.({behavior: 'smooth', block: 'center'});
-    };
-  }
   if ($('dtn-sender-status')) {
     if ($('dtn-sender-status').style) $('dtn-sender-status').style.cursor = 'pointer';
     $('dtn-sender-status').onclick = () => {
@@ -1265,8 +1244,7 @@ async function initialize() {
       $('dtn-send-url')?.scrollIntoView?.({behavior: 'smooth', block: 'center'});
     };
   }
-  await gnss.poll();
-  void gnss.listPorts();
+  await systemClock.poll();
   try {
     const config = await get('/dtn/config');
     initAdapterHealth(config.adapterUrl || '', log, (text, className, tone) => {

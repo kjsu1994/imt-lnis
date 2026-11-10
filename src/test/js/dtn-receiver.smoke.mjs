@@ -335,9 +335,9 @@ await elements.get('dtn-cancel').onclick();
 assert.equal(nextTests.find(job=>job.testId==='selected').state, 'CANCELLED');
 assert.equal(nextTests.find(job=>job.testId==='another').state, 'WAITING_DTN');
 console.log('PASS: manual selection preserved and receiver cancellation targets one trial');
-assert.match(elements.get('service-clock-value').textContent, /^2026-09-29 21:00:0\d\.\d{3}$/);
-assert.match(elements.get('service-clock-state').textContent, /미보정/);
-assert.match(elements.get('service-clock-detail').textContent, /GNSS 상태: GNSS 미연결 · 시간 미확인 \/ 상대 GNSS 시간 미확인/);
+assert.match(elements.get('service-clock-value').textContent, /^2026\. 09\. 29\. 21:00:0\d$/);
+assert.ok(!html.includes('id="service-clock-sync"'));
+assert.ok(!html.includes('id="gnss-port"'));
 assert.ok(requests.every(request => !String(request.url || request).includes('/lnis/api/v1/lnis/api/v1')),
   'API prefix must never be duplicated');
 elements.get('reference-details').hidden = true;
@@ -375,12 +375,12 @@ assert.deepEqual(shownReceipts, [oldReceipt]);
 assert.equal(elements.get('dtn-tests').value, 'old-rejected');
 context.fetch = ordinaryReceiverFetch;
 assert.ok(elements.has('dtn-cancel-waiting'));
-const gnssControls = vm.runInContext('gnss', context), normalGnssPoll = gnssControls.poll;
+const gnssControls = vm.runInContext('systemClock', context), normalGnssPoll = gnssControls.poll;
 gnssControls.poll = async () => { throw new Error('GNSS view failed'); };
 await context.poll(true);
 assert.equal(vm.runInContext('polling', context), false);
 gnssControls.poll = normalGnssPoll;
-console.log('PASS: selected-trial receipts remain reachable beyond global history and GNSS errors release polling');
+console.log('PASS: selected-trial receipts remain reachable beyond global history and system clock errors release polling');
 
 // I/Q observation loading must not require a valid or existing PVT epoch.
 vm.runInContext("selectionPinned=false; selectedId='';", context);

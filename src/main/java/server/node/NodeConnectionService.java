@@ -51,8 +51,6 @@ public class NodeConnectionService {
         result.setBusy(busy());
         result.setPeerOnline(connection.online());
         result.setReverseOnline(connection.reverseOnline());
-        result.setPeerGnssTimeState(connection.gnssTimeState());
-        result.setPeerClockSkewSeconds(connection.peerClockSkewSeconds());
         return result;
     }
 

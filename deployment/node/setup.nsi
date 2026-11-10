@@ -71,9 +71,7 @@ Var ManagementEdit
 Var AdapterTokenEdit
 Var RevealCheck
 Var IqPath
-Var Ntp
 Var IqEdit
-Var NtpEdit
 Var Installing
 Var InstallLog
 
@@ -137,7 +135,6 @@ Function LoadHints
   !insertmacro ReadHint SendToken env LNIS_DTN_SEND_TOKEN
   !insertmacro ReadHint ReceiveToken env LNIS_DTN_RECEIVE_TOKEN
   !insertmacro ReadHint IqPath env LNIS_IQ_HOST_PATH
-  !insertmacro ReadHint Ntp env LNIS_NTP_SERVER
 FunctionEnd
 
 Function RolePage
@@ -301,15 +298,11 @@ Function AdvancedPage
   ${NSD_CreateDirRequest} 0 18u 300u 14u "$IqPath"
   Pop $IqEdit
   !insertmacro Label 0 44u 100% "실제 파일은 설치 폴더의 exchange에 저장됩니다. 어댑터 기준 경로가 다를 때만 변경하세요."
-  !insertmacro Label 0 72u 100% "내부 NTP 서버 (선택)"
-  ${NSD_CreateText} 0 90u 300u 14u "$Ntp"
-  Pop $NtpEdit
   nsDialogs::Show
 FunctionEnd
 
 Function AdvancedLeave
   ${NSD_GetText} $IqEdit $IqPath
-  ${NSD_GetText} $NtpEdit $Ntp
 FunctionEnd
 
 Function SaveRequest
@@ -331,7 +324,6 @@ Function SaveRequest
   !insertmacro WriteValue LNIS_DTN_SEND_TOKEN "$SendToken"
   !insertmacro WriteValue LNIS_DTN_RECEIVE_TOKEN "$ReceiveToken"
   !insertmacro WriteValue LNIS_IQ_HOST_PATH "$IqPath"
-  !insertmacro WriteValue LNIS_NTP_SERVER "$Ntp"
 FunctionEnd
 
 Function ReviewPage

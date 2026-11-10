@@ -68,7 +68,6 @@ public class NodeDtnController {
             throw new IllegalArgumentException("DTN 사전 등록 필수 항목을 확인하세요.");
         }
         synchronized (clock) {
-            clock.requireAvailable();
             var result = service.accept(registration, clock.stamp());
             return new ResponseEntity<>(result, HttpStatus.ACCEPTED);
         }

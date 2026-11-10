@@ -62,7 +62,6 @@ function Write-SetupHints([string]$Path, [string]$Output) {
         LNIS_NODE_MANAGEMENT_TOKEN='imt123'
         LNIS_DTN_SEND_TOKEN='imt123';LNIS_DTN_RECEIVE_TOKEN='imt123'
         LNIS_IQ_HOST_PATH=(Join-Path $Path 'exchange')
-        LNIS_NTP_SERVER=''
     }
     foreach ($key in $defaults.Keys) { if (!$values.ContainsKey($key)) { $values[$key]=$defaults[$key] } }
     if ($addresses.Count -and ($addresses -notcontains ([Uri]$values.LNIS_NODE_BASE_URL).Host)) {
@@ -103,7 +102,7 @@ function Prepare-SetupConfiguration([string]$InputFile, [string]$Output) {
     $values = Get-SetupValues $path
     foreach ($key in @('LNIS_NODE_ROLE','LNIS_SERVER_PORT','LNIS_NODE_BASE_URL','LNIS_NODE_PEER_URL',
             'dtn_adapter','LNIS_NODE_MANAGEMENT_TOKEN','LNIS_DTN_SEND_TOKEN','LNIS_DTN_RECEIVE_TOKEN',
-            'LNIS_IQ_HOST_PATH','LNIS_NTP_SERVER')) {
+            'LNIS_IQ_HOST_PATH')) {
         $values[$key] = Read-SetupIni $InputFile 'env' $key
     }
     if (!(Get-NodeInstallLayout $path).Existing -and !$values.ContainsKey('LNIS_IQ_ENABLED')) {

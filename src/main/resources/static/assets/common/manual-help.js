@@ -14,7 +14,6 @@ const targets = [
   ['#dtn-settings-view section.card > .card-title h2', 'types'],
   ['.receiver-connection-heading:has(label[for="sender-address"])', 'routes', '상대 송신 서비스'],
   ['.receiver-connection-heading:has(label[for="dtn-send-url"])', 'health', '수신 어댑터'],
-  ['.receiver-connection-heading:has(label[for="gnss-port"])', 'clock', 'GNSS 시간 입력'],
   ['.reference-heading', 'reference', '송신 비교 자료'],
   ['.card-title:has(+ .gnss-time) h2', 'sender-reference'],
   ['.receiver-log h2, .dtn-log-tools h2', 'logs'],

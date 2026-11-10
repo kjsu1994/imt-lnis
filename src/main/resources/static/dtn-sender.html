@@ -1,11 +1,11 @@
 <!doctype html>
 <html lang="ko">
 <head>
-  <link rel="icon" type="image/svg+xml" href="/lnis/assets/common/transfer-mark.svg?v=20261106">
+  <link rel="icon" type="image/svg+xml" href="/lnis/assets/common/transfer-mark.svg?v=20261110-system-clock-20261106">
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>GNSS 전송 시험 · 송신</title>
-  <link rel="stylesheet" href="/lnis/assets/common/app.css?v=20261106-compact-help-20261103-system-logo-v2">
-  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20261106-help-20261105-capture-epochs">
+  <link rel="stylesheet" href="/lnis/assets/common/app.css?v=20261110-system-clock-20261106-compact-help-20261103-system-logo-v2">
+  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20261110-system-clock-20261106-help-20261105-capture-epochs">
 </head>
 <body data-page="dtn-sender">
 <header style="position: relative;">
@@ -23,7 +23,7 @@
   </a>
   <div><h1 class="dtn-brand"><img src="/lnis/assets/common/imt_logo.png" alt="imtplus · 송신 서비스" width="227" height="55"></h1></div>
   <div class="header-center-logo">
-    <img src="/lnis/assets/common/system_logo.png?v=20261103-v2" alt="우주 항법 및 통신 성능 검증 시스템" width="520" height="174">
+    <img src="/lnis/assets/common/system_logo.png?v=20261110-system-clock-20261103-v2" alt="우주 항법 및 통신 성능 검증 시스템" width="520" height="174">
   </div>
   <nav class="role-nav">
     <img class="kari-logo" src="/lnis/assets/common/Kari_logo.png" alt="한국항공우주연구원" width="200" height="67">
@@ -38,16 +38,9 @@
     <span id="dtn-receiver-status" class="pill" title="클릭하여 상대 수신 서비스 설정으로 이동">수신 처리기 확인 중</span>
     <span id="dtn-adapter-strip-status" class="pill warning" title="클릭하여 어댑터 설정 열기">어댑터 확인 중</span>
     <span id="dtn-test-status" class="pill">시험 대기</span>
-    <span id="dtn-clock-skew-warning" class="pill warning" hidden title="노드 간 시각이 어긋나 있습니다. 시간 맞추기 버튼으로 보정하세요.">⚠️ 시계 오차 <strong id="clock-skew-val">0.0s</strong> · 동기화 필요</span>
-    <div class="service-clock-pill" title="시험 기준시각 및 보정 상태">
-      <span class="clock-label">기준시각</span>
+    <div class="service-clock-pill" title="서비스 시스템 시각 · 한국 표준시">
+      <span class="clock-label">시스템 시각</span>
       <time id="service-clock-value">—</time>
-      <span id="service-clock-state" class="pill mini">미보정</span>
-      <button id="service-clock-sync" type="button" class="clock-sync-btn" title="내부 시험 시각 보정">시간 맞추기</button>
-      <details class="service-clock-dropdown">
-        <summary title="시각 상세">상세</summary>
-        <pre id="service-clock-detail"></pre>
-      </details>
     </div>
     <button id="dtn-config-hud" type="button" class="config-hud-pill" title="다음 전송의 시험 및 어댑터 설정 열기">⚙️ 다음 전송 · <span id="hud-type">AFS</span> · <span id="hud-route">DTN → HDTN</span> · <span id="hud-constellation">GPS</span></button>
   </section>
@@ -245,8 +238,6 @@
       </div>
       <div class="serial-status" aria-live="polite">
         <span id="gnss-connection-state" class="pill">미연결</span>
-        <span id="gnss-time-state">시간 미확인</span>
-        <details class="gnss-details"><summary>시간 상세</summary><pre id="gnss-time-detail"></pre></details>
       </div>
       <p id="dtn-port-status" role="status" hidden></p>
       <div class="serial-status" aria-label="GNSS 수집">
@@ -362,6 +353,6 @@
   <span class="software-version" title="소프트웨어 버전" aria-label="소프트웨어 버전 @lnisVersion@">v@lnisVersion@</span>
 </footer>
 
-<script type="module" src="/lnis/assets/dtn/dtn.js?v=20261106-help-20261105-capture-epochs"></script>
-  <script type="module" src="/lnis/assets/common/manual-help.js?v=20261106"></script>
+<script type="module" src="/lnis/assets/dtn/dtn.js?v=20261110-system-clock-20261106-help-20261105-capture-epochs"></script>
+  <script type="module" src="/lnis/assets/common/manual-help.js?v=20261110-system-clock-20261106"></script>
 </body></html>

@@ -339,7 +339,7 @@ public class IqReceiver {
         var evidence = restored.evidence();
         List<Pvt> values;
         if (negative) {
-            String message = "음수 지연 · 송수신 PC 시계 동기화를 확인하세요.";
+            String message = "음수 지연 · 송수신 PC의 시스템 시각을 확인하세요.";
             var invalid = new Pvt();
             invalid.setWeek(evidence.originalTime().week());
             invalid.setTowSeconds(evidence.originalTime().towSeconds());

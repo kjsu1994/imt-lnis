@@ -50,8 +50,6 @@ public class NodeRoleFilter extends OncePerRequestFilter {
                 && path.startsWith("/lnis/api/v1/")
                 && !path.startsWith("/lnis/api/v1/node/peer/")
                 && !("POST".equals(request.getMethod()) && java.util.List.of(
-                        "/lnis/api/v1/node/gnss/connect", "/lnis/api/v1/node/gnss/disconnect",
-                        "/lnis/api/v1/node/clock/prepare", "/lnis/api/v1/node/clock/apply",
                         "/lnis/api/v1/node/connection/test").contains(path))
                 && !("PUT".equals(request.getMethod()) && path.equals("/lnis/api/v1/node/connection"))
                 && !path.startsWith("/lnis/api/v1/data-management/")

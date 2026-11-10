@@ -350,7 +350,7 @@ public class DtnLogService {
                 false,
                 "수신측 · 시험 시작→수신 지연 "
                         + evidence.delaySeconds() * 1000
-                        + " ms · 양쪽 PC 시계 동기화 정확도 미확인");
+                        + " ms · PC 시계 차이 포함 가능");
         add(
                 id,
                 "TEST",

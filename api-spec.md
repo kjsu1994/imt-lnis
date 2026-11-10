@@ -58,7 +58,7 @@ I/Q 파일 생성 후 대기와 수신 후 복호시간은 지연에 합산하�
 새 보고서의 `comparisonBasis`는 `RF_BASELINE`이며 `rfBaselinePvt`가 지연 미적용 RF 해입니다. `referencePvt`는 송신 원본, `receivedPvt`는 지연 반영 RF 해로 유지합니다. RF 기준 해는 `fileResult.rfBaselinePvt`에도 보관되어 서비스 간 결과 조회에 포함됩니다.
 화면의 `data-integrity`는 `fileResult.verdict`와 `comparison.verdict`를 구분해 함께 표시합니다. 파일 크기·SHA-256 불일치는 `fileResult.verdict=FAIL`로 기록하며, 복호 실패만으로 파일 불일치를 판정하지 않습니다. 지연 시험의 `MEASURED`는 PVT 차이 측정 완료이며 원본과 같은 값이라는 뜻은 아닙니다.
 생성 후 전체 해시 계산 중에는 I/Q 상태가 GENERATING이며 phase=VERIFYING과 verificationBytes·verificationTotalBytes·verificationElapsedMillis를 제공합니다.
-PC 시계 동기화가 전제이며 음수 지연은 비교 불가로 처리합니다.
+시험 시각은 보정 없이 서비스 시스템 시각을 사용합니다. 지연에는 송수신 PC의 시계 차이가 포함되며, 음수 지연은 비교 불가로 처리합니다.
 
 ## 서비스 간 시험 등록 정보
 
@@ -140,3 +140,6 @@ GET /lnis/api/v1/dtn/tests/{testId}/pvt-history는 선택 시험과 같은 묶�
 availability는 AVAILABLE / WAITING / FAILED / CANCELLED / UNAVAILABLE / REFERENCE_MISMATCH입니다. ecefMeters는 위치 비교가 가능한 시험에만 제공합니다. 속도 무효만으로 위치 점을 제외하지 않습니다. 실패·중지·기준 불일치·유효하지 않은 위치는 점으로 표시하지 않습니다. 원문·관측값·설정·상세 로그는 포함하지 않으며 선택한 시험의 기존 API에서 조회합니다.
 
 묶음이 없는 이전 시험과 I/Q는 historyKey=null, 빈 trials를 반환합니다. 과거 시험을 자동으로 묶지 않습니다. 기존 testId 등록의 묶음 값을 변경하면 HTTP 409이며, 신규 등록의 잘못된 형식·유형은 HTTP 400입니다. 같은 입력·Epoch·유형으로 돌아오면 기존 묶음을 복원합니다. 자료 삭제·보관 정리 후에는 남은 이력만 반환합니다.
+
+### 시스템 시각 조회
+GET /lnis/api/v1/node/clock은 화면 표시용 시스템 시각을 반환합니다. GNSS·NTP 보정 및 상대 시계 예약 API는 제공하지 않습니다. 날짜·시각은 화면에서 초 단위로 표시하며 JSON·프레임·계산 정밀도는 유지합니다.

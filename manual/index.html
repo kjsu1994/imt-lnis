@@ -172,7 +172,7 @@ html.manual-embedded { scroll-behavior: auto; }
 <button aria-controls="contents-panel" aria-selected="true" id="contents-tab" role="tab" type="button">목차</button>
 <button aria-controls="results-panel" aria-selected="false" disabled="" id="results-tab" role="tab" type="button">검색 결과</button>
 </div>
-<nav aria-label="설명서 목차" aria-labelledby="contents-tab" id="contents-panel" role="tabpanel"><details><summary>사용 안내</summary><a href="#cover">GNSS 전송 시험 사용자 설명서</a><a href="#reading">설명서 적용 범위</a><a href="#contents">목차</a></details><details><summary>시작 전 확인</summary><a href="#roles">서비스와 어댑터의 역할</a><a href="#access">접속과 시험 전 준비</a></details><details><summary>기본 실행 순서</summary><a href="#quick">빠른 실행 · 파일 입력으로 첫 시험</a></details><details><summary>송신 화면</summary><a href="#sender-map">송신 화면에서 구분할 영역</a></details><details><summary>송신 설정</summary><a href="#settings">설정 열기와 적용 시점</a><a href="#types">시험 유형 선택</a><a href="#routes">전송 경로와 연결 주소</a><a href="#health">어댑터 연결 확인</a><a href="#presets">프리셋 저장·불러오기·수정</a><a href="#hdtn">HDTN 파라미터</a><a href="#hdtn-advanced">HDTN 고급 설정과 입력 제한</a><a href="#dtn">DTN(ION) 파라미터</a></details><details><summary>GNSS 입력</summary><a href="#upload">UBX / GRAW 파일 적용</a><a href="#serial">COM 포트 연결과 장비 설정</a><a href="#capture">GNSS 수집과 UBX 다운로드</a></details><details><summary>시각 준비</summary><a href="#clock">기준시각 확인과 시간 맞추기</a></details><details><summary>관측값 확인</summary><a href="#sender-data">송신 원본 GNSS 관측값 읽기</a><a href="#rawx">RAWX 필드와 PRN</a><a href="#navigation">항법정보와 RAWX의 관계</a><a href="#receiver-info">수신기 정보와 입력 상태</a></details><details><summary>유형별 실행</summary><a href="#run-raw">GNSS RAW 시험 실행</a><a href="#run-afs">AFS Frame 시험 실행</a><a href="#iq-generate">I/Q Sample 생성과 저장 파일 선택</a><a href="#iq-files">I/Q 공유 폴더와 파일 전달</a></details><details><summary>송신 결과 확인</summary><a href="#sender-reference">송신 Reference PVT와 시험 이력</a></details><details><summary>수신 화면</summary><a href="#receiver-map">수신 화면과 처리 단계</a></details><details><summary>수신 결과 확인</summary><a href="#received-values">수신 원본 GNSS 관측값</a><a href="#iq-observations">I/Q RF 관측값과 지연 비교</a><a href="#reference">송신 비교 자료 확인</a><a href="#pvt-result">PVT 결과에서 확인할 순서</a><a href="#pvt-views">반복 시험 위치 편차</a><a href="#pvt-numbers">ECEF 상세 수치와 시간 잔차</a></details><details><summary>결과 해석</summary><a href="#delay-model">공통 지연과 의사거리 계산</a><a href="#delay-meaning">지연이 큰데 위치 차이가 작은 이유</a><a href="#iq-integrity">I/Q 파일 일치와 처리 시간</a></details><details><summary>시험 관리</summary><a href="#history">여러 시험 전송과 이력 조회</a><a href="#cancel">시험별 중지와 대기 전체 종료</a></details><details><summary>원문과 로그</summary><a href="#json">송신·수신 JSON 원문 확인</a><a href="#logs">로그 상세·다운로드·전체화면</a><a href="#log-evidence">로그를 이용한 장애 전달</a></details><details><summary>장애 대응</summary><a href="#errors">문제 발생 시 확인 순서</a><a href="#actual-errors">실제 이력으로 보는 비교 불가와 실패</a></details><details><summary>관리자 부록</summary><a href="#management">데이터 관리 접속과 조회</a><a href="#management-detail">시험·수신 원문·파일 상세</a><a href="#delete">자료 선택 삭제</a><a href="#retention">보관 기간과 자동 정리</a><a href="#install-prepare">Windows PC 설치 준비</a><a href="#install-settings">송신·수신 PC 설정</a><a href="#install-start">설치 완료 확인과 일상 실행</a><a href="#operations">기동·종료·업데이트</a><a href="#environment">다른 PC 설치 시 확인할 설정</a><a href="#docker-logs">Docker 로그 확인</a></details><details><summary>참고</summary><a href="#intro">구조·동작 안내 화면 사용</a><a href="#glossary">용어와 단위</a><a href="#record">시험 결과 기록 항목</a></details>
+<nav aria-label="설명서 목차" aria-labelledby="contents-tab" id="contents-panel" role="tabpanel"><details><summary>사용 안내</summary><a href="#cover">GNSS 전송 시험 사용자 설명서</a><a href="#reading">설명서 적용 범위</a><a href="#contents">목차</a></details><details><summary>시작 전 확인</summary><a href="#roles">서비스와 어댑터의 역할</a><a href="#access">접속과 시험 전 준비</a></details><details><summary>기본 실행 순서</summary><a href="#quick">빠른 실행 · 파일 입력으로 첫 시험</a></details><details><summary>송신 화면</summary><a href="#sender-map">송신 화면에서 구분할 영역</a></details><details><summary>송신 설정</summary><a href="#settings">설정 열기와 적용 시점</a><a href="#types">시험 유형 선택</a><a href="#routes">전송 경로와 연결 주소</a><a href="#health">어댑터 연결 확인</a><a href="#presets">프리셋 저장·불러오기·수정</a><a href="#hdtn">HDTN 파라미터</a><a href="#hdtn-advanced">HDTN 고급 설정과 입력 제한</a><a href="#dtn">DTN(ION) 파라미터</a></details><details><summary>GNSS 입력</summary><a href="#upload">UBX / GRAW 파일 적용</a><a href="#serial">COM 포트 연결과 장비 설정</a><a href="#capture">GNSS 수집과 UBX 다운로드</a></details><details><summary>시각 준비</summary><a href="#clock">시스템 시각과 지연</a></details><details><summary>관측값 확인</summary><a href="#sender-data">송신 원본 GNSS 관측값 읽기</a><a href="#rawx">RAWX 필드와 PRN</a><a href="#navigation">항법정보와 RAWX의 관계</a><a href="#receiver-info">수신기 정보와 입력 상태</a></details><details><summary>유형별 실행</summary><a href="#run-raw">GNSS RAW 시험 실행</a><a href="#run-afs">AFS Frame 시험 실행</a><a href="#iq-generate">I/Q Sample 생성과 저장 파일 선택</a><a href="#iq-files">I/Q 공유 폴더와 파일 전달</a></details><details><summary>송신 결과 확인</summary><a href="#sender-reference">송신 Reference PVT와 시험 이력</a></details><details><summary>수신 화면</summary><a href="#receiver-map">수신 화면과 처리 단계</a></details><details><summary>수신 결과 확인</summary><a href="#received-values">수신 원본 GNSS 관측값</a><a href="#iq-observations">I/Q RF 관측값과 지연 비교</a><a href="#reference">송신 비교 자료 확인</a><a href="#pvt-result">PVT 결과에서 확인할 순서</a><a href="#pvt-views">반복 시험 위치 편차</a><a href="#pvt-numbers">ECEF 상세 수치와 시간 잔차</a></details><details><summary>결과 해석</summary><a href="#delay-model">공통 지연과 의사거리 계산</a><a href="#delay-meaning">지연이 큰데 위치 차이가 작은 이유</a><a href="#iq-integrity">I/Q 파일 일치와 처리 시간</a></details><details><summary>시험 관리</summary><a href="#history">여러 시험 전송과 이력 조회</a><a href="#cancel">시험별 중지와 대기 전체 종료</a></details><details><summary>원문과 로그</summary><a href="#json">송신·수신 JSON 원문 확인</a><a href="#logs">로그 상세·다운로드·전체화면</a><a href="#log-evidence">로그를 이용한 장애 전달</a></details><details><summary>장애 대응</summary><a href="#errors">문제 발생 시 확인 순서</a><a href="#actual-errors">실제 이력으로 보는 비교 불가와 실패</a></details><details><summary>관리자 부록</summary><a href="#management">데이터 관리 접속과 조회</a><a href="#management-detail">시험·수신 원문·파일 상세</a><a href="#delete">자료 선택 삭제</a><a href="#retention">보관 기간과 자동 정리</a><a href="#install-prepare">Windows PC 설치 준비</a><a href="#install-settings">송신·수신 PC 설정</a><a href="#install-start">설치 완료 확인과 일상 실행</a><a href="#operations">기동·종료·업데이트</a><a href="#environment">다른 PC 설치 시 확인할 설정</a><a href="#docker-logs">Docker 로그 확인</a></details><details><summary>참고</summary><a href="#intro">구조·동작 안내 화면 사용</a><a href="#glossary">용어와 단위</a><a href="#record">시험 결과 기록 항목</a></details>
 </nav><div aria-labelledby="results-tab" hidden="" id="results-panel" role="tabpanel">
 <p hidden="" id="empty">검색 결과가 없습니다. 다른 단어로 검색해 보세요.
 </p>
@@ -250,7 +250,7 @@ html.manual-embedded { scroll-behavior: auto; }
 <p class="eyebrow">사용 안내 · 03
 </p>
 <h1 id="title-contents">목차
-</h1></div><div id="printed-toc"><a href="#roles"><span>서비스와 어댑터의 역할</span><small>04</small></a><a href="#access"><span>접속과 시험 전 준비</span><small>05</small></a><a href="#quick"><span>빠른 실행 · 파일 입력으로 첫 시험</span><small>06</small></a><a href="#sender-map"><span>송신 화면에서 구분할 영역</span><small>07</small></a><a href="#settings"><span>설정 열기와 적용 시점</span><small>08</small></a><a href="#types"><span>시험 유형 선택</span><small>09</small></a><a href="#routes"><span>전송 경로와 연결 주소</span><small>10</small></a><a href="#health"><span>어댑터 연결 확인</span><small>11</small></a><a href="#presets"><span>프리셋 저장·불러오기·수정</span><small>12</small></a><a href="#hdtn"><span>HDTN 파라미터</span><small>13</small></a><a href="#hdtn-advanced"><span>HDTN 고급 설정과 입력 제한</span><small>14</small></a><a href="#dtn"><span>DTN(ION) 파라미터</span><small>15</small></a><a href="#upload"><span>UBX / GRAW 파일 적용</span><small>16</small></a><a href="#serial"><span>COM 포트 연결과 장비 설정</span><small>17</small></a><a href="#capture"><span>GNSS 수집과 UBX 다운로드</span><small>18</small></a><a href="#clock"><span>기준시각 확인과 시간 맞추기</span><small>19</small></a><a href="#sender-data"><span>송신 원본 GNSS 관측값 읽기</span><small>20</small></a><a href="#rawx"><span>RAWX 필드와 PRN</span><small>21</small></a><a href="#navigation"><span>항법정보와 RAWX의 관계</span><small>22</small></a><a href="#receiver-info"><span>수신기 정보와 입력 상태</span><small>23</small></a><a href="#run-raw"><span>GNSS RAW 시험 실행</span><small>24</small></a><a href="#run-afs"><span>AFS Frame 시험 실행</span><small>25</small></a><a href="#iq-generate"><span>I/Q Sample 생성과 저장 파일 선택</span><small>26</small></a><a href="#iq-files"><span>I/Q 공유 폴더와 파일 전달</span><small>27</small></a><a href="#sender-reference"><span>송신 Reference PVT와 시험 이력</span><small>28</small></a><a href="#receiver-map"><span>수신 화면과 처리 단계</span><small>29</small></a><a href="#received-values"><span>수신 원본 GNSS 관측값</span><small>30</small></a><a href="#iq-observations"><span>I/Q RF 관측값과 지연 비교</span><small>31</small></a><a href="#reference"><span>송신 비교 자료 확인</span><small>32</small></a><a href="#pvt-result"><span>PVT 결과에서 확인할 순서</span><small>33</small></a><a href="#pvt-views"><span>반복 시험 위치 편차</span><small>34</small></a><a href="#pvt-numbers"><span>ECEF 상세 수치와 시간 잔차</span><small>35</small></a><a href="#delay-model"><span>공통 지연과 의사거리 계산</span><small>36</small></a><a href="#delay-meaning"><span>지연이 큰데 위치 차이가 작은 이유</span><small>37</small></a><a href="#iq-integrity"><span>I/Q 파일 일치와 처리 시간</span><small>38</small></a><a href="#history"><span>여러 시험 전송과 이력 조회</span><small>39</small></a><a href="#cancel"><span>시험별 중지와 대기 전체 종료</span><small>40</small></a><a href="#json"><span>송신·수신 JSON 원문 확인</span><small>41</small></a><a href="#logs"><span>로그 상세·다운로드·전체화면</span><small>42</small></a><a href="#log-evidence"><span>로그를 이용한 장애 전달</span><small>43</small></a><a href="#errors"><span>문제 발생 시 확인 순서</span><small>44</small></a><a href="#actual-errors"><span>실제 이력으로 보는 비교 불가와 실패</span><small>45</small></a><a href="#management"><span>데이터 관리 접속과 조회</span><small>46</small></a><a href="#management-detail"><span>시험·수신 원문·파일 상세</span><small>47</small></a><a href="#delete"><span>자료 선택 삭제</span><small>48</small></a><a href="#retention"><span>보관 기간과 자동 정리</span><small>49</small></a><a href="#install-prepare"><span>Windows PC 설치 준비</span><small>50</small></a><a href="#install-settings"><span>송신·수신 PC 설정</span><small>51</small></a><a href="#install-start"><span>설치 완료 확인과 일상 실행</span><small>52</small></a><a href="#operations"><span>기동·종료·업데이트</span><small>53</small></a><a href="#environment"><span>다른 PC 설치 시 확인할 설정</span><small>54</small></a><a href="#docker-logs"><span>Docker 로그 확인</span><small>55</small></a><a href="#intro"><span>구조·동작 안내 화면 사용</span><small>56</small></a><a href="#glossary"><span>용어와 단위</span><small>57</small></a><a href="#record"><span>시험 결과 기록 항목</span><small>58</small></a></div><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>3 / 58</span></div>
+</h1></div><div id="printed-toc"><a href="#roles"><span>서비스와 어댑터의 역할</span><small>04</small></a><a href="#access"><span>접속과 시험 전 준비</span><small>05</small></a><a href="#quick"><span>빠른 실행 · 파일 입력으로 첫 시험</span><small>06</small></a><a href="#sender-map"><span>송신 화면에서 구분할 영역</span><small>07</small></a><a href="#settings"><span>설정 열기와 적용 시점</span><small>08</small></a><a href="#types"><span>시험 유형 선택</span><small>09</small></a><a href="#routes"><span>전송 경로와 연결 주소</span><small>10</small></a><a href="#health"><span>어댑터 연결 확인</span><small>11</small></a><a href="#presets"><span>프리셋 저장·불러오기·수정</span><small>12</small></a><a href="#hdtn"><span>HDTN 파라미터</span><small>13</small></a><a href="#hdtn-advanced"><span>HDTN 고급 설정과 입력 제한</span><small>14</small></a><a href="#dtn"><span>DTN(ION) 파라미터</span><small>15</small></a><a href="#upload"><span>UBX / GRAW 파일 적용</span><small>16</small></a><a href="#serial"><span>COM 포트 연결과 장비 설정</span><small>17</small></a><a href="#capture"><span>GNSS 수집과 UBX 다운로드</span><small>18</small></a><a href="#clock"><span>시스템 시각과 지연</span><small>19</small></a><a href="#sender-data"><span>송신 원본 GNSS 관측값 읽기</span><small>20</small></a><a href="#rawx"><span>RAWX 필드와 PRN</span><small>21</small></a><a href="#navigation"><span>항법정보와 RAWX의 관계</span><small>22</small></a><a href="#receiver-info"><span>수신기 정보와 입력 상태</span><small>23</small></a><a href="#run-raw"><span>GNSS RAW 시험 실행</span><small>24</small></a><a href="#run-afs"><span>AFS Frame 시험 실행</span><small>25</small></a><a href="#iq-generate"><span>I/Q Sample 생성과 저장 파일 선택</span><small>26</small></a><a href="#iq-files"><span>I/Q 공유 폴더와 파일 전달</span><small>27</small></a><a href="#sender-reference"><span>송신 Reference PVT와 시험 이력</span><small>28</small></a><a href="#receiver-map"><span>수신 화면과 처리 단계</span><small>29</small></a><a href="#received-values"><span>수신 원본 GNSS 관측값</span><small>30</small></a><a href="#iq-observations"><span>I/Q RF 관측값과 지연 비교</span><small>31</small></a><a href="#reference"><span>송신 비교 자료 확인</span><small>32</small></a><a href="#pvt-result"><span>PVT 결과에서 확인할 순서</span><small>33</small></a><a href="#pvt-views"><span>반복 시험 위치 편차</span><small>34</small></a><a href="#pvt-numbers"><span>ECEF 상세 수치와 시간 잔차</span><small>35</small></a><a href="#delay-model"><span>공통 지연과 의사거리 계산</span><small>36</small></a><a href="#delay-meaning"><span>지연이 큰데 위치 차이가 작은 이유</span><small>37</small></a><a href="#iq-integrity"><span>I/Q 파일 일치와 처리 시간</span><small>38</small></a><a href="#history"><span>여러 시험 전송과 이력 조회</span><small>39</small></a><a href="#cancel"><span>시험별 중지와 대기 전체 종료</span><small>40</small></a><a href="#json"><span>송신·수신 JSON 원문 확인</span><small>41</small></a><a href="#logs"><span>로그 상세·다운로드·전체화면</span><small>42</small></a><a href="#log-evidence"><span>로그를 이용한 장애 전달</span><small>43</small></a><a href="#errors"><span>문제 발생 시 확인 순서</span><small>44</small></a><a href="#actual-errors"><span>실제 이력으로 보는 비교 불가와 실패</span><small>45</small></a><a href="#management"><span>데이터 관리 접속과 조회</span><small>46</small></a><a href="#management-detail"><span>시험·수신 원문·파일 상세</span><small>47</small></a><a href="#delete"><span>자료 선택 삭제</span><small>48</small></a><a href="#retention"><span>보관 기간과 자동 정리</span><small>49</small></a><a href="#install-prepare"><span>Windows PC 설치 준비</span><small>50</small></a><a href="#install-settings"><span>송신·수신 PC 설정</span><small>51</small></a><a href="#install-start"><span>설치 완료 확인과 일상 실행</span><small>52</small></a><a href="#operations"><span>기동·종료·업데이트</span><small>53</small></a><a href="#environment"><span>다른 PC 설치 시 확인할 설정</span><small>54</small></a><a href="#docker-logs"><span>Docker 로그 확인</span><small>55</small></a><a href="#intro"><span>구조·동작 안내 화면 사용</span><small>56</small></a><a href="#glossary"><span>용어와 단위</span><small>57</small></a><a href="#record"><span>시험 결과 기록 항목</span><small>58</small></a></div><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>3 / 58</span></div>
 </section>
 <section aria-labelledby="title-roles" class="sheet" id="roles"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
 <p class="eyebrow">시작 전 확인 · 04
@@ -415,7 +415,7 @@ html.manual-embedded { scroll-behavior: auto; }
 <tr>
 <td>연결 상태 / 기준시각
 </td>
-<td>송수신 처리기, 어댑터, 시험 상태, 서비스 내부 기준시각과 보정 상태
+<td>송수신 처리기, 어댑터, 시험 상태, 서비스 시스템 시각
 </td>
 </tr>
 <tr>
@@ -1108,60 +1108,20 @@ html.manual-embedded { scroll-behavior: auto; }
 <section aria-labelledby="title-clock" class="sheet" id="clock"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
 <p class="eyebrow">시각 준비 · 19
 </p>
-<h1 id="title-clock">기준시각 확인과 시간 맞추기
+<h1 id="title-clock">시스템 시각과 지연
 </h1></div>
-<figure class="wide"><a aria-label="기준시각 · PC 시각 미보정 예시 확대" href="assets/sender-status.png" target="_blank"><img alt="기준시각 · PC 시각 미보정 예시" src="assets/sender-status.png"/></a>
-<figcaption>기준시각 · PC 시각 미보정 예시
-</figcaption>
-</figure>
-<ol class="steps">
-<li>송신·수신 화면의 <b>기준시각</b>과 보정 상태를 확인합니다.
-</li>
-<li><b>상세</b>에서 시각 원천, 보정량, 보정 시점 및 시계 변경 정보를 확인합니다.
-</li>
-<li>필요하면 <b>시간 맞추기</b>를 눌러 제안된 원천·보정량을 검토합니다.
-</li>
-<li>확인 후 적용하고 양쪽 상태를 다시 확인합니다. 지연 시험 중에는 시각 원천·보정 상태를 바꾸지 않습니다.
-</li>
-</ol>
-<table>
-<thead>
-<tr>
-<th>상태
-</th>
-<th>해석
-</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>PC 시각 · 미보정 (SYSTEM)
-</td>
-<td>현재 PC 시각을 사용하는 상태
-</td>
-</tr>
-<tr>
-<td>GNSS 근사보정 (GNSS_USB)
-</td>
-<td>로컬 GNSS 입력을 이용한 서비스 내부 시각 보정
-</td>
-</tr>
-<tr>
-<td>상대 GNSS 근사보정 (PEER_GNSS)
-</td>
-<td>상대 서비스의 GNSS 기준을 활용한 근사보정
-</td>
-</tr>
-<tr>
-<td>공통 NTP 근사보정 (NTP)
-</td>
-<td>공통 시각 기준을 활용한 근사보정
-</td>
-</tr>
-</tbody>
-</table>
-<aside class="note">시간 맞추기는 서비스의 시험 시각을 보정합니다. 재기동 후 보정 상태를 다시 확인하세요.
-</aside><div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>19 / 58</span></div>
+<figure class="wide"><a href="assets/sender-status.png" target="_blank" aria-label="시스템 시각 표시 확대"><img src="assets/sender-status.png" alt="송신 화면의 시스템 시각"/></a><figcaption>시스템 시각 · 한국 표준시</figcaption></figure>
+<div class="grid two"><div>
+<h2>시각 표시</h2>
+<ul><li>송신·수신 화면 상단에 서비스 시스템 시각을 초 단위로 표시합니다.</li>
+<li>GNSS·NTP를 이용한 시험 시각 보정은 사용하지 않습니다.</li>
+<li>COM 연결은 송신부의 GNSS 관측값 수집에 사용합니다.</li></ul>
+</div><div><h2>지연 계산</h2>
+<p>지연 = 수신 본문 완료 시각 − 송신 시험 시작 시각</p>
+<p>지연에는 송수신 PC의 시계 차이가 포함될 수 있습니다. 음수 지연은 PVT 비교 불가로 표시합니다.</p>
+<p>지연시간·Clock Bias·GNSS 관측값의 계산 정밀도는 유지합니다.</p>
+</div></div>
+<div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>19 / 58</span></div>
 </section>
 <section aria-labelledby="title-sender-data" class="sheet" id="sender-data"><div class="sheet-head"><img alt="한국항공우주연구원" class="manual-kari" src="assets/Kari_logo.png"/>
 <p class="eyebrow">관측값 확인 · 20
@@ -1695,8 +1655,8 @@ html.manual-embedded { scroll-behavior: auto; }
 </p>
 <h1 id="title-receiver-map">수신 화면과 처리 단계
 </h1></div>
-<figure class="wide"><a aria-label="AFS 완료 시험을 선택한 수신 화면 상단 확대" href="assets/receiver-header.png" target="_blank"><img alt="AFS 완료 시험을 선택한 수신 화면 상단" src="assets/receiver-header.png"/></a>
-<figcaption>AFS 완료 시험을 선택한 수신 화면 상단
+<figure class="wide"><a aria-label="수신 화면 연결 설정과 시험 기록 확대" href="assets/receiver-header.png" target="_blank"><img alt="수신 화면 연결 설정과 시험 기록" src="assets/receiver-header.png"/></a>
+<figcaption>수신 화면 연결 설정과 시험 기록
 </figcaption>
 </figure>
 <table>
@@ -1727,12 +1687,7 @@ html.manual-embedded { scroll-behavior: auto; }
 <td>이 PC의 어댑터 health 확인 주소입니다. 상대 서비스 주소와 다릅니다.
 </td>
 </tr>
-<tr>
-<td>GNSS 시간 입력
-</td>
-<td>수신 서비스의 시험 시각을 맞출 GNSS 장비를 연결합니다.
-</td>
-</tr>
+
 <tr>
 <td>시험 등록 → 번들 수신 → 복원·PVT 계산
 </td>
@@ -2154,7 +2109,7 @@ html.manual-embedded { scroll-behavior: auto; }
 </p>
 <h1 id="title-history">여러 시험 전송과 이력 조회
 </h1></div>
-<figure class="wide"><a aria-label="시험 기록 선택과 대기 전체 종료 · 수신 화면 확대" href="assets/receiver-status.png" target="_blank"><img alt="시험 기록 선택과 대기 전체 종료 · 수신 화면" src="assets/receiver-status.png"/></a>
+<figure class="wide"><a aria-label="시험 기록 선택과 대기 전체 종료 · 수신 화면 확대" href="assets/receiver-header.png" target="_blank"><img alt="시험 기록 선택과 대기 전체 종료 · 수신 화면" src="assets/receiver-header.png"/></a>
 <figcaption>시험 기록 선택과 대기 전체 종료 · 수신 화면
 </figcaption>
 </figure>
@@ -2531,7 +2486,7 @@ html.manual-embedded { scroll-behavior: auto; }
 <tr>
 <td>AFS 음수 지연
 </td>
-<td>기존 이력에서 R − S가 약 −1.019초였습니다. 전송이 음의 시간에 이뤄졌다는 의미가 아니며 양쪽 기준시각·보정 변경을 확인합니다.
+<td>기존 이력에서 R − S가 약 −1.019초였습니다. 전송이 음의 시간에 이뤄졌다는 의미가 아니며 송수신 PC의 시계 차이를 확인합니다.
 </td>
 </tr>
 <tr>
@@ -3266,7 +3221,7 @@ docker logs --tail 100 -f &lt;컨테이너-이름&gt;</pre>
 <tr>
 <td>시각 조건
 </td>
-<td>송수신 시각 원천·보정 상태, 시험 중 시계 변경 여부, 시작 S·본문 수신 R
+<td>시작 S·본문 수신 R, 시험 중 시스템 시각 변경 여부
 </td>
 </tr>
 <tr>

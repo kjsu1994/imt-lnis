@@ -264,7 +264,6 @@ public class DtnController {
     public ResponseEntity<Map<String, Object>> create(@Valid @RequestBody CreateRequest request)
             throws Exception {
         synchronized (clock) {
-            clock.requireAvailable();
             var stamp = clock.stamp();
             synchronized (dtnService) {
                 return createAt(request, stamp);

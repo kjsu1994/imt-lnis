@@ -553,7 +553,7 @@ public class DtnService {
                     job.getId(),
                     "송신 시작",
                     true,
-                    "시작 접수 " + startedAt + " · 이후 준비/변환/전송 대기 포함 · 시계 동기화 정확도 미확인");
+                    "시작 접수 " + startedAt + " · 이후 준비/변환/전송 대기 포함 · PC 시계 차이 포함 가능");
         }
         update(job, "PREPARING", "기준 PVT 계산 및 " + testType + " 준비 중");
         try {
@@ -666,6 +666,22 @@ public class DtnService {
         } else if (job.getReceiverClockJson() == null && job.getReceivedAt() != null) {
             job.setReceiverClockJson(value);
             String before = job.getReceiverRegistrationClockJson();
+            for (String recorded : new String[]{before, job.getSenderClockJson()}) {
+                if (recorded == null) continue;
+                try {
+                    var previous = objectMapper.readValue(recorded, server.common.ServiceClock.Stamp.class);
+                    if (!"SYSTEM".equals(previous.source()) || previous.offsetSeconds() != 0) {
+                        String message = "시각 기준 변경 · 이전 보정 시각으로 시작한 시험은 새로 실행하세요.";
+                        job.setClockWarning(message);
+                        job.setComparisonJson(objectMapper.writeValueAsString(
+                                Map.of("verdict", "INCONCLUSIVE", "message", message)));
+                        update(job, "INCONCLUSIVE", message);
+                        return;
+                    }
+                } catch (java.io.IOException invalid) {
+                    job.setClockWarning("과거 시험의 시각 기준을 확인할 수 없습니다.");
+                }
+            }
             if (before != null) {
                 try {
                     var previous = objectMapper.readValue(before, server.common.ServiceClock.Stamp.class);
@@ -674,23 +690,8 @@ public class DtnService {
                         job.setClockWarning("시험 중 시계 변경 또는 서비스 재시작 감지 · 전달 지연 해석 주의");
                     }
                 } catch (java.io.IOException invalid) {
-                    job.setClockWarning("등록 시각의 보정 근거를 확인할 수 없습니다.");
+                    job.setClockWarning("등록 시각의 기록을 확인할 수 없습니다.");
                 }
-            }
-            if ("SYSTEM".equals(stamp.source()) || stamp.ageSeconds() > 300) {
-                if (job.getClockWarning() == null) {
-                    job.setClockWarning("수신 시험 시각 미보정 또는 마지막 보정 후 5분 경과");
-                }
-            }
-            try {
-                var source = job.getSenderClockJson() == null ? null
-                        : objectMapper.readValue(job.getSenderClockJson(), server.common.ServiceClock.Stamp.class);
-                if (job.getClockWarning() == null && (source == null || "SYSTEM".equals(source.source())
-                        || source.ageSeconds() > 300)) {
-                    job.setClockWarning("송신 시험 시각 미보정 또는 보정 정보가 오래됨");
-                }
-            } catch (java.io.IOException invalid) {
-                job.setClockWarning("송신 시각 보정 근거를 확인할 수 없습니다.");
             }
         }
         dtnRepository.saveAndFlush(job);

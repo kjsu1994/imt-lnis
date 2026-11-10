@@ -220,7 +220,6 @@ if (!$values.ContainsKey('LNIS_IQ_ENABLED')) { $values.LNIS_IQ_ENABLED = [string
 if (!$values.LNIS_IQ_HOST_PATH -or $values.LNIS_IQ_HOST_PATH -ieq (Join-Path $layout.Data 'exchange')) {
     $values.LNIS_IQ_HOST_PATH = Join-Path $data 'exchange'
 }
-if (!$values.ContainsKey('LNIS_NTP_SERVER')) { $values.LNIS_NTP_SERVER = '' }
 if (!$layout.Existing -and !$values.LNIS_SERIAL_BRIDGE_PORT) {
     $usedPorts = [Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties().GetActiveTcpListeners().Port
     $bridgePort = if ($values.LNIS_NODE_ROLE -eq 'receiver') { 18766 } else { 18765 }

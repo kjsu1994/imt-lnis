@@ -215,10 +215,15 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
  job={testId:'test1',state:'COMPLETED',testType:'AFS_METADATA',senderMode:'HDTN',receiverMode:'HDTN',hdtnConfig:config,createdAt:'2026-09-23T00:00:00Z',updatedAt:'2026-09-23T00:00:00Z',dtnReceived:true};
  for(const route of ['/sender','/receiver']){
   await page.goto(base+route);
+  await page.waitForFunction(() => document.getElementById('service-clock-value').textContent !== '—');
+  assert.equal(await page.locator('#service-clock-sync, #service-clock-state, #service-clock-detail, #dtn-clock-skew-warning').count(), 0);
+  assert.match(await page.locator('#service-clock-value').innerText(), /\d{2}:\d{2}:\d{2}$/);
+  assert.equal((await page.locator('#service-clock-value').innerText()).includes('미보정'), false);
+  if (route === '/receiver') assert.equal(await page.locator('#gnss-port, #gnss-connect').count(), 0);
   assert.equal(await page.locator('#gnss-dtr, #gnss-rts, .serial-advanced').count(),0);
   if(route==='/receiver'){
    assert.equal(await page.locator('.receiver-overview > .receiver-trial-toolbar').count(),1);
-   assert.equal(await page.locator('.receiver-connections > div').count(),3);
+   assert.equal(await page.locator('.receiver-connections > div').count(),2);
    for(const width of [1920,1366,1100,1000,820,390]){
     await page.setViewportSize({width,height:1000});
     const layout=await page.evaluate(()=>{
@@ -228,7 +233,7 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
       toolbar:bounds('.receiver-trial-toolbar'),
       selection:bounds('.receiver-selection'),
       flow:bounds('.receiver-flow-container'),
-      controls:['#sender-address-test','#dtn-adapter-health','#gnss-refresh'].map(bounds),
+      controls:['#sender-address-test','#dtn-adapter-health'].map(bounds),
       groups:[...document.querySelectorAll('.receiver-connections > div')].map(e=>e.getBoundingClientRect().toJSON())
      };
     });
@@ -238,7 +243,7 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
     assert.ok(Math.abs(layout.toolbar.width-layout.connections.width)<2,'trial controls span the card at '+width);
     if(width>1200){
      assert.ok(layout.controls.every(b=>b.width<100),'connection buttons keep their content width');
-     assert.ok(Math.abs(layout.controls[0].y-layout.controls[2].y)<6,'connection controls align');
+     assert.ok(Math.abs(layout.controls[0].y-layout.controls[1].y)<6,'connection controls align');
     }
     for(let i=0;i<layout.groups.length;i++){
      const a=layout.groups[i];
@@ -248,6 +253,7 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
     }
    }
    await page.setViewportSize({width:1600,height:1000});
+   await page.locator('.receiver-overview').screenshot({path:'build/system-clock-receiver.png'});
   }
 
   assert.equal(await page.locator('#dtn-observations [data-pvt-filter]').isChecked(),true);

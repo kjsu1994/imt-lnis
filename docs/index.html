@@ -283,13 +283,13 @@
             <button type="button" class="shared-folder tx-folder" data-link="tx-file" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 5h8l2 3h10v12H2z"/></svg>송신 공유 폴더 · BIN</button>
             <button type="button" class="shared-folder rx-folder" data-link="rx-file" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 5h8l2 3h10v12H2z"/></svg>수신 공유 폴더 · BIN</button>
             <button type="button" class="management-link" data-link="management">서비스 간 REST · 등록 / 원본 비교 ↕</button>
-            <button class="node tx-node" data-node="source" style="left:12%" type="button"><svg fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><use href="#icon-satellite"/></svg><strong>GNSS 수신기</strong><small>관측값 · 항법정보</br>시간 동기화</small></button>
+            <button class="node tx-node" data-node="source" style="left:12%" type="button"><svg fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><use href="#icon-satellite"/></svg><strong>GNSS 수신기</strong><small>관측값 · 항법정보</small></button>
             <button class="node tx-node switch" id="data-switch" style="left:30%" type="button" title="클릭하여 RAW, AFS, I/Q 순서로 전환"><svg fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><use id="data-icon" href="#icon-frame"/></svg><strong id="data-label"></strong><small>클릭하여 변경 ↻</small></button>
             <button class="node tx-node" data-node="frame" style="left:48%" type="button"><svg fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><use href="#icon-frame"/></svg><strong>AFS Frame 구성</strong><small>6,000 bits</small></button>
             <button class="node tx-node" data-node="encode" style="left:66%" type="button"><svg fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><use href="#icon-wave"/></svg><strong>I/Q 생성</strong><small>프레임 → 신호 샘플</small></button>
             <button class="node tx-node switch" id="tx-switch" style="left:86%" type="button"><svg fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><use href="#icon-router"/></svg><strong id="tx-label">HDTN</strong><small>송신 엔진 변경 ↻</small></button>
             <span class="reference-label" id="reference-label" title="수신부가 PVT 계산을 마친 뒤 서비스 간 REST로 조회하는 비교자료입니다.">원본·Reference 보관</span>
-            <p class="clock-note" id="clock-note">시계 동기화는 시험 전제입니다.<br>지연 = 수신 본문 수신 완료 − 시험 시작 접수 · 수집 후 시작 전 대기시간 제외</p>
+            <p class="clock-note" id="clock-note">시스템 시각 기준입니다.<br>지연 = 수신 본문 수신 완료 − 시험 시작 접수 · 수집 후 시작 전 대기시간 제외</p>
             <button class="network" data-node="network" type="button">번들 전송 · 저장 / 대기 ↓</button>
 
             <button class="node receiver rx-node switch" id="rx-switch" style="left:86%" type="button"><svg fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><use href="#icon-router"/></svg><strong id="rx-label">HDTN</strong><small>수신 엔진 변경 ↻</small></button>
@@ -1653,7 +1653,7 @@
       document.querySelector('.management-link').textContent =
         iq ? '서비스 간 REST · 등록 / 결과 확인 ↕' : '서비스 간 REST · 등록 / 원본 조회 ↕';
       $('clock-note').hidden = false;
-      $('clock-note').textContent = 'Δt = 본문 수신 완료 − 시험 시작 접수 · 시작 전 대기 제외 · 송수신 시간 기준 확인';
+      $('clock-note').textContent = 'Δt = 본문 수신 완료 − 시험 시작 접수 · 시작 전 대기 제외 · PC 시계 차이 포함';
       $('selection-summary').textContent = labels[state.data] + ' · ' + state.tx + ' → ' + state.rx;
       $('data-label').textContent = labels[state.data];
       $('data-icon').setAttribute('href', '#icon-' + (iq ? 'wave' : state.data === 'raw' ? 'data' : 'frame'));

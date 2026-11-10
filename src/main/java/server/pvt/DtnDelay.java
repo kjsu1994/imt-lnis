@@ -156,7 +156,7 @@ public final class DtnDelay {
         double addedMeters = C * delay;
         Time original = new Time(epoch.week(), epoch.receiverTowSeconds());
         if (delay < 0) {
-            return failed(records, timing, original, "음수 지연 · 양쪽 PC 시계 동기화를 확인하세요.");
+            return failed(records, timing, original, "음수 지연 · 송수신 PC의 시스템 시각을 확인하세요.");
         }
 
         Time shifted;

@@ -1,6 +1,6 @@
 import {parseNodeAddress, initPresetControls, renderTrialSettings, trialTypeLabel, trialOption, colorTrialSelection, initWaitingCancellation, initTrialSettingsDialog} from './dtn-settings.js?v=20261104-peer-address-validation-2';
 import {requestJson} from '../common/http.js?v=20261103-management-reset';
-import {initGnssControls} from './dtn-gnss.js?v=20261104-serial-controls';
+import {initGnssControls, initSystemClock} from './dtn-gnss.js?v=20261110-system-clock';
 import {createDtnLog} from './dtn-log.js?v=20261103-management-reset';
 import {initAdapterHealth, validAdapterUrl} from './dtn-adapter-health.js?v=20261106-service-time';
 import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20261026-frame6';
@@ -42,6 +42,7 @@ function request(path, options = {}) {
 const post = (path, body) => request(path, {method: 'POST', headers: {'Content-Type': 'application/json'},
   body: body === undefined ? undefined : JSON.stringify(body)});
 const logView=createDtnLog($('dtn-log'));
+const systemClock = initSystemClock();
 const gnss = initGnssControls({port: 'dtn-port', baud: 'dtn-baud', refresh: 'dtn-refresh', log,
   changed(state) { gnssState = state; updateControls(); }});
 const waitingCancellation = initWaitingCancellation({isLocked: () => busy || !!pendingCapture, refresh: () => poll(), log});
@@ -517,18 +518,6 @@ function destination(text, state = 'unknown') {
   if ($('destination-dot')) $('destination-dot').className = 'connection-dot ' + state;
   if ($('dtn-peer-summary')) $('dtn-peer-summary').textContent = text;
   if ($('dtn-peer-summary-dot')) $('dtn-peer-summary-dot').className = 'connection-dot ' + state;
-}
-function updateClockSkewWarning(connection) {
-  const warning = $('dtn-clock-skew-warning');
-  if (!warning) return;
-  const skew = connection?.peerClockSkewSeconds;
-  if (connection?.peerOnline && typeof skew === 'number' && Math.abs(skew) >= 0.5) {
-    warning.hidden = false;
-    const skewVal = $('clock-skew-val');
-    if (skewVal) skewVal.textContent = (skew > 0 ? '+' : '') + skew.toFixed(2) + 's';
-  } else {
-    warning.hidden = true;
-  }
 }
 const buildSendUrl = () => validAdapterUrl(appliedSendUrl || $('dtn-send-url').value);
 const urlValid = () => !!buildSendUrl();
@@ -1226,7 +1215,7 @@ async function poll() {
   if (polling || document.visibilityState === 'hidden') return;
   polling = true;
   try {
-    await gnss.poll();
+    await Promise.all([gnss.poll(), systemClock.poll()]);
     if (generatingIq()) {
       iqJob = await request('/dtn/iq/' + iqJob.id); renderIq();
       if (!generatingIq()) { log('I/Q 생성 결과 · ' + iqJob.state + ' · ' + iqJob.message); await loadIqFiles(); }
@@ -1259,8 +1248,6 @@ async function poll() {
     if (peerConfig) {
       const connection = await request('/node/connection');
       peerConfig = connection;
-      gnss.setPeerTime(connection.peerGnssTimeState);
-      updateClockSkewWarning(connection);
       if (!peerAddressDirty) {
         $('dtn-receiver-ip').value = formatPeerAddress(connection);
         destination(connection.peerOnline ? '연결됨' : '연결 끊김', connection.peerOnline ? 'online' : 'offline');
