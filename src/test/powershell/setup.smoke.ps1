@@ -32,7 +32,11 @@ try {
     if ($management.Length -ne 64 -or $receiveToken.Length -ne 64 -or $management -eq $receiveToken) { throw 'Existing required-token defaults failed.' }
     $request = Join-Path $case 'request.ini'
     $config = Join-Path $case 'configuration.env'
-    function Write-TestRequest([string]$Role='sender',[string]$Port='18088') {
+    $listener = New-Object Net.Sockets.TcpListener ([Net.IPAddress]::Loopback),0
+    $listener.Start()
+    $testPort = [string]$listener.LocalEndpoint.Port
+    $listener.Stop()
+    function Write-TestRequest([string]$Role='sender',[string]$Port=$testPort) {
         [IO.File]::WriteAllLines($request,@(
             '[setup]',"destination=$destination",'[env]',"LNIS_NODE_ROLE=$Role","LNIS_SERVER_PORT=$Port",
             ('LNIS_NODE_BASE_URL=http://192.0.2.10:'+$Port),'LNIS_NODE_PEER_URL=','dtn_adapter=',
@@ -43,7 +47,7 @@ try {
     Write-TestRequest
     Prepare-SetupConfiguration $request $config
     $values = Read-NodeEnvironment $config
-    if ($values.LNIS_NODE_PEER_URL -ne '' -or $values.dtn_adapter -ne '' -or $values.LNIS_SERVER_PORT -ne '18088') { throw 'Blank remote addresses/custom port not preserved.' }
+    if ($values.LNIS_NODE_PEER_URL -ne '' -or $values.dtn_adapter -ne '' -or $values.LNIS_SERVER_PORT -ne $testPort) { throw 'Blank remote addresses/custom port not preserved.' }
     $pending = Get-SetupPendingPath
     if ((Get-Content -LiteralPath $pending -Raw).Contains($management)) { throw 'Pending configuration exposed plaintext credentials.' }
     $resumed = Read-SetupPending
@@ -75,6 +79,24 @@ try {
 
     $tokens=$null;$errors=$null
     $installerAst=[Management.Automation.Language.Parser]::ParseFile((Join-Path $repo 'deployment\node\install.ps1'),[ref]$tokens,[ref]$errors)
+    $manual=$installerAst.Find({param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Get-InstallSettings'},$false)
+    Invoke-Expression $manual.Extent.Text
+    function Read-Host { param($Prompt) return $script:manualAnswers.Dequeue() }
+    function Read-InstallSecret { param($Prompt) if($Prompt -like '*관리*'){return 'x'*32};return 'adapter-token' }
+    foreach($role in @('sender','receiver')){
+        $script:manualAnswers=New-Object 'Collections.Generic.Queue[string]'
+        foreach($answer in @($role,'18090','192.0.2.10','','')){$script:manualAnswers.Enqueue($answer)}
+        $manualValues=Get-InstallSettings (Join-Path $case 'not-installed.env') ''
+        Assert-InstallSettings $manualValues
+        if($manualValues.LNIS_NODE_ROLE -ne $role -or $manualValues.LNIS_NODE_BASE_URL -ne 'http://192.0.2.10:18090' -or
+            $manualValues.LNIS_NODE_PEER_URL -ne '' -or $manualValues.dtn_adapter -ne ''){
+            throw 'Manual command-line role/address input did not preserve optional blank addresses.'
+        }
+    }
+    Remove-Item Function:\Read-Host
+    Remove-Item Function:\Read-InstallSecret
+    Write-Host 'PASS: manual INSTALL settings for sender/receiver with optional blank addresses'
+
     $definition=$installerAst.Find({param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Install-WslPrerequisites'},$false)
     Invoke-Expression $definition.Extent.Text
     function Get-CimInstance {

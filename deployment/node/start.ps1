@@ -7,15 +7,7 @@ $lock = Enter-NodeLock $context
 $created = $false
 try {
     $created = Start-NodeKeepAlive $context
-    $deadline = (Get-Date).AddSeconds(60)
-    do {
-        try { Invoke-NodeWsl $context @('docker','info','--format','{{.OSType}}') | Out-Null; break }
-        catch {
-            if ((Get-Date) -ge $deadline) { throw 'Docker가 준비되지 않았습니다. 설치를 다시 확인하세요.' }
-            Invoke-NodeWsl $context @('sudo','-n','systemctl','start','docker') | Out-Null
-            Start-Sleep -Seconds 2
-        }
-    } while ($true)
+    Wait-NodeDocker $context
     $gnssReady = $true
     try {
         & (Join-Path $context.App 'start-serial-bridge.ps1') -Distribution $context.Distribution -DataDirectory $context.Data
@@ -34,7 +26,9 @@ try {
     # Compose reuses unchanged containers and applies edited env values without a rebuild.
     Invoke-NodeWsl $context (@('docker') + $compose + @('up','-d','--no-build','--pull','never')) | Out-Host
     $url = Wait-NodeReady $context
-    Write-Host ("서비스 실행 완료: " + $context.Settings.LNIS_NODE_ROLE + " / $url")
+    $browserUrl = $context.Settings.LNIS_NODE_BASE_URL
+    if (!$browserUrl) { $browserUrl = $url }
+    Write-Host ("서비스 실행 완료: " + $context.Settings.LNIS_NODE_ROLE + " / $browserUrl")
     if (!$gnssReady) { Write-Warning '파일 기반 시험은 사용할 수 있습니다. GNSS 장비 수집은 중계 상태를 확인하세요.' }
     if ($context.Installed) {
         try {
@@ -42,7 +36,7 @@ try {
             if (!$public.online -or $public.role -ine $context.Settings.LNIS_NODE_ROLE) { throw '잘못된 응답' }
         } catch { Write-Warning "PC 주소·포트 접속 실패: $($context.Settings.LNIS_NODE_BASE_URL). INSTALL.cmd의 네트워크 설정을 확인하세요." }
     }
-    if (!$NoBrowser) { Start-Process $url }
+    if (!$NoBrowser) { Start-Process $browserUrl }
 } catch {
     if ($created) {
         try {

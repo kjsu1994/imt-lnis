@@ -57,6 +57,11 @@ try {
     $notFolder = Join-Path $case 'not-a-folder'
     Set-Content -LiteralPath $notFolder 'test'
     Assert-Throws { Assert-InstallLocation $notFolder }
+    $hiddenParent=Join-Path $case 'hidden-parent'
+    New-Item -ItemType Directory -Path $hiddenParent -Force | Out-Null
+    [IO.File]::SetAttributes($hiddenParent,([IO.File]::GetAttributes($hiddenParent) -bor [IO.FileAttributes]::Hidden))
+    $hiddenInstall=Join-Path $hiddenParent 'installed'
+    if ((Assert-InstallLocation $hiddenInstall) -ne $hiddenInstall) { throw 'Hidden parent such as AppData was rejected.' }
     Write-Host 'PASS: role/token/port validation, Korean env comments, installed paths and Compose arguments'
 
     $nativeEncoding=[Console]::OutputEncoding
@@ -92,11 +97,36 @@ try {
     Assert-Throws { Assert-NodeFiles $app }
     Write-Host 'PASS: changed payload and outside-manifest paths rejected'
 
-    $script:fakeProcess=$null;$script:started=0;$script:stopped=0
+    $script:dockerChecks=0;$script:dockerStarts=0
+    function Invoke-NodeWsl {
+        param($Context,$Arguments)
+        if ($Arguments -contains 'info') {
+            $script:dockerChecks++
+            if ($script:dockerChecks -lt 3) { throw 'Docker cold startup' }
+            return 'linux'
+        }
+        $script:dockerStarts++
+        if ($script:dockerStarts -eq 1) { throw 'systemd starting' }
+    }
+    Wait-NodeDocker $context
+    if ($script:dockerChecks -ne 3 -or $script:dockerStarts -ne 2) { throw 'Cold Docker startup was not retried.' }
+    $script:dockerClock=0
+    function Get-Date {
+        $script:dockerClock++
+        return ([datetime]'2026-01-01').AddSeconds(70 * $script:dockerClock)
+    }
+    function Invoke-NodeWsl { param($Context,$Arguments) throw 'Docker never ready' }
+    try { Wait-NodeDocker $context; throw 'Docker timeout ignored' }
+    catch { if (!$_.Exception.Message.Contains('Docker never ready')) { throw 'Docker timeout hid the underlying cause.' } }
+    Remove-Item Function:\Get-Date
+    Write-Host 'PASS: cold Docker/systemd readiness retry and timeout diagnostic'
+
+    $script:fakeProcess=$null;$script:started=0;$script:stopped=0;$script:browserUrls=@()
     $creation=[DateTime]'2026-01-01T00:00:00Z'
     function Get-CimInstance { param($ClassName,$Filter) return $script:fakeProcess }
     function Start-Process {
         param($FilePath,$ArgumentList,$WindowStyle,[switch]$PassThru,$RedirectStandardOutput,$RedirectStandardError)
+        if ($FilePath -like 'http://*') { $script:browserUrls += $FilePath; return }
         if ($FilePath -ne 'wsl.exe' -or ($ArgumentList -join ' ') -ne '-d LNIS-Test --exec sleep infinity' -or $WindowStyle -ne 'Hidden') { throw 'Unexpected background command.' }
         if ($RedirectStandardOutput -ne (Join-Path $context.Data 'wsl-start.log') -or
             $RedirectStandardError -ne (Join-Path $context.Data 'wsl-error.log')) { throw 'WSL child must detach output handles.' }
@@ -128,6 +158,61 @@ try {
     }
     if ((Get-NodeReady $context) -ne 'http://[::1]:18088') { throw 'IPv6 localhost fallback failed.' }
     Write-Host 'PASS: readiness verifies health and role with IPv6 fallback'
+
+    $runtimeRoot=Join-Path $case 'runtime-selection'
+    $runtimeData=Join-Path $runtimeRoot 'data'
+    New-Item -ItemType Directory -Path $runtimeData -Force | Out-Null
+    $script:runtimes=@();$script:imports=0;$script:failImport=$false
+    function Get-NodeWslRuntimes { return $script:runtimes }
+    function wsl.exe {
+        if ($args[0] -ne '--import') { throw 'Unexpected runtime command' }
+        $script:imports++
+        $name=$args[1];$location=$args[2]
+        New-Item -ItemType Directory -Path $location -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $location 'ext4.vhdx') 'preserved-runtime'
+        if ($script:failImport) { $global:LASTEXITCODE=1;return }
+        $script:runtimes+=@([pscustomobject]@{Name=$name;Location=$location;Version=2})
+        $global:LASTEXITCODE=0
+        'WSL import completed'
+    }
+    $name=Initialize-NodeRuntime $runtimeRoot $runtimeData $case ''
+    if ($name -ne 'LNIS-Runtime' -or $script:imports -ne 1) { throw 'Fresh runtime selection/import result is incorrect.' }
+    if ((Initialize-NodeRuntime $runtimeRoot $runtimeData $case '') -ne $name -or $script:imports -ne 1) {
+        throw 'Interrupted managed installation was not resumed.'
+    }
+    Remove-Item -LiteralPath (Join-Path $runtimeData 'runtime-registration.json')
+    if ((Initialize-NodeRuntime $runtimeRoot $runtimeData $case $name) -ne $name -or $script:imports -ne 1) {
+        throw 'Installed app could not recover its missing runtime record.'
+    }
+    $manualRoot=Join-Path $case 'manual-runtime'
+    $manualData=Join-Path $manualRoot 'data'
+    New-Item -ItemType Directory -Path $manualData -Force | Out-Null
+    $newName=Initialize-NodeRuntime $manualRoot $manualData $case ''
+    if ($newName -ne 'LNIS-Runtime-1') { throw 'Foreign/manual runtime name was not preserved.' }
+    if ((Get-Content -LiteralPath (Join-Path $runtimeRoot 'runtime\ext4.vhdx')) -ne 'preserved-runtime') {
+        throw 'Foreign runtime data changed.'
+    }
+    Remove-Item -LiteralPath (Join-Path $manualData 'runtime-registration.json')
+    $third=Initialize-NodeRuntime $manualRoot $manualData $case ''
+    if ($third -ne 'LNIS-Runtime-2') { throw 'Unrecorded existing runtime folders were overwritten.' }
+    Set-Content -LiteralPath (Join-Path $manualData 'runtime-registration.json') '{invalid'
+    $script:runtimes=@($script:runtimes|Where-Object Name -ne $third)
+    $next=Initialize-NodeRuntime $manualRoot $manualData $case ''
+    if ($next -ne 'LNIS-Runtime-3') { throw 'Deleted distribution/nonempty runtime was not preserved.' }
+    $failureRoot=Join-Path $case 'failed-runtime'
+    $failureData=Join-Path $failureRoot 'data'
+    New-Item -ItemType Directory -Path $failureData -Force | Out-Null
+    $script:failImport=$true
+    Assert-Throws { Initialize-NodeRuntime $failureRoot $failureData $case '' }
+    $failed=Get-Content -LiteralPath (Join-Path $failureData 'runtime-registration.json') -Raw | ConvertFrom-Json
+    $script:failImport=$false
+    $resumed=Initialize-NodeRuntime $failureRoot $failureData $case ''
+    if ($resumed -eq $failed.distribution -or !(Test-Path -LiteralPath $failed.location)) {
+        throw 'Retry did not preserve incomplete import data.'
+    }
+    Write-Host 'PASS: fresh/imported runtime, interrupted install, missing/corrupt record, foreign/manual name, missing distro and import retry'
+    Remove-Item Function:\wsl.exe
+    Remove-Item Function:\Get-NodeWslRuntimes
 
     $script:networkCalls=@();$script:foreignRule=$false
     function Get-NetIPAddress { param($AddressFamily) return @{IPAddress='192.0.2.10'} }
@@ -196,7 +281,10 @@ try {
         Replace('$context = Get-NodeContext $PSScriptRoot','$context = $script:testContext')
     $script:testContext=$context
     & ([ScriptBlock]::Create($source)) -NoBrowser
-    & ([ScriptBlock]::Create($source)) -NoBrowser
+    & ([ScriptBlock]::Create($source))
+    if ($script:browserUrls.Count -ne 1 -or $script:browserUrls[0] -ne $values.LNIS_NODE_BASE_URL) {
+        throw 'START opened localhost instead of the configured PC address.'
+    }
     if ($script:started -ne 1) { throw 'START twice created extra WSL processes.' }
     $ups=@($script:commands|Where-Object { $_ -match ' up ' })
     if ($ups.Count -ne 2 -or ($ups|Where-Object { $_ -notmatch '--no-build --pull never' })) { throw 'START must reconcile env without build/pull.' }
@@ -227,15 +315,24 @@ if (Test-Path (Join-Path $fixtureData 'fail-once')) {
 Set-Content (Join-Path (Split-Path $PSScriptRoot) 'data\stopped-marker') 'stopped'
 '@
     Set-Content (Join-Path $bundleApp 'stop-serial-bridge.ps1') 'param($DataDirectory)'
-    Set-Content (Join-Path $bundleApp 'START.cmd') ''
-    Set-Content (Join-Path $bundleApp 'STOP.cmd') ''
+    Copy-Item -LiteralPath (Join-Path $repo 'deployment\node\START.cmd'),(Join-Path $repo 'deployment\node\STOP.cmd') -Destination $bundleApp
     function Invoke-InstallerAdmin { param($Arguments) $script:adminCalls+=($Arguments -join ' ') }
     function Assert-NodeFiles { param($Root) return $script:release }
-    function Invoke-NodeWsl { param($Context,$Arguments) $script:installCalls+=($Arguments -join ' ') }
+    $script:installWslHeld=$false;$script:installKeeps=0
+    function Start-NodeKeepAlive { param($Context) $script:installWslHeld=$true;$script:installKeeps++;return $true }
+    function Stop-NodeKeepAlive { param($Context) $script:installWslHeld=$false }
+    function Invoke-NodeWsl {
+        param($Context,$Arguments)
+        if (!$script:installWslHeld) { throw 'Installer used Docker before keeping WSL running.' }
+        $script:installCalls+=($Arguments -join ' ')
+    }
     function Get-NodeReady { param($Context) return 'http://127.0.0.1:18088' }
     function Wait-NodeReady { param($Context) return 'http://127.0.0.1:18088' }
     function Assert-NodeIdle { param($Context,$Url) $script:idleChecks++ }
     function wsl.exe { $global:LASTEXITCODE=0;return 'LNIS-Runtime' }
+    function Get-NodeWslRuntimes {
+        return @([pscustomobject]@{Name='LNIS-Runtime';Location=(Join-Path $Destination 'runtime');Version=2})
+    }
     function Invoke-RestMethod { param($Uri,$TimeoutSec) return @{online=$true;role='sender'} }
     $script:fakeShell=New-Object PSObject
     $script:fakeShell|Add-Member ScriptMethod CreateShortcut {
@@ -259,6 +356,18 @@ Set-Content (Join-Path (Split-Path $PSScriptRoot) 'data\stopped-marker') 'stoppe
     $installedContext=Get-NodeContext (Join-Path $Destination 'app')
     if (!$installedContext.Installed -or $installedContext.Data -ne $script:installData) { throw 'Fresh install path mismatch.' }
     if (!($script:installCalls|Where-Object {$_ -match 'docker load --input'})) { throw 'Offline image not loaded.' }
+    if ($script:installKeeps -lt 1) { throw 'Fresh install did not hold WSL before loading the image.' }
+    foreach ($name in @('START','STOP')) {
+        $launcher=Get-Content -LiteralPath (Join-Path $Destination ($name+'.cmd')) -Raw -Encoding UTF8
+        if (!$launcher.Contains('%~dp0app\'+$name.ToLowerInvariant()+'.ps1')) { throw 'Root launcher did not target the installed app.' }
+    }
+    $rootStart=Join-Path $Destination 'START.cmd'
+    $savedStart=Get-Content -LiteralPath $rootStart -Raw
+    [IO.File]::WriteAllText($rootStart,'user-owned launcher')
+    Assert-Throws { & ([ScriptBlock]::Create($transaction)) }
+    if ((Get-Content -LiteralPath $rootStart -Raw) -ne 'user-owned launcher') { throw 'An unrelated launcher was overwritten.' }
+    [IO.File]::WriteAllText($rootStart,$savedStart)
+
     Set-Content (Join-Path $script:installData 'DB\marker') 'original-db'
     $Configuration=$null
     & ([ScriptBlock]::Create($transaction))

@@ -88,6 +88,60 @@ function Install-WslPrerequisites([string]$Offline) {
     return ($restart -or $process.ExitCode -eq 3010)
 }
 
+function Get-NodeWslRuntimes {
+    foreach ($entry in Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Lxss\*' -ErrorAction SilentlyContinue) {
+        if ($entry.DistributionName -and $entry.BasePath) {
+            $location = [Environment]::ExpandEnvironmentVariables($entry.BasePath)
+            if ($location.StartsWith('\\?\')) { $location = $location.Substring(4) }
+            [pscustomobject]@{Name=$entry.DistributionName; Location=[IO.Path]::GetFullPath($location).TrimEnd('\'); Version=$entry.Version}
+        }
+    }
+}
+
+function Initialize-NodeRuntime([string]$Destination, [string]$Data, [string]$Offline, [string]$PreviousDistribution) {
+    $runtimes = @(Get-NodeWslRuntimes)
+    $recordFile = Join-Path $Data 'runtime-registration.json'
+    $owner = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+    $saved = $null
+    if (Test-Path -LiteralPath $recordFile) {
+        try { $saved = Get-Content -LiteralPath $recordFile -Raw -Encoding UTF8 | ConvertFrom-Json }
+        catch { Write-Warning '이전 WSL 설치 기록을 확인할 수 없어 별도 실행 환경을 준비합니다.' }
+    }
+    $runtime = $runtimes | Where-Object {
+        $_.Version -eq 2 -and (Split-Path $_.Location) -ieq $Destination -and (
+            ($saved -and $saved.owner -eq $owner -and $saved.location -ieq $_.Location -and
+                (!$saved.distribution -or $saved.distribution -ieq $_.Name)) -or
+            ($PreviousDistribution -and $_.Name -ieq $PreviousDistribution)
+        )
+    } | Select-Object -First 1
+    if ($runtime) {
+        Assert-InstallLocation $runtime.Location | Out-Null
+        Write-Host ("기존 WSL 실행 환경 재사용: " + $runtime.Name)
+    } else {
+        $index = 0
+        do {
+            $suffix = if ($index) { '-' + $index } else { '' }
+            $name = 'LNIS-Runtime' + $suffix
+            $location = Join-Path $Destination ('runtime' + $suffix)
+            $occupied = ($runtimes.Name -contains $name) -or
+                ((Test-Path -LiteralPath $location) -and @(Get-ChildItem -LiteralPath $location -Force).Count -gt 0)
+            $index++
+        } while ($occupied)
+        Assert-InstallLocation $location | Out-Null
+        $runtime = [pscustomobject]@{Name=$name;Location=$location}
+        @{distribution=$name;location=$location;owner=$owner} |
+            ConvertTo-Json | Set-Content -LiteralPath $recordFile -Encoding UTF8
+        Write-Host ("새 WSL 실행 환경 준비: " + $name)
+        & wsl.exe --import $name $location (Join-Path $Offline 'ubuntu-runtime.tar') --version 2 | Out-Host
+        if ($LASTEXITCODE -ne 0) {
+            throw 'WSL 실행 환경을 가져오지 못했습니다. 기존 환경은 보존했습니다. 재부팅·가상화 지원·설치 기록을 확인한 뒤 다시 실행하세요.'
+        }
+    }
+    @{distribution=$runtime.Name;location=$runtime.Location;owner=$owner} |
+        ConvertTo-Json | Set-Content -LiteralPath $recordFile -Encoding UTF8
+    return $runtime.Name
+}
+
 function Set-NodeNetwork($Config) {
     $address = $null
     if (![Net.IPAddress]::TryParse($Config.listenAddress,[ref]$address) -or
@@ -211,7 +265,6 @@ $data = Join-Path $destinationRoot 'data'
 $existing = Join-Path $data '.env'
 $values = Get-InstallSettings $existing $Configuration
 Assert-InstallSettings $values
-$values.LNIS_WSL_DISTRIBUTION = 'LNIS-Runtime'
 $values.LNIS_NODE_IMAGE = $release.image
 $values.LNIS_STATE_DIR = ConvertTo-NodeLinuxPath $data
 if (!$values.ContainsKey('LNIS_IQ_ENABLED')) { $values.LNIS_IQ_ENABLED = [string]($values.LNIS_NODE_ROLE -eq 'sender') }
@@ -226,6 +279,15 @@ if ($drive.AvailableFreeSpace -lt $required) { throw '설치·복원에 필요�
 Set-InstallStage '[2/7] Windows 및 WSL 구성요소 확인'
 Invoke-InstallerAdmin @('-SystemSetup')
 New-Item -ItemType Directory -Path $destinationRoot,$data,(Join-Path $data 'DB'),(Join-Path $data 'exchange') -Force | Out-Null
+$launchers = @{}
+foreach ($name in @('START','STOP')) {
+    $target = Join-Path $destinationRoot ($name + '.cmd')
+    $content = (Get-Content -LiteralPath (Join-Path $script:bundle ('app\' + $name + '.cmd')) -Raw -Encoding UTF8).Replace('%~dp0', '%~dp0app\')
+    if ((Test-Path -LiteralPath $target) -and (Get-Content -LiteralPath $target -Raw -Encoding UTF8) -ne $content) {
+        throw "설치 위치에 다른 실행 파일이 있습니다. 파일을 확인하거나 다른 경로를 선택하세요: $target"
+    }
+    $launchers[$target] = $content
+}
 $stage = Join-Path $destinationRoot ('app.staging-' + [Guid]::NewGuid().ToString('N'))
 Copy-Item -LiteralPath (Join-Path $script:bundle 'app') -Destination $stage -Recurse
 Assert-NodeFiles $stage | Out-Null
@@ -243,8 +305,12 @@ try {
             Assert-NodeIdle $context $url
             & (Join-Path $app 'stop.ps1')
         } else {
-            $running = Invoke-NodeWsl $context @('docker','ps','--quiet')
-            if ($running) { throw '실행 중인 기존 서비스의 상태를 확인할 수 없습니다. 로그를 확인한 뒤 다시 설치하세요.' }
+            if (@(Get-NodeWslRuntimes | Where-Object Name -eq $context.Distribution).Count) {
+                Start-NodeKeepAlive $context | Out-Null
+                Wait-NodeDocker $context
+                $running = Invoke-NodeWsl $context @('docker','ps','--quiet')
+                if ($running) { throw '실행 중인 기존 서비스의 상태를 확인할 수 없습니다. 로그를 확인한 뒤 다시 설치하세요.' }
+            }
             & (Join-Path $app 'stop-serial-bridge.ps1') -DataDirectory $context.Data
             Stop-NodeKeepAlive $context
         }
@@ -252,25 +318,15 @@ try {
         New-Item -ItemType Directory -Path $backup -Force | Out-Null
         Copy-Item -LiteralPath (Join-Path $data 'DB') -Destination $backup -Recurse
         Copy-Item -LiteralPath $existing -Destination (Join-Path $backup '.env')
-        if (Test-Path -LiteralPath (Join-Path $data 'network.json')) {
-            Copy-Item -LiteralPath (Join-Path $data 'network.json') -Destination $backup
+        foreach ($record in @('network.json','runtime-registration.json')) {
+            if (Test-Path -LiteralPath (Join-Path $data $record)) {
+                Copy-Item -LiteralPath (Join-Path $data $record) -Destination $backup
+            }
         }
     }
     Set-InstallStage '[3/7] 오프라인 WSL 실행 환경 준비'
-    $distributions = (& wsl.exe --list --quiet) -replace [char]0, ''
-    $registrationFile = Join-Path $data 'runtime-registration.json'
-    if ($distributions -notcontains 'LNIS-Runtime') {
-        @{location=(Join-Path $destinationRoot 'runtime');owner=[Security.Principal.WindowsIdentity]::GetCurrent().User.Value} |
-            ConvertTo-Json | Set-Content -LiteralPath $registrationFile -Encoding UTF8
-        & wsl.exe --import LNIS-Runtime (Join-Path $destinationRoot 'runtime') (Join-Path $script:bundle 'offline\ubuntu-runtime.tar') --version 2
-        if ($LASTEXITCODE -ne 0) { throw 'WSL 실행 환경을 가져오지 못했습니다. 가상화 지원과 재부팅 여부를 확인하세요.' }
-    } elseif (!$context) {
-        $registration = if (Test-Path -LiteralPath $registrationFile) { Get-Content -Raw -LiteralPath $registrationFile -Encoding UTF8 | ConvertFrom-Json } else { $null }
-        if (!$registration -or $registration.location -ne (Join-Path $destinationRoot 'runtime') -or
-            $registration.owner -ne [Security.Principal.WindowsIdentity]::GetCurrent().User.Value) {
-            throw '같은 이름의 WSL 배포판이 이미 있습니다. 기존 설치 경로를 확인하세요.'
-        }
-    }
+    $previousDistribution = if ($context) { $context.Distribution } else { '' }
+    $values.LNIS_WSL_DISTRIBUTION = Initialize-NodeRuntime $destinationRoot $data (Join-Path $script:bundle 'offline') $previousDistribution
     @{dataDirectory=$data} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $stage 'installation.json') -Encoding UTF8
     if (Test-Path -LiteralPath $app) {
         if (!$backup) { throw '관리되지 않는 app 폴더가 있습니다. 다른 설치 경로를 사용하세요.' }
@@ -281,7 +337,8 @@ try {
     $context = Get-NodeContext $app
     $imageArchive = ConvertTo-NodeLinuxPath (Join-Path $script:bundle 'offline\service-image.tar')
     Set-InstallStage '[4/7] Docker 및 서비스 이미지 준비'
-    Invoke-NodeWsl $context @('sudo','-n','systemctl','start','docker') | Out-Null
+    Start-NodeKeepAlive $context | Out-Null
+    Wait-NodeDocker $context
     Invoke-NodeWsl $context @('docker','load','--input',$imageArchive) | Out-Host
     Set-InstallStage '[5/7] 서비스 실행 및 준비 상태 확인'
     & (Join-Path $app 'start.ps1') -NoBrowser
@@ -300,6 +357,9 @@ try {
     $public = Invoke-RestMethod ($values.LNIS_NODE_BASE_URL + '/lnis/api/v1/node') -TimeoutSec 5
     if (!$public.online -or $public.role -ine $values.LNIS_NODE_ROLE) { throw 'Windows PC 주소와 WSL 서비스 연결을 확인하지 못했습니다.' }
     Set-InstallStage '[7/7] 바탕화면 바로가기 생성'
+    foreach ($target in $launchers.Keys) {
+        [IO.File]::WriteAllText($target, $launchers[$target], (New-Object Text.UTF8Encoding $false))
+    }
     $shell = New-Object -ComObject WScript.Shell
     foreach ($name in @('START','STOP')) {
         $link = $shell.CreateShortcut((Join-Path ([Environment]::GetFolderPath('Desktop')) ($(if ($name -eq 'START') { Get-NodeShortcutName $values.LNIS_NODE_ROLE } else { 'DTN STOP' }) + '.lnk')))
@@ -314,7 +374,7 @@ try {
         if ($oldLink.TargetPath -ieq (Join-Path $app 'START.cmd')) { Remove-Item -LiteralPath $oldLinkPath }
     }
     Write-Host '설치 확인 완료. 이후에는 바탕화면의 송신·수신 바로가기로 실행하세요.'
-    if (!$NoBrowser) { Start-Process $localUrl }
+    if (!$NoBrowser) { Start-Process $values.LNIS_NODE_BASE_URL }
 } catch {
     $failure = $_
     if ($backup -and (Test-Path -LiteralPath (Join-Path $backup 'app'))) {
@@ -328,6 +388,10 @@ try {
             Move-Item -LiteralPath (Join-Path $data 'DB') -Destination $dbFailed
             Copy-Item -LiteralPath (Join-Path $backup 'DB') -Destination (Join-Path $data 'DB') -Recurse
             & (Join-Path $app 'start.ps1') -NoBrowser
+            $savedRuntime = Join-Path $backup 'runtime-registration.json'
+            if (Test-Path -LiteralPath $savedRuntime) {
+                Copy-Item -LiteralPath $savedRuntime -Destination (Join-Path $data 'runtime-registration.json') -Force
+            }
             $savedNetwork = Join-Path $backup 'network.json'
             if (Test-Path -LiteralPath $savedNetwork) {
                 Invoke-InstallerAdmin @('-NetworkSetup',('"' + $savedNetwork + '"'))

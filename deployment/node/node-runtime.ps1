@@ -67,6 +67,23 @@ function Invoke-NodeWsl($Context, [string[]]$Arguments) {
     }
 }
 
+function Wait-NodeDocker($Context) {
+    $deadline = (Get-Date).AddSeconds(60)
+    do {
+        try {
+            Invoke-NodeWsl $Context @('docker','info','--format','{{.OSType}}') | Out-Null
+            return
+        } catch {
+            if ((Get-Date) -ge $deadline) {
+                throw ("Docker가 준비되지 않았습니다. WSL 시작 로그를 확인하세요." + [Environment]::NewLine + $_.Exception.Message)
+            }
+            # systemd can still be starting after a cold WSL launch.
+            try { Invoke-NodeWsl $Context @('sudo','-n','systemctl','start','docker') | Out-Null } catch {}
+            Start-Sleep -Seconds 2
+        }
+    } while ($true)
+}
+
 function Get-NodeCompose($Context) {
     $arguments = @('compose', '--env-file', (ConvertTo-NodeLinuxPath $Context.EnvFile), '-f', 'docker-compose.yml')
     if (Test-Path -LiteralPath (Join-Path $Context.App 'docker-compose.override.yml')) {
@@ -168,14 +185,14 @@ function Assert-NodeFiles([string]$Root) {
         $target = [IO.Path]::GetFullPath((Join-Path $Root $file.path))
         $directory = Split-Path $target
         while ($directory.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) {
-            if ((Get-Item -LiteralPath $directory).Attributes -band [IO.FileAttributes]::ReparsePoint) {
+            if ((Get-Item -LiteralPath $directory -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) {
                 throw "배포 경로에 연결된 폴더가 있습니다: $($file.path)"
             }
             $directory = Split-Path $directory
         }
         if (!$target.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase) -or
             !(Test-Path -LiteralPath $target -PathType Leaf) -or
-            ((Get-Item -LiteralPath $target).Attributes -band [IO.FileAttributes]::ReparsePoint) -or
+            ((Get-Item -LiteralPath $target -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) -or
             (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash -ne $file.sha256) {
             throw "배포 파일 무결성 확인 실패: $($file.path)"
         }
@@ -215,7 +232,7 @@ function Assert-InstallLocation([string]$Path) {
     $part = $full
     while ($part) {
         if (Test-Path -LiteralPath $part) {
-            $item = Get-Item -LiteralPath $part
+            $item = Get-Item -LiteralPath $part -Force
             if (!$item.PSIsContainer) { throw "폴더가 아닌 경로에는 설치할 수 없습니다: $part" }
             if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
                 throw "연결된 폴더에는 설치할 수 없습니다: $part"
