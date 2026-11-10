@@ -1,4 +1,4 @@
-﻿; Offline wrapper only; the existing PowerShell installer owns app/data/runtime.
+; Offline wrapper only; the existing PowerShell installer owns app/data/runtime.
 Unicode true
 ManifestDPIAware true
 RequestExecutionLevel user
@@ -253,7 +253,7 @@ Function AuthPage
   !insertmacro Label 0 0 100% "서비스 연결 인증값 · 상대 PC와 동일하게 사용"
   ${NSD_CreatePassword} 0 18u 300u 14u "$ManagementToken"
   Pop $ManagementEdit
-  !insertmacro Label 0 39u 100% "새 설치는 자동 생성됩니다. 기존 상대 PC가 있으면 같은 값을 입력하세요."
+  !insertmacro Label 0 39u 100% "기본값은 imt123입니다. 양쪽 서비스와 어댑터의 값을 맞추세요."
   ${If} $Role == receiver
     !insertmacro Label 0 66u 100% "수신 어댑터 인증값 · 어댑터의 수신 API 설정과 일치"
     ${NSD_CreatePassword} 0 84u 300u 14u "$ReceiveToken"
@@ -300,7 +300,7 @@ Function AdvancedPage
   !insertmacro Label 0 0 100% "I/Q 파일 경로 · 어댑터 기준"
   ${NSD_CreateDirRequest} 0 18u 300u 14u "$IqPath"
   Pop $IqEdit
-  !insertmacro Label 0 44u 100% "실제 파일은 data\exchange에 저장됩니다. 어댑터 기준 경로가 다를 때만 변경하세요."
+  !insertmacro Label 0 44u 100% "실제 파일은 설치 폴더의 exchange에 저장됩니다. 어댑터 기준 경로가 다를 때만 변경하세요."
   !insertmacro Label 0 72u 100% "내부 NTP 서버 (선택)"
   ${NSD_CreateText} 0 90u 300u 14u "$Ntp"
   Pop $NtpEdit

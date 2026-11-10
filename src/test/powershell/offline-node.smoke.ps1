@@ -33,6 +33,7 @@ try {
     Set-Content (Join-Path $app 'docker-compose.windows-serial.yml') 'services: {}'
     Set-Content (Join-Path $data '.serial-bridge.env') 'test-only'
     if ((Read-NodeEnvironment $file).EXISTING_CUSTOM_SETTING -ne 'preserved') { throw 'Existing extra env setting lost.' }
+    Copy-Item -LiteralPath (Join-Path $repo 'deployment\node\.env.example') -Destination $app
     $context=Get-NodeContext $app
     if ($context.Data -ne $data -or $context.Distribution -ne 'LNIS-Test' -or $context.Port -ne 18088) { throw 'Installed paths/configuration mismatch.' }
     $compose=Get-NodeCompose $context
@@ -162,57 +163,67 @@ try {
     $runtimeRoot=Join-Path $case 'runtime-selection'
     $runtimeData=Join-Path $runtimeRoot 'data'
     New-Item -ItemType Directory -Path $runtimeData -Force | Out-Null
-    $script:runtimes=@();$script:imports=0;$script:failImport=$false
+    $script:imports=0;$script:failImport=$false
+    $ubuntu=[pscustomobject]@{Name='Ubuntu';Location='C:\existing-ubuntu';Version=2;IsDefault=$true}
+    $private=[pscustomobject]@{Name='LNIS-Runtime';Location='C:\old-runtime';Version=2;IsDefault=$false}
+    $script:runtimes=@($private,$ubuntu)
     function Get-NodeWslRuntimes { return $script:runtimes }
     function wsl.exe {
-        if ($args[0] -ne '--import') { throw 'Unexpected runtime command' }
+        if ($args[0] -ne '--import' -or $args[1] -ne 'Ubuntu') { throw 'Unexpected runtime import' }
         $script:imports++
-        $name=$args[1];$location=$args[2]
-        New-Item -ItemType Directory -Path $location -Force | Out-Null
-        Set-Content -LiteralPath (Join-Path $location 'ext4.vhdx') 'preserved-runtime'
-        if ($script:failImport) { $global:LASTEXITCODE=1;return }
-        $script:runtimes+=@([pscustomobject]@{Name=$name;Location=$location;Version=2})
+        New-Item -ItemType Directory -Path $args[2] -Force|Out-Null
+        Set-Content -LiteralPath (Join-Path $args[2] 'ext4.vhdx') 'preserved'
+        if ($script:failImport) {$global:LASTEXITCODE=1;return}
+        $script:runtimes+=@([pscustomobject]@{Name='Ubuntu';Location=$args[2];Version=2;IsDefault=$true})
         $global:LASTEXITCODE=0
-        'WSL import completed'
+        'import completed'
     }
-    $name=Initialize-NodeRuntime $runtimeRoot $runtimeData $case ''
-    if ($name -ne 'LNIS-Runtime' -or $script:imports -ne 1) { throw 'Fresh runtime selection/import result is incorrect.' }
-    if ((Initialize-NodeRuntime $runtimeRoot $runtimeData $case '') -ne $name -or $script:imports -ne 1) {
-        throw 'Interrupted managed installation was not resumed.'
-    }
-    Remove-Item -LiteralPath (Join-Path $runtimeData 'runtime-registration.json')
-    if ((Initialize-NodeRuntime $runtimeRoot $runtimeData $case $name) -ne $name -or $script:imports -ne 1) {
-        throw 'Installed app could not recover its missing runtime record.'
-    }
-    $manualRoot=Join-Path $case 'manual-runtime'
-    $manualData=Join-Path $manualRoot 'data'
-    New-Item -ItemType Directory -Path $manualData -Force | Out-Null
-    $newName=Initialize-NodeRuntime $manualRoot $manualData $case ''
-    if ($newName -ne 'LNIS-Runtime-1') { throw 'Foreign/manual runtime name was not preserved.' }
-    if ((Get-Content -LiteralPath (Join-Path $runtimeRoot 'runtime\ext4.vhdx')) -ne 'preserved-runtime') {
-        throw 'Foreign runtime data changed.'
-    }
-    Remove-Item -LiteralPath (Join-Path $manualData 'runtime-registration.json')
-    $third=Initialize-NodeRuntime $manualRoot $manualData $case ''
-    if ($third -ne 'LNIS-Runtime-2') { throw 'Unrecorded existing runtime folders were overwritten.' }
-    Set-Content -LiteralPath (Join-Path $manualData 'runtime-registration.json') '{invalid'
-    $script:runtimes=@($script:runtimes|Where-Object Name -ne $third)
-    $next=Initialize-NodeRuntime $manualRoot $manualData $case ''
-    if ($next -ne 'LNIS-Runtime-3') { throw 'Deleted distribution/nonempty runtime was not preserved.' }
-    $failureRoot=Join-Path $case 'failed-runtime'
-    $failureData=Join-Path $failureRoot 'data'
-    New-Item -ItemType Directory -Path $failureData -Force | Out-Null
+    if ((Initialize-NodeRuntime $runtimeRoot $runtimeData $case 'LNIS-Runtime') -ne 'Ubuntu' -or $script:imports) { throw 'Existing default Docker WSL was not reused.' }
+    Set-Content -LiteralPath (Join-Path $runtimeData 'runtime-registration.json') '{invalid'
+    if ((Initialize-NodeRuntime $runtimeRoot $runtimeData $case '') -ne 'Ubuntu' -or $script:imports) { throw 'Stale installation record blocked existing Ubuntu.' }
+    $debian=[pscustomobject]@{Name='Debian';Location='C:\existing-debian';Version=2;IsDefault=$false}
+    $script:runtimes+=@($debian)
+    if ((Initialize-NodeRuntime $runtimeRoot $runtimeData $case 'Debian') -ne 'Debian') { throw 'Configured existing distro was ignored.' }
+    $ubuntu.IsDefault=$false
+    Assert-Throws { Initialize-NodeRuntime $runtimeRoot $runtimeData $case '' }
+    $script:runtimes=@($private)
     $script:failImport=$true
-    Assert-Throws { Initialize-NodeRuntime $failureRoot $failureData $case '' }
-    $failed=Get-Content -LiteralPath (Join-Path $failureData 'runtime-registration.json') -Raw | ConvertFrom-Json
+    Assert-Throws { Initialize-NodeRuntime $runtimeRoot $runtimeData $case '' }
     $script:failImport=$false
-    $resumed=Initialize-NodeRuntime $failureRoot $failureData $case ''
-    if ($resumed -eq $failed.distribution -or !(Test-Path -LiteralPath $failed.location)) {
-        throw 'Retry did not preserve incomplete import data.'
-    }
-    Write-Host 'PASS: fresh/imported runtime, interrupted install, missing/corrupt record, foreign/manual name, missing distro and import retry'
+    if ((Initialize-NodeRuntime $runtimeRoot $runtimeData $case '') -ne 'Ubuntu') { throw 'Fresh PC offline Ubuntu retry failed.' }
+    if (!(Test-Path -LiteralPath (Join-Path $runtimeRoot 'wsl\ext4.vhdx'))) { throw 'Partial runtime data was deleted.' }
+    $script:runtimes=@([pscustomobject]@{Name='Ubuntu';Location='C:\old';Version=1;IsDefault=$true})
+    Assert-Throws { Initialize-NodeRuntime $runtimeRoot $runtimeData $case '' }
     Remove-Item Function:\wsl.exe
     Remove-Item Function:\Get-NodeWslRuntimes
+    $context.Settings.LNIS_COMPOSE_PROJECT='gnss-isolated'
+    if ((Get-NodeCompose $context) -notcontains 'gnss-isolated') { throw 'Shared Docker project isolation missing.' }
+    $context.Settings.LNIS_COMPOSE_PROJECT='bad project'
+    Assert-Throws { Get-NodeCompose $context }
+    $context.Settings.Remove('LNIS_COMPOSE_PROJECT')
+    Write-Host 'PASS: default/shared WSL, explicit distro, private runtime exclusion, fresh Ubuntu retry, WSL1 protection and Compose isolation'
+
+    function Get-NodeAddresses { return @('192.0.2.10') }
+    $savedIdle=(Get-Command Assert-NodeIdle).ScriptBlock
+    $script:addressIdleChecks=0
+    function Assert-NodeIdle { param($Context,$Url) $script:addressIdleChecks++ }
+    $beforeHash=(Get-FileHash $context.EnvFile).Hash
+    Update-NodeAddress $context | Out-Null
+    if ((Get-FileHash $context.EnvFile).Hash -ne $beforeHash) { throw 'Unchanged IP rewrote configuration.' }
+    function Get-NodeAddresses { return @('192.0.2.99') }
+    Update-NodeAddress $context | Out-Null
+    if ($context.Settings.LNIS_NODE_BASE_URL -ne 'http://192.0.2.99:18088' -or
+        (Read-NodeEnvironment $context.EnvFile).LNIS_NODE_BASE_URL -ne 'http://192.0.2.99:18088') { throw 'Changed IP/port was not persisted.' }
+    function Get-NodeAddresses { return @('192.0.2.100') }
+    function Assert-NodeIdle { param($Context,$Url) throw 'Busy capture' }
+    $beforeHash=(Get-FileHash $context.EnvFile).Hash
+    Assert-Throws { Update-NodeAddress $context }
+    if ((Get-FileHash $context.EnvFile).Hash -ne $beforeHash) { throw 'Busy work changed configuration.' }
+    function Get-NodeAddresses { return @('192.0.2.10') }
+    function Assert-NodeIdle { param($Context,$Url) }
+    Update-NodeAddress $context | Out-Null
+    Set-Item Function:\Assert-NodeIdle $savedIdle
+    Write-Host 'PASS: current IP refresh, preserved service port, unchanged-IP no-op and active-work protection'
 
     $script:networkCalls=@();$script:foreignRule=$false
     function Get-NetIPAddress { param($AddressFamily) return @{IPAddress='192.0.2.10'} }
@@ -248,6 +259,13 @@ try {
     $script:foreignRule=$true
     Assert-Throws { Set-NodeNetwork $network }
     $network.loopback='172.20.0.2';Assert-Throws { Set-NodeNetwork $network }
+    $network.listenAddress='0.0.0.0';$network.loopback='::1'
+    Assert-Throws { Set-NodeNetwork $network }
+    $script:rules=''
+    Set-NodeNetwork $network
+    if (!($script:networkCalls|Where-Object { $_ -match 'add v4tov6.*listenaddress=0.0.0.0.*connectport=18088' })) {
+        throw 'IP-independent listener was not configured.'
+    }
     Write-Host 'PASS: matching Windows/WSL port, stable loopback proxy and foreign-rule isolation'
 
     $script:hostConfig='{"services":{"node":{"network_mode":"host","environment":{}}}}'
@@ -279,6 +297,8 @@ try {
     $source=(Get-Content -Raw -LiteralPath (Join-Path $repo 'deployment\node\start.ps1') -Encoding UTF8).
         Replace(". (Join-Path "+'$PSScriptRoot'+" 'node-runtime.ps1')",'').
         Replace('$context = Get-NodeContext $PSScriptRoot','$context = $script:testContext')
+    function Get-NodeAddresses { return @('192.0.2.10') }
+    function Repair-NodeNetwork { param($Context,$LocalUrl) }
     $script:testContext=$context
     & ([ScriptBlock]::Create($source)) -NoBrowser
     & ([ScriptBlock]::Create($source))
@@ -304,7 +324,7 @@ try {
     Copy-Item (Join-Path $repo 'deployment\node\.env.example') $bundleApp
     Set-Content (Join-Path $bundleApp 'start.ps1') @'
 param([switch]$NoBrowser)
-$fixtureData=Join-Path (Split-Path $PSScriptRoot) 'data'
+$fixtureData=(Get-Content (Join-Path $PSScriptRoot 'installation.json') -Raw|ConvertFrom-Json).dataDirectory
 if (Test-Path (Join-Path $fixtureData 'fail-once')) {
     Remove-Item (Join-Path $fixtureData 'fail-once')
     Set-Content (Join-Path $fixtureData 'DB\marker') 'changed-by-failed-upgrade'
@@ -312,10 +332,12 @@ if (Test-Path (Join-Path $fixtureData 'fail-once')) {
 }
 '@
     Set-Content (Join-Path $bundleApp 'stop.ps1') @'
-Set-Content (Join-Path (Split-Path $PSScriptRoot) 'data\stopped-marker') 'stopped'
+$fixtureData=(Get-Content (Join-Path $PSScriptRoot 'installation.json') -Raw|ConvertFrom-Json).dataDirectory
+Set-Content (Join-Path $fixtureData 'stopped-marker') 'stopped'
 '@
     Set-Content (Join-Path $bundleApp 'stop-serial-bridge.ps1') 'param($DataDirectory)'
     Copy-Item -LiteralPath (Join-Path $repo 'deployment\node\START.cmd'),(Join-Path $repo 'deployment\node\STOP.cmd') -Destination $bundleApp
+    function Test-NodeWslReady { return $false }
     function Invoke-InstallerAdmin { param($Arguments) $script:adminCalls+=($Arguments -join ' ') }
     function Assert-NodeFiles { param($Root) return $script:release }
     $script:installWslHeld=$false;$script:installKeeps=0
@@ -331,7 +353,7 @@ Set-Content (Join-Path (Split-Path $PSScriptRoot) 'data\stopped-marker') 'stoppe
     function Assert-NodeIdle { param($Context,$Url) $script:idleChecks++ }
     function wsl.exe { $global:LASTEXITCODE=0;return 'LNIS-Runtime' }
     function Get-NodeWslRuntimes {
-        return @([pscustomobject]@{Name='LNIS-Runtime';Location=(Join-Path $Destination 'runtime');Version=2})
+        return @([pscustomobject]@{Name='Ubuntu';Location=(Join-Path $Destination 'runtime');Version=2;IsDefault=$true})
     }
     function Invoke-RestMethod { param($Uri,$TimeoutSec) return @{online=$true;role='sender'} }
     $script:fakeShell=New-Object PSObject
@@ -342,7 +364,7 @@ Set-Content (Join-Path (Split-Path $PSScriptRoot) 'data\stopped-marker') 'stoppe
         return $shortcut
     }
     $Destination=Join-Path $case 'installed'
-    $script:installData=Join-Path $Destination 'data'
+    $script:installData=$Destination
     New-Item -ItemType Directory -Path $script:installData -Force|Out-Null
     @{location=(Join-Path $Destination 'runtime');owner=[Security.Principal.WindowsIdentity]::GetCurrent().User.Value}|
         ConvertTo-Json|Set-Content (Join-Path $script:installData 'runtime-registration.json') -Encoding UTF8
@@ -353,21 +375,16 @@ Set-Content (Join-Path (Split-Path $PSScriptRoot) 'data\stopped-marker') 'stoppe
     $transaction=$transaction.Replace('$shell = New-Object -ComObject WScript.Shell','$shell = $script:fakeShell')
     $script:adminCalls=@();$script:installCalls=@();$script:idleChecks=0;$script:breakUpgrade=$false
     & ([ScriptBlock]::Create($transaction))
-    $installedContext=Get-NodeContext (Join-Path $Destination 'app')
+    $installedContext=Get-NodeContext $Destination
     if (!$installedContext.Installed -or $installedContext.Data -ne $script:installData) { throw 'Fresh install path mismatch.' }
     if (!($script:installCalls|Where-Object {$_ -match 'docker load --input'})) { throw 'Offline image not loaded.' }
     if ($script:installKeeps -lt 1) { throw 'Fresh install did not hold WSL before loading the image.' }
     foreach ($name in @('START','STOP')) {
         $launcher=Get-Content -LiteralPath (Join-Path $Destination ($name+'.cmd')) -Raw -Encoding UTF8
-        if (!$launcher.Contains('%~dp0app\'+$name.ToLowerInvariant()+'.ps1')) { throw 'Root launcher did not target the installed app.' }
+        if (!$launcher.Contains('%~dp0'+$name.ToLowerInvariant()+'.ps1')) { throw 'Root launcher did not target the installed app.' }
     }
-    $rootStart=Join-Path $Destination 'START.cmd'
-    $savedStart=Get-Content -LiteralPath $rootStart -Raw
-    [IO.File]::WriteAllText($rootStart,'user-owned launcher')
-    Assert-Throws { & ([ScriptBlock]::Create($transaction)) }
-    if ((Get-Content -LiteralPath $rootStart -Raw) -ne 'user-owned launcher') { throw 'An unrelated launcher was overwritten.' }
-    [IO.File]::WriteAllText($rootStart,$savedStart)
-
+    if (Test-Path (Join-Path $Destination 'backups')) { throw 'Installation left a backups folder.' }
+    if (Test-Path (Join-Path $Destination 'app')) { throw 'Fresh installation is not flat.' }
     Set-Content (Join-Path $script:installData 'DB\marker') 'original-db'
     $Configuration=$null
     & ([ScriptBlock]::Create($transaction))
@@ -376,11 +393,11 @@ Set-Content (Join-Path (Split-Path $PSScriptRoot) 'data\stopped-marker') 'stoppe
     Set-Content (Join-Path $script:installData 'fail-once') ''
     Assert-Throws { & ([ScriptBlock]::Create($transaction)) }
     if ((Get-Content (Join-Path $script:installData 'DB\marker')) -ne 'original-db') { throw 'Failed upgrade did not restore the DB.' }
-    if (!(Test-Path (Join-Path $Destination 'app\installation.json'))) { throw 'Failed upgrade did not restore the app.' }
+    if (!(Test-Path (Join-Path $Destination 'installation.json'))) { throw 'Failed upgrade did not restore the app.' }
     Write-Host 'PASS: actual installer fresh install, offline image load, idle upgrade, and failed-upgrade app/env/DB restoration'
 
     $Destination=Join-Path $case 'interrupted-first-install'
-    $retryData=Join-Path $Destination 'data'
+    $retryData=$Destination
     New-Item -ItemType Directory -Path $retryData -Force|Out-Null
     @{location=(Join-Path $Destination 'runtime');owner=[Security.Principal.WindowsIdentity]::GetCurrent().User.Value}|
         ConvertTo-Json|Set-Content (Join-Path $retryData 'runtime-registration.json') -Encoding UTF8
@@ -389,14 +406,52 @@ Set-Content (Join-Path (Split-Path $PSScriptRoot) 'data\stopped-marker') 'stoppe
     Assert-Throws { & ([ScriptBlock]::Create($transaction)) }
     if (!(Test-Path (Join-Path $retryData 'stopped-marker'))) { throw 'Failed first installation did not stop its new service.' }
     $marker=Get-Content (Join-Path $retryData 'DB\marker') -Raw
-    Set-Content (Join-Path $Destination 'app\stop.ps1') "throw 'Old Compose cannot be parsed'"
+    Set-Content (Join-Path $Destination 'stop.ps1') "throw 'Old Compose cannot be parsed'"
+    $legacyValues=Read-NodeEnvironment (Join-Path $retryData '.env')
+    $legacyValues.Remove('LNIS_COMPOSE_PROJECT')
+    Write-InstallEnvironment (Join-Path $bundleApp '.env.example') (Join-Path $retryData '.env') $legacyValues
     function Get-NodeReady { param($Context) return $null }
     $script:installCalls=@()
     & ([ScriptBlock]::Create($transaction))
-    if (!($script:installCalls | Where-Object { $_ -eq 'docker ps --quiet' })) { throw 'Interrupted install must check running containers without parsing old Compose.' }
+    if (!($script:installCalls | Where-Object { $_ -like 'docker ps --quiet --filter label=com.docker.compose.project.working_dir=*' })) { throw 'Interrupted install must check running containers without parsing old Compose.' }
     if ((Get-Content (Join-Path $retryData 'DB\marker') -Raw) -ne $marker) { throw 'First-install retry removed data.' }
-    if (!(Test-Path (Join-Path $Destination 'app\installation.json'))) { throw 'First-install retry did not complete.' }
+    if (!(Test-Path (Join-Path $Destination 'installation.json'))) { throw 'First-install retry did not complete.' }
     Write-Host 'PASS: first installation interrupted after app deployment can be retried without deleting data'
+
+    foreach ($failMigration in @($false,$true)) {
+        $Destination=Join-Path $case ('legacy-' + $failMigration)
+        $legacyApp=Join-Path $Destination 'app'
+        $legacyData=Join-Path $Destination 'data'
+        New-Item -ItemType Directory -Path $Destination,$legacyData,(Join-Path $legacyData 'DB'),(Join-Path $legacyData 'exchange') -Force | Out-Null
+        Copy-Item -LiteralPath $bundleApp -Destination $legacyApp -Recurse
+        Copy-Item -LiteralPath $file -Destination (Join-Path $legacyData '.env')
+        @{dataDirectory=$legacyData}|ConvertTo-Json|Set-Content (Join-Path $legacyApp 'installation.json') -Encoding UTF8
+        $listed=@(Get-ChildItem -LiteralPath $legacyApp -File -Recurse -Force|ForEach-Object{
+            @{path=$_.FullName.Substring($legacyApp.Length+1).Replace('\','/');sha256=(Get-FileHash -LiteralPath $_.FullName).Hash}
+        })
+        @{image='lnis-node:fixture';imageId='sha256:fixture';files=$listed}|ConvertTo-Json -Depth 6|
+            Set-Content (Join-Path $legacyApp 'release.json') -Encoding UTF8
+        Set-Content (Join-Path $legacyData 'DB\marker') 'legacy-db'
+        Set-Content (Join-Path $legacyData 'exchange\sample.bin') 'iq-file'
+        if ($failMigration) { Set-Content (Join-Path $legacyData 'fail-once') '' }
+        $Configuration=$null
+        if ($failMigration) {
+            Assert-Throws { & ([ScriptBlock]::Create($transaction)) }
+            if ((Get-Content (Join-Path $legacyData 'DB\marker')) -ne 'legacy-db' -or
+                (Get-Content (Join-Path $legacyData 'exchange\sample.bin')) -ne 'iq-file' -or
+                !(Test-Path (Join-Path $legacyApp 'installation.json'))) { throw 'Legacy migration rollback lost data/code.' }
+        } else {
+            & ([ScriptBlock]::Create($transaction))
+            if ((Get-Content (Join-Path $Destination 'DB\marker')) -ne 'legacy-db' -or
+                (Get-Content (Join-Path $Destination 'exchange\sample.bin')) -ne 'iq-file' -or
+                !(Test-Path (Join-Path $Destination '.env'))) { throw 'Legacy migration lost DB/input settings.' }
+            if ((Test-Path $legacyApp) -or (Test-Path $legacyData) -or (Test-Path (Join-Path $Destination 'backups'))) {
+                throw 'Successful migration left app/data/backups folders.'
+            }
+        }
+    }
+    Write-Host 'PASS: legacy app/data to flat installation, I/Q preservation and failed-migration restoration'
+
 
 
 } finally {

@@ -20,8 +20,8 @@ services:
     command: [node, /app/dev-relay.mjs]
     environment:
       RECEIVER_URL: http://lnis-receiver:8091/lnis/api/v1/dtn/receive
-      RECEIVE_TOKEN: ${LNIS_DEV_RECEIVE_TOKEN:?Development receiver token required}
-      SEND_TOKEN: ${LNIS_DTN_SEND_TOKEN:?Development send token required}
+      RECEIVE_TOKEN: ${LNIS_DEV_RECEIVE_TOKEN:-imt123}
+      SEND_TOKEN: ${LNIS_DTN_SEND_TOKEN-imt123}
     volumes:
       - ./dev-relay.mjs:/app/dev-relay.mjs:ro
       - ${LNIS_DEV_SENDER_FILES:-./exchange}:/sender-files:ro

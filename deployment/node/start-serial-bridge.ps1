@@ -103,6 +103,7 @@ if ($health -and !(Test-Path -LiteralPath $pidFile)) {
 [IO.File]::WriteAllText((Join-Path $envRoot '.serial-bridge.env'), $bridgeEnvironment, $utf8)
 [IO.File]::WriteAllText((Join-Path $stateRoot 'bridge-version.txt'), $version + "`n", $utf8)
 [IO.File]::WriteAllText($config,"bind=$bindAddress`nport=$bridgePort`ntoken=$token`n",$utf8)
+if (!$JavaHome -and (Test-Path -LiteralPath (Join-Path $root 'jre\bin\java.exe'))) { $JavaHome = Join-Path $root 'jre' }
 if (!$JavaHome -and (Test-Path -LiteralPath (Join-Path $root 'runtime\bin\java.exe'))) { $JavaHome = Join-Path $root 'runtime' }
 if (!$JavaHome) {
     $installed = Get-ChildItem (Join-Path $env:USERPROFILE '.jdks') -Directory -ErrorAction SilentlyContinue | Where-Object Name -Match '21' | Select-Object -First 1

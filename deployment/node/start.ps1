@@ -1,13 +1,18 @@
 ﻿[CmdletBinding()]
-param([switch]$NoBrowser)
+param([switch]$NoBrowser, [string]$NetworkSetup, [switch]$SkipNetworkSetup)
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'node-runtime.ps1')
+if ($NetworkSetup) {
+    Set-NodeNetwork (Get-Content -LiteralPath $NetworkSetup -Raw -Encoding UTF8 | ConvertFrom-Json)
+    exit 0
+}
 $context = Get-NodeContext $PSScriptRoot
 $lock = Enter-NodeLock $context
 $created = $false
 try {
     $created = Start-NodeKeepAlive $context
     Wait-NodeDocker $context
+    if ($context.Installed) { Update-NodeAddress $context | Out-Null }
     $gnssReady = $true
     try {
         & (Join-Path $context.App 'start-serial-bridge.ps1') -Distribution $context.Distribution -DataDirectory $context.Data
@@ -30,6 +35,7 @@ try {
     if (!$browserUrl) { $browserUrl = $url }
     Write-Host ("서비스 실행 완료: " + $context.Settings.LNIS_NODE_ROLE + " / $browserUrl")
     if (!$gnssReady) { Write-Warning '파일 기반 시험은 사용할 수 있습니다. GNSS 장비 수집은 중계 상태를 확인하세요.' }
+    if ($context.Installed -and !$SkipNetworkSetup) { Repair-NodeNetwork $context $url }
     if ($context.Installed) {
         try {
             $public = Invoke-RestMethod ($context.Settings.LNIS_NODE_BASE_URL + '/lnis/api/v1/node') -TimeoutSec 3

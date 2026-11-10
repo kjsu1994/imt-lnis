@@ -35,7 +35,7 @@ services:
       LNIS_NODE_BASE_URL: ${LNIS_NODE_BASE_URL:?현재 PC의 URL을 설정하세요}
       # 상대 PC 미설정 시 로컬 노드만 시작한다. 시험 실행 전 상대 주소를 설정해야 한다.
       LNIS_NODE_PEER_URL: ${LNIS_NODE_PEER_URL:-}
-      LNIS_NODE_MANAGEMENT_TOKEN: ${LNIS_NODE_MANAGEMENT_TOKEN:?양쪽 관리 토큰을 설정하세요}
+      LNIS_NODE_MANAGEMENT_TOKEN: ${LNIS_NODE_MANAGEMENT_TOKEN:-imt123}
       LNIS_NATIVE_DIR: /app/native
       LNIS_DB_URL: jdbc:h2:file:/app/data/lnis
       LNIS_DB_PASSWORD: ${LNIS_DB_PASSWORD:-}
@@ -45,8 +45,8 @@ services:
       LNIS_IQ_HOST_PATH: ${LNIS_IQ_HOST_PATH:-}
       OMP_NUM_THREADS: "2"
       dtn_adapter: ${dtn_adapter:-}
-      LNIS_DTN_SEND_TOKEN: ${LNIS_DTN_SEND_TOKEN:-}
-      LNIS_DTN_RECEIVE_TOKEN: ${LNIS_DTN_RECEIVE_TOKEN:-}
+      LNIS_DTN_SEND_TOKEN: ${LNIS_DTN_SEND_TOKEN-imt123}
+      LNIS_DTN_RECEIVE_TOKEN: ${LNIS_DTN_RECEIVE_TOKEN-imt123}
     volumes:
       - ${LNIS_STATE_DIR:-.}/DB:/app/data
       - ${LNIS_STATE_DIR:-.}/exchange:/exchange

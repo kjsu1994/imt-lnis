@@ -18,6 +18,17 @@ function ConvertTo-NodeLinuxPath([string]$Path) {
     return '/mnt/' + $full.Substring(0, 1).ToLowerInvariant() + $full.Substring(2).Replace('\', '/')
 }
 
+function Get-NodeInstallLayout([string]$Root) {
+    $app = $Root
+    $data = $Root
+    if (!(Test-Path -LiteralPath (Join-Path $Root '.env')) -and
+            (Test-Path -LiteralPath (Join-Path $Root 'app\installation.json'))) {
+        $app = Join-Path $Root 'app'
+        $data = Join-Path $Root 'data'
+    }
+    return [pscustomobject]@{App=$app;Data=$data;EnvFile=(Join-Path $data '.env');Existing=(Test-Path -LiteralPath (Join-Path $data '.env'))}
+}
+
 function Get-NodeContext([string]$AppRoot) {
     $app = [IO.Path]::GetFullPath($AppRoot)
     $data = $app
@@ -86,6 +97,10 @@ function Wait-NodeDocker($Context) {
 
 function Get-NodeCompose($Context) {
     $arguments = @('compose', '--env-file', (ConvertTo-NodeLinuxPath $Context.EnvFile), '-f', 'docker-compose.yml')
+    if ($Context.Settings.LNIS_COMPOSE_PROJECT) {
+        if ($Context.Settings.LNIS_COMPOSE_PROJECT -notmatch '^[a-z0-9][a-z0-9_-]{0,62}$') { throw 'Docker 프로젝트 이름을 확인하세요.' }
+        $arguments += @('--project-name', $Context.Settings.LNIS_COMPOSE_PROJECT)
+    }
     if (Test-Path -LiteralPath (Join-Path $Context.App 'docker-compose.override.yml')) {
         $arguments += @('-f', 'docker-compose.override.yml')
     }
@@ -285,11 +300,146 @@ function Assert-InstallSettings($Values) {
     if ($Values.LNIS_NODE_PEER_URL -and ([Uri]$Values.LNIS_NODE_PEER_URL).Equals([Uri]$Values.LNIS_NODE_BASE_URL)) {
         throw '상대 PC 주소는 내 PC 주소와 다르게 입력하세요.'
     }
-    if ($Values.LNIS_NODE_MANAGEMENT_TOKEN.Length -lt 32) { throw '공통 관리 토큰은 32자 이상이어야 합니다.' }
+    if ([string]::IsNullOrWhiteSpace($Values.LNIS_NODE_MANAGEMENT_TOKEN)) { throw '공통 관리 인증값을 입력하세요.' }
     if ($Values.LNIS_NODE_ROLE -eq 'receiver' -and !$Values.LNIS_DTN_RECEIVE_TOKEN) { throw '수신 인증 토큰을 입력하세요.' }
 }
 
 function Get-NodeShortcutName([string]$Role) {
     if ($Role -notin @('sender','receiver')) { throw '송신·수신 역할을 확인하세요.' }
     return 'GNSS 전송 시험 · ' + $(if ($Role -eq 'sender') { '송신' } else { '수신' })
+}
+
+function Get-NodeAddresses {
+    $preferred = New-Object 'Collections.Generic.List[string]'
+    $other = New-Object 'Collections.Generic.List[string]'
+    foreach ($adapter in [Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces()) {
+        if ($adapter.OperationalStatus -ne 'Up' -or
+                $adapter.NetworkInterfaceType -in @('Loopback','Tunnel') -or
+                $adapter.Name -match 'vEthernet|WSL|Docker|Loopback') { continue }
+        try { $properties = $adapter.GetIPProperties() } catch { continue }
+        $gateway = @($properties.GatewayAddresses | Where-Object {
+            $_.Address.AddressFamily -eq 'InterNetwork' -and $_.Address.ToString() -ne '0.0.0.0'
+        }).Count -gt 0
+        foreach ($item in $properties.UnicastAddresses) {
+            $ip = $item.Address.ToString()
+            if ($item.Address.AddressFamily -ne 'InterNetwork' -or $ip -match '^(127\.|169\.254\.)') { continue }
+            $target = $preferred
+            if (!$gateway) { $target = $other }
+            if (!$target.Contains($ip)) { $target.Add($ip) }
+        }
+    }
+    return @($preferred.ToArray()) + @($other.ToArray() | Where-Object { !$preferred.Contains($_) })
+}
+
+function Set-NodeNetwork($Config) {
+    $address = $null
+    if (![Net.IPAddress]::TryParse($Config.listenAddress,[ref]$address) -or
+        $address.AddressFamily -ne [Net.Sockets.AddressFamily]::InterNetwork -or
+        ($Config.listenAddress -ne '0.0.0.0' -and !(Get-NetIPAddress -AddressFamily IPv4 | Where-Object IPAddress -eq $Config.listenAddress))) {
+        throw '현재 PC에 할당된 IPv4 주소를 입력하세요.'
+    }
+    $port = [int]$Config.port
+    $bridgePort = [int]$Config.bridgePort
+    if ($port -lt 1 -or $port -gt 65535 -or $bridgePort -lt 1 -or $bridgePort -gt 65535) { throw '서비스 및 중계 포트는 1~65535여야 합니다.' }
+    if ($Config.loopback -notin @('127.0.0.1','::1')) { throw '포트 전달 대상은 Windows 내부 주소만 허용합니다.' }
+    $mode = if ($Config.loopback -eq '::1') { 'v4tov6' } else { 'v4tov4' }
+    $record = $Config.record
+    $owned = if (Test-Path -LiteralPath $record) { Get-Content -Raw -LiteralPath $record -Encoding UTF8 | ConvertFrom-Json } else { $null }
+    $rules = @(& netsh.exe interface portproxy show all)
+    $existing = @($rules | Where-Object { $_ -match ('^\s*' + [regex]::Escape($Config.listenAddress) + '\s+' + $port + '\s+') })
+    if ($existing.Count -and (!$owned -or $owned.listenAddress -ne $Config.listenAddress -or [int]$owned.port -ne $port)) {
+        throw '같은 주소·포트의 기존 전달 규칙이 있습니다. 설치 담당자가 확인해야 합니다.'
+    }
+    if ($Config.listenAddress -eq '0.0.0.0') {
+        $foreign = @($rules | Where-Object {
+            $_ -match ('^\s*(\S+)\s+' + $port + '\s+') -and
+                (!$owned -or $Matches[1] -ne $owned.listenAddress -or [int]$owned.port -ne $port)
+        })
+        if ($foreign.Count) { throw '같은 포트의 다른 전달 규칙이 있습니다. 다른 서비스 포트를 선택하세요.' }
+    }
+    $oldRule = @()
+    if ($owned) {
+        $oldRule = @($rules | Where-Object { $_ -match ('^\s*' + [regex]::Escape($owned.listenAddress) + '\s+' + [int]$owned.port + '\s+') })
+        if ($oldRule.Count -and $oldRule[0] -notmatch ('\s' + [regex]::Escape($owned.loopback) + '\s+' + [int]$owned.port + '\s*$')) {
+            throw '다른 프로그램이 포트 전달 규칙을 변경했습니다.'
+        }
+    }
+    Set-Service iphlpsvc -StartupType Automatic
+    Start-Service iphlpsvc
+    $added = $false
+    try {
+        if ($oldRule.Count) {
+            & netsh.exe interface portproxy delete $owned.mode "listenaddress=$($owned.listenAddress)" "listenport=$($owned.port)" | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw '기존 전달 규칙을 갱신하지 못했습니다.' }
+        }
+        & netsh.exe interface portproxy add $mode "listenaddress=$($Config.listenAddress)" "listenport=$port" "connectaddress=$($Config.loopback)" "connectport=$port" | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw 'Windows → WSL 포트 전달 설정에 실패했습니다.' }
+        $added = $true
+        foreach ($name in @(('IMT-DTN-Service-' + $port),('IMT-DTN-COM-' + $port))) {
+            Get-NetFirewallRule -Name $name -ErrorAction SilentlyContinue | Remove-NetFirewallRule
+        }
+        New-NetFirewallRule -Name ('IMT-DTN-Service-' + $port) -DisplayName 'IMT DTN service' -Direction Inbound -Protocol TCP -LocalAddress Any -LocalPort $port -RemoteAddress LocalSubnet -Profile Any -Action Allow | Out-Null
+        New-NetFirewallRule -Name ('IMT-DTN-COM-' + $port) -DisplayName 'IMT DTN COM bridge' -Direction Inbound -Protocol TCP -LocalPort $bridgePort -Program $Config.java -RemoteAddress LocalSubnet -Profile Any -Action Allow | Out-Null
+        if ($owned -and [int]$owned.port -ne $port) {
+            foreach ($name in @(('IMT-DTN-Service-' + $owned.port),('IMT-DTN-COM-' + $owned.port))) {
+                Get-NetFirewallRule -Name $name -ErrorAction SilentlyContinue | Remove-NetFirewallRule
+            }
+        }
+        $Config | Add-Member -NotePropertyName mode -NotePropertyValue $mode -Force
+        $Config | ConvertTo-Json | Set-Content -LiteralPath $record -Encoding UTF8
+    } catch {
+        $failure = $_
+        if ($added) {
+            & netsh.exe interface portproxy delete $mode "listenaddress=$($Config.listenAddress)" "listenport=$port" | Out-Null
+        }
+        if ($oldRule.Count) {
+            & netsh.exe interface portproxy add $owned.mode "listenaddress=$($owned.listenAddress)" "listenport=$($owned.port)" "connectaddress=$($owned.loopback)" "connectport=$($owned.port)" | Out-Null
+            if ($LASTEXITCODE -ne 0) { Write-Warning '이전 포트 전달 규칙 복원에 실패했습니다. 설치 로그를 확인하세요.' }
+        }
+        throw $failure
+    }
+}
+
+
+function Update-NodeAddress($Context) {
+    $addresses = @(Get-NodeAddresses)
+    if (!$addresses.Count) { throw '연결된 네트워크의 IPv4 주소를 확인하세요.' }
+    $current = if ($Context.Settings.LNIS_NODE_BASE_URL) { ([Uri]$Context.Settings.LNIS_NODE_BASE_URL).Host } else { '' }
+    $address = if ($addresses -contains $current) { $current } else { $addresses[0] }
+    $url = 'http://' + $address + ':' + $Context.Port
+    if ($url -ne $Context.Settings.LNIS_NODE_BASE_URL) {
+        $ready = Get-NodeReady $Context
+        if ($ready) { Assert-NodeIdle $Context $ready }
+        $Context.Settings.LNIS_NODE_BASE_URL = $url
+        Write-InstallEnvironment (Join-Path $Context.App '.env.example') $Context.EnvFile $Context.Settings
+        Write-Host ("현재 PC 주소 적용: " + $url)
+    }
+    return $url
+}
+
+function Repair-NodeNetwork($Context, [string]$LocalUrl) {
+    $record = Join-Path $Context.Data 'network.json'
+    $loopback = ([Uri]$LocalUrl).Host.Trim('[',']')
+    $saved = if (Test-Path -LiteralPath $record) { Get-Content -LiteralPath $record -Raw -Encoding UTF8 | ConvertFrom-Json } else { $null }
+    if ($saved -and $saved.listenAddress -eq '0.0.0.0' -and [int]$saved.port -eq $Context.Port -and $saved.loopback -eq $loopback) {
+        try {
+            $node = Invoke-RestMethod ($Context.Settings.LNIS_NODE_BASE_URL + '/lnis/api/v1/node') -TimeoutSec 3
+            if ($node.online -and $node.role -ieq $Context.Settings.LNIS_NODE_ROLE) { return }
+        } catch {}
+    }
+    $javaDirectory = if (Test-Path -LiteralPath (Join-Path $Context.App 'jre\bin\java.exe')) { 'jre' } else { 'runtime' }
+    $configuration = @{
+        listenAddress='0.0.0.0';port=$Context.Port;loopback=$loopback;record=$record
+        bridgePort=$(if ($Context.Settings.LNIS_SERIAL_BRIDGE_PORT) { [int]$Context.Settings.LNIS_SERIAL_BRIDGE_PORT } elseif ($Context.Settings.LNIS_NODE_ROLE -eq 'receiver') { 18766 } else { 18765 })
+        java=(Join-Path $Context.App ($javaDirectory + '\bin\java.exe'))
+    }
+    $file = Join-Path ([IO.Path]::GetTempPath()) ('gnss-network-' + [Guid]::NewGuid().ToString('N') + '.json')
+    try {
+        $configuration | ConvertTo-Json | Set-Content -LiteralPath $file -Encoding UTF8
+        $arguments = @('-NoProfile','-ExecutionPolicy','Bypass','-File',('"' + (Join-Path $Context.App 'start.ps1') + '"'),'-NetworkSetup',('"' + $file + '"'))
+        $child = Start-Process powershell.exe -ArgumentList $arguments -Verb RunAs -WindowStyle Hidden -Wait -PassThru
+        if ($child.ExitCode -ne 0) { throw 'Windows 접속 포트 설정을 완료하지 못했습니다. 관리자 승인과 포트 사용 상태를 확인하세요.' }
+    } finally {
+        if (Test-Path -LiteralPath $file) { Remove-Item -LiteralPath $file -Force }
+    }
 }

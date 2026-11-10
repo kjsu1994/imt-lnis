@@ -29,7 +29,7 @@ try {
     if ((Read-SetupIni $hints 'setup' 'ipCount') -ne '2') { throw 'Multiple interfaces were lost.' }
     $management = Read-SetupIni $hints 'env' 'LNIS_NODE_MANAGEMENT_TOKEN'
     $receiveToken = Read-SetupIni $hints 'env' 'LNIS_DTN_RECEIVE_TOKEN'
-    if ($management.Length -ne 64 -or $receiveToken.Length -ne 64 -or $management -eq $receiveToken) { throw 'Existing required-token defaults failed.' }
+    if ($management -ne 'imt123' -or $receiveToken -ne 'imt123' -or (Read-SetupIni $hints 'env' 'LNIS_DTN_SEND_TOKEN') -ne 'imt123') { throw 'Fixed service/adapter token defaults failed.' }
     $request = Join-Path $case 'request.ini'
     $config = Join-Path $case 'configuration.env'
     $listener = New-Object Net.Sockets.TcpListener ([Net.IPAddress]::Loopback),0
@@ -47,6 +47,7 @@ try {
     Write-TestRequest
     Prepare-SetupConfiguration $request $config
     $values = Read-NodeEnvironment $config
+    if ($values.LNIS_IQ_ENABLED -ine 'true') { throw 'A new sender must keep I/Q generation enabled by default.' }
     if ($values.LNIS_NODE_PEER_URL -ne '' -or $values.dtn_adapter -ne '' -or $values.LNIS_SERVER_PORT -ne $testPort) { throw 'Blank remote addresses/custom port not preserved.' }
     $pending = Get-SetupPendingPath
     if ((Get-Content -LiteralPath $pending -Raw).Contains($management)) { throw 'Pending configuration exposed plaintext credentials.' }
@@ -97,6 +98,8 @@ try {
     Remove-Item Function:\Read-InstallSecret
     Write-Host 'PASS: manual INSTALL settings for sender/receiver with optional blank addresses'
 
+    $readyDefinition=$installerAst.Find({param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Test-NodeWslReady'},$false)
+    Invoke-Expression $readyDefinition.Extent.Text
     $definition=$installerAst.Find({param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Install-WslPrerequisites'},$false)
     Invoke-Expression $definition.Extent.Text
     function Get-CimInstance {
@@ -107,6 +110,9 @@ try {
             'Win32_ComputerSystem' { return @{HypervisorPresent=$true} }
         }
     }
+    $script:existingWsl=$false
+    function Get-NodeWslRuntimes { if ($script:existingWsl) { return @{Name='Ubuntu';Version=2} };return @() }
+    function wsl.exe { $global:LASTEXITCODE=0 }
     $script:wslVersion=[version]'2.6.3'
     function Get-InstalledWslVersion { return $script:wslVersion }
     $script:release=@{wslVersion='3.0.0'}
@@ -120,6 +126,10 @@ try {
         return @{ExitCode=$script:msiExit}
     }
     if (Install-WslPrerequisites $case) { throw 'Existing WSL incorrectly requires a reboot.' }
+    $script:existingWsl=$true
+    $script:missingFeature=$true
+    if (Install-WslPrerequisites $case) { throw 'Working WSL should skip redundant Windows feature setup.' }
+    $script:existingWsl=$false
     $script:missingFeature=$true
     if (!(Install-WslPrerequisites $case)) { throw 'New Windows features must request a reboot.' }
     if ($script:msiRuns -ne 0) { throw 'A supported WSL installation must not be updated just to match the bundled MSI.' }

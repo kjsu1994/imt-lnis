@@ -26,49 +26,23 @@ function Read-SetupPending {
 function Save-SetupPending([string]$Path, $Values) {
     $file = Get-SetupPendingPath
     New-Item -ItemType Directory -Path (Split-Path $file) -Force | Out-Null
-    $json = @{destination=$Path;values=$Values} | ConvertTo-Json -Depth 4 -Compress
+    $json = @{destination=$Path;values=$Values;authDefaults='imt123'} | ConvertTo-Json -Depth 4 -Compress
     $protected = ConvertTo-SecureString $json -AsPlainText -Force | ConvertFrom-SecureString
     [IO.File]::WriteAllText($file, $protected, [Text.Encoding]::ASCII)
 }
 
-function Get-SetupAddresses {
-    $addresses = New-Object 'Collections.Generic.List[string]'
-    try {
-        foreach ($item in Get-NetIPConfiguration -ErrorAction Stop) {
-            if ($item.IPv4DefaultGateway -and $item.NetAdapter.Status -eq 'Up' -and
-                    $item.InterfaceAlias -notmatch 'vEthernet|WSL|Docker|Loopback') {
-                foreach ($ip in $item.IPv4Address.IPAddress) {
-                    if ($ip -and !$addresses.Contains($ip)) { $addresses.Add($ip) }
-                }
-            }
-        }
-    } catch {}
-    foreach ($adapter in [Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces()) {
-        if ($adapter.OperationalStatus -ne 'Up' -or
-                $adapter.NetworkInterfaceType -in @('Loopback','Tunnel') -or
-                $adapter.Name -match 'vEthernet|WSL|Docker|Loopback') { continue }
-        foreach ($item in $adapter.GetIPProperties().UnicastAddresses) {
-            $ip = $item.Address.ToString()
-            if ($item.Address.AddressFamily -eq 'InterNetwork' -and $ip -notmatch '^(127\.|169\.254\.)' -and
-                    !$addresses.Contains($ip)) { $addresses.Add($ip) }
-        }
-    }
-    return $addresses.ToArray()
-}
-
-function New-SetupToken {
-    $bytes = New-Object byte[] 32
-    $random = [Security.Cryptography.RandomNumberGenerator]::Create()
-    try { $random.GetBytes($bytes) } finally { $random.Dispose() }
-    return [BitConverter]::ToString($bytes).Replace('-', '').ToLowerInvariant()
-}
+function Get-SetupAddresses { return Get-NodeAddresses }
 
 function Get-SetupValues([string]$Path) {
-    $existing = Join-Path $Path 'data\.env'
+    $existing = (Get-NodeInstallLayout $Path).EnvFile
     $values = if (Test-Path -LiteralPath $existing) { Read-NodeEnvironment $existing } else { @{} }
     $pending = Read-SetupPending
     if ($pending -and $pending.destination -ieq $Path) {
-        foreach ($property in $pending.values.PSObject.Properties) { $values[$property.Name] = [string]$property.Value }
+        foreach ($property in $pending.values.PSObject.Properties) {
+            if (!(Test-Path -LiteralPath $existing) -and $pending.authDefaults -ne 'imt123' -and
+                    $property.Name -in @('LNIS_NODE_MANAGEMENT_TOKEN','LNIS_DTN_SEND_TOKEN','LNIS_DTN_RECEIVE_TOKEN')) { continue }
+            $values[$property.Name] = [string]$property.Value
+        }
     }
     return $values
 }
@@ -85,13 +59,16 @@ function Write-SetupHints([string]$Path, [string]$Output) {
         LNIS_NODE_ROLE='sender';LNIS_SERVER_PORT='8088'
         LNIS_NODE_BASE_URL=$(if ($first) { 'http://' + $first + ':8088' } else { '' })
         LNIS_NODE_PEER_URL='';dtn_adapter=''
-        LNIS_NODE_MANAGEMENT_TOKEN=(New-SetupToken)
-        LNIS_DTN_SEND_TOKEN='';LNIS_DTN_RECEIVE_TOKEN=(New-SetupToken)
-        LNIS_IQ_HOST_PATH=(Join-Path $Path 'data\exchange')
+        LNIS_NODE_MANAGEMENT_TOKEN='imt123'
+        LNIS_DTN_SEND_TOKEN='imt123';LNIS_DTN_RECEIVE_TOKEN='imt123'
+        LNIS_IQ_HOST_PATH=(Join-Path $Path 'exchange')
         LNIS_NTP_SERVER=''
     }
     foreach ($key in $defaults.Keys) { if (!$values.ContainsKey($key)) { $values[$key]=$defaults[$key] } }
-    $lines = @('[setup]', "destination=$Path", ('existing=' + [int](Test-Path -LiteralPath (Join-Path $Path 'app\installation.json'))),
+    if ($addresses.Count -and ($addresses -notcontains ([Uri]$values.LNIS_NODE_BASE_URL).Host)) {
+        $values.LNIS_NODE_BASE_URL = 'http://' + $first + ':' + $values.LNIS_SERVER_PORT
+    }
+    $lines = @('[setup]', "destination=$Path", ('existing=' + [int](Get-NodeInstallLayout $Path).Existing),
         ('ipCount=' + $addresses.Count))
     for ($i=0; $i -lt $addresses.Count; $i++) { $lines += ('ip' + $i + '=' + $addresses[$i]) }
     $lines += '[network]'
@@ -129,13 +106,16 @@ function Prepare-SetupConfiguration([string]$InputFile, [string]$Output) {
             'LNIS_IQ_HOST_PATH','LNIS_NTP_SERVER')) {
         $values[$key] = Read-SetupIni $InputFile 'env' $key
     }
+    if (!(Get-NodeInstallLayout $path).Existing -and !$values.ContainsKey('LNIS_IQ_ENABLED')) {
+        $values.LNIS_IQ_ENABLED = [string]($values.LNIS_NODE_ROLE -eq 'sender')
+    }
     Assert-InstallSettings $values
     if ((Get-SetupAddresses) -notcontains ([Uri]$values.LNIS_NODE_BASE_URL).Host) {
         throw '현재 PC에 할당된 IPv4 주소를 선택하세요. 네트워크 연결을 확인한 뒤 설치 프로그램을 다시 실행하세요.'
     }
-    $installed = Join-Path $path 'app\installation.json'
-    $existing = Join-Path $path 'data\.env'
-    if (Test-Path -LiteralPath $installed) {
+    $layout = Get-NodeInstallLayout $path
+    $existing = $layout.EnvFile
+    if ($layout.Existing) {
         if ((Read-NodeEnvironment $existing).LNIS_NODE_ROLE -ne $values.LNIS_NODE_ROLE) {
             throw '기존 설치의 송신·수신 역할은 변경할 수 없습니다. 다른 설치 경로를 선택하세요.'
         }
