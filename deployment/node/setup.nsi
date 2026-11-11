@@ -72,6 +72,9 @@ Var AdapterTokenEdit
 Var RevealCheck
 Var IqPath
 Var IqEdit
+Var ReplaceProxy
+Var ReplaceProxyCheck
+Var ProxyArgument
 Var Installing
 Var InstallLog
 
@@ -156,7 +159,7 @@ Function RolePage
   ${NSD_CreateBrowseButton} 256u 53u 44u 14u "찾기"
   Pop $0
   ${NSD_OnClick} $0 BrowseDirectory
-  ${NSD_CreateCheckbox} 0 82u 100% 14u "고급 설정 확인 (I/Q 폴더 · 시간 서버)"
+  ${NSD_CreateCheckbox} 0 82u 100% 14u "고급 설정 확인 (I/Q 폴더)"
   Pop $AdvancedCheck
   ${If} $Advanced == 1
     ${NSD_Check} $AdvancedCheck
@@ -307,6 +310,7 @@ FunctionEnd
 
 Function SaveRequest
   WriteINIStr $Request setup destination "$Destination"
+  WriteINIStr $Request setup replacePortProxy "$ReplaceProxy"
   !insertmacro WriteValue LNIS_NODE_ROLE "$Role"
   !insertmacro WriteValue LNIS_SERVER_PORT "$LocalPort"
   !insertmacro WriteValue LNIS_NODE_BASE_URL "http://$LocalIp:$LocalPort"
@@ -348,11 +352,21 @@ Function ReviewPage
     StrCpy $0 "$AdapterIp:$AdapterPort"
   ${EndIf}
   !insertmacro Label 0 88u 100% "어댑터: $0"
-  !insertmacro Label 0 116u 100% "서비스·Docker·Windows 접속 포트는 자동으로 일치시킵니다."
+  ${NSD_CreateCheckbox} 0 114u 100% 14u "선택한 포트($LocalPort)의 기존 전달 규칙 정리"
+  Pop $ReplaceProxyCheck
+  ${If} $ReplaceProxy == 1
+    ${NSD_Check} $ReplaceProxyCheck
+  ${EndIf}
+  !insertmacro Label 0 133u 100% "포트 충돌 시 선택하세요. 설치 중 해당 포트의 Windows 전달 규칙을 교체합니다."
   nsDialogs::Show
 FunctionEnd
 
 Function ReviewLeave
+  ${NSD_GetState} $ReplaceProxyCheck $ReplaceProxy
+  StrCpy $ProxyArgument ""
+  ${If} $ReplaceProxy == 1
+    StrCpy $ProxyArgument "-ReplacePortProxy"
+  ${EndIf}
   Call SaveRequest
   nsExec::ExecToStack '"$WINDIR\Sysnative\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "$PLUGINSDIR\bundle\installer\setup-settings.ps1" -Action Prepare -Request "$Request" -Configuration "$Settings"'
   Pop $0
@@ -376,7 +390,7 @@ Section "설치"
   ${NSD_AddStyle} $mui.InstFilesPage.ProgressBar 0x8
   SendMessage $mui.InstFilesPage.ProgressBar 0x40A 1 80
   DetailPrint "실행 환경과 서비스를 설치합니다."
-  nsExec::ExecToLog '"$WINDIR\Sysnative\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "$PLUGINSDIR\bundle\installer\install.ps1" -BundleRoot "$PLUGINSDIR\bundle" -Destination "$Destination" -Configuration "$Settings" -LogFile "$InstallLog" -NoBrowser'
+  nsExec::ExecToLog '"$WINDIR\Sysnative\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "$PLUGINSDIR\bundle\installer\install.ps1" -BundleRoot "$PLUGINSDIR\bundle" -Destination "$Destination" -Configuration "$Settings" -LogFile "$InstallLog" -NoBrowser $ProxyArgument'
   Pop $0
   SendMessage $mui.InstFilesPage.ProgressBar 0x40A 0 0
   StrCpy $Installing 0

@@ -212,6 +212,7 @@ try {
     $beforeHash=(Get-FileHash $context.EnvFile).Hash
     Update-NodeAddress $context | Out-Null
     if ((Get-FileHash $context.EnvFile).Hash -ne $beforeHash) { throw 'Unchanged IP rewrote configuration.' }
+    Remove-Item -LiteralPath (Join-Path $context.App '.env.example')
     function Get-NodeAddresses { return @('192.0.2.99') }
     Update-NodeAddress $context | Out-Null
     if ($context.Settings.LNIS_NODE_BASE_URL -ne 'http://192.0.2.99:18088' -or
@@ -264,16 +265,15 @@ try {
     $network.listenAddress='0.0.0.0';$network.loopback='::1'
     Assert-Throws { Set-NodeNetwork $network }
     $script:rules='192.0.2.10 18088 127.0.0.1 18088'
-    Assert-Throws { Set-NodeNetwork $network -ReplaceStaleProxy }
     $script:rules=@('10.213.14.53 18088 127.0.0.1 18088','10.213.14.53 18091 127.0.0.1 18091')
     Assert-Throws { Set-NodeNetwork $network }
     $script:networkCalls=@();$script:failAdd=$true
-    Assert-Throws { Set-NodeNetwork $network -ReplaceStaleProxy }
+    Assert-Throws { Set-NodeNetwork $network -ReplacePortProxy }
     if (($script:networkCalls | Select-Object -Last 1) -notmatch 'add v4tov4.*listenaddress=10.213.14.53.*listenport=18088.*connectaddress=127.0.0.1') {
         throw 'Failed installation did not restore the stale proxy.'
     }
     $script:networkCalls=@()
-    Set-NodeNetwork $network -ReplaceStaleProxy
+    Set-NodeNetwork $network -ReplacePortProxy
     $deletes=@($script:networkCalls | Where-Object { $_ -match ' delete ' })
     if ($deletes.Count -ne 1 -or $deletes[0] -notmatch 'delete v4tov4.*listenaddress=10.213.14.53.*listenport=18088') {
         throw 'Installer must replace only the stale proxy on the selected port.'
@@ -281,6 +281,14 @@ try {
     if (!($script:networkCalls|Where-Object { $_ -match 'add v4tov6.*listenaddress=0.0.0.0.*connectport=18088' })) {
         throw 'IP-independent listener was not configured.'
     }
+    $script:rules='192.0.2.10 18088 172.24.182.165 18081'
+    $script:failAdd=$true
+    $script:networkCalls=@()
+    Assert-Throws { Set-NodeNetwork $network -ReplacePortProxy }
+    if (($script:networkCalls | Select-Object -Last 1) -notmatch 'add v4tov4.*listenaddress=192.0.2.10.*connectaddress=172.24.182.165.*connectport=18081') {
+        throw 'Selected proxy replacement lost the original forwarding target during rollback.'
+    }
+    $script:rules=''
     Write-Host 'PASS: matching Windows/WSL port, stable loopback proxy and foreign-rule isolation'
 
     $script:hostConfig='{"services":{"node":{"network_mode":"host","environment":{}}}}'

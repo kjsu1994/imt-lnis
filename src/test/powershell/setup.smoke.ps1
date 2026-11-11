@@ -36,9 +36,9 @@ try {
     $listener.Start()
     $testPort = [string]$listener.LocalEndpoint.Port
     $listener.Stop()
-    function Write-TestRequest([string]$Role='sender',[string]$Port=$testPort) {
+    function Write-TestRequest([string]$Role='sender',[string]$Port=$testPort,[string]$ReplaceProxy='0') {
         [IO.File]::WriteAllLines($request,@(
-            '[setup]',"destination=$destination",'[env]',"LNIS_NODE_ROLE=$Role","LNIS_SERVER_PORT=$Port",
+            '[setup]',"destination=$destination","replacePortProxy=$ReplaceProxy",'[env]',"LNIS_NODE_ROLE=$Role","LNIS_SERVER_PORT=$Port",
             ('LNIS_NODE_BASE_URL=http://192.0.2.10:'+$Port),'LNIS_NODE_PEER_URL=','dtn_adapter=',
             "LNIS_NODE_MANAGEMENT_TOKEN=$management",'LNIS_DTN_SEND_TOKEN=',"LNIS_DTN_RECEIVE_TOKEN=$receiveToken",
             ('LNIS_IQ_HOST_PATH='+(Join-Path $destination 'data\exchange'))
@@ -49,6 +49,24 @@ try {
     $values = Read-NodeEnvironment $config
     if ($values.LNIS_IQ_ENABLED -ine 'true') { throw 'A new sender must keep I/Q generation enabled by default.' }
     if ($values.LNIS_NODE_PEER_URL -ne '' -or $values.dtn_adapter -ne '' -or $values.LNIS_SERVER_PORT -ne $testPort) { throw 'Blank remote addresses/custom port not preserved.' }
+    $savedProxyLookup = ${function:Get-NodePortProxyRules}
+    $script:proxyFixture = @([pscustomobject]@{listenAddress='10.213.14.53';port=[int]$testPort})
+    function Get-NodePortProxyRules { param([int]$Port) return $script:proxyFixture }
+    Write-TestRequest
+    Assert-Throws { Prepare-SetupConfiguration $request $config }
+    Write-TestRequest sender $testPort 1
+    Prepare-SetupConfiguration $request $config
+    $listener.Start()
+    try {
+        $busyPort = [string]$listener.LocalEndpoint.Port
+        $script:proxyFixture = @()
+        Write-TestRequest sender $busyPort 1
+        Assert-Throws { Prepare-SetupConfiguration $request $config }
+    } finally { $listener.Stop() }
+    Set-Item Function:\Get-NodePortProxyRules $savedProxyLookup
+    Write-TestRequest
+    Prepare-SetupConfiguration $request $config
+    Write-Host 'PASS: wizard requires proxy replacement consent and still rejects an application listener'
     $pending = Get-SetupPendingPath
     if ((Get-Content -LiteralPath $pending -Raw).Contains($management)) { throw 'Pending configuration exposed plaintext credentials.' }
     $resumed = Read-SetupPending

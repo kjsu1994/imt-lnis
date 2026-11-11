@@ -118,7 +118,15 @@ function Prepare-SetupConfiguration([string]$InputFile, [string]$Output) {
         if ((Read-NodeEnvironment $existing).LNIS_NODE_ROLE -ne $values.LNIS_NODE_ROLE) {
             throw '기존 설치의 송신·수신 역할은 변경할 수 없습니다. 다른 설치 경로를 선택하세요.'
         }
-    } elseif ([Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties().GetActiveTcpListeners().Port -contains [int]$values.LNIS_SERVER_PORT) {
+    }
+    $port = [int]$values.LNIS_SERVER_PORT
+    $proxy = @(Get-NodePortProxyRules $port)
+    $replace = (Read-SetupIni $InputFile 'setup' 'replacePortProxy') -eq '1'
+    if ($proxy.Count -and !$replace -and !$layout.Existing) {
+        throw '선택한 포트의 전달 규칙이 남아 있습니다. 설정 확인 화면에서 기존 전달 규칙 정리를 선택하거나 포트를 변경하세요.'
+    }
+    if (!$layout.Existing -and !$proxy.Count -and
+            ([Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties().GetActiveTcpListeners().Port -contains $port)) {
         throw '선택한 서비스 포트를 다른 프로그램이 사용 중입니다. 포트를 변경하세요.'
     }
     $template = Join-Path (Split-Path $PSScriptRoot) 'app\.env.example'
