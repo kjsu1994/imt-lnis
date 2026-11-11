@@ -46,6 +46,7 @@ services:
       LNIS_DTN_SEND_TOKEN: ${LNIS_DTN_SEND_TOKEN-imt123}
       LNIS_DTN_RECEIVE_TOKEN: ${LNIS_DTN_RECEIVE_TOKEN-imt123}
     volumes:
+      - ./lnis.jar:/app/lnis.jar:ro
       - ${LNIS_STATE_DIR:-.}/DB:/app/data
       - ${LNIS_STATE_DIR:-.}/exchange:/exchange
     tmpfs:

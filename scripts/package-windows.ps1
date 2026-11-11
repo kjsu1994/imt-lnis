@@ -123,6 +123,7 @@ RUN useradd -m -s /bin/bash lnis && usermod -aG docker lnis && printf 'lnis ALL=
     if ($LASTEXITCODE -ne 0) { throw 'COM 중계용 Java 실행 환경 생성 실패' }
 
     $jar = Join-Path $repo 'build\libs\lnis.jar'
+    Copy-Item -LiteralPath $jar -Destination (Join-Path $app 'lnis.jar')
     $image = 'lnis-node:1.0.0-' + (Get-FileHash -LiteralPath $jar).Hash.Substring(0,12).ToLowerInvariant()
     $build = Join-Path $dockerStage 'service-build'
     New-Item -ItemType Directory -Path $build -Force | Out-Null
@@ -144,7 +145,7 @@ RUN useradd -m -s /bin/bash lnis && usermod -aG docker lnis && printf 'lnis ALL=
     }
     $imageConfigId = 'sha256:' + $Matches[1]
     $info = [ordered]@{
-        version='1.0.0'; image=$image; imageId=$imageId.Trim(); imageConfigId=$imageConfigId
+        version='1.0.0'; jarSha256=(Get-FileHash -LiteralPath $jar).Hash; image=$image; imageId=$imageId.Trim(); imageConfigId=$imageConfigId
         wslVersion=$metadata.wslVersion; dockerVersion=$metadata.dockerVersion; composeVersion=$metadata.composeVersion
         createdAt=[DateTime]::UtcNow.ToString('o')
     }

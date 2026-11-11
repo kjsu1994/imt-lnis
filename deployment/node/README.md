@@ -69,3 +69,9 @@ Linux x86-64 PC에서는 linuxNodeDistZip 묶음을 사용합니다. .env.exampl
 라이선스와 native-sources.zip은 배포에 포함됩니다. 외부 오픈소스 폴더는 실행에 필요하지 않으며, 네이티브 재빌드 자료는 별도로 보존합니다.
 
 기존 Linux에서 docker ps로 컨테이너를 확인하고 docker logs -f 컨테이너명으로 로그를 조회합니다. 설치마다 별도 Compose 프로젝트를 사용하므로 START/STOP은 해당 설치의 컨테이너만 제어합니다. 기존 Linux에는 Docker Engine과 Compose가 준비되어 있어야 합니다.
+
+## JAR 파일 교체 업데이트
+
+이 방식을 지원하는 Setup.exe로 설치한 PC에서는 STOP.cmd로 서비스를 종료하고 설치 폴더의 lnis.jar를 새 build/libs/lnis.jar로 교체한 뒤 START.cmd 또는 바탕화면 바로가기를 실행합니다. 변경된 파일을 감지해 컨테이너를 재생성합니다. 파일이 같으면 기존 실행을 유지합니다. DB·입력·I/Q·연결 설정은 설치 폴더에 유지됩니다.
+
+네이티브 라이브러리·Java 실행 환경·설치 스크립트·Compose 변경은 새 Setup.exe로 적용합니다. 이전 이미지 전용 설치본은 지원 버전 Setup.exe로 한 번 업데이트해야 합니다.

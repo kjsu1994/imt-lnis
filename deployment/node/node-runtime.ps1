@@ -155,7 +155,7 @@ function Enter-NodeLock($Context) {
 }
 
 function Get-NodeReady($Context) {
-    foreach ($hostName in @('127.0.0.1', '[::1]')) {
+    foreach ($hostName in @('[::1]', '127.0.0.1')) {
         $url = 'http://' + $hostName + ':' + $Context.Port
         try {
             $node = Invoke-RestMethod "$url/lnis/api/v1/node" -TimeoutSec 2

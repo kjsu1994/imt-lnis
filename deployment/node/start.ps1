@@ -32,11 +32,38 @@ try {
         $imageId = (Invoke-NodeWsl $context @('docker','image','inspect','--format','{{.Id}}',$release.image)) -join ''
         if ($imageId.Trim() -ne $release.imageId -and (!$release.imageConfigId -or $imageId.Trim() -ne $release.imageConfigId)) { throw '설치된 서비스 이미지가 배포본과 다릅니다. INSTALL.cmd를 다시 실행하세요.' }
     }
+    $jarHash = $null
+    $jarChanged = $false
+    if ($context.Installed -and $release.jarSha256) {
+        $jar = Join-Path $context.App 'lnis.jar'
+        if (!(Test-Path -LiteralPath $jar -PathType Leaf)) { throw '설치 폴더의 lnis.jar 파일을 확인하세요.' }
+        $jarHash = (Get-FileHash -LiteralPath $jar -Algorithm SHA256).Hash
+        $jarChanged = $release.appliedJarSha256 -ne $jarHash
+        if ($jarChanged) {
+            Add-Type -AssemblyName System.IO.Compression.FileSystem
+            $archive = [IO.Compression.ZipFile]::OpenRead($jar)
+            try {
+                if (!$archive.GetEntry('META-INF/MANIFEST.MF') -or
+                    !$archive.GetEntry('BOOT-INF/classes/server/LnisApplication.class')) {
+                    throw '서비스 실행용 lnis.jar 파일이 아닙니다.'
+                }
+            } finally { $archive.Dispose() }
+            $runningUrl = Get-NodeReady $context
+            if ($runningUrl) { Assert-NodeIdle $context $runningUrl }
+            Write-Host '변경된 lnis.jar를 적용합니다.'
+        }
+    }
     $compose = Get-NodeCompose $context
     Assert-NodePortMapping $context
     # Compose reuses unchanged containers and applies edited env values without a rebuild.
-    Invoke-NodeWsl $context (@('docker') + $compose + @('up','-d','--no-build','--pull','never')) | Out-Host
+    $up = @('up','-d','--no-build','--pull','never')
+    if ($jarChanged) { $up += '--force-recreate' }
+    Invoke-NodeWsl $context (@('docker') + $compose + $up) | Out-Host
     $url = Wait-NodeReady $context
+    if ($jarChanged) {
+        $release | Add-Member -NotePropertyName appliedJarSha256 -NotePropertyValue $jarHash -Force
+        $release | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $context.App 'release.json') -Encoding UTF8
+    }
     $browserUrl = $context.Settings.LNIS_NODE_BASE_URL
     if (!$browserUrl) { $browserUrl = $url }
     Write-Host ("서비스 실행 완료: " + $context.Settings.LNIS_NODE_ROLE + " / $browserUrl")
