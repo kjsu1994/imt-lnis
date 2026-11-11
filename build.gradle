@@ -258,7 +258,7 @@ tasks.register('windowsSerialBridgeDist', Sync) {
     }) { into 'lib' }
 }
 // Service guide is the source; publishing only changes links for the static site.
-def introAssets = ['transfer-mark.svg', 'imt_logo.png', 'system_logo.png']
+def introAssets = ['transfer-mark.svg', 'Kari_logo.png', 'system_logo.png']
 def introForDocs = {
     def html = file('src/main/resources/static/dtn-intro.html').getText('UTF-8')
     introAssets.each { name ->
