@@ -14,12 +14,18 @@ try {
     Wait-NodeDocker $context
     if ($context.Installed) { Update-NodeAddress $context | Out-Null }
     $gnssReady = $true
-    try {
-        & (Join-Path $context.App 'start-serial-bridge.ps1') -Distribution $context.Distribution -DataDirectory $context.Data
-    } catch {
-        if ($_.Exception.Message -match '\[GNSS_(BUSY|CONFIG)\]') { throw }
-        $gnssReady = $false
-        Write-Warning "GNSS 연결 기능 사용 불가: $($_.Exception.Message)"
+    if ($context.Settings.LNIS_NODE_ROLE -eq 'sender') {
+        try {
+            & (Join-Path $context.App 'start-serial-bridge.ps1') -Distribution $context.Distribution -DataDirectory $context.Data
+        } catch {
+            if ($_.Exception.Message -match '\[GNSS_(BUSY|CONFIG)\]') { throw }
+            $gnssReady = $false
+            Write-Warning "GNSS 연결 기능 사용 불가: $($_.Exception.Message)"
+        }
+    } else {
+        # 기존 Compose의 env_file 경로는 유지하되 수신부 중계 연결은 비운다.
+        [IO.File]::WriteAllText((Join-Path $context.Data '.serial-bridge.env'),
+            "LNIS_SERIAL_BRIDGE_URL=`nLNIS_SERIAL_BRIDGE_TOKEN=`n", [Text.UTF8Encoding]::new($false))
     }
     if ($context.Installed) {
         $release = Get-Content -Raw -LiteralPath (Join-Path $context.App 'release.json') -Encoding UTF8 | ConvertFrom-Json

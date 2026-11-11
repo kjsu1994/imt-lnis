@@ -251,7 +251,7 @@ foreach ($directory in $TargetDirectories) {
     }
     $previousImage = Invoke-Docker $linux @('inspect', '--format', '{{.Image}}', $id)
     $targets += [pscustomobject]@{ Path=$path; Linux=$linux; Image=$node.image; PreviousImage=$previousImage;
-        Compose=$compose; Bridge=[bool]$node.environment.LNIS_SERIAL_BRIDGE_URL;
+        Compose=$compose; Bridge=($node.environment.LNIS_NODE_ROLE -eq "sender" -and [bool]$node.environment.LNIS_SERIAL_BRIDGE_URL);
         Url=([string]$node.environment.LNIS_NODE_BASE_URL).TrimEnd('/'); GnssConnected=$false;
         Role=$node.environment.LNIS_NODE_ROLE; Backup=(Join-Path $path "backups\$timestamp") }
     Write-Host "Validated $($node.environment.LNIS_NODE_ROLE): $path"
@@ -342,6 +342,10 @@ foreach ($target in $targets) {
             & (Join-Path $target.Path 'stop-serial-bridge.ps1')
             Install-Bridge $bridgeSource (Join-Path $target.Path 'serial-bridge') $target.Path
             & (Join-Path $target.Path 'start-serial-bridge.ps1')
+        }
+        if ($target.Role -eq 'receiver') {
+            [IO.File]::WriteAllText((Join-Path $target.Path '.serial-bridge.env'),
+                "LNIS_SERIAL_BRIDGE_URL=`nLNIS_SERIAL_BRIDGE_TOKEN=`n", [Text.UTF8Encoding]::new($false))
         }
         Invoke-Docker $target.Linux ($target.Compose + @('up', '-d', '--no-build', '--no-deps', 'node')) | Out-Host
         Wait-Healthy $target

@@ -331,7 +331,7 @@ function Get-NodeAddresses {
     return @($preferred.ToArray()) + @($other.ToArray() | Where-Object { !$preferred.Contains($_) })
 }
 
-function Set-NodeNetwork($Config) {
+function Set-NodeNetwork($Config, [switch]$ReplaceStaleProxy) {
     $address = $null
     if (![Net.IPAddress]::TryParse($Config.listenAddress,[ref]$address) -or
         $address.AddressFamily -ne [Net.Sockets.AddressFamily]::InterNetwork -or
@@ -346,6 +346,24 @@ function Set-NodeNetwork($Config) {
     $record = $Config.record
     $owned = if (Test-Path -LiteralPath $record) { Get-Content -Raw -LiteralPath $record -Encoding UTF8 | ConvertFrom-Json } else { $null }
     $rules = @(& netsh.exe interface portproxy show all)
+    if ($LASTEXITCODE -ne 0) { throw 'Windows 포트 전달 규칙을 조회하지 못했습니다.' }
+    $stale = @()
+    if ($ReplaceStaleProxy -and $Config.listenAddress -eq '0.0.0.0') {
+        $assigned = @(Get-NetIPAddress -AddressFamily IPv4 -ErrorAction Stop | Select-Object -ExpandProperty IPAddress)
+        foreach ($line in $rules) {
+            if ($line -notmatch '^\s*(\d{1,3}(?:\.\d{1,3}){3})\s+(\d+)\s+(127\.0\.0\.1|::1)\s+(\d+)\s*$') { continue }
+            $ip = $Matches[1]
+            $target = $Matches[3]
+            if ([int]$Matches[2] -ne $port -or [int]$Matches[4] -ne $port -or
+                    $ip -eq '0.0.0.0' -or $ip.StartsWith('127.') -or $assigned -contains $ip -or
+                    ($owned -and $owned.listenAddress -eq $ip -and [int]$owned.port -eq $port)) { continue }
+            $stale += [pscustomobject]@{
+                line=$line; listenAddress=$ip; port=$port; loopback=$target
+                mode=$(if ($target -eq '::1') { 'v4tov6' } else { 'v4tov4' })
+            }
+        }
+        $rules = @($rules | Where-Object { $_ -notin $stale.line })
+    }
     $existing = @($rules | Where-Object { $_ -match ('^\s*' + [regex]::Escape($Config.listenAddress) + '\s+' + $port + '\s+') })
     if ($existing.Count -and (!$owned -or $owned.listenAddress -ne $Config.listenAddress -or [int]$owned.port -ne $port)) {
         throw '같은 주소·포트의 기존 전달 규칙이 있습니다. 설치 담당자가 확인해야 합니다.'
@@ -367,10 +385,15 @@ function Set-NodeNetwork($Config) {
     Set-Service iphlpsvc -StartupType Automatic
     Start-Service iphlpsvc
     $added = $false
+    $removed = @()
     try {
-        if ($oldRule.Count) {
-            & netsh.exe interface portproxy delete $owned.mode "listenaddress=$($owned.listenAddress)" "listenport=$($owned.port)" | Out-Null
+        $replace = @($stale)
+        if ($oldRule.Count) { $replace += $owned }
+        foreach ($rule in $replace) {
+            & netsh.exe interface portproxy delete $rule.mode "listenaddress=$($rule.listenAddress)" "listenport=$($rule.port)" | Out-Null
             if ($LASTEXITCODE -ne 0) { throw '기존 전달 규칙을 갱신하지 못했습니다.' }
+            $removed += $rule
+            if ($rule.line) { Write-Host ("이전 PC 주소의 전달 규칙 정리: " + $rule.listenAddress + ":" + $rule.port) }
         }
         & netsh.exe interface portproxy add $mode "listenaddress=$($Config.listenAddress)" "listenport=$port" "connectaddress=$($Config.loopback)" "connectport=$port" | Out-Null
         if ($LASTEXITCODE -ne 0) { throw 'Windows → WSL 포트 전달 설정에 실패했습니다.' }
@@ -392,8 +415,8 @@ function Set-NodeNetwork($Config) {
         if ($added) {
             & netsh.exe interface portproxy delete $mode "listenaddress=$($Config.listenAddress)" "listenport=$port" | Out-Null
         }
-        if ($oldRule.Count) {
-            & netsh.exe interface portproxy add $owned.mode "listenaddress=$($owned.listenAddress)" "listenport=$($owned.port)" "connectaddress=$($owned.loopback)" "connectport=$($owned.port)" | Out-Null
+        foreach ($rule in $removed) {
+            & netsh.exe interface portproxy add $rule.mode "listenaddress=$($rule.listenAddress)" "listenport=$($rule.port)" "connectaddress=$($rule.loopback)" "connectport=$($rule.port)" | Out-Null
             if ($LASTEXITCODE -ne 0) { Write-Warning '이전 포트 전달 규칙 복원에 실패했습니다. 설치 로그를 확인하세요.' }
         }
         throw $failure

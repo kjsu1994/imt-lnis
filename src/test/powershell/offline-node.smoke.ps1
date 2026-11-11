@@ -157,7 +157,7 @@ try {
         param($Uri,$TimeoutSec)
         if ($Uri.StartsWith('http://127.0.0.1:')) { throw 'IPv4 unavailable' }
         if ($Uri.EndsWith('/readiness')) { return @{status='UP'} }
-        return @{online=$true;role='SENDER'}
+        return @{online=$true;role=$context.Settings.LNIS_NODE_ROLE}
     }
     if ((Get-NodeReady $context) -ne 'http://[::1]:18088') { throw 'IPv6 localhost fallback failed.' }
     Write-Host 'PASS: readiness verifies health and role with IPv6 fallback'
@@ -228,7 +228,7 @@ try {
     Write-Host 'PASS: current IP refresh, preserved service port, unchanged-IP no-op and active-work protection'
 
     $script:networkCalls=@();$script:foreignRule=$false
-    function Get-NetIPAddress { param($AddressFamily) return @{IPAddress='192.0.2.10'} }
+    function Get-NetIPAddress { param($AddressFamily) return [pscustomobject]@{IPAddress='192.0.2.10'} }
     function netsh.exe {
         $script:networkCalls+=($args -join ' ');$global:LASTEXITCODE=0
         if ($args -contains 'show' -and $script:foreignRule) { return '192.0.2.10 18088 172.20.0.2 18088' }
@@ -263,8 +263,21 @@ try {
     $network.loopback='172.20.0.2';Assert-Throws { Set-NodeNetwork $network }
     $network.listenAddress='0.0.0.0';$network.loopback='::1'
     Assert-Throws { Set-NodeNetwork $network }
-    $script:rules=''
-    Set-NodeNetwork $network
+    $script:rules='192.0.2.10 18088 127.0.0.1 18088'
+    Assert-Throws { Set-NodeNetwork $network -ReplaceStaleProxy }
+    $script:rules=@('10.213.14.53 18088 127.0.0.1 18088','10.213.14.53 18091 127.0.0.1 18091')
+    Assert-Throws { Set-NodeNetwork $network }
+    $script:networkCalls=@();$script:failAdd=$true
+    Assert-Throws { Set-NodeNetwork $network -ReplaceStaleProxy }
+    if (($script:networkCalls | Select-Object -Last 1) -notmatch 'add v4tov4.*listenaddress=10.213.14.53.*listenport=18088.*connectaddress=127.0.0.1') {
+        throw 'Failed installation did not restore the stale proxy.'
+    }
+    $script:networkCalls=@()
+    Set-NodeNetwork $network -ReplaceStaleProxy
+    $deletes=@($script:networkCalls | Where-Object { $_ -match ' delete ' })
+    if ($deletes.Count -ne 1 -or $deletes[0] -notmatch 'delete v4tov4.*listenaddress=10.213.14.53.*listenport=18088') {
+        throw 'Installer must replace only the stale proxy on the selected port.'
+    }
     if (!($script:networkCalls|Where-Object { $_ -match 'add v4tov6.*listenaddress=0.0.0.0.*connectport=18088' })) {
         throw 'IP-independent listener was not configured.'
     }
@@ -312,6 +325,16 @@ try {
     if ($script:started -ne 1) { throw 'START twice created extra WSL processes.' }
     $ups=@($script:commands|Where-Object { $_ -match ' up ' })
     if ($ups.Count -ne 2 -or ($ups|Where-Object { $_ -notmatch '--no-build --pull never' })) { throw 'START must reconcile env without build/pull.' }
+    Set-Content (Join-Path $app 'start-serial-bridge.ps1') 'throw "[GNSS_CONFIG] Receiver must not start COM"'
+    $context.Settings.LNIS_NODE_ROLE='receiver'
+    & ([ScriptBlock]::Create($source)) -NoBrowser
+    $receiverBridge=Read-NodeEnvironment (Join-Path $context.Data '.serial-bridge.env')
+    if ($receiverBridge.LNIS_SERIAL_BRIDGE_URL -or $receiverBridge.LNIS_SERIAL_BRIDGE_TOKEN) {
+        throw 'Receiver retained a COM bridge connection.'
+    }
+    $context.Settings.LNIS_NODE_ROLE='sender'
+    Set-Content (Join-Path $app 'start-serial-bridge.ps1') 'param($Distribution,$DataDirectory)'
+    Write-Host 'PASS: receiver START skips COM bridge and clears legacy bridge connection'
     $source=(Get-Content -Raw -LiteralPath (Join-Path $repo 'deployment\node\stop.ps1') -Encoding UTF8).
         Replace(". (Join-Path "+'$PSScriptRoot'+" 'node-runtime.ps1')",'').
         Replace('$context = Get-NodeContext $PSScriptRoot','$context = $script:testContext')

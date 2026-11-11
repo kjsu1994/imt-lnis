@@ -5,6 +5,7 @@ param(
     [string]$Configuration,
     [switch]$SystemSetup,
     [string]$NetworkSetup,
+    [switch]$ReplaceStaleProxy,
     [switch]$NoBrowser,
     [string]$LogFile
 )
@@ -202,7 +203,7 @@ if ($NetworkSetup) {
     try {
         if (!$LogFile) { Start-Transcript -Path (Join-Path $script:bundle 'installer\install.log') -Append -Force | Out-Null }
         Set-InstallStage '[6/7] Windows·WSL 접속 포트 적용'
-        Set-NodeNetwork (Get-Content -Raw -LiteralPath $NetworkSetup -Encoding UTF8 | ConvertFrom-Json)
+        Set-NodeNetwork (Get-Content -Raw -LiteralPath $NetworkSetup -Encoding UTF8 | ConvertFrom-Json) -ReplaceStaleProxy:$ReplaceStaleProxy
         exit 0
     } catch { throw }
 }
@@ -376,7 +377,7 @@ try {
     $networkFile = Join-Path $work 'network-install.json'
     $network | ConvertTo-Json | Set-Content -LiteralPath $networkFile -Encoding UTF8
     Set-InstallStage '[6/7] Windows·WSL 접속 포트 적용'
-    Invoke-InstallerAdmin @('-NetworkSetup',('"' + $networkFile + '"'))
+    Invoke-InstallerAdmin @('-NetworkSetup',('"' + $networkFile + '"'),'-ReplaceStaleProxy')
     $public = Invoke-RestMethod ($values.LNIS_NODE_BASE_URL + '/lnis/api/v1/node') -TimeoutSec 5
     if (!$public.online -or $public.role -ine $values.LNIS_NODE_ROLE) { throw 'Windows PC 주소와 WSL 서비스 연결을 확인하지 못했습니다.' }
     Set-InstallStage '[7/7] 바탕화면 바로가기 생성'
