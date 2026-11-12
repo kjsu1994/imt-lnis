@@ -8,7 +8,7 @@ const root = resolve(__dirname, '../../../build/resources/main/static');
 const config = {maxNumberOfBundlesInPipeline:50,maxSumOfBundleBytesInPipeline:50000000,maxBundleSizeBytes:10485760,
   tcpclMaxSegmentSizeBytes:20000,neighborDepletedStorageDelaySeconds:10,enforceBundlePriority:false,
   storageDeletionPolicy:'DELETE_AFTER_FORWARDING',totalStorageCapacityBytes:8589934592,maxLtpReceiveUdpPacketSizeBytes:65536,acsSendPeriodMilliseconds:1000};
-let browser, bulkRequests=0;
+let browser, bulkRequests=0, clockSyncs=0, clockCorrected=false;
 let rows=[], id=0, job=null, starts=0, reportFixture={referencePvt:[],receivedPvt:[]};
 let managementRole = 'sender', policySaves = 0, managementDeletes = 0, proposedPolicies;
 let retentionSettings = {tests:{enabled:false,days:7},receipts:{enabled:false,days:7},files:{enabled:false,days:30}};
@@ -82,7 +82,11 @@ const server=createServer((req,res)=>{
    if(path.endsWith('/cancel-waiting')){assert.equal(data.asOf,'2026-10-01T00:00:00Z');assert.deepEqual(data.testIds,['waiting-a','waiting-b','waiting-c']);bulkRequests++;return json({requested:3,cancelled:2,skipped:1,pending:0});}
    if(path.endsWith('/node/gnss/ports')||path.endsWith('/captures/pending'))return json([]);
    if(path.endsWith('/node/gnss'))return json({state:'DISCONNECTED',timeState:'UNAVAILABLE'});
-   if(path.endsWith('/node/clock'))return json({busy:false,clock:{trialAt:new Date().toISOString(),rawAt:new Date().toISOString(),source:'SYSTEM',offsetSeconds:0,ageSeconds:0,clockChanges:0}});
+   if(path.endsWith('/node/clock/sync')){clockSyncs++;clockCorrected=true;return json({});}
+   if(path.endsWith('/node/clock'))return json({clock:{trialAt:new Date().toISOString(),rawAt:new Date().toISOString(),
+     source:clockCorrected?'TCP_PEER':'SYSTEM',calibratedAt:clockCorrected?new Date().toISOString():null,
+     offsetSeconds:clockCorrected?.005:0,roundTripSeconds:.002,ageSeconds:0,clockChanges:0}});
+
    if(path.endsWith('/config'))return json({delaySupported:true,iqEnabled:false,defaultSendUrl:'http://adapter:8080',adapterUrl:'http://adapter:8080'});
    if(path.endsWith('/agents'))return json([{agentId:'sender-1',role:'SENDER',state:'READY'},{agentId:'receiver-1',role:'RECEIVER',state:'READY'}]);
    if(path.endsWith('/node/connection'))return json({ip:'127.0.0.1',port:8091,editable:true,peerOnline:true});
@@ -216,7 +220,18 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
  for(const route of ['/sender','/receiver']){
   await page.goto(base+route);
   await page.waitForFunction(() => document.getElementById('service-clock-value').textContent !== '—');
-  assert.equal(await page.locator('#service-clock-sync, #service-clock-state, #service-clock-detail, #dtn-clock-skew-warning').count(), 0);
+  assert.equal(await page.locator('#service-clock-sync').count(), 1);
+  const priorSyncs = clockSyncs, priorStarts = starts;
+  await page.locator('#service-clock-sync').click();
+  await page.waitForFunction(()=>!document.getElementById('service-clock-sync').disabled);
+  assert.equal(clockSyncs,priorSyncs+1);
+  assert.equal(starts,priorStarts);
+  await page.locator('.clock-details summary').click();
+  assert.match(await page.locator('#service-clock-detail').innerText(),/5.000 ms/);
+  await page.locator('.clock-details summary').click();
+  await page.locator('.status-strip').screenshot({path:'build/tcp-clock-'+route.slice(1)+'.png'});
+
+  assert.equal(await page.locator('#dtn-clock-skew-warning').count(), 0);
   assert.match(await page.locator('#service-clock-value').innerText(), /\d{2}:\d{2}:\d{2}$/);
   assert.equal((await page.locator('#service-clock-value').innerText()).includes('미보정'), false);
   if (route === '/receiver') assert.equal(await page.locator('#gnss-port, #gnss-connect').count(), 0);

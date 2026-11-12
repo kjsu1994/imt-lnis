@@ -58,7 +58,7 @@ I/Q 파일 생성 후 대기와 수신 후 복호시간은 지연에 합산하�
 새 보고서의 `comparisonBasis`는 `RF_BASELINE`이며 `rfBaselinePvt`가 지연 미적용 RF 해입니다. `referencePvt`는 송신 원본, `receivedPvt`는 지연 반영 RF 해로 유지합니다. RF 기준 해는 `fileResult.rfBaselinePvt`에도 보관되어 서비스 간 결과 조회에 포함됩니다.
 화면의 `data-integrity`는 `fileResult.verdict`와 `comparison.verdict`를 구분해 함께 표시합니다. 파일 크기·SHA-256 불일치는 `fileResult.verdict=FAIL`로 기록하며, 복호 실패만으로 파일 불일치를 판정하지 않습니다. 지연 시험의 `MEASURED`는 PVT 차이 측정 완료이며 원본과 같은 값이라는 뜻은 아닙니다.
 생성 후 전체 해시 계산 중에는 I/Q 상태가 GENERATING이며 phase=VERIFYING과 verificationBytes·verificationTotalBytes·verificationElapsedMillis를 제공합니다.
-시험 시각은 보정 없이 서비스 시스템 시각을 사용합니다. 지연에는 송수신 PC의 시계 차이가 포함되며, 음수 지연은 비교 불가로 처리합니다.
+시험 시각은 기본적으로 서비스 시스템 시각을 사용하며, TCP 보정을 적용하면 수신측 시각을 송신 기준으로 환산합니다. 지연에는 송수신 PC의 시계 차이가 포함되며, 음수 지연은 비교 불가로 처리합니다.
 
 ## 서비스 간 시험 등록 정보
 
@@ -142,4 +142,15 @@ availability는 AVAILABLE / WAITING / FAILED / CANCELLED / UNAVAILABLE / REFEREN
 묶음이 없는 이전 시험과 I/Q는 historyKey=null, 빈 trials를 반환합니다. 과거 시험을 자동으로 묶지 않습니다. 기존 testId 등록의 묶음 값을 변경하면 HTTP 409이며, 신규 등록의 잘못된 형식·유형은 HTTP 400입니다. 같은 입력·Epoch·유형으로 돌아오면 기존 묶음을 복원합니다. 자료 삭제·보관 정리 후에는 남은 이력만 반환합니다.
 
 ### 시스템 시각 조회
-GET /lnis/api/v1/node/clock은 화면 표시용 시스템 시각을 반환합니다. GNSS·NTP 보정 및 상대 시계 예약 API는 제공하지 않습니다. 날짜·시각은 화면에서 초 단위로 표시하며 JSON·프레임·계산 정밀도는 유지합니다.
+GET /lnis/api/v1/node/clock은 화면 표시용 시스템 시각을 반환합니다. GNSS·NTP 보정은 사용하지 않습니다. 날짜·시각은 화면에서 초 단위로 표시하며 JSON·프레임·계산 정밀도는 유지합니다.
+
+### TCP 시험 시각 보정
+- POST /lnis/api/v1/node/clock/sync — 송신 화면에서는 수신 서비스에 보정을 요청하며, 수신 서비스가 송신 시스템 시각과의 차이를 측정합니다.
+- GET /lnis/api/v1/node/peer/clock — 인증된 상대 요청에 수신·응답 시각과 시각 기준을 반환합니다.
+- POST /lnis/api/v1/node/peer/clock/sync — 인증된 송신 요청으로 수신측 보정을 수행합니다.
+- GET /lnis/api/v1/node/clock — clock은 로컬 상태, receiverClock은 송신측이 마지막 보정 요청에서 확인한 수신 상태입니다.
+7회 이내 측정 중 왕복 시간이 가장 짧은 값을 사용합니다. 보정은 Windows 시계에 적용하지 않습니다.
+시험 등록 시 수신측 보정값을 고정하고 본문 수신 완료 시각에 적용합니다. 보정 이후 재등록이나 재보정으로 기존 시험의 고정값을 덮어쓰지 않습니다.
+receiverClock에는 원시 수신 시각 rawAt, 계산용 시각 trialAt, 보정량 offsetSeconds, 측정 왕복 roundTripSeconds가 기록됩니다.
+재시작·PC 시각 변경으로 고정된 TCP 기준이 무효화되면 원문은 보존하고 비교 불가로 처리합니다.
+지연의 절댓값이 측정 왕복 시간의 절반 이내이면 clockWarning에 시각 오차 범위를 안내합니다. 이 범위는 경로 대칭성을 가정한 참고값이며 정확도 보증이 아닙니다.

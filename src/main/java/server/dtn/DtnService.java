@@ -665,12 +665,20 @@ public class DtnService {
             }
         } else if (job.getReceiverClockJson() == null && job.getReceivedAt() != null) {
             job.setReceiverClockJson(value);
+            if ("TCP_INVALID".equals(stamp.source())) {
+                String message = "시험 시각 기준 변경 · 수신 서비스 재시작 또는 PC 시각 변경으로 비교할 수 없습니다.";
+                job.setClockWarning(message);
+                job.setComparisonJson("{\"verdict\":\"INCONCLUSIVE\"}");
+                update(job, "INCONCLUSIVE", message);
+                return;
+            }
             String before = job.getReceiverRegistrationClockJson();
             for (String recorded : new String[]{before, job.getSenderClockJson()}) {
                 if (recorded == null) continue;
                 try {
                     var previous = objectMapper.readValue(recorded, server.common.ServiceClock.Stamp.class);
-                    if (!"SYSTEM".equals(previous.source()) || previous.offsetSeconds() != 0) {
+                    if (!"TCP_PEER".equals(previous.source())
+                            && (!"SYSTEM".equals(previous.source()) || previous.offsetSeconds() != 0)) {
                         String message = "시각 기준 변경 · 이전 보정 시각으로 시작한 시험은 새로 실행하세요.";
                         job.setClockWarning(message);
                         job.setComparisonJson(objectMapper.writeValueAsString(
@@ -693,6 +701,18 @@ public class DtnService {
                     job.setClockWarning("등록 시각의 기록을 확인할 수 없습니다.");
                 }
             }
+        }
+        if (!sender && "TCP_PEER".equals(stamp.source())) {
+            double bound = stamp.roundTripSeconds() == null ? 0 : stamp.roundTripSeconds() / 2;
+            double delay = job.getTestStartedAt() == null || job.getReceivedAt() == null
+                    ? Double.NaN : server.common.ServiceClock.seconds(job.getTestStartedAt(), job.getReceivedAt());
+            if (Math.abs(delay) <= bound && job.getClockWarning() == null) {
+                job.setClockWarning("시각 오차 범위 내 · 지연과 PC 시각 차이를 구분하기 어렵습니다.");
+            }
+            trace(job.getId(), "시험 시각", true, "TCP 보정 · 시험 등록 시 고정 · 보정량 "
+                    + stamp.offsetSeconds() * 1000 + " ms · 측정 왕복 "
+                    + (stamp.roundTripSeconds() == null ? "-" : stamp.roundTripSeconds() * 1000)
+                    + " ms · 원시 수신 " + stamp.rawAt() + " · 보정 수신 " + stamp.trialAt());
         }
         dtnRepository.saveAndFlush(job);
     }
@@ -1031,6 +1051,16 @@ public class DtnService {
 
     public synchronized DtnJob receive(String authorization, byte[] body, Instant receivedAt)
             throws Exception {
+        return receive(authorization, body, receivedAt, null);
+    }
+
+    public synchronized DtnJob receive(String authorization, byte[] body, server.common.ServiceClock.Stamp clock)
+            throws Exception {
+        return receive(authorization, body, clock.rawAt(), clock);
+    }
+
+    private DtnJob receive(String authorization, byte[] body, Instant receivedAt,
+            server.common.ServiceClock.Stamp receivedClock) throws Exception {
         authenticate(authorization);
         if (sendingNode()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "DTN callback은 수신 노드로 보내세요.");
@@ -1044,6 +1074,13 @@ public class DtnService {
         }
         UUID id = UUID.fromString(received.path("testId").asText());
         DtnJob job = get(id);
+        server.common.ServiceClock.Stamp trialClock = null;
+        if (receivedClock != null) {
+            var frozen = job.getReceiverRegistrationClockJson() == null ? null
+                    : objectMapper.readValue(job.getReceiverRegistrationClockJson(), server.common.ServiceClock.Stamp.class);
+            trialClock = server.common.ServiceClock.forTrial(receivedClock, frozen);
+            receivedAt = trialClock.trialAt();
+        }
         JsonNode adapterLogs = received.get("dtnLogsBase64");
         JsonNode plainLogs = received.get("dtnLogs");
         ((com.fasterxml.jackson.databind.node.ObjectNode) received)
@@ -1140,6 +1177,7 @@ public class DtnService {
         if (logs != null && (adapterLogs != null || plainLogs != null)) {
             logs.adapter(job.getId(), adapterLogs, plainLogs, job.getReceivedAt());
         }
+        if (trialClock != null) recordClock(job, trialClock, false);
         return job;
     }
 

@@ -96,7 +96,7 @@ public final class DelayTransferCodec {
 
     public static Restored restore(Transfer transfer, NativeAfsCodec codec, DtnDelay.Timing timing) {
         if (timing == null || timing.seconds() < 0) {
-            throw new IllegalArgumentException("지연 시각 누락 또는 음수 지연: 송수신 PC의 시스템 시각을 확인하세요.");
+            throw new IllegalArgumentException("지연 시각 누락 또는 음수 지연: 송수신 시각 차이와 TCP 보정 상태를 확인하세요.");
         }
         if (!server.common.DtnModels.PROFILE.equals(transfer.getProfile())
                 || transfer.getMetadata() != null || transfer.getReferencePvt() != null

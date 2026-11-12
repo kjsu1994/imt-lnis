@@ -289,7 +289,7 @@
             <button class="node tx-node" data-node="encode" style="left:66%" type="button"><svg fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><use href="#icon-wave"/></svg><strong>I/Q 생성</strong><small>프레임 → 신호 샘플</small></button>
             <button class="node tx-node switch" id="tx-switch" style="left:86%" type="button"><svg fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><use href="#icon-router"/></svg><strong id="tx-label">HDTN</strong><small>송신 엔진 변경 ↻</small></button>
             <span class="reference-label" id="reference-label" title="수신부가 PVT 계산을 마친 뒤 서비스 간 REST로 조회하는 비교자료입니다.">원본·Reference 보관</span>
-            <p class="clock-note" id="clock-note">시스템 시각 기준입니다.<br>지연 = 수신 본문 수신 완료 − 시험 시작 접수 · 수집 후 시작 전 대기시간 제외</p>
+            <p class="clock-note" id="clock-note">송신 시스템 시각 기준 · TCP 시험 시각 보정 지원<br>지연 = 수신 본문 수신 완료 − 시험 시작 접수 · 수집 후 시작 전 대기시간 제외</p>
             <button class="network" data-node="network" type="button">번들 전송 · 저장 / 대기 ↓</button>
 
             <button class="node receiver rx-node switch" id="rx-switch" style="left:86%" type="button"><svg fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><use href="#icon-router"/></svg><strong id="rx-label">HDTN</strong><small>수신 엔진 변경 ↻</small></button>

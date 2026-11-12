@@ -551,7 +551,6 @@ public class DtnController {
         dtnService.authenticate(authorization);
         byte[] bytes = request.getInputStream().readNBytes(DtnModels.MAX_JSON_BYTES + 1);
         var receivedClock = clock.stamp();
-        java.time.Instant receivedAt = receivedClock.trialAt();
         boolean truncated = bytes.length > DtnModels.MAX_JSON_BYTES;
         if (truncated) {
             bytes = Arrays.copyOf(bytes, DtnModels.MAX_JSON_BYTES);
@@ -566,8 +565,7 @@ public class DtnController {
         try {
             DtnJob job;
             synchronized (dtnService) {
-                job = dtnService.receive(authorization, bytes, receivedAt);
-                dtnService.recordClock(job, receivedClock, false);
+                job = dtnService.receive(authorization, bytes, receivedClock);
             }
             boolean stopped = "CANCELLED".equals(job.getState());
             receipts.finish(receipt, stopped ? "AFTER_CANCEL" : "ACCEPTED",

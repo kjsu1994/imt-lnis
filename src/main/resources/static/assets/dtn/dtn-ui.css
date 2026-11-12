@@ -2198,6 +2198,9 @@ body[data-page="dtn-sender"] .gnss-data-header .observation-summary { margin-lef
 /* Inline Service Clock in Status Strip */
 .service-clock-pill {
   display: inline-flex;
+  max-width: 100%;
+  flex-wrap: wrap;
+  box-sizing: border-box;
   align-items: center;
   gap: 6px;
   padding: 3px 8px;
@@ -3729,3 +3732,9 @@ button.satellite-select.constellation-badge[aria-pressed="true"] {
   .history-active .pvt-details-section { min-width:0; }
   .history-active .wgs84-comparison-wrap { max-width:100%; overflow-x:auto; }
 }
+
+.service-clock-pill > button { margin: 0; padding: 2px 7px; font-size: 11px; line-height: 1.5; }
+.clock-details { position: relative; }
+.clock-details summary { cursor: pointer; color: #64748b; font-size: 11px; }
+.clock-details pre { position: absolute; right: 0; top: 18px; z-index: 20; margin: 0; padding: 10px 12px; width: min(340px, 80vw); white-space: pre-wrap; background: white; color: #334155; border: 1px solid #cbd5e1; border-radius: 6px; box-shadow: 0 4px 16px #0002; font: 12px/1.6 sans-serif; }
+.clock-warning { margin: 6px 0; color: #92400e; font-size: 12px; }

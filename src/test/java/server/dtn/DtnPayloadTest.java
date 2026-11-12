@@ -142,4 +142,40 @@ class DtnPayloadTest {
                                                 + "-received.json\""))
                 .andExpect(content().bytes(original.getBytes(StandardCharsets.UTF_8)));
     }
+
+    @Test
+    void callbackUsesRegistrationCorrectionAndPreservesFirstReception() throws Exception {
+        objectMapper.findAndRegisterModules();
+        var raw = java.time.Instant.parse("2026-11-12T00:00:00Z");
+        var frozen = new server.common.ServiceClock.Stamp(raw.minusSeconds(1), raw.minusSeconds(1).plusMillis(5),
+                "TCP_PEER", raw.minusSeconds(2), .005, 1, .002, "receiver-session", 1, 0);
+        var current = new server.common.ServiceClock.Stamp(raw, raw.plusMillis(20),
+                "TCP_PEER", raw, .020, 0, .002, "receiver-session", 2, 0);
+        job.setReceiverRegistrationClockJson(objectMapper.writeValueAsString(frozen));
+        job.setTestStartedAt(raw.plusMillis(3));
+        service.receive("Bearer test-token", original.getBytes(StandardCharsets.UTF_8), current);
+        assertEquals(raw.plusMillis(5), job.getReceivedAt());
+        assertEquals("WAITING_RECEIVER", job.getState());
+        assertEquals(original, job.getReceivedRawJson());
+        var stored = objectMapper.readValue(job.getReceiverClockJson(), server.common.ServiceClock.Stamp.class);
+        assertEquals(.005, stored.offsetSeconds(), 1e-15);
+        assertEquals(raw, stored.rawAt());
+        service.receive("Bearer test-token", original.getBytes(StandardCharsets.UTF_8), new server.common.ServiceClock().stamp());
+        assertEquals(raw.plusMillis(5), job.getReceivedAt());
+        assertEquals(frozen, objectMapper.readValue(job.getReceiverRegistrationClockJson(),
+                server.common.ServiceClock.Stamp.class));
+    }
+
+    @Test
+    void restartedReceiverKeepsBodyButDoesNotCalculateWithOldCorrection() throws Exception {
+        objectMapper.findAndRegisterModules();
+        var current = new server.common.ServiceClock().stamp();
+        var old = new server.common.ServiceClock.Stamp(current.rawAt(), current.rawAt().plusMillis(5),
+                "TCP_PEER", current.rawAt(), .005, 0, .002, "old-receiver-session", 1, 0);
+        job.setReceiverRegistrationClockJson(objectMapper.writeValueAsString(old));
+        service.receive("Bearer test-token", original.getBytes(StandardCharsets.UTF_8), current);
+        assertEquals("INCONCLUSIVE", job.getState());
+        assertEquals(original, job.getReceivedRawJson());
+        assertTrue(job.getClockWarning().contains("시각 기준 변경"));
+    }
 }

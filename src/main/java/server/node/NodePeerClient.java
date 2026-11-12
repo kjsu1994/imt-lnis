@@ -92,9 +92,10 @@ public class NodePeerClient {
         if (!path.startsWith("/lnis/api/v1/node/peer/")) {
             throw new IllegalArgumentException("관리 API 경로가 아닙니다.");
         }
+        int timeoutSeconds = path.equals("/lnis/api/v1/node/peer/clock/sync") ? 20 : 5;
         HttpRequest.Builder builder =
                 HttpRequest.newBuilder(address.resolve(path))
-                        .timeout(Duration.ofSeconds(5))
+                        .timeout(Duration.ofSeconds(timeoutSeconds))
                         .header("Authorization", "Bearer " + nodeProperties.getManagementToken());
         try {
             if (body == null) {
@@ -115,7 +116,7 @@ public class NodePeerClient {
                         information -> new LimitedBodySubscriber(maximumBytes));
         try {
             // 헤더 이후 본문이 멈추는 경우도 포함해 전체 조회 시간에 제한을 둔다.
-            HttpResponse<byte[]> response = pending.get(5, TimeUnit.SECONDS);
+            HttpResponse<byte[]> response = pending.get(timeoutSeconds, TimeUnit.SECONDS);
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 throw new RemoteRequestException(
                         response.statusCode(),

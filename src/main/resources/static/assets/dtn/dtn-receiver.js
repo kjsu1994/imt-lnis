@@ -1,7 +1,7 @@
 import {parseNodeAddress, renderTrialSettings, trialTypeLabel, trialOption, colorTrialSelection, initWaitingCancellation, initTrialSettingsDialog} from './dtn-settings.js?v=20261104-peer-address-validation-2';
 import {requestJson} from '../common/http.js?v=20261103-management-reset';
 import {createPvtHistory} from './dtn-pvt-history.js?v=20261106-reference-rings';
-import {initSystemClock} from './dtn-gnss.js?v=20261110-system-clock';
+import {initSystemClock} from './dtn-gnss.js?v=20261112-tcp-clock';
 import {createDtnLog} from './dtn-log.js?v=20261103-management-reset';
 import {initAdapterHealth} from './dtn-adapter-health.js?v=20261106-service-time';
 import {createPayloadViewer} from './dtn-payload.js?v=20261026-frame6';
@@ -39,8 +39,18 @@ let tests = [], epochs = [], selectedId = '', renderVersion = 0, polling = false
 let reportKey = '';
 let receivedIds = null, knownIds = null;
 let historyPage = 0, selectionPinned = false, cancelling = false;
+let trialClockDescription = '';
 let referenceEpochs = [], comparisonEpochs = [], delayComparison = false, delayEvidence = null, rfComparison = false;
 function setComparison(report = {}) {
+  const clockWarning = $('trial-clock-warning');
+  if (clockWarning) {
+    clockWarning.hidden = !report?.clockWarning;
+    clockWarning.textContent = report?.clockWarning || '';
+  }
+  const clock = report.receiverClock;
+  trialClockDescription = clock ? '시험 시각 기준: ' + (clock.source === 'TCP_PEER' ? 'TCP 보정' : '시스템 시각')
+    + '\n수신측 보정량: ' + String(clock.offsetSeconds * 1000) + ' ms'
+    + '\n원시 본문 수신 (UTC): ' + clock.rawAt + '\n계산용 본문 수신 (UTC): ' + clock.trialAt : '';
   renderReference(report);
   delayComparison = report.comparisonMode === 'DELAY';
   rfComparison = report.comparisonBasis === 'RF_BASELINE';
@@ -85,7 +95,7 @@ function get(path, options = {}) {
 const logView=createDtnLog($('dtn-log'));
 const waitingCancellation = initWaitingCancellation({isLocked: () => cancelling, refresh: () => poll(true), log});
 function log(message,level='INFO') { logView.write(message,level); }
-const systemClock = initSystemClock();
+const systemClock = initSystemClock(log);
 let peerAddressDirty = false, peerSaving = false, lastPeerPort = 8090, lastPeerScheme = 'http';
 $('sender-address').oninput = () => {
   peerAddressDirty = true;
@@ -797,6 +807,7 @@ function renderClockAnalysis(delta, reference, pvt) {
     (rfComparison ? 'RF 기준 GNSS 시각: ' : '송신 기준 GNSS 시각: ') + epoch(delayEvidence?.originalTime),
     '지연 반영 GNSS 시각: ' + epoch(delayEvidence?.shiftedTime),
     '시험 전달 지연: ' + raw(delayEvidence?.delaySeconds) + ' s',
+    trialClockDescription,
     (rfComparison ? 'RF 기준 Clock Bias: ' : '송신 기준 Clock Bias: ') + raw(reference?.positionValid ? reference.receiverClockBiasSeconds : null) + ' s',
     '수신 Clock Bias: ' + raw(pvt?.positionValid ? pvt.receiverClockBiasSeconds : null) + ' s',
     '시계오차 변화: ' + raw(available ? delta?.clockDifferenceSeconds : null) + ' s',

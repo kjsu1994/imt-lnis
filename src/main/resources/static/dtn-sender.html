@@ -5,7 +5,7 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>GNSS 전송 시험 · 송신</title>
   <link rel="stylesheet" href="/lnis/assets/common/app.css?v=20261110-system-clock-20261106-compact-help-20261103-system-logo-v2">
-  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20261110-system-clock-20261106-help-20261105-capture-epochs">
+  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20261112-tcp-20261110-system-clock-20261106-help-20261105-capture-epochs">
 </head>
 <body data-page="dtn-sender">
 <header style="position: relative;">
@@ -41,6 +41,9 @@
     <div class="service-clock-pill" title="서비스 시스템 시각 · 한국 표준시">
       <span class="clock-label">시스템 시각</span>
       <time id="service-clock-value">—</time>
+      <span id="service-clock-status" class="clock-label" role="status">보정 미적용</span>
+      <button id="service-clock-sync" type="button" title="TCP로 송수신 서비스의 시험 시각 맞추기">시각 맞추기</button>
+      <details class="clock-details"><summary title="시험 시각 보정 상세">상세</summary><pre id="service-clock-detail"></pre></details>
     </div>
     <button id="dtn-config-hud" type="button" class="config-hud-pill" title="다음 전송의 시험 및 어댑터 설정 열기">⚙️ 다음 전송 · <span id="hud-type">AFS</span> · <span id="hud-route">DTN → HDTN</span> · <span id="hud-constellation">GPS</span></button>
   </section>
@@ -353,6 +356,6 @@
   <span class="software-version" title="소프트웨어 버전" aria-label="소프트웨어 버전 @lnisVersion@">v@lnisVersion@</span>
 </footer>
 
-<script type="module" src="/lnis/assets/dtn/dtn.js?v=20261110-system-clock-20261106-help-20261105-capture-epochs"></script>
+<script type="module" src="/lnis/assets/dtn/dtn.js?v=20261112-tcp-clock"></script>
   <script type="module" src="/lnis/assets/common/manual-help.js?v=20261110-system-clock-20261106"></script>
 </body></html>

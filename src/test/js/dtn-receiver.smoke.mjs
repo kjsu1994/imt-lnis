@@ -336,7 +336,7 @@ assert.equal(nextTests.find(job=>job.testId==='selected').state, 'CANCELLED');
 assert.equal(nextTests.find(job=>job.testId==='another').state, 'WAITING_DTN');
 console.log('PASS: manual selection preserved and receiver cancellation targets one trial');
 assert.match(elements.get('service-clock-value').textContent, /^2026\. 09\. 29\. 21:00:0\d$/);
-assert.ok(!html.includes('id="service-clock-sync"'));
+assert.ok(html.includes('id="service-clock-sync"'));
 assert.ok(!html.includes('id="gnss-port"'));
 assert.ok(requests.every(request => !String(request.url || request).includes('/lnis/api/v1/lnis/api/v1')),
   'API prefix must never be duplicated');

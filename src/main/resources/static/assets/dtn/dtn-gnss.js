@@ -80,9 +80,12 @@ export function initGnssControls({port, baud, refresh, changed = () => {}, log =
 
 
 // 브라우저 시계 대신 서비스의 시스템 시각을 표시한다.
-export function initSystemClock() {
+export function initSystemClock(log = () => {}) {
   const element = document.getElementById('service-clock-value');
-  let sample = null, sampledAt = 0;
+  let sample = null, sampledAt = 0, syncing = false, lastError = '', generation = 0;
+  const button = document.getElementById('service-clock-sync');
+  const state = document.getElementById('service-clock-status');
+  const detail = document.getElementById('service-clock-detail');
   const tickNow = () => globalThis.performance?.now() ?? Date.now();
   const format = new Intl.DateTimeFormat('ko-KR', {
     timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit',
@@ -97,16 +100,53 @@ export function initSystemClock() {
   async function poll() {
     if (!element) return;
     try {
+      const version = generation;
       const response = await requestJson('/node/clock', {cache: 'no-store'});
+      if (version !== generation) return;
       const value = Date.parse(response?.clock?.rawAt);
       if (!Number.isFinite(value)) throw new Error('시스템 시각 응답 없음');
       sample = value;
       sampledAt = tickNow();
+      const correction = response.receiverClock || response.clock;
+      const corrected = correction?.source === 'TCP_PEER';
+      if (state) state.textContent = corrected
+        ? (response.receiverClock ? '마지막 보정 완료' : '보정 적용') : '보정 미적용';
+      if (detail) {
+        const ms = value => Number.isFinite(value) ? (value * 1000).toFixed(3) + ' ms' : '—';
+        detail.textContent = '기준: 송신 서비스 시스템 시각'
+          + '\n수신측 보정량: ' + (corrected ? ms(correction.offsetSeconds) : '—')
+          + '\n측정 왕복: ' + (corrected ? ms(correction.roundTripSeconds) : '—')
+          + '\n마지막 보정: ' + (correction?.calibratedAt ? format.format(new Date(correction.calibratedAt)) : '—')
+          + '\n시험 등록 당시의 보정값을 해당 시험에 적용합니다.'
+          + '\n왕복 경로 차이에 따른 잔여 오차가 있습니다.' + (lastError ? '\n최근 보정 실패: ' + lastError : '');
+      }
     } catch {
       sample = null;
     }
     draw();
   }
+  if (button) button.onclick = async () => {
+    if (syncing) return;
+    syncing = true;
+    generation++;
+    lastError = '';
+    button.disabled = true;
+    button.textContent = '측정 중…';
+    try {
+      await requestJson('/node/clock/sync', {method: 'POST'});
+      log('시험 시각 보정 완료 · 송신 서비스 기준', 'INFO');
+    } catch (error) {
+      lastError = error.message;
+      log('시험 시각 보정 실패 · ' + error.message, 'WARN');
+      if (state) state.textContent = '보정 실패';
+      if (detail) detail.textContent = error.message;
+    } finally {
+      syncing = false;
+      button.disabled = false;
+      button.textContent = '시각 맞추기';
+      await poll();
+    }
+  };
   setInterval(draw, 1000);
   return {poll};
 }

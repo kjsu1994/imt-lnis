@@ -615,7 +615,7 @@ console.log('PASS: direct UBX upload reuses observation/PVT preview and retains 
 
 assert.match(html, /class="service-clock-pill"/);
 assert.equal((html.match(/id="service-clock-value"/g) || []).length, 1);
-assert.ok(!html.includes('id="service-clock-sync"'));
+assert.ok(html.includes('id="service-clock-sync"'));
 assert.ok(html.includes('시스템 시각'));
 console.log('PASS: sender clock shares the status strip with unique existing controls');
 

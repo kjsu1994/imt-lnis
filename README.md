@@ -95,7 +95,7 @@ The I/Q receiver uses actual RF-tracked pseudorange, Doppler and C/N0, with navi
 
 Sender dispatch checks file existence, size and format, and reuses the generation SHA-256 without re-reading the complete file. The receiver verifies the complete SHA-256 once before decoding, then checks file size, modification time and identity after decoding. The shared file must remain unchanged during processing. Full hash progress includes bytes read, elapsed time and throughput. Changes to the sender file after generation are detected at the receiver, not during dispatch.
 
-Only GPS L1 C/A is used for new PVT calculations. Other constellations remain visible as received data. Receiver waiting has no expiry, but a long delay can exceed ephemeris-selection or solver conditions and yield no valid PVT. Existing results and files are retained; older I/Q layouts must be regenerated for new trials. Trial timestamps use the service system clock without GNSS/NTP correction. Measured delay includes any clock offset between the two PCs.
+Only GPS L1 C/A is used for new PVT calculations. Other constellations remain visible as received data. Receiver waiting has no expiry, but a long delay can exceed ephemeris-selection or solver conditions and yield no valid PVT. Existing results and files are retained; older I/Q layouts must be regenerated for new trials. Trial timestamps use the service system clock, with optional TCP-based receiver correction to the sender clock. Measured delay includes any clock offset between the two PCs.
 
 ### Trial Modes Summary
 
@@ -262,7 +262,7 @@ RAW·AFS는 같은 입력·Epoch·유형으로 **전송시험 시작**을 반복
    - Inspect the computed **Reference PVT** (ECEF position, velocity, receiver clock bias, and per-satellite LNAV SF1–3 readiness).
    - Saved I/Q files retain their stored modification order after restart. The list shows up to 50 entries with the active generation first; older files remain on disk.
 3. **System Time**:
-   - Trial timestamps use the service system clock. The application does not adjust either PC clock.
+   - Trial timestamps use the service system clock. The “시각 맞추기” button estimates the receiver offset through the existing peer REST connection. Each registered trial freezes its own correction. OS clocks remain under Windows control.
 4. **Trial Execution (`Start Trial`)**:
    - Each click registers a unique `testId` and dispatches the bundle to the external adapter.
    - Once the adapter accepts the dispatch, subsequent trials can be queued immediately without waiting for prior bundles to arrive.

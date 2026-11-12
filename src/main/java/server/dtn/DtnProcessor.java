@@ -143,7 +143,7 @@ public final class DtnProcessor {
             if (!id.equals(transfer.getTestId())) throw new IllegalArgumentException("시험 ID 불일치");
             if (timing != null && timing.seconds() < 0) {
                 AgentResult unavailable = new AgentResult();
-                String message = "음수 지연 · 송수신 PC의 시스템 시각을 확인하세요.";
+                String message = "음수 지연 · 송수신 시각 차이와 TCP 보정 상태를 확인하세요.";
                 var decoded = DelayTransferCodec.restore(transfer, afs,
                         new DtnDelay.Timing(timing.startedAt(), timing.startedAt()));
                 var original = decoded.evidence().originalTime();

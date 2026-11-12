@@ -1,6 +1,6 @@
 import {parseNodeAddress, initPresetControls, renderTrialSettings, trialTypeLabel, trialOption, colorTrialSelection, initWaitingCancellation, initTrialSettingsDialog} from './dtn-settings.js?v=20261104-peer-address-validation-2';
 import {requestJson} from '../common/http.js?v=20261103-management-reset';
-import {initGnssControls, initSystemClock} from './dtn-gnss.js?v=20261110-system-clock';
+import {initGnssControls, initSystemClock} from './dtn-gnss.js?v=20261112-tcp-clock';
 import {createDtnLog} from './dtn-log.js?v=20261103-management-reset';
 import {initAdapterHealth, validAdapterUrl} from './dtn-adapter-health.js?v=20261106-service-time';
 import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20261026-frame6';
@@ -42,7 +42,7 @@ function request(path, options = {}) {
 const post = (path, body) => request(path, {method: 'POST', headers: {'Content-Type': 'application/json'},
   body: body === undefined ? undefined : JSON.stringify(body)});
 const logView=createDtnLog($('dtn-log'));
-const systemClock = initSystemClock();
+const systemClock = initSystemClock(log);
 const gnss = initGnssControls({port: 'dtn-port', baud: 'dtn-baud', refresh: 'dtn-refresh', log,
   changed(state) { gnssState = state; updateControls(); }});
 const waitingCancellation = initWaitingCancellation({isLocked: () => busy || !!pendingCapture, refresh: () => poll(), log});
