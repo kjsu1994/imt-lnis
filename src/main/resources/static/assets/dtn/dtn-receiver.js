@@ -1,7 +1,7 @@
 import {parseNodeAddress, renderTrialSettings, trialTypeLabel, trialOption, colorTrialSelection, initWaitingCancellation, initTrialSettingsDialog} from './dtn-settings.js?v=20261104-peer-address-validation-2';
 import {requestJson} from '../common/http.js?v=20261103-management-reset';
 import {createPvtHistory} from './dtn-pvt-history.js?v=20261106-reference-rings';
-import {initSystemClock} from './dtn-gnss.js?v=20261112-tcp-clock';
+import {initSystemClock} from './dtn-gnss.js?v=20261113-server-clock';
 import {createDtnLog} from './dtn-log.js?v=20261103-management-reset';
 import {initAdapterHealth} from './dtn-adapter-health.js?v=20261106-service-time';
 import {createPayloadViewer} from './dtn-payload.js?v=20261026-frame6';
@@ -95,7 +95,7 @@ function get(path, options = {}) {
 const logView=createDtnLog($('dtn-log'));
 const waitingCancellation = initWaitingCancellation({isLocked: () => cancelling, refresh: () => poll(true), log});
 function log(message,level='INFO') { logView.write(message,level); }
-const systemClock = initSystemClock(log);
+initSystemClock(log);
 let peerAddressDirty = false, peerSaving = false, lastPeerPort = 8090, lastPeerScheme = 'http';
 $('sender-address').oninput = () => {
   peerAddressDirty = true;
@@ -857,60 +857,20 @@ function renderEpoch() {
     $('pvt-' + axis).textContent = number(recVal);
 
     const diffEl = $('pvt-diff-' + axis);
-    const statusEl = $('pvt-status-' + axis);
-    if (diffEl && statusEl) {
-      if (refVal != null && recVal != null) {
-        const diff = recVal - refVal;
-        diffEl.textContent = formatCoordDiff(diff);
-        const absDiff = Math.abs(diff);
-        if (absDiff <= 0.005) {
-          statusEl.className = 'pvt-table-badge badge-perfect';
-          statusEl.textContent = '🟢 일치';
-        } else if (absDiff <= 0.05) {
-          statusEl.className = 'pvt-table-badge badge-acceptable';
-          statusEl.textContent = '🟡 허용치';
-        } else {
-          statusEl.className = 'pvt-table-badge badge-warning';
-          statusEl.textContent = '🔴 편차';
-        }
-      } else {
-        diffEl.textContent = '—';
-        statusEl.className = 'pvt-table-badge';
-        statusEl.textContent = '—';
-      }
-    }
+    if (diffEl) diffEl.textContent = refVal != null && recVal != null
+      ? formatCoordDiff(recVal - refVal) : '—';
   });
 
-  // 수신기 시계 오차 (Clock Bias) 및 지연 흡수 판정
+  // 수신기 시계 오차 (Clock Bias)
   const refClock = reference?.positionValid ? reference.receiverClockBiasSeconds : null;
   const recClock = position ? pvt.receiverClockBiasSeconds : null;
   renderClockBias($('reference-clock'), refClock);
   renderClockBias($('pvt-clock'), recClock);
   const diffClockEl = $('pvt-diff-clock');
-  const statusClockEl = $('pvt-status-clock');
-  if (diffClockEl && statusClockEl) {
-    if (refClock != null && recClock != null) {
-      const diff = recClock - refClock;
-      const sign = diff >= 0 ? '+' : '-';
-      if (delayComparison) {
-        diffClockEl.textContent = `${sign}${Math.abs(diff).toFixed(9)} s (지연 흡수)`;
-        statusClockEl.className = 'pvt-table-badge badge-perfect';
-        statusClockEl.textContent = '🟢 지연 정상 흡수';
-      } else {
-        diffClockEl.textContent = `${sign}${Math.abs(diff).toFixed(9)} s`;
-        if (Math.abs(diff) < 1e-7) {
-          statusClockEl.className = 'pvt-table-badge badge-perfect';
-          statusClockEl.textContent = '🟢 동기 일치';
-        } else {
-          statusClockEl.className = 'pvt-table-badge badge-acceptable';
-          statusClockEl.textContent = '🟡 클록 편차';
-        }
-      }
-    } else {
-      diffClockEl.textContent = '—';
-      statusClockEl.className = 'pvt-table-badge';
-      statusClockEl.textContent = '—';
-    }
+  if (diffClockEl) {
+    const diff = refClock != null && recClock != null ? recClock - refClock : null;
+    diffClockEl.textContent = diff != null
+      ? `${diff >= 0 ? '+' : '-'}${Math.abs(diff).toFixed(9)} s` : '—';
   }
 
   // 속도 (Velocity) X, Y, Z 및 3D 합성치
@@ -923,26 +883,10 @@ function renderEpoch() {
   if ($('reference-v-total')) $('reference-v-total').textContent = number(refV3D, 3);
   if ($('pvt-v-total')) $('pvt-v-total').textContent = number(recV3D, 3);
   const diffVEl = $('pvt-diff-v');
-  const statusVEl = $('pvt-status-v');
-  if (diffVEl && statusVEl) {
-    if (refV3D != null && recV3D != null) {
-      const vDiff = delta?.velocityDifferenceMetersPerSecond ?? Math.abs(recV3D - refV3D);
-      diffVEl.textContent = measured(vDiff, 6, 'm/s');
-      if (vDiff < 0.001) {
-        statusVEl.className = 'pvt-table-badge badge-perfect';
-        statusVEl.textContent = '🟢 일치';
-      } else if (vDiff < 0.1) {
-        statusVEl.className = 'pvt-table-badge badge-acceptable';
-        statusVEl.textContent = '🟡 양호';
-      } else {
-        statusVEl.className = 'pvt-table-badge badge-warning';
-        statusVEl.textContent = '🔴 편차';
-      }
-    } else {
-      diffVEl.textContent = '—';
-      statusVEl.className = 'pvt-table-badge';
-      statusVEl.textContent = '—';
-    }
+  if (diffVEl) {
+    const vDiff = refV3D != null && recV3D != null
+      ? delta?.velocityDifferenceMetersPerSecond ?? Math.abs(recV3D - refV3D) : null;
+    diffVEl.textContent = measured(vDiff, 6, 'm/s');
   }
 
   // 사용 위성수
@@ -951,23 +895,10 @@ function renderEpoch() {
   $('reference-satellites').textContent = refSats ?? '-';
   $('pvt-satellites').textContent = recSats ?? '-';
   const diffSatsEl = $('pvt-diff-satellites');
-  const statusSatsEl = $('pvt-status-satellites');
-  if (diffSatsEl && statusSatsEl) {
-    if (refSats != null && recSats != null) {
-      const satDiff = recSats - refSats;
-      diffSatsEl.textContent = satDiff === 0 ? '동일 (0개)' : (satDiff > 0 ? `+${satDiff}개` : `${satDiff}개`);
-      if (satDiff === 0) {
-        statusSatsEl.className = 'pvt-table-badge badge-perfect';
-        statusSatsEl.textContent = `🟢 ${refSats}기 동일`;
-      } else {
-        statusSatsEl.className = 'pvt-table-badge badge-acceptable';
-        statusSatsEl.textContent = `🟡 ${Math.abs(satDiff)}기 차이`;
-      }
-    } else {
-      diffSatsEl.textContent = '—';
-      statusSatsEl.className = 'pvt-table-badge';
-      statusSatsEl.textContent = '—';
-    }
+  if (diffSatsEl) {
+    const satDiff = refSats != null && recSats != null ? recSats - refSats : null;
+    diffSatsEl.textContent = satDiff == null ? '—' : satDiff === 0 ? '동일 (0개)'
+      : `${satDiff > 0 ? '+' : ''}${satDiff}개`;
   }
 
   pill('pvt-validity', !pvt ? '결과 대기' : '위치 ' + (position ? '유효' : '무효') + ' · 속도 ' + (velocity ? '유효' : '무효'),
@@ -1172,7 +1103,6 @@ async function poll(force = false) {
   polling = true;
   $('dtn-refresh').disabled = true;
   try {
-    await systemClock.poll();
     const query = new URLSearchParams({page: historyPage});
     if ($('dtn-test-filter').value) query.set('state', $('dtn-test-filter').value);
     const [agents, nextTests] = await Promise.all([get('/agents'), get('/dtn/tests?' + query)]);
@@ -1255,7 +1185,6 @@ async function initialize() {
       $('dtn-send-url')?.scrollIntoView?.({behavior: 'smooth', block: 'center'});
     };
   }
-  await systemClock.poll();
   try {
     const config = await get('/dtn/config');
     initAdapterHealth(config.adapterUrl || '', log, (text, className, tone) => {

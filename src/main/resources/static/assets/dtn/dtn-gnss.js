@@ -82,31 +82,29 @@ export function initGnssControls({port, baud, refresh, changed = () => {}, log =
 // 브라우저 시계 대신 서비스의 시스템 시각을 표시한다.
 export function initSystemClock(log = () => {}) {
   const element = document.getElementById('service-clock-value');
-  let sample = null, sampledAt = 0, syncing = false, lastError = '', generation = 0;
+  let pending = null, syncing = false, lastError = '', generation = 0;
   const button = document.getElementById('service-clock-sync');
   const state = document.getElementById('service-clock-status');
   const detail = document.getElementById('service-clock-detail');
-  const tickNow = () => globalThis.performance?.now() ?? Date.now();
   const format = new Intl.DateTimeFormat('ko-KR', {
     timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit',
     hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
   });
-  function draw() {
-    if (!element) return;
-    const elapsed = tickNow() - sampledAt;
-    element.textContent = sample !== null && elapsed < 6000
-      ? format.format(new Date(sample + elapsed)) : '—';
+  function poll() {
+    if (!element || syncing || document.visibilityState === 'hidden') return Promise.resolve();
+    if (pending) return pending;
+    pending = read().finally(() => { pending = null; });
+    return pending;
   }
-  async function poll() {
-    if (!element) return;
+  async function read() {
+    const version = generation;
     try {
-      const version = generation;
-      const response = await requestJson('/node/clock', {cache: 'no-store'});
+      const response = await requestJson('/node/clock', {cache: 'no-store'}, {timeoutMillis: 3000});
       if (version !== generation) return;
       const value = Date.parse(response?.clock?.rawAt);
       if (!Number.isFinite(value)) throw new Error('시스템 시각 응답 없음');
-      sample = value;
-      sampledAt = tickNow();
+      element.textContent = format.format(new Date(value));
+      element.title = '서버 시스템 시각';
       const correction = response.receiverClock || response.clock;
       const corrected = correction?.source === 'TCP_PEER';
       if (state) state.textContent = corrected
@@ -121,9 +119,10 @@ export function initSystemClock(log = () => {}) {
           + '\n왕복 경로 차이에 따른 잔여 오차가 있습니다.' + (lastError ? '\n최근 보정 실패: ' + lastError : '');
       }
     } catch {
-      sample = null;
+      if (version !== generation) return;
+      element.textContent = '—';
+      element.title = '시각 확인 불가';
     }
-    draw();
   }
   if (button) button.onclick = async () => {
     if (syncing) return;
@@ -133,6 +132,7 @@ export function initSystemClock(log = () => {}) {
     button.disabled = true;
     button.textContent = '측정 중…';
     try {
+      await pending;
       await requestJson('/node/clock/sync', {method: 'POST'});
       log('시험 시각 보정 완료 · 송신 서비스 기준', 'INFO');
     } catch (error) {
@@ -147,6 +147,7 @@ export function initSystemClock(log = () => {}) {
       await poll();
     }
   };
-  setInterval(draw, 1000);
+  setInterval(poll, 1000);
+  void poll();
   return {poll};
 }

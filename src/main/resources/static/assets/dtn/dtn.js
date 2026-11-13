@@ -1,6 +1,6 @@
 import {parseNodeAddress, initPresetControls, renderTrialSettings, trialTypeLabel, trialOption, colorTrialSelection, initWaitingCancellation, initTrialSettingsDialog} from './dtn-settings.js?v=20261104-peer-address-validation-2';
 import {requestJson} from '../common/http.js?v=20261103-management-reset';
-import {initGnssControls, initSystemClock} from './dtn-gnss.js?v=20261112-tcp-clock';
+import {initGnssControls, initSystemClock} from './dtn-gnss.js?v=20261113-server-clock';
 import {createDtnLog} from './dtn-log.js?v=20261103-management-reset';
 import {initAdapterHealth, validAdapterUrl} from './dtn-adapter-health.js?v=20261106-service-time';
 import {createPayloadViewer, renderIqFile} from './dtn-payload.js?v=20261026-frame6';
@@ -42,7 +42,7 @@ function request(path, options = {}) {
 const post = (path, body) => request(path, {method: 'POST', headers: {'Content-Type': 'application/json'},
   body: body === undefined ? undefined : JSON.stringify(body)});
 const logView=createDtnLog($('dtn-log'));
-const systemClock = initSystemClock(log);
+initSystemClock(log);
 const gnss = initGnssControls({port: 'dtn-port', baud: 'dtn-baud', refresh: 'dtn-refresh', log,
   changed(state) { gnssState = state; updateControls(); }});
 const waitingCancellation = initWaitingCancellation({isLocked: () => busy || !!pendingCapture, refresh: () => poll(), log});
@@ -1215,7 +1215,7 @@ async function poll() {
   if (polling || document.visibilityState === 'hidden') return;
   polling = true;
   try {
-    await Promise.all([gnss.poll(), systemClock.poll()]);
+    await gnss.poll();
     if (generatingIq()) {
       iqJob = await request('/dtn/iq/' + iqJob.id); renderIq();
       if (!generatingIq()) { log('I/Q 생성 결과 · ' + iqJob.state + ' · ' + iqJob.message); await loadIqFiles(); }

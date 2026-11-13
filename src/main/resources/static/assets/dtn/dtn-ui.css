@@ -3369,32 +3369,6 @@ button.satellite-select.constellation-badge[aria-pressed="true"] {
   margin-top: 3px;
 }
 
-.pvt-table-badge {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.pvt-table-badge.badge-perfect {
-  background: #ecfdf5;
-  color: #047857;
-  border: 1px solid #a7f3d0;
-}
-
-.pvt-table-badge.badge-acceptable {
-  background: #fffbeb;
-  color: #b45309;
-  border: 1px solid #fde68a;
-}
-
-.pvt-table-badge.badge-warning {
-  background: #fef2f2;
-  color: #b91c1c;
-  border: 1px solid #fecaca;
-}
-
 /* --- 수치 대조표 내부 DTN 지연 및 시계오차 계산 근거 박스 --- */
 .pvt-delay-evidence-box {
   margin-top: 14px;

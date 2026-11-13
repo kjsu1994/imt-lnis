@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>GNSS 전송 시험 · 수신</title>
   <link rel="stylesheet" href="/lnis/assets/common/app.css?v=20261110-system-clock-20261106-compact-help-20261103-system-logo-v2">
-  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20261112-tcp-20261110-system-clock-20261106-help-20261106-reference-rings">
+  <link rel="stylesheet" href="/lnis/assets/dtn/dtn-ui.css?v=20261113-pvt-values">
 </head>
 <body data-page="dtn-receiver">
 <header style="position: relative;">
@@ -449,7 +449,6 @@
               <th data-reference-label="송신 기준 (Original)">송신 기준 (Original)</th>
               <th>수신 지연 반영 (Shifted)</th>
               <th>편차 (Difference)</th>
-              <th>판정 상태</th>
             </tr>
           </thead>
           <tbody>
@@ -458,28 +457,24 @@
               <td><span id="reference-x">-</span> <small>m</small></td>
               <td><span id="pvt-x">-</span> <small>m</small></td>
               <td class="col-diff"><strong id="pvt-diff-x">-</strong></td>
-              <td><span id="pvt-status-x" class="pvt-table-badge">-</span></td>
             </tr>
             <tr>
               <td class="col-param"><strong>ECEF Y</strong> <small>좌표</small></td>
               <td><span id="reference-y">-</span> <small>m</small></td>
               <td><span id="pvt-y">-</span> <small>m</small></td>
               <td class="col-diff"><strong id="pvt-diff-y">-</strong></td>
-              <td><span id="pvt-status-y" class="pvt-table-badge">-</span></td>
             </tr>
             <tr>
               <td class="col-param"><strong>ECEF Z</strong> <small>좌표</small></td>
               <td><span id="reference-z">-</span> <small>m</small></td>
               <td><span id="pvt-z">-</span> <small>m</small></td>
               <td class="col-diff"><strong id="pvt-diff-z">-</strong></td>
-              <td><span id="pvt-status-z" class="pvt-table-badge">-</span></td>
             </tr>
             <tr>
               <td class="col-param"><strong>수신기 시계 오차</strong> <small>Clock Bias</small></td>
               <td><span id="reference-clock">-</span> <small>s</small></td>
               <td><span id="pvt-clock">-</span> <small>s</small></td>
               <td class="col-diff"><strong id="pvt-diff-clock">-</strong></td>
-              <td><span id="pvt-status-clock" class="pvt-table-badge">-</span></td>
             </tr>
             <tr>
               <td class="col-param"><strong>속도 (Velocity)</strong> <small>3D 합성 / 축별</small></td>
@@ -492,14 +487,12 @@
                 <div class="v-sub-coords">X: <span id="pvt-vx">-</span> | Y: <span id="pvt-vy">-</span> | Z: <span id="pvt-vz">-</span></div>
               </td>
               <td class="col-diff"><strong id="pvt-diff-v">-</strong></td>
-              <td><span id="pvt-status-v" class="pvt-table-badge">-</span></td>
             </tr>
             <tr>
               <td class="col-param"><strong>사용 위성수</strong> <small>Satellites</small></td>
               <td><span id="reference-satellites">-</span> <small>개</small></td>
               <td><span id="pvt-satellites">-</span> <small>개</small></td>
               <td class="col-diff"><strong id="pvt-diff-satellites">-</strong></td>
-              <td><span id="pvt-status-satellites" class="pvt-table-badge">-</span></td>
             </tr>
           </tbody>
         </table>
@@ -541,7 +534,7 @@
   <span class="software-version" title="소프트웨어 버전" aria-label="소프트웨어 버전 @lnisVersion@">v@lnisVersion@</span>
 </footer>
 
-<script type="module" src="/lnis/assets/dtn/dtn-receiver.js?v=20261112-tcp-clock"></script>
+<script type="module" src="/lnis/assets/dtn/dtn-receiver.js?v=20261113-pvt-values"></script>
   <script type="module" src="/lnis/assets/common/manual-help.js?v=20261110-system-clock-20261106"></script>
 </body>
 </html>

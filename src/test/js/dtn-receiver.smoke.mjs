@@ -199,6 +199,22 @@ report.comparison = {verdict: 'PASS'};
 await context.poll(true);
 assert.equal(elements.get('reference-x').textContent, '1.000');
 assert.equal(elements.get('pvt-match').className, 'pill online');
+assert.equal(elements.has('pvt-status-x'), false);
+assert.ok(!html.includes('pvt-status-'));
+assert.equal(elements.get('pvt-diff-x').textContent, '0.0 mm');
+assert.equal(elements.get('pvt-diff-clock').textContent, '+0.000000000 s');
+assert.equal(elements.get('pvt-diff-satellites').textContent, '동일 (0개)');
+assert.match(elements.get('pvt-diff-v').textContent, /0\.000000 m\/s/);
+report.receivedPvt[0].ecefMeters[0] += 0.02;
+report.receivedPvt[0].receiverClockBiasSeconds = 0.025;
+report.receivedPvt[0].satellitesUsed = 6;
+await context.poll(true);
+assert.equal(elements.get('pvt-diff-x').textContent, '+20.0 mm');
+assert.equal(elements.get('pvt-diff-clock').textContent, '+0.025000000 s');
+assert.equal(elements.get('pvt-diff-satellites').textContent, '-1개');
+report.receivedPvt = structuredClone(report.referencePvt);
+
+
 report.comparison = {verdict: 'FAIL'};
 await context.poll(true);
 assert.equal(elements.get('pvt-match').textContent, '전체 PVT 불일치');
@@ -375,12 +391,7 @@ assert.deepEqual(shownReceipts, [oldReceipt]);
 assert.equal(elements.get('dtn-tests').value, 'old-rejected');
 context.fetch = ordinaryReceiverFetch;
 assert.ok(elements.has('dtn-cancel-waiting'));
-const gnssControls = vm.runInContext('systemClock', context), normalGnssPoll = gnssControls.poll;
-gnssControls.poll = async () => { throw new Error('GNSS view failed'); };
-await context.poll(true);
-assert.equal(vm.runInContext('polling', context), false);
-gnssControls.poll = normalGnssPoll;
-console.log('PASS: selected-trial receipts remain reachable beyond global history and system clock errors release polling');
+console.log('PASS: selected-trial receipts remain reachable beyond global history');
 
 // I/Q observation loading must not require a valid or existing PVT epoch.
 vm.runInContext("selectionPinned=false; selectedId='';", context);
@@ -412,3 +423,64 @@ await multi.initialize();
 assert.equal(elements.get('sender-address').value, 'https://192.168.1.72:443',
   'initial connection load must preserve an address already edited by the user');
 console.log('PASS: initial settings loading preserves the edited peer address');
+
+
+// Display polling is independent of trial operations.
+const clockElements = new Map(['service-clock-value', 'service-clock-status',
+  'service-clock-detail', 'service-clock-sync'].map(id => [id, {textContent: ''}]));
+let clockAt = '2026-11-13T00:00:00.900Z', clockReads = 0, clockFailure = false, heldClock;
+const clockTimers = [], clockRequests = [];
+const clockContext = vm.createContext({
+  Date, Intl, Number, Promise,
+  document: {visibilityState: 'visible', getElementById: id => clockElements.get(id)},
+  setInterval(fn, ms) { clockTimers.push({fn, ms}); },
+  requestJson: async (path, options, policy) => {
+    clockRequests.push(path);
+    if (path.endsWith('/sync')) return {};
+    clockReads++;
+    assert.equal(policy.timeoutMillis, 3000);
+    if (heldClock) return heldClock;
+    if (clockFailure) throw new Error('offline');
+    return {clock: {rawAt: clockAt, source: 'SYSTEM'}};
+  }
+});
+vm.runInContext(readFileSync(new URL('../../main/resources/static/assets/dtn/dtn-gnss.js', import.meta.url), 'utf8')
+  .replace(/^import .*;\r?\n/gm, '').replace(/^export /gm, '')
+  + ';globalThis.displayClock = initSystemClock();', clockContext);
+await clockContext.displayClock.poll();
+assert.equal(clockTimers.length, 1);
+assert.equal(clockTimers[0].ms, 1000);
+assert.equal(clockElements.get('service-clock-value').textContent, '2026. 11. 13. 09:00:00');
+await clockTimers[0].fn();
+assert.equal(clockElements.get('service-clock-value').textContent, '2026. 11. 13. 09:00:00',
+  'a new timer tick must not invent elapsed server time');
+clockAt = '2026-11-13T00:00:02Z';
+await clockTimers[0].fn();
+assert.equal(clockElements.get('service-clock-value').textContent, '2026. 11. 13. 09:00:02');
+assert.ok(clockRequests.every(path => path === '/node/clock'), 'automatic polling must not register trials or apply correction');
+let releaseClock;
+heldClock = new Promise(resolve => { releaseClock = resolve; });
+const firstClockRead = clockContext.displayClock.poll(), readsBeforeOverlap = clockReads;
+const overlappingClockRead = clockContext.displayClock.poll();
+assert.equal(clockReads, readsBeforeOverlap, 'pending requests must be shared');
+const syncClock = clockElements.get('service-clock-sync').onclick();
+releaseClock({clock: {rawAt: '2026-11-13T00:00:59Z', source: 'SYSTEM'}});
+heldClock = null;
+await Promise.all([firstClockRead, overlappingClockRead, syncClock]);
+assert.equal(clockElements.get('service-clock-value').textContent, '2026. 11. 13. 09:00:02',
+  'a response started before synchronization must not replace the current display');
+assert.equal(clockRequests.filter(path => path.endsWith('/sync')).length, 1);
+assert.equal(clockElements.get('service-clock-sync').disabled, false);
+clockContext.document.visibilityState = 'hidden';
+const readsBeforeHidden = clockReads;
+await clockTimers[0].fn();
+assert.equal(clockReads, readsBeforeHidden);
+clockContext.document.visibilityState = 'visible';
+clockFailure = true;
+await clockTimers[0].fn();
+assert.equal(clockElements.get('service-clock-value').textContent, '—');
+assert.equal(clockElements.get('service-clock-value').title, '시각 확인 불가');
+clockFailure = false;
+await clockTimers[0].fn();
+assert.equal(clockElements.get('service-clock-value').textContent, '2026. 11. 13. 09:00:02');
+console.log('PASS: server-only clock display, single polling timer, overlap, sync, hidden tab and reconnect');
