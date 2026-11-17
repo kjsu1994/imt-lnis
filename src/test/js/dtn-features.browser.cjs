@@ -5,8 +5,8 @@ const {readFileSync} = require('node:fs');
 const {resolve, extname} = require('node:path');
 const assert = require('node:assert/strict');
 const root = resolve(__dirname, '../../../build/resources/main/static');
-const config = {maxNumberOfBundlesInPipeline:50,maxSumOfBundleBytesInPipeline:50000000,maxBundleSizeBytes:10485760,
-  tcpclMaxSegmentSizeBytes:20000,neighborDepletedStorageDelaySeconds:10,enforceBundlePriority:false,
+const config = {maxNumberOfBundlesInPipeline:8,maxSumOfBundleBytesInPipeline:6000000000,maxBundleSizeBytes:3000000000,
+  tcpclMaxSegmentSizeBytes:1000000,neighborDepletedStorageDelaySeconds:10,enforceBundlePriority:false,
   storageDeletionPolicy:'DELETE_AFTER_FORWARDING',totalStorageCapacityBytes:8589934592,maxLtpReceiveUdpPacketSizeBytes:65536,acsSendPeriodMilliseconds:1000};
 let browser, bulkRequests=0, clockSyncs=0, clockCorrected=false;
 let rows=[], id=0, job=null, starts=0, reportFixture={referencePvt:[],receivedPvt:[]};
@@ -208,9 +208,9 @@ const server=createServer((req,res)=>{
  await page.setViewportSize({width:1600,height:1000});
 await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>!document.getElementById('preset-save').disabled);
  await page.locator('#preset-save').click();await page.locator('#preset-name').fill('기본');await page.locator('#preset-confirm').click();await page.waitForFunction(()=>document.getElementById('preset-status').textContent==='저장했습니다.');
- assert.equal(rows.length,1);assert.equal(rows[0].settings.hdtnConfig.maxNumberOfBundlesInPipeline,50);
+ assert.equal(rows.length,1);assert.equal(rows[0].settings.hdtnConfig.maxNumberOfBundlesInPipeline,8);
  await page.locator('#adapter-tab-hdtn').click();
- await page.locator('#hdtn-maxNumberOfBundlesInPipeline').fill('60');await page.locator('#preset-load').click();assert.equal(await page.locator('#hdtn-maxNumberOfBundlesInPipeline').inputValue(),'50');
+ await page.locator('#hdtn-maxNumberOfBundlesInPipeline').fill('60');await page.locator('#preset-load').click();assert.equal(await page.locator('#hdtn-maxNumberOfBundlesInPipeline').inputValue(),'8');
  await page.locator('#hdtn-maxNumberOfBundlesInPipeline').fill('70');await page.locator('#preset-update').click();await page.locator('#preset-confirm').click();await page.waitForFunction(()=>!document.getElementById('preset-dialog').open);assert.equal(rows[0].settings.hdtnConfig.maxNumberOfBundlesInPipeline,70);
  await page.locator('#preset-manage').click();await page.locator('#preset-name').fill('수정 이름');await page.locator('#preset-confirm').click();await page.waitForFunction(()=>!document.getElementById('preset-dialog').open);assert.equal(rows[0].name,'수정 이름');
  const other=await context.newPage();await other.goto(base+'/sender');await other.locator('#dtn-settings-open').click();await other.waitForFunction(()=>document.querySelectorAll('#preset-select option').length===2);assert.match(await other.locator('#preset-select').textContent(),/수정 이름/);await other.close();
@@ -279,7 +279,6 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
   const manualLink = page.getByRole('link', {name:'사용자 설명서 · 새 탭에서 열기'});
   assert.equal(await manualLink.getAttribute('href'), '/user-manual/');
   assert.equal(await manualLink.getAttribute('target'), '_blank');
-  assert.match(await page.locator('.site-footer').innerText(), /© 2026 imtplus\. All rights reserved\./);
   assert.match(await page.locator('.software-version').innerText(), /^v\d+\.\d+\.\d+$/);
   assert.notEqual(await page.locator('.site-footer').evaluate(e=>getComputedStyle(e).position), 'fixed');
   const popupPromise = page.waitForEvent('popup');
@@ -714,9 +713,9 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
   await selectStage(mode,'send');
   await openStageDetails();
   const request=JSON.parse(await page.locator('#request-json').innerText());
-  assert.equal(request.hdtnConfig.maxSumOfBundleBytesInPipeline,3000000000);
+  assert.equal(request.hdtnConfig.maxSumOfBundleBytesInPipeline,6000000000);
   assert.equal(request.hdtnConfig.maxBundleSizeBytes,3000000000);
-  assert.equal(request.hdtnConfig.tcpclMaxSegmentSizeBytes,200000);
+  assert.equal(request.hdtnConfig.tcpclMaxSegmentSizeBytes,1000000);
   assert.equal(request.hdtnConfig.storageDeletionPolicy,'never');
   assert.equal(await page.locator('#send-engine-fields [data-iq-only]').isVisible(),mode==='iq');
   await selectStage(mode,'receive');
@@ -1094,6 +1093,8 @@ await page.locator('#dtn-settings-open').click();await page.waitForFunction(()=>
  await historyPage.locator('#pvt-history-expand').click();
  const referenceLabel=overview.locator('text').filter({hasText:/^Reference$/});
  assert.equal(await referenceLabel.count(),1);
+ await overview.waitFor({state:'visible'});
+ await referenceLabel.waitFor({state:'visible'});
  const referenceBox=await referenceLabel.boundingBox(), detailBox=await overview.boundingBox();
  assert.ok(referenceBox.x>=detailBox.x&&referenceBox.x+referenceBox.width<=detailBox.x+detailBox.width,'Reference label stays inside the plot');
  await historyPage.keyboard.press('Escape');

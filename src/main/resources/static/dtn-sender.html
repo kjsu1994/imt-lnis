@@ -126,15 +126,15 @@
             <small id="dtn-contactRateBytesPerSec-error" class="adapter-error" aria-live="polite" hidden></small>
           </label>
           <label class="adapter-field"><span>최대 생성 속도 (Bytes/s) <span class="adapter-config-help" tabindex="0" role="img" aria-label="maxProductionRateBytesPerSec: 노드 단위 시간당 생성 가능한 최대 번들 바이트 양">ⓘ<span class="adapter-tooltip"><code>maxProductionRateBytesPerSec</code>노드 내부에서 단위 시간당 생성할 수 있는 최대 번들 바이트 양(Bytes/s)입니다.</span></span></span>
-            <input id="dtn-maxProductionRateBytesPerSec" title="maxProductionRateBytesPerSec: 초당 최대 생성 속도(Bytes/s)" aria-describedby="dtn-maxProductionRateBytesPerSec-error" type="number" step="1" value="100000000" required>
+            <input id="dtn-maxProductionRateBytesPerSec" title="maxProductionRateBytesPerSec: 초당 최대 생성 속도(Bytes/s)" aria-describedby="dtn-maxProductionRateBytesPerSec-error" type="number" step="1" value="125000000" required>
             <small id="dtn-maxProductionRateBytesPerSec-error" class="adapter-error" aria-live="polite" hidden></small>
           </label>
           <label class="adapter-field"><span>최대 소비 속도 (Bytes/s) <span class="adapter-config-help" tabindex="0" role="img" aria-label="maxConsumptionRateBytesPerSec: 노드 단위 시간당 소비 가능한 최대 번들 바이트 양">ⓘ<span class="adapter-tooltip"><code>maxConsumptionRateBytesPerSec</code>노드 내부에서 단위 시간당 소비할 수 있는 최대 번들 바이트 양(Bytes/s)입니다.</span></span></span>
-            <input id="dtn-maxConsumptionRateBytesPerSec" title="maxConsumptionRateBytesPerSec: 초당 최대 소비 속도(Bytes/s)" aria-describedby="dtn-maxConsumptionRateBytesPerSec-error" type="number" step="1" value="100000000" required>
+            <input id="dtn-maxConsumptionRateBytesPerSec" title="maxConsumptionRateBytesPerSec: 초당 최대 소비 속도(Bytes/s)" aria-describedby="dtn-maxConsumptionRateBytesPerSec-error" type="number" step="1" value="125000000" required>
             <small id="dtn-maxConsumptionRateBytesPerSec-error" class="adapter-error" aria-live="polite" hidden></small>
           </label>
-          <label class="adapter-field"><span>TCPCL 세그먼트 크기 (Bytes) <span class="adapter-config-help" tabindex="0" role="img" aria-label="tcpclMaxSegmentSizeBytes: TCPCL 단일 프래그먼트 MTU">ⓘ<span class="adapter-tooltip"><code>tcpclMaxSegmentSizeBytes</code>TCPCL 컨버전스 레이어 프로토콜 사용 시 적용되는 단일 프래그먼트 MTU(Bytes)입니다.<small>권장값: 20,000 Bytes</small></span></span></span>
-            <input id="dtn-tcpclMaxSegmentSizeBytes" title="tcpclMaxSegmentSizeBytes: TCPCL 단일 프래그먼트 MTU(Bytes)" aria-describedby="dtn-tcpclMaxSegmentSizeBytes-error" type="number" step="1" value="20000" required>
+          <label class="adapter-field"><span>TCPCL 세그먼트 크기 (Bytes) <span class="adapter-config-help" tabindex="0" role="img" aria-label="tcpclMaxSegmentSizeBytes: TCPCL 단일 프래그먼트 MTU">ⓘ<span class="adapter-tooltip"><code>tcpclMaxSegmentSizeBytes</code>TCPCL 컨버전스 레이어 프로토콜 사용 시 적용되는 단일 프래그먼트 MTU(Bytes)입니다.<small>권장값: 1,000,000 Bytes</small></span></span></span>
+            <input id="dtn-tcpclMaxSegmentSizeBytes" title="tcpclMaxSegmentSizeBytes: TCPCL 단일 프래그먼트 MTU(Bytes)" aria-describedby="dtn-tcpclMaxSegmentSizeBytes-error" type="number" step="1" value="1000000" required>
             <small id="dtn-tcpclMaxSegmentSizeBytes-error" class="adapter-error" aria-live="polite" hidden></small>
           </label>
           <label class="adapter-field"><span>라우팅 모드 <span class="adapter-config-help" tabindex="0" role="img" aria-label="routingMode: ION 라우팅 방식">ⓘ<span class="adapter-tooltip"><code>routingMode</code>ION 라우팅 방식입니다.<small>기본값: StaticPlan</small></span></span></span>
@@ -149,19 +149,19 @@
         <small id="hdtn-config-notice" role="status" hidden></small>
         <div class="adapter-fields">
           <label class="adapter-field"><span>최대 동시 번들 수 <span class="adapter-config-help" tabindex="0" role="img" aria-label="maxNumberOfBundlesInPipeline: 파이프라인 동시 대기 번들 최대 개수">ⓘ<span class="adapter-tooltip"><code>maxNumberOfBundlesInPipeline</code>송신 파이프라인(메모리 큐)에서 동시에 대기할 번들의 최대 개수입니다.</span></span></span>
-            <input id="hdtn-maxNumberOfBundlesInPipeline" title="maxNumberOfBundlesInPipeline: 파이프라인에서 동시에 대기할 번들의 최대 개수입니다." aria-describedby="hdtn-maxNumberOfBundlesInPipeline-error" type="number" step="1" value="50" required>
+            <input id="hdtn-maxNumberOfBundlesInPipeline" title="maxNumberOfBundlesInPipeline: 파이프라인에서 동시에 대기할 번들의 최대 개수입니다." aria-describedby="hdtn-maxNumberOfBundlesInPipeline-error" type="number" step="1" value="8" required>
             <small id="hdtn-maxNumberOfBundlesInPipeline-error" class="adapter-error" aria-live="polite" hidden></small>
           </label>
-          <label class="adapter-field"><span>최대 동시 번들 용량 (Bytes) <span class="adapter-config-help" tabindex="0" role="img" aria-label="maxSumOfBundleBytesInPipeline: 대기 중인 번들 용량 합계 상한">ⓘ<span class="adapter-tooltip"><code>maxSumOfBundleBytesInPipeline</code>대기 중인 번들 용량의 합계 상한(Bytes)입니다. 대용량 파일 전송 시 파일 크기 이상으로 권장합니다.</span></span></span>
-            <input id="hdtn-maxSumOfBundleBytesInPipeline" title="maxSumOfBundleBytesInPipeline: 대기 중인 번들 용량의 합계(Bytes)" aria-describedby="hdtn-maxSumOfBundleBytesInPipeline-error" type="number" step="1" value="3000000000" required>
+          <label class="adapter-field"><span>최대 동시 번들 용량 (Bytes) <span class="adapter-config-help" tabindex="0" role="img" aria-label="maxSumOfBundleBytesInPipeline: 대기 중인 번들 용량 합계 상한">ⓘ<span class="adapter-tooltip"><code>maxSumOfBundleBytesInPipeline</code>대기 중인 번들 용량의 합계 상한(Bytes)입니다. 최대 번들 크기보다 크게 설정해야 합니다.</span></span></span>
+            <input id="hdtn-maxSumOfBundleBytesInPipeline" title="maxSumOfBundleBytesInPipeline: 대기 중인 번들 용량의 합계(Bytes)" aria-describedby="hdtn-maxSumOfBundleBytesInPipeline-error" type="number" step="1" value="6000000000" required>
             <small id="hdtn-maxSumOfBundleBytesInPipeline-error" class="adapter-error" aria-live="polite" hidden></small>
           </label>
           <label class="adapter-field"><span>최대 번들 크기 (Bytes) <span class="adapter-config-help" tabindex="0" role="img" aria-label="maxBundleSizeBytes: 단일 번들 최대 허용 크기">ⓘ<span class="adapter-tooltip"><code>maxBundleSizeBytes</code>HDTN 엔진이 거부하지 않고 처리할 수 있는 단일 번들의 최대 크기(Bytes)입니다. 송신 파일보다 커야 합니다.</span></span></span>
             <input id="hdtn-maxBundleSizeBytes" title="maxBundleSizeBytes: 단일 번들의 크기 상한(Bytes)" aria-describedby="hdtn-maxBundleSizeBytes-error" type="number" step="1" value="3000000000" required>
             <small id="hdtn-maxBundleSizeBytes-error" class="adapter-error" aria-live="polite" hidden></small>
           </label>
-          <label class="adapter-field"><span>TCPCL 세그먼트 크기 (Bytes) <span class="adapter-config-help" tabindex="0" role="img" aria-label="tcpclMaxSegmentSizeBytes: TCPCL 세그먼트 크기">ⓘ<span class="adapter-tooltip"><code>tcpclMaxSegmentSizeBytes</code>HDTN TCPCL 프로토콜 단일 프래그먼트 MTU(Bytes)입니다.<small>기본값: 200,000 Bytes</small></span></span></span>
-            <input id="hdtn-tcpclMaxSegmentSizeBytes" title="tcpclMaxSegmentSizeBytes: TCPCL 세그먼트 크기(Bytes)" aria-describedby="hdtn-tcpclMaxSegmentSizeBytes-error" type="number" step="1" value="200000" required>
+          <label class="adapter-field"><span>TCPCL 세그먼트 크기 (Bytes) <span class="adapter-config-help" tabindex="0" role="img" aria-label="tcpclMaxSegmentSizeBytes: TCPCL 세그먼트 크기">ⓘ<span class="adapter-tooltip"><code>tcpclMaxSegmentSizeBytes</code>HDTN TCPCL 프로토콜 단일 프래그먼트 MTU(Bytes)입니다.<small>기본값: 1,000,000 Bytes</small></span></span></span>
+            <input id="hdtn-tcpclMaxSegmentSizeBytes" title="tcpclMaxSegmentSizeBytes: TCPCL 세그먼트 크기(Bytes)" aria-describedby="hdtn-tcpclMaxSegmentSizeBytes-error" type="number" step="1" value="1000000" required>
             <small id="hdtn-tcpclMaxSegmentSizeBytes-error" class="adapter-error" aria-live="polite" hidden></small>
           </label>
           <label class="adapter-field"><span>저장 공간 부족 시 대기 (초) <span class="adapter-config-help" tabindex="0" role="img" aria-label="neighborDepletedStorageDelaySeconds: 저장 공간 부족 신호 수신 시 대기 시간">ⓘ<span class="adapter-tooltip"><code>neighborDepletedStorageDelaySeconds</code>인접 노드의 저장 공간 부족 신호를 받았을 때 전송을 보류하는 대기 시간(초)입니다.</span></span></span>
@@ -355,6 +355,6 @@
   <span class="software-version" title="소프트웨어 버전" aria-label="소프트웨어 버전 @lnisVersion@">v@lnisVersion@</span>
 </footer>
 
-<script type="module" src="/lnis/assets/dtn/dtn.js?v=20261113-server-clock"></script>
+<script type="module" src="/lnis/assets/dtn/dtn.js?v=20261117-adapter-defaults"></script>
   <script type="module" src="/lnis/assets/common/manual-help.js?v=20261110-system-clock-20261106"></script>
 </body></html>

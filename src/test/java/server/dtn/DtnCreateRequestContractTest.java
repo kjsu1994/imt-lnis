@@ -140,6 +140,7 @@ class DtnCreateRequestContractTest {
         }
         for (long largeValue : List.of(3000000000L, 9007199254740992L)) {
             settings.put("maxBundleSizeBytes", largeValue);
+            settings.put("maxSumOfBundleBytesInPipeline", largeValue + 1);
             mvc.perform(
                             post("/lnis/api/v1/dtn/tests")
                                     .contentType(MediaType.APPLICATION_JSON)
@@ -147,6 +148,7 @@ class DtnCreateRequestContractTest {
                     .andExpect(status().isAccepted());
         }
         settings.put("maxBundleSizeBytes", 10485760L);
+        settings.put("maxSumOfBundleBytesInPipeline", 60000000L);
         for (int segment : List.of(20000, 200000, 300000)) {
             settings.put("tcpclMaxSegmentSizeBytes", segment);
             mvc.perform(
@@ -212,7 +214,8 @@ class DtnCreateRequestContractTest {
                                         .content(json.writeValueAsBytes(body)))
                         .andExpect(status().isBadRequest());
             }
-            for (long valid : List.of(50000L, 50L)) {
+            for (long valid : key.equals("maxSumOfBundleBytesInPipeline")
+                    ? List.of(50000000L, 50000001L) : List.of(50000L, 50L)) {
                 settings.put(key, valid);
                 mvc.perform(
                                 post("/lnis/api/v1/dtn/tests")

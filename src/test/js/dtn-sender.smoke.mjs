@@ -210,9 +210,9 @@ assert.equal(elements.get('dtn-send-url').value, 'http://127.0.0.1:18092');
 await elements.get('dtn-send').onclick();
 assert.equal(starts, 1);
 assert.equal(lastStartBody.sendUrl, 'http://sender.default:8080', 'sendUrl must only update after clicking save·apply');
-assert.equal(lastStartBody.hdtnConfig.maxNumberOfBundlesInPipeline, 50);
+assert.equal(lastStartBody.hdtnConfig.maxNumberOfBundlesInPipeline, 8);
 assert.equal(lastStartBody.hdtnConfig.enforceBundlePriority, false);
-assert.equal(lastStartBody.hdtnConfig.tcpclMaxSegmentSizeBytes, 200000);
+assert.equal(lastStartBody.hdtnConfig.tcpclMaxSegmentSizeBytes, 1000000);
 assert.equal(elements.get('hdtn-maxBundleSizeBytes').disabled, true);
 assert.equal(elements.get('dtn-upload').disabled, true);
 await elements.get('dtn-settings-open').onclick();
@@ -346,7 +346,7 @@ console.log('PASS: adapter address browser persistence, restore and invalid addr
 savedAddresses.set('lnis.hdtnConfig.v1', JSON.stringify({maxNumberOfBundlesInPipeline: 65}));
 context.initializeHdtnConfig();
 assert.equal(elements.get('hdtn-maxNumberOfBundlesInPipeline').value, '65');
-assert.equal(elements.get('hdtn-tcpclMaxSegmentSizeBytes').value, '200000', 'old saved settings gain only the new default');
+assert.equal(elements.get('hdtn-tcpclMaxSegmentSizeBytes').value, '1000000', 'old saved settings gain only the new default');
 elements.get('hdtn-tcpclMaxSegmentSizeBytes').value = '100000';
 elements.get('hdtn-maxNumberOfBundlesInPipeline').value = '75';
 elements.get('hdtn-enforceBundlePriority').value = 'false';
@@ -395,7 +395,7 @@ context.initializeHdtnConfig();
 savedAddresses.set('lnis.hdtnConfig.v1', JSON.stringify({maxNumberOfBundlesInPipeline:75,tcpclMaxSegmentSizeBytes:-1,enforceBundlePriority:true}));
 context.initializeHdtnConfig();
 assert.equal(elements.get('hdtn-maxNumberOfBundlesInPipeline').value,'75');
-assert.equal(elements.get('hdtn-tcpclMaxSegmentSizeBytes').value,'200000');
+assert.equal(elements.get('hdtn-tcpclMaxSegmentSizeBytes').value,'1000000');
 assert.equal(elements.get('hdtn-enforceBundlePriority').value,'true');
 assert.equal(elements.get('hdtn-config-notice').hidden,false);
 elements.get('hdtn-acsSendPeriodMilliseconds').value='0';
@@ -737,3 +737,28 @@ await cleared.initialize();
 assert.equal(elements.get('dtn-receiver-ip').value, 'https://192.168.1.72:443',
   'initial connection load must preserve an address already edited by the user');
 console.log('PASS: initial settings loading preserves the edited peer address');
+
+vm.runInContext("busy=false;pendingCapture=null;job=null;iqJob=null;senderMode='HDTN';receiverMode='DTN'", context);
+context.localStorage.setItem = (key,value) => savedAddresses.set(key,value);
+savedAddresses.delete('lnis.hdtnConfig.v1');
+context.initializeHdtnConfig();
+assert.equal(context.readHdtnConfig().maxNumberOfBundlesInPipeline,8);
+assert.equal(context.readHdtnConfig().maxSumOfBundleBytesInPipeline,6000000000);
+assert.equal(context.readHdtnConfig().tcpclMaxSegmentSizeBytes,1000000);
+for(const value of ['3000000000','2999999999']){
+ elements.get('hdtn-maxSumOfBundleBytesInPipeline').value=value;
+ assert.throws(()=>context.readHdtnConfig());
+ assert.equal(elements.get('hdtn-maxSumOfBundleBytesInPipeline')['aria-invalid'],'true');
+}
+elements.get('hdtn-maxSumOfBundleBytesInPipeline').value='3000000001';
+assert.equal(context.readHdtnConfig().maxSumOfBundleBytesInPipeline,3000000001);
+savedAddresses.set('lnis.hdtnConfig.v1',JSON.stringify({maxNumberOfBundlesInPipeline:75,maxSumOfBundleBytesInPipeline:3000000000,maxBundleSizeBytes:3000000000}));
+context.initializeHdtnConfig();
+assert.equal(context.readHdtnConfig().maxNumberOfBundlesInPipeline,75);
+assert.equal(context.readHdtnConfig().maxSumOfBundleBytesInPipeline,6000000000);
+context.initializeDtnConfig();
+elements.get('dtn-reset').onclick();
+assert.equal(context.readDtnConfig().maxProductionRateBytesPerSec,125000000);
+assert.equal(context.readDtnConfig().maxConsumptionRateBytesPerSec,125000000);
+assert.equal(context.readDtnConfig().tcpclMaxSegmentSizeBytes,1000000);
+console.log('PASS: adapter defaults, 64-bit pipeline capacity, strict size inequality and legacy saved pair repair');

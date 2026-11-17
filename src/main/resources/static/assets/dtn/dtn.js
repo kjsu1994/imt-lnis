@@ -56,12 +56,12 @@ function log(message,level='INFO') {
 const hdtnRules = {
   "maxNumberOfBundlesInPipeline": {
     "label": "최대 동시 번들 수",
-    "default": 50,
+    "default": 8,
     "advanced": false
   },
   "maxSumOfBundleBytesInPipeline": {
     "label": "최대 동시 번들 용량",
-    "default": 3000000000,
+    "default": 6000000000,
     "advanced": false
   },
   "maxBundleSizeBytes": {
@@ -71,7 +71,7 @@ const hdtnRules = {
   },
   "tcpclMaxSegmentSizeBytes": {
     "label": "TCPCL 세그먼트 크기",
-    "default": 200000,
+    "default": 1000000,
     "advanced": false
   },
   "neighborDepletedStorageDelaySeconds": {
@@ -138,6 +138,15 @@ function readAdapterConfig(prefix, rules, validate) {
       if (!firstError) { failure.field = key; firstError = failure; }
     }
   }
+  if (!firstError && prefix === 'hdtn'
+      && result.maxSumOfBundleBytesInPipeline <= result.maxBundleSizeBytes) {
+    const message = '최대 동시 번들 용량은 최대 번들 크기보다 커야 합니다.';
+    const key = 'maxSumOfBundleBytesInPipeline';
+    $(prefix + '-' + key).setAttribute('aria-invalid', 'true');
+    const error = $(prefix + '-' + key + '-error');
+    if (error) { error.hidden = false; error.textContent = message; }
+    firstError = Object.assign(new Error(message), {field: key});
+  }
   if (firstError) throw firstError;
   return result;
 }
@@ -165,6 +174,13 @@ function initializeAdapterConfig({prefix, rules, storageKey, validate, uses, res
       try { saveAdapterConfig(storageKey, readAdapterConfig(prefix, rules, validate)); } catch { /* Keep invalid edits visible, never persist them. */ }
       updateAdapterControls(prefix, rules, validate, uses);
     };
+  }
+  if (prefix === 'hdtn' && Number($('hdtn-maxSumOfBundleBytesInPipeline').value)
+      <= Number($('hdtn-maxBundleSizeBytes').value)) {
+    for (const key of ['maxSumOfBundleBytesInPipeline', 'maxBundleSizeBytes']) {
+      $('hdtn-' + key).value = String(rules[key].default);
+      restored.push(rules[key].label);
+    }
   }
   const values = readAdapterConfig(prefix, rules, validate);
   if (restored.length) saveAdapterConfig(storageKey, values);
@@ -246,15 +262,15 @@ const dtnRules = {
   },
   "maxProductionRateBytesPerSec": {
     "label": "최대 생성 속도",
-    "default": 100000000
+    "default": 125000000
   },
   "maxConsumptionRateBytesPerSec": {
     "label": "최대 소비 속도",
-    "default": 100000000
+    "default": 125000000
   },
   "tcpclMaxSegmentSizeBytes": {
     "label": "TCPCL 세그먼트 크기",
-    "default": 20000
+    "default": 1000000
   },
   "routingMode": {
     "label": "라우팅 모드",

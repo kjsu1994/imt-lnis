@@ -138,6 +138,7 @@ public class DtnPresetService {
             throw bad("프리셋 이름과 설정 범위를 확인하세요.");
         }
         HdtnConfig config = request.settings().hdtnConfig();
+        config.validateCapacity();
         if (config.getTcpclMaxSegmentSizeBytes() == null
                 || config.getTotalStorageCapacityBytes() == null
                 || config.getAcsSendPeriodMilliseconds() == null) {

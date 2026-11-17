@@ -114,6 +114,13 @@ public final class DtnModels {
         @jakarta.validation.constraints.Pattern(
                 regexp = "never|on_forward|on_delivery|DELETE_AFTER_FORWARDING|on_expiration|on_storage_full")
         private String storageDeletionPolicy;
+
+        public void validateCapacity() {
+            if (maxSumOfBundleBytesInPipeline != null && maxBundleSizeBytes != null
+                    && maxSumOfBundleBytesInPipeline <= maxBundleSizeBytes) {
+                throw new IllegalArgumentException("최대 동시 번들 용량은 최대 번들 크기보다 커야 합니다.");
+            }
+        }
     }
 
     /** 시험별 DTN(ION) 어댑터 설정. ionconfig.cfg / bpadmin.rc / ionadmin.rc 매핑은 어댑터가 담당한다. */

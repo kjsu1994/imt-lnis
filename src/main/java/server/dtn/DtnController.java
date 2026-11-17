@@ -263,6 +263,7 @@ public class DtnController {
     @ResponseStatus(HttpStatus.ACCEPTED)
     public ResponseEntity<Map<String, Object>> create(@Valid @RequestBody CreateRequest request)
             throws Exception {
+        if (request.getHdtnConfig() != null) request.getHdtnConfig().validateCapacity();
         synchronized (clock) {
             var stamp = clock.stamp();
             synchronized (dtnService) {

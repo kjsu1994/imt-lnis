@@ -112,14 +112,14 @@ class HdtnConfigTransferTest {
             ReflectionTestUtils.setField(service, "iq", iq);
             HdtnConfig settings = new HdtnConfig();
             settings.setMaxNumberOfBundlesInPipeline(75);
-            settings.setMaxSumOfBundleBytesInPipeline(60000000L);
+            settings.setMaxSumOfBundleBytesInPipeline(6000000000L);
             settings.setEnforceBundlePriority(false);
             settings.setNeighborDepletedStorageDelaySeconds(0);
-            settings.setTcpclMaxSegmentSizeBytes(100000);
+            settings.setTcpclMaxSegmentSizeBytes(1000000);
             settings.setTotalStorageCapacityBytes(8589934592L);
             settings.setMaxLtpReceiveUdpPacketSizeBytes(65536);
             settings.setAcsSendPeriodMilliseconds(1000);
-            settings.setMaxBundleSizeBytes(10485760L);
+            settings.setMaxBundleSizeBytes(3000000000L);
             settings.setStorageDeletionPolicy("DELETE_AFTER_FORWARDING");
             JsonNode expected = json.readTree(json.writeValueAsBytes(settings));
             DtnConfig dtnSettings = new DtnConfig();
@@ -229,5 +229,18 @@ class HdtnConfigTransferTest {
                                 "HDTN",
                                 null,
                                 new DtnConfig()));
+    }
+
+    @Test
+    void validatesPipelineCapacityWithoutTruncatingLargeValuesOrBreakingStoredJson() throws Exception {
+        var json = new ObjectMapper();
+        String valid = "{\"maxSumOfBundleBytesInPipeline\":6000000000,\"maxBundleSizeBytes\":3000000000}";
+        assertEquals(6000000000L, json.readValue(valid, HdtnConfig.class).getMaxSumOfBundleBytesInPipeline());
+        for (long capacity : new long[]{3000000000L, 2999999999L}) {
+            String invalid = valid.replace("6000000000", String.valueOf(capacity));
+            assertThrows(IllegalArgumentException.class,
+                    () -> json.readValue(invalid, HdtnConfig.class).validateCapacity());
+            assertNotNull(new ObjectMapper().readValue(invalid, HdtnConfig.class));
+        }
     }
 }

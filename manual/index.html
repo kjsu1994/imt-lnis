@@ -148,7 +148,7 @@ html.manual-embedded { scroll-behavior: auto; }
 .manual-embedded .sheet { width: auto; min-height: 0; margin: 0; padding: 24px; border: 0; border-radius: 0; box-shadow: none; }
 @media (max-width: 600px) { .manual-embedded .sheet { padding: 16px; } }
 #search::-webkit-search-cancel-button { -webkit-appearance: none; }
-</style><meta content="1.0" name="manual-version"/><meta content="2026-11-16" name="manual-updated"/></head><body>
+</style><meta content="1.0" name="manual-version"/><meta content="2026-11-17" name="manual-updated"/></head><body>
 <a class="skip" href="#manual">본문으로 이동</a>
 <header class="toolbar">
 <button aria-controls="manual-sidebar" aria-expanded="false" id="contents-toggle" type="button">목차</button>
@@ -745,7 +745,7 @@ html.manual-embedded { scroll-behavior: auto; }
 <tr>
 <td>최대 동시 번들 수 / maxNumberOfBundlesInPipeline
 </td>
-<td>50 개
+<td>8 개
 </td>
 <td>동시에 유지할 번들 수의 요청 한도
 </td>
@@ -753,9 +753,9 @@ html.manual-embedded { scroll-behavior: auto; }
 <tr>
 <td>최대 동시 번들 용량 / maxSumOfBundleBytesInPipeline
 </td>
-<td>3,000,000,000 Bytes
+<td>6,000,000,000 Bytes
 </td>
-<td>파이프라인 누적 바이트 한도
+<td>파이프라인 누적 바이트 한도. 최대 번들 크기보다 크게 설정합니다.
 </td>
 </tr>
 <tr>
@@ -769,7 +769,7 @@ html.manual-embedded { scroll-behavior: auto; }
 <tr>
 <td>TCPCL 세그먼트 크기 / tcpclMaxSegmentSizeBytes
 </td>
-<td>200,000 Bytes
+<td>1,000,000 Bytes
 </td>
 <td>TCPCL 세그먼트 크기
 </td>
@@ -921,7 +921,7 @@ html.manual-embedded { scroll-behavior: auto; }
 <tr>
 <td>최대 생성 / 최대 소비 속도
 </td>
-<td>각 100,000,000 Bytes/s
+<td>각 125,000,000 Bytes/s
 </td>
 <td>생성·소비 전송률 요청
 </td>
@@ -929,7 +929,7 @@ html.manual-embedded { scroll-behavior: auto; }
 <tr>
 <td>TCPCL 세그먼트 / tcpclMaxSegmentSizeBytes
 </td>
-<td>20,000 Bytes
+<td>1,000,000 Bytes
 </td>
 <td>세그먼트 크기
 </td>
