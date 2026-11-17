@@ -148,7 +148,7 @@ html.manual-embedded { scroll-behavior: auto; }
 .manual-embedded .sheet { width: auto; min-height: 0; margin: 0; padding: 24px; border: 0; border-radius: 0; box-shadow: none; }
 @media (max-width: 600px) { .manual-embedded .sheet { padding: 16px; } }
 #search::-webkit-search-cancel-button { -webkit-appearance: none; }
-</style><meta content="1.0" name="manual-version"/><meta content="2026-11-09" name="manual-updated"/></head><body>
+</style><meta content="1.0" name="manual-version"/><meta content="2026-11-16" name="manual-updated"/></head><body>
 <a class="skip" href="#manual">본문으로 이동</a>
 <header class="toolbar">
 <button aria-controls="manual-sidebar" aria-expanded="false" id="contents-toggle" type="button">목차</button>
@@ -1023,7 +1023,7 @@ html.manual-embedded { scroll-behavior: auto; }
 </li>
 <li><b>연결</b>을 눌러 선택한 COM 포트를 연결합니다.
 </li>
-<li>연결 상태와 시간 수신 상태를 각각 확인합니다. 수집은 별도 <b>GNSS 수집</b>으로 시작합니다.
+<li>연결 상태를 확인한 뒤 <b>GNSS 수집</b>을 누릅니다.
 </li>
 </ol></div></div>
 <table>
@@ -1037,9 +1037,9 @@ html.manual-embedded { scroll-behavior: auto; }
 </thead>
 <tbody>
 <tr>
-<td>연결됨 / 시간 미확인
+<td>연결됨
 </td>
-<td>포트는 연결됐지만 유효한 GNSS 시간을 아직 확보하지 못했을 수 있습니다.
+<td>선택한 COM 포트가 연결된 상태입니다. 수집은 GNSS 수집 버튼으로 시작합니다.
 </td>
 </tr>
 <tr>
@@ -1114,16 +1114,16 @@ html.manual-embedded { scroll-behavior: auto; }
 <div class="grid two"><div>
 <h2>시각 표시</h2>
 <ul><li>송신·수신 화면 상단에 서버에서 조회한 시스템 시각을 1초 간격으로 표시합니다. 조회에 실패하면 —로 표시합니다.</li>
-<li>양쪽 서비스를 연결한 뒤 상단 <b>시각 맞추기</b>를 누릅니다. 어느 화면에서 눌러도 수신 서비스가 송신 시각을 기준으로 보정합니다.</li>
-<li><b>보정 적용</b> 또는 송신 화면의 <b>마지막 보정 완료</b>을 확인한 뒤 시험을 시작합니다.</li>
+<li>시각 차이를 보정하려면 양쪽 서비스를 연결한 뒤 <b>시각 맞추기</b>를 누릅니다.</li>
+<li>보정하지 않으면 각 서버의 시스템 시각으로 시험합니다.</li>
 <li><b>상세</b>에서 수신측 보정량·측정 왕복·마지막 보정 시각을 확인합니다.</li>
-<li>COM 연결은 송신부의 GNSS 관측값 수집에 사용합니다.</li></ul>
+</ul>
 </div><div><h2>지연 계산</h2>
 <p>지연 = 수신 본문 완료 시각 − 송신 시험 시작 시각</p>
 <p>보정값은 시험 등록 시 고정됩니다. 이후 다시 맞춰도 수신 대기 중인 시험에는 등록 당시 값을 사용합니다.</p>
 <p>서비스를 재기동하거나 PC 시각을 바꾼 뒤에는 다시 맞추세요. 적용된 TCP 기준이 무효화된 시험은 원문을 보관하고 비교 불가로 표시합니다.</p>
 <p>TCP 측정에도 잔여 오차가 있어 짧은 지연은 음수로 나올 수 있습니다. 결과의 시각 오차 안내와 상세 로그를 함께 확인하세요.</p>
-<p>지연시간·Clock Bias·GNSS 관측값의 계산 정밀도는 유지합니다.</p>
+<p>보정값은 수신 시험 시각에 적용합니다. 상단 시스템 시각은 보정 전 값입니다.</p>
 </div></div>
 <div class="page-foot"><span>© 2026 imtplus · 사용자 설명서 <span data-doc-version=""></span></span><span>19 / 58</span></div>
 </section>
@@ -1904,8 +1904,8 @@ html.manual-embedded { scroll-behavior: auto; }
 </p>
 <h1 id="title-pvt-numbers">ECEF 상세 수치와 시간 잔차
 </h1></div>
-<figure class="wide"><a aria-label="ECEF 원시 수치 상세 대조표 · 상단 일부 확대" href="assets/receiver-ecef.png" target="_blank"><img alt="ECEF 원시 수치 상세 대조표 · 상단 일부" src="assets/receiver-ecef.png"/></a>
-<figcaption>ECEF 원시 수치 상세 대조표 · 상단 일부
+<figure class="wide"><a aria-label="ECEF 수치 대조표 · 화면 구성 예시 확대" href="assets/receiver-ecef.png" target="_blank"><img alt="ECEF 수치 대조표 · 화면 구성 예시" src="assets/receiver-ecef.png"/></a>
+<figcaption>ECEF 수치 대조표 · 화면 구성 예시
 </figcaption>
 </figure>
 <table>
@@ -2904,6 +2904,10 @@ html.manual-embedded { scroll-behavior: auto; }
 </td>
 </tr>
 <tr>
+<td>JAR 교체 업데이트</td>
+<td>지원 설치본에서 STOP.cmd → 설치 폴더의 lnis.jar 교체 → START.cmd 또는 바탕화면 바로가기를 실행합니다. 기존 .env·release.json·Docker 이미지는 유지합니다.</td>
+</tr>
+<tr>
 <td>설치 중 복구 자료
 </td>
 <td>Windows 임시 폴더에 준비하고 정상 완료 후 삭제합니다. 설치 폴더에 backups를 만들지 않습니다.
@@ -3253,7 +3257,7 @@ docker logs --tail 100 -f &lt;컨테이너-이름&gt;</pre>
 </td>
 </tr>
 <tr>
-<td>시험 판정
+<td>결과 검토
 </td>
 <td>시험 기준과 측정값을 비교합니다.
 </td>
