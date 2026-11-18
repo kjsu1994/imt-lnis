@@ -109,7 +109,7 @@ public final class DtnModels {
 
         @jakarta.validation.constraints.NotNull private Boolean enforceBundlePriority;
 
-        /** 어댑터 가이드: never / on_forward / on_delivery. 과거 저장값은 조회 호환을 위해 허용한다. */
+        /** 신규 선택값: never / on_expiration / on_storage_full. 과거 저장값은 조회 호환을 위해 허용한다. */
         @jakarta.validation.constraints.NotBlank
         @jakarta.validation.constraints.Pattern(
                 regexp = "never|on_forward|on_delivery|DELETE_AFTER_FORWARDING|on_expiration|on_storage_full")

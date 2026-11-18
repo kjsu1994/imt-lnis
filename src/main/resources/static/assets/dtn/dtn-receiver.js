@@ -1,4 +1,4 @@
-import {parseNodeAddress, renderTrialSettings, trialTypeLabel, trialOption, colorTrialSelection, initWaitingCancellation, initTrialSettingsDialog} from './dtn-settings.js?v=20261104-peer-address-validation-2';
+import {parseNodeAddress, renderTrialSettings, trialTypeLabel, trialOption, colorTrialSelection, initWaitingCancellation, initTrialSettingsDialog} from './dtn-settings.js?v=20261118-storage-policy';
 import {requestJson} from '../common/http.js?v=20261103-management-reset';
 import {createPvtHistory} from './dtn-pvt-history.js?v=20261106-reference-rings';
 import {initSystemClock} from './dtn-gnss.js?v=20261113-server-clock';

@@ -1,4 +1,4 @@
-import {parseNodeAddress, initPresetControls, renderTrialSettings, trialTypeLabel, trialOption, colorTrialSelection, initWaitingCancellation, initTrialSettingsDialog} from './dtn-settings.js?v=20261104-peer-address-validation-2';
+import {parseNodeAddress, initPresetControls, renderTrialSettings, trialTypeLabel, trialOption, colorTrialSelection, initWaitingCancellation, initTrialSettingsDialog} from './dtn-settings.js?v=20261118-storage-policy';
 import {requestJson} from '../common/http.js?v=20261103-management-reset';
 import {initGnssControls, initSystemClock} from './dtn-gnss.js?v=20261113-server-clock';
 import {createDtnLog} from './dtn-log.js?v=20261103-management-reset';
@@ -101,7 +101,7 @@ const hdtnRules = {
   }
 };
 const hdtnDefaults = Object.fromEntries(Object.entries(hdtnRules).map(([key, rule]) => [key, rule.default]));
-const hdtnPolicies = ['never', 'on_forward', 'on_delivery', 'DELETE_AFTER_FORWARDING', 'on_expiration', 'on_storage_full'];
+const hdtnPolicies = ['never', 'on_expiration', 'on_storage_full'];
 const hdtnStorageKey = 'lnis.hdtnConfig.v1';
 const usesHdtn = () => senderMode === 'HDTN' || receiverMode === 'HDTN';
 
@@ -387,7 +387,12 @@ const presets = initPresetControls({read: () => ({
   selectedType = settings.testType; senderMode = settings.senderMode; receiverMode = settings.receiverMode;
   if (settings.pvtConstellation && settings.pvtConstellation !== 'GPS') log('이전 프리셋의 PVT 계산 대상을 GPS L1 C/A로 적용합니다.', 'WARN');
   if (settings.hdtnConfig) {
-    const configValues = Object.fromEntries(Object.keys(hdtnRules).map(key => [key, hdtnValue(key, String(settings.hdtnConfig?.[key] ?? ''))]));
+    const values = {...settings.hdtnConfig};
+    if (!hdtnPolicies.includes(values.storageDeletionPolicy)) {
+      values.storageDeletionPolicy = hdtnDefaults.storageDeletionPolicy;
+      log('이전 삭제 정책을 기본값 never로 적용했습니다. 삭제 정책을 확인하세요.', 'WARN');
+    }
+    const configValues = Object.fromEntries(Object.keys(hdtnRules).map(key => [key, hdtnValue(key, String(values[key] ?? ''))]));
     for (const [key, value] of Object.entries(configValues)) if ($('hdtn-' + key)) $('hdtn-' + key).value = String(value);
     saveHdtnConfig(configValues);
   }

@@ -172,8 +172,8 @@
             <select id="hdtn-enforceBundlePriority" title="enforceBundlePriority: 번들 우선순위 준수"><option value="false">사용 안 함 (속도 최적화)</option><option value="true">사용</option></select>
             <small id="hdtn-enforceBundlePriority-error" class="adapter-error" aria-live="polite" hidden></small>
           </label>
-          <label class="adapter-field"><span>스토리지 삭제 정책 <span class="adapter-config-help" tabindex="0" role="img" aria-label="storageDeletionPolicy: 스토리지 삭제 정책">ⓘ<span class="adapter-tooltip"><code>storageDeletionPolicy</code>번들 처리 후 스토리지 보존 및 삭제 정책입니다.<small>기본값: DELETE_AFTER_FORWARDING</small></span></span></span>
-            <select id="hdtn-storageDeletionPolicy" title="storageDeletionPolicy: 삭제 정책"><option value="never">자동 삭제 안 함 (never)</option><option value="on_forward">전달 완료 시 삭제 (on_forward)</option><option value="on_delivery">인도 완료 시 삭제 (on_delivery)</option><option value="DELETE_AFTER_FORWARDING">어댑터 기본 (DELETE_AFTER_FORWARDING)</option></select>
+          <label class="adapter-field"><span>스토리지 삭제 정책 <span class="adapter-config-help" tabindex="0" role="img" aria-label="storageDeletionPolicy: 스토리지 삭제 정책">ⓘ<span class="adapter-tooltip"><code>storageDeletionPolicy</code>번들 수명 만료 시 삭제 정책입니다.<small>기본값: never</small></span></span></span>
+            <select id="hdtn-storageDeletionPolicy" title="storageDeletionPolicy: 삭제 정책"><option value="never">수명 만료 시에도 삭제 안 함 (never)</option><option value="on_expiration">수명 만료 즉시 삭제 (on_expiration)</option><option value="on_storage_full">디스크가 가득 찼을 때 만료 번들 정리 (on_storage_full)</option></select>
             <small id="hdtn-storageDeletionPolicy-error" class="adapter-error" aria-live="polite" hidden></small>
           </label>
         </div>
@@ -355,6 +355,6 @@
   <span class="software-version" title="소프트웨어 버전" aria-label="소프트웨어 버전 @lnisVersion@">v@lnisVersion@</span>
 </footer>
 
-<script type="module" src="/lnis/assets/dtn/dtn.js?v=20261117-adapter-defaults"></script>
+<script type="module" src="/lnis/assets/dtn/dtn.js?v=20261118-storage-policy"></script>
   <script type="module" src="/lnis/assets/common/manual-help.js?v=20261110-system-clock-20261106"></script>
 </body></html>

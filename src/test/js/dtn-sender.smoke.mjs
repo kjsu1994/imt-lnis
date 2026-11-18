@@ -27,7 +27,7 @@ for (const key of ['maxNumberOfBundlesInPipeline', 'maxSumOfBundleBytesInPipelin
   'neighborDepletedStorageDelaySeconds', 'maxBundleSizeBytes', 'tcpclMaxSegmentSizeBytes', 'storageDeletionPolicy']) {
   assert.ok(html.includes('id="hdtn-' + key + '" title="' + key + ':'), 'each HDTN control explains its meaning on hover');
 }
-const source = pageSource('dtn.js');
+const source = pageSource('dtn.js').replace('initPresetControls = () => ({update() {}, refresh() {}});', 'initPresetControls = options => { globalThis.presetOptions = options; return {update() {}, refresh() {}}; };');
 class Element {
   constructor() {
     this.value = ''; this.options = []; this.files = []; this.textContent = '';
@@ -410,10 +410,17 @@ assert.equal(elements.get('hdtn-acsSendPeriodMilliseconds').value,'1000');
 assert.equal(elements.get('hdtn-enforceBundlePriority').value,'false');
 assert.equal(elements.get('hdtn-acsSendPeriodMilliseconds-error').hidden,true);
 assert.equal(context.readHdtnConfig().totalStorageCapacityBytes,8589934592);
-for (const policy of ['DELETE_AFTER_FORWARDING','on_expiration','on_storage_full','never']) {
+for (const policy of ['on_expiration','on_storage_full','never']) {
   elements.get('hdtn-storageDeletionPolicy').value=policy;
   assert.equal(context.readHdtnConfig().storageDeletionPolicy,policy);
 }
+for (const policy of ['on_forward','on_delivery','DELETE_AFTER_FORWARDING']) {
+  elements.get('hdtn-storageDeletionPolicy').value=policy;
+  assert.throws(()=>context.readHdtnConfig());
+}
+const policyOptions = html.match(/<select id="hdtn-storageDeletionPolicy"[^>]*>(.*?)<\/select>/s)[1];
+assert.deepEqual([...policyOptions.matchAll(/option value="([^"]+)"/g)].map(match=>match[1]),
+  ['never','on_expiration','on_storage_full']);
 elements.get('hdtn-reset').onclick();
 for (const [key, rule] of Object.entries(vm.runInContext('hdtnRules',context))) {
   if (typeof rule.default !== 'number') continue;
@@ -762,3 +769,18 @@ assert.equal(context.readDtnConfig().maxProductionRateBytesPerSec,125000000);
 assert.equal(context.readDtnConfig().maxConsumptionRateBytesPerSec,125000000);
 assert.equal(context.readDtnConfig().tcpclMaxSegmentSizeBytes,1000000);
 console.log('PASS: adapter defaults, 64-bit pipeline capacity, strict size inequality and legacy saved pair repair');
+
+savedAddresses.set('lnis.hdtnConfig.v1',JSON.stringify({maxNumberOfBundlesInPipeline:75,storageDeletionPolicy:'on_forward'}));
+context.initializeHdtnConfig();
+assert.equal(context.readHdtnConfig().storageDeletionPolicy,'never');
+assert.equal(context.readHdtnConfig().maxNumberOfBundlesInPipeline,75);
+console.log('PASS: three storage policy wire values and legacy saved policy recovery');
+
+vm.runInContext('inputId=null;busy=false;pendingCapture=null;job=null;iqJob=null;',context);
+const legacyPreset = {testType:'AFS_METADATA',senderMode:'HDTN',receiverMode:'DTN',
+  hdtnConfig:{...context.readHdtnConfig(),storageDeletionPolicy:'on_delivery'}};
+context.presetOptions.apply(legacyPreset);
+assert.equal(context.readHdtnConfig().storageDeletionPolicy,'never');
+assert.equal(context.readHdtnConfig().maxNumberOfBundlesInPipeline,75);
+assert.equal(legacyPreset.hdtnConfig.storageDeletionPolicy,'on_delivery','stored history stays unchanged');
+console.log('PASS: legacy preset policy recovery preserves other fields and original preset');

@@ -79,12 +79,12 @@ const dtnFields = {
 };
 
 const policies = {
-  never: '자동 삭제 안 함 (never)',
-  on_forward: '전달 완료 시 삭제 (on_forward)',
-  on_delivery: '인도 완료 시 삭제 (on_delivery)',
-  DELETE_AFTER_FORWARDING: '어댑터 기본 (DELETE_AFTER_FORWARDING)',
-  on_expiration: '수명 만료 시 삭제',
-  on_storage_full: '저장소 부족 시 삭제'
+  never: '수명 만료 시에도 삭제 안 함 (never)',
+  on_expiration: '수명 만료 즉시 삭제 (on_expiration)',
+  on_storage_full: '디스크가 가득 찼을 때 만료 번들 정리 (on_storage_full)',
+  on_forward: '이전 설정 (on_forward)',
+  on_delivery: '이전 설정 (on_delivery)',
+  DELETE_AFTER_FORWARDING: '이전 설정 (DELETE_AFTER_FORWARDING)'
 };
 
 function formatParam(key, value) {
